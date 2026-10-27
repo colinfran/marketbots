@@ -23,7 +23,10 @@ const KEEP_MS = 30 * 86_400_000
 
 export type RankingInputs = { held: string[]; universe: Pick<ScanUniverse, "day" | "symbols"> | null }
 
-/** Builds the ranking for New York day `day` from completed sessions only (bars end at that day's midnight). */
+/**
+ * Builds the ranking for New York day `day` from completed sessions only. A daily bar is stamped
+ * at its day's midnight ET and Alpaca's `end` is inclusive, so the bars end a moment before `day`.
+ */
 export const buildCoreRanking = async (alpaca: Pick<Alpaca, "listAssets" | "getBars">, settings: Settings, day: string, { held, universe }: RankingInputs, now = new Date()): Promise<CoreRanking> => {
   const assets = new Map((await alpaca.listAssets()).map((a) => [a.symbol, a]))
   const { candidates, excluded } = coreCandidates({
@@ -35,7 +38,7 @@ export const buildCoreRanking = async (alpaca: Pick<Alpaca, "listAssets" | "getB
     assets,
   })
   const symbols = [...new Set(["SPY", ...candidates.map((c) => c.symbol)])]
-  const bars = await alpaca.getBars(symbols, "1Day", marketTime(addDays(day, -LOOKBACK_DAYS), "00:00"), marketTime(day, "00:00"), { feed: "sip" })
+  const bars = await alpaca.getBars(symbols, "1Day", marketTime(addDays(day, -LOOKBACK_DAYS), "00:00"), new Date(marketTime(day, "00:00").getTime() - 1), { feed: "sip" })
   const rows = candidates.flatMap((c) => {
     const metrics = coreMetrics(c.symbol, bars[c.symbol] ?? [], bars.SPY, c.name)
     if (!metrics) excluded.push({ symbol: c.symbol, reason: "no daily bars" })

@@ -149,13 +149,16 @@ describe("passesTrend and rankCandidates", () => {
       row("CCC", { return_12_1_pct: 40, return_6m_pct: 10, volatility_60d_pct: 40 }), // 1.0, 0.25
       row("AAA", { return_12_1_pct: 30, return_6m_pct: 20, volatility_60d_pct: 20 }), // 1.5, 1.0
       row("ZZZ", { price: 90, return_12_1_pct: 90, return_6m_pct: 90, volatility_60d_pct: 10 }), // below its 200-day
-      row("BBB", { return_12_1_pct: 10, return_6m_pct: 10, volatility_60d_pct: 10 }), // 1.0, 1.0
+      row("BBB", { return_12_1_pct: 20, return_6m_pct: 20, volatility_60d_pct: 20 }), // 1.0, 1.0
+      // 3% on 5% volatility would be 0.6 a year; measured at the 15% floor it's 0.2.
+      row("LOW", { return_12_1_pct: 3, return_6m_pct: 3, volatility_60d_pct: 5 }),
       row("NEW", { return_12_1_pct: null, return_6m_pct: 10, volatility_60d_pct: 10 }),
     ])
     expect(rows.map((r) => [r.symbol, r.trend_ok, r.score, r.rank])).toEqual([
-      ["AAA", true, 87.5, 1],
-      ["BBB", true, 50, 2],
-      ["CCC", true, 12.5, 3],
+      ["AAA", true, 91.7, 1],
+      ["BBB", true, 66.7, 2],
+      ["CCC", true, 41.7, 3],
+      ["LOW", true, 0, 4],
       ["NEW", true, null, null],
       ["ZZZ", false, null, null],
     ])

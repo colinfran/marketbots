@@ -101,7 +101,7 @@ export default async function CorePage() {
         </p>
         <p>
           The score ranks the names that pass, from 0 to 100: the average percentile of two momentum measures, the 12-month return without the last month and the 6-month return, each divided by the
-          stock&apos;s volatility, so a steady climb beats a wild one. The weekly review reads the theses behind the top names with live research before anything is bought; see{" "}
+          name&apos;s volatility (counted as at least 15%, about the market&apos;s), so a steady climb beats a wild one and a calm fund can&apos;t win on calm alone. The weekly review reads the theses behind the top names with live research before anything is bought; see{" "}
           <Link href="/strategies" className="text-foreground underline underline-offset-2">
             Strategies
           </Link>{" "}

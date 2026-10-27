@@ -76,7 +76,7 @@ Between reviews, the trading cycles leave core holdings alone. A holding leaves 
 
 **Ranking**, in code:
 - Trend filter: price above the 200-day average and the 50-day above the 200-day.
-- Score: a rank-average of the 12-1 month and 6-month returns, divided by volatility.
+- Score: a rank-average of the 12-1 month and 6-month returns, each divided by volatility (floored at 15%, about the market's: on the first real ranking, a dollar fund up 2.8% on 4.9% volatility ranked 29th without it).
 - The top 25, plus every theme ticker and holding (even ones that fail the filter, marked as such), go to Grok with their numbers.
 
 **Themes**: you write them in Admin. Research checks each theme against current evidence: earnings and guidance, capex, demand. It can name tickers you didn't list, but only ones on the candidate list or ones that pass Alpaca's tradable check. A theme is a reason to look, not an order: Grok still has to make the case, and the theme cap applies.

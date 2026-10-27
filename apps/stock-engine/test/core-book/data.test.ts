@@ -12,8 +12,8 @@ import { bar, DAY, session } from "../helpers/factories"
 
 const testDb = useTestDb()
 
-/** Daily bars, one per calendar day, the last on 2026-10-25 (before DAY's midnight). */
-const series = (closes: number[]): Bar[] => closes.map((c, i) => bar(new Date(Date.UTC(2026, 9, 25 - (closes.length - 1 - i), 4)).toISOString(), c))
+/** Daily bars, one per calendar day at midnight ET, the last on DAY itself (a session still in progress). */
+const series = (closes: number[]): Bar[] => closes.map((c, i) => bar(new Date(Date.UTC(2026, 9, 26 - (closes.length - 1 - i), 4)).toISOString(), c))
 
 const asset = (symbol: string, name: string): AlpacaAsset => ({ symbol, name, class: "us_equity", exchange: "NASDAQ", status: "active", tradable: true, fractionable: true })
 
@@ -53,8 +53,10 @@ describe("CoreRankingStore", () => {
 
   it("builds the day's ranking once, from a year of completed daily bars", async () => {
     const ranking = (await store.refresh(session(), IN_WINDOW))!
-    expect(broker.barRequests).toEqual([{ symbols: ["SPY", "NVDA", "AAPL"], timeframe: "1Day", start: marketTime("2025-10-11", "00:00"), end: marketTime(DAY, "00:00") }])
+    // Completed sessions only: today's bar (stamped at midnight ET) falls just after the end.
+    expect(broker.barRequests).toEqual([{ symbols: ["SPY", "NVDA", "AAPL"], timeframe: "1Day", start: marketTime("2025-10-11", "00:00"), end: new Date(marketTime(DAY, "00:00").getTime() - 1) }])
     expect(ranking).toMatchObject({ day: DAY, as_of: "2026-10-25", universe_day: "2026-10-23" })
+    expect(ranking.rows[0].sessions).toBe(299)
     expect(ranking.rows.map((r) => [r.symbol, r.sources, r.themes, r.trend_ok, r.rank])).toEqual([
       ["NVDA", ["universe", "theme"], ["Chips"], true, 1],
       ["SPY", ["benchmark", "held"], [], true, 2],

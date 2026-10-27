@@ -17,13 +17,19 @@ import { round } from "../market/indicators"
  *               20-day dollar volume
  *   ranking     a trend filter (price above the 200-day average, the 50-day above the 200-day), then
  *               a score: the mean percentile of the 12-1 month and 6-month returns, each divided by
- *               the volatility, among the names that pass the filter
+ *               the volatility (at least VOLATILITY_FLOOR_PCT), among the names that pass the filter
  */
 
 /** Sessions in one, three, six and twelve months. */
 export const SESSIONS = { m1: 21, m3: 63, m6: 126, m12: 252 } as const
 
 const VOLATILITY_SESSIONS = 60
+
+/**
+ * The score divides returns by at least this volatility (about the market's), so a fund calmer than
+ * the market (a dollar or bond fund up 3% on 5% volatility) can't outrank stocks on calm alone.
+ */
+export const VOLATILITY_FLOOR_PCT = 15
 
 /** A fund's name (ETF, ETN, trust, the big leveraged-fund families). */
 const FUND_NAME = /\b(?:ETF|ETN|Fund|Trust|Shares|ProShares|Direxion)\b/i
@@ -165,9 +171,10 @@ const percentiles = (values: number[]) => {
  */
 export const rankCandidates = (rows: (CoreMetrics & Pick<CoreRankRow, "sources" | "themes">)[]): CoreRankRow[] => {
   const scored = rows.map((m) => ({ ...m, trend_ok: passesTrend(m), score: null as number | null, rank: null as number | null }))
-  const eligible = scored.filter((r) => r.trend_ok && r.return_12_1_pct !== null && r.return_6m_pct !== null && !!r.volatility_60d_pct)
-  const long = percentiles(eligible.map((r) => r.return_12_1_pct! / r.volatility_60d_pct!))
-  const mid = percentiles(eligible.map((r) => r.return_6m_pct! / r.volatility_60d_pct!))
+  const eligible = scored.filter((r) => r.trend_ok && r.return_12_1_pct !== null && r.return_6m_pct !== null && r.volatility_60d_pct !== null)
+  const risk = (r: (typeof eligible)[number]) => Math.max(r.volatility_60d_pct!, VOLATILITY_FLOOR_PCT)
+  const long = percentiles(eligible.map((r) => r.return_12_1_pct! / risk(r)))
+  const mid = percentiles(eligible.map((r) => r.return_6m_pct! / risk(r)))
   eligible.forEach((r, i) => (r.score = round(((long[i] + mid[i]) / 2) * 100, 1)))
   const ranked = [...eligible].sort((a, b) => b.score! - a.score! || a.symbol.localeCompare(b.symbol))
   ranked.forEach((r, i) => (r.rank = i + 1))
