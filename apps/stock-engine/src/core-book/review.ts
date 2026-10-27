@@ -34,17 +34,22 @@ import { CORE_MIN_STOP_PCT, CORE_MIN_WEIGHT_PCT, type CoreHolding, initialCoreSt
  */
 
 const CORE_RESEARCH_TIMEOUT_MS = 300_000
+/** A single-holding review researches one name and one event. */
+const HOLDING_RESEARCH_TIMEOUT_MS = 120_000
 const MAX_SUMMARY = 600
 
 export type CoreReviewOptions = {
   kind: CoreReviewKind
-  /** "schedule", "manual"… */
+  /** "schedule", "manual", "news: …" */
   trigger: string
   dryRun: boolean
   session: Session
   /** Why new entries are blocked right now (kill switch, pause), or null. */
   entriesBlocked: () => string | null
   ranking: Pick<CoreRankingStore, "build" | "latest">
+  /** Single-holding reviews: the holding, and the news that started it (the event section of the prompts). */
+  symbol?: string
+  event?: string
 }
 
 export type CoreReviewOutcome = { reviewId: string; cycleId: string; status: CoreReviewStatus; summary: string | null }
@@ -97,7 +102,9 @@ export const runCoreReview = async (ctx: EngineContext, o: CoreReviewOptions): P
   const reviewId = randomUUID()
   const cycleId = randomUUID()
   const started = Date.now()
-  const label = `Core review${o.dryRun ? " (dry run)" : ""}`
+  const holdingReview = o.kind === "holding"
+  const symbol = holdingReview ? (o.symbol ?? null) : null
+  const label = `Core review${symbol ? ` of ${symbol}` : ""}${o.dryRun ? " (dry run)" : ""}`
   const meta = { cycle_id: cycleId }
 
   await col.cycles.insertOne({
@@ -121,7 +128,7 @@ export const runCoreReview = async (ctx: EngineContext, o: CoreReviewOptions): P
     cycle_id: cycleId,
     kind: o.kind,
     trigger: o.trigger,
-    symbol: null,
+    symbol,
     dry_run: o.dryRun,
     status: "running",
     trading_day: day,
@@ -144,7 +151,7 @@ export const runCoreReview = async (ctx: EngineContext, o: CoreReviewOptions): P
   }
   await col.coreReviews.insertOne(doc)
   bus.emit("cycle.started", { cycle_id: cycleId, phase: "intraday", trigger: `core review: ${o.trigger}` }, { summary: `${label} started (${o.trigger})`, ...meta })
-  bus.emit("core.review.started", { review_id: reviewId, cycle_id: cycleId, kind: o.kind, trigger: o.trigger, symbol: null, dry_run: o.dryRun }, { summary: `${label} started`, ...meta })
+  bus.emit("core.review.started", { review_id: reviewId, cycle_id: cycleId, kind: o.kind, trigger: o.trigger, symbol, dry_run: o.dryRun }, { summary: `${label} started`, ...meta, ...(symbol ? { instrument: symbol } : {}) })
 
   const state = (s: CycleState, detail?: string) => {
     ctx.setCycleState(s, detail)
@@ -195,7 +202,7 @@ export const runCoreReview = async (ctx: EngineContext, o: CoreReviewOptions): P
   try {
     // ─── The book ───────────────────────────────────────────────────────
     state("gathering_data", "account, positions, core holdings")
-    const { account, holdings, tradingStocks, adopted, firstReview } = await step(
+    const { account, book, holdings, tradingStocks, adopted, firstReview } = await step(
       "book",
       async () => {
         const [account, positions, plans] = await Promise.all([alpaca.getAccount(), alpaca.getPositions(), col.plans.find().toArray()])
@@ -221,21 +228,25 @@ export const runCoreReview = async (ctx: EngineContext, o: CoreReviewOptions): P
           const qty = Math.floor(Number(p.qty))
           return plan && bookOf(plan) === "core" && qty >= 1 ? [{ symbol: p.symbol, qty, avg_entry: Number(p.avg_entry_price), price: Number(p.current_price), market_value: Number(p.market_value), plan }] : []
         })
+        // A single-holding review sees the rest of the book only in the totals.
+        const reviewed = symbol ? holdings.filter((h) => h.symbol === symbol) : holdings
         const core = new Set(holdings.map((h) => h.symbol))
-        return { account, holdings, tradingStocks: stocks.filter((s) => !core.has(s.symbol)), adopted: adopt.map((a) => a.symbol), firstReview }
+        return { account, book: holdings, holdings: reviewed, tradingStocks: stocks.filter((s) => !core.has(s.symbol)), adopted: adopt.map((a) => a.symbol), firstReview: firstReview && !holdingReview }
       },
-      (b) => `${b.holdings.length} core holdings${b.adopted.length ? ` (adopted ${b.adopted.join(", ")} from the seed${o.dryRun ? ", dry run" : ""})` : ""}, ${b.tradingStocks.length} trading stocks`,
+      (b) => `${b.book.length} core holdings${b.adopted.length ? ` (adopted ${b.adopted.join(", ")} from the seed${o.dryRun ? ", dry run" : ""})` : ""}, ${b.tradingStocks.length} trading stocks`,
     )
     const equity = Number(account.equity)
     const cash = Number(account.cash)
-    const bookBefore = bookState(settings, equity, cash, holdings)
+    const bookBefore = bookState(settings, equity, cash, book)
     await col.coreReviews.updateOne({ _id: reviewId }, { $set: { book_before: bookBefore, adopted } })
+    if (symbol && !holdings.length) return await finish("skipped", { book_after: bookBefore }, `${symbol} is no longer a core holding`)
 
     // ─── Ranking ────────────────────────────────────────────────────────
     const ranking = await step(
       "ranking",
       async () => {
-        const fresh = await o.ranking.build(day)
+        // A weekly review rebuilds it for today's holdings and themes; a single holding's numbers are in today's.
+        const fresh = holdingReview ? null : await o.ranking.build(day)
         const r = fresh ?? (await o.ranking.latest())
         if (!r) throw new Error("no ranking: the long-term data is unavailable")
         return r
@@ -246,8 +257,8 @@ export const runCoreReview = async (ctx: EngineContext, o: CoreReviewOptions): P
     // ─── Context ────────────────────────────────────────────────────────
     const themes: CoreTheme[] = c.themes.map(parseTheme).filter((t): t is CoreTheme => t !== null)
     const rowBy = new Map(ranking.rows.map((r) => [r.symbol, r]))
-    const held = new Set(holdings.map((h) => h.symbol))
-    const shown = ranking.rows.filter((r) => (r.rank !== null && r.rank <= CORE_TOP_CANDIDATES) || r.themes.length > 0 || held.has(r.symbol))
+    const held = new Set(book.map((h) => h.symbol))
+    const shown = symbol ? ranking.rows.filter((r) => r.symbol === symbol) : ranking.rows.filter((r) => (r.rank !== null && r.rank <= CORE_TOP_CANDIDATES) || r.themes.length > 0 || held.has(r.symbol))
     const risk = computeRiskState(account, 0, 0, settings)
     const lastDone = await col.coreReviews.findOne({ kind: "weekly", dry_run: false, status: "done" }, { sort: { created_at: -1 } })
     const tradingValue = tradingStocks.reduce((s, p) => s + Number(p.market_value), 0)
@@ -257,8 +268,8 @@ export const runCoreReview = async (ctx: EngineContext, o: CoreReviewOptions): P
     if (blocked) notes.push(`NO BUYS: ${blocked}`)
     if (risk.circuit_breaker) notes.push(`CIRCUIT BREAKER: day P&L ${risk.day_pnl_pct}%: no buys today; sells and trims are allowed`)
     if (bookBefore.core_pct >= c.target_pct - c.band_pct) notes.push(`The book is ${bookBefore.core_pct}% of equity, within ${c.band_pct} points of its ${c.target_pct}% target: no buys unless sells or trims make room`)
-    if (holdings.length >= c.max_holdings) notes.push(`${holdings.length} holdings: the maximum. Sell one before buying another`)
-    if (holdings.length < c.min_holdings) notes.push(`${holdings.length} holdings, under the minimum of ${c.min_holdings}: build toward it with buys that make the case`)
+    if (!symbol && book.length >= c.max_holdings) notes.push(`${book.length} holdings: the maximum. Sell one before buying another`)
+    if (!symbol && book.length < c.min_holdings) notes.push(`${book.length} holdings, under the minimum of ${c.min_holdings}: build toward it with buys that make the case`)
     const context: CoreReviewContext = {
       now_et: marketClock(new Date()),
       trading_day: day,
@@ -275,7 +286,7 @@ export const runCoreReview = async (ctx: EngineContext, o: CoreReviewOptions): P
         core_pct: bookBefore.core_pct,
         trading_value: roundTo(tradingValue, 2),
         trading_pct: equity > 0 ? roundTo((tradingValue / equity) * 100, 2) : 0,
-        holdings: holdings.length,
+        holdings: book.length,
         min_holdings: c.min_holdings,
         max_holdings: c.max_holdings,
         max_holding_pct: c.max_holding_pct,
@@ -322,7 +333,8 @@ export const runCoreReview = async (ctx: EngineContext, o: CoreReviewOptions): P
 
     if (!ctx.ai.available) return await finish("skipped", { book_after: bookBefore }, "AI is disabled (AI_GATEWAY_API_KEY not set)")
     const estimate = (await ctx.budget.estimate("research")) + (await ctx.budget.estimate("decision"))
-    const afford = await ctx.budget.canAfford(estimate, { reservePct: settings.wire.mode === "live" ? settings.wire.event_budget_reserve_pct : 0 })
+    // A single-holding review is a news event: it may use the event reserve; the weekly one leaves it alone.
+    const afford = await ctx.budget.canAfford(estimate, { reservePct: !holdingReview && settings.wire.mode === "live" ? settings.wire.event_budget_reserve_pct : 0 })
     if (!afford.ok) {
       bus.emit("budget.exhausted", { spent_usd: afford.status.spent_usd, budget_usd: afford.status.budget_usd }, { summary: `AI budget exhausted ($${afford.status.spent_usd.toFixed(2)} of $${afford.status.budget_usd}); the core review waits`, level: "warn", ...meta })
       return await finish("skipped", { book_after: bookBefore }, `daily AI budget exhausted ($${afford.status.spent_usd.toFixed(2)} of $${afford.status.budget_usd}); the next trading day tries again`)
@@ -339,10 +351,10 @@ export const runCoreReview = async (ctx: EngineContext, o: CoreReviewOptions): P
           cycleId,
           model: settings.ai.models.research,
           fallback: settings.ai.models.fallback,
-          prompt: coreResearchPrompt(context),
+          prompt: coreResearchPrompt(context, { event: o.event }),
           xSearch: settings.ai.x_search,
           fromDate: addDays(day, -30),
-          timeoutMs: CORE_RESEARCH_TIMEOUT_MS,
+          timeoutMs: holdingReview ? HOLDING_RESEARCH_TIMEOUT_MS : CORE_RESEARCH_TIMEOUT_MS,
           signal: ctx.signal,
           progress: {
             onQuery: (query, tool) => bus.emit("research.query", { research_id: researchId, query, tool }, { summary: `${tool === "x_search" ? "Searching X" : "Searching the web"}: ${query}`, level: "debug", ...meta }),
@@ -373,7 +385,7 @@ export const runCoreReview = async (ctx: EngineContext, o: CoreReviewOptions): P
           model: settings.ai.models.decision,
           fallback: settings.ai.models.fallback,
           system: coreSystemPrompt(context, settings.account.starting_capital),
-          prompt: coreDecisionPrompt(context, research),
+          prompt: coreDecisionPrompt(context, research, { event: o.event }),
           schema: coreReviewSchema,
           name: "core_review",
           description: "StockMarketBot core book review: one decision per holding, new buys, a watch list.",
@@ -395,7 +407,8 @@ export const runCoreReview = async (ctx: EngineContext, o: CoreReviewOptions): P
       throw error
     })
     cost += decision.cost_usd
-    const output = decision.output
+    // A single-holding review decides on that holding only: anything else it says is dropped.
+    const output = symbol ? { ...decision.output, holdings: decision.output.holdings.filter((h) => h.symbol === symbol && h.action !== "buy"), watch: [] } : decision.output
     bus.emit("ai.decision.completed", { cycle_id: cycleId, decisions: output.holdings.length, attempts: decision.attempts, repaired: decision.repaired, cost_usd: roundTo(decision.cost_usd, 4) }, { summary: `${output.holdings.length} core decisions`, ...meta })
     await col.coreReviews.updateOne({ _id: reviewId }, { $set: { output, model: decision.model } })
 

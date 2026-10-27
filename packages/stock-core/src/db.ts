@@ -424,6 +424,12 @@ export type DailyStatsDoc = {
   losses: number
   best: { symbol: string; pnl: number } | null
   worst: { symbol: string; pnl: number } | null
+  /**
+   * Per book, once the core book holds or trades something (absent before). core: its holdings'
+   * value at the close and the day's P&L on them (held shares from yesterday's close or today's buy,
+   * shares sold today from yesterday's close to the sale); trading: the rest of the day's P&L.
+   */
+  books?: { core: { value: number; pnl: number; pnl_pct: number | null; realized: number; holdings: number }; trading: { pnl: number; realized: number } }
   updated_at: Date
 }
 

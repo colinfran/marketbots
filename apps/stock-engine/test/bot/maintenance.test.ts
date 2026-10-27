@@ -9,7 +9,7 @@ import type { EventBus } from "../../src/bus/event-bus"
 import { fakeBroker, type FakeBroker } from "../helpers/broker"
 import { makeCtx, type SentAlert } from "../helpers/ctx"
 import { useTestDb } from "../helpers/db"
-import { afterOpen, alpacaOrder, beforeClose, CLOSE, closedSession, cycleDoc, fill, planDoc, session } from "../helpers/factories"
+import { afterOpen, alpacaOrder, beforeClose, CLOSE, closedSession, cycleDoc, dailyStats as statsDoc, fill, planDoc, session } from "../helpers/factories"
 
 const NOW = afterOpen(90) // 11:00 ET
 const testDb = useTestDb()
@@ -199,6 +199,16 @@ describe("enforceOvernightRules", () => {
     expect([...broker.holdings.keys()]).toEqual(["WIN", "FLAT"])
   })
 
+  it("leaves core holdings out of the overnight rules while the core book is on", async () => {
+    ctx.settings.current.core.enabled = true
+    broker.setPosition("SPY", 12, 500) // 6,000: over the cap on its own
+    await addPlan("SPY", { book: "core", horizon: "multi_day" })
+    broker.setPosition("SWING", 20, 100)
+    await addPlan("SWING", { horizon: "multi_day" })
+    expect(await settle(enforceOvernightRules())).toEqual([])
+    expect([...broker.holdings.keys()]).toEqual(["SPY", "SWING"])
+  })
+
   it("sells intraday positions first and counts only what's left toward the cap", async () => {
     broker.setPosition("DAY", 60, 100) // 6,000, would break the cap on its own
     await addPlan("DAY", { horizon: "intraday" })
@@ -252,6 +262,22 @@ describe("maintain", () => {
       ["AAPL", "sell", "market"],
       ["MSFT", "sell", "market"],
     ])
+  })
+
+  it("liquidates only the trading book when the core book is on: core holdings keep their stops", async () => {
+    ctx.settings.current.core.enabled = true
+    broker.setPosition("AAPL", 10, 100)
+    broker.setPosition("SPY", 4, 500)
+    broker.lastEquity = 10_500
+    await addPlan("AAPL")
+    await addPlan("SPY", { book: "core", horizon: "multi_day", stop_loss: 425, take_profit: null })
+    broker.addOrder(alpacaOrder({ symbol: "SPY", side: "sell", type: "stop", qty: "4", stop_price: "425", status: "new" }))
+
+    const notes = await settle(maintain(session(), NOW))
+    expect([...broker.holdings.keys()]).toEqual(["SPY"])
+    expect(notes).toEqual(["DAILY LOSS LIMIT: day P&L -4.76% breached -4%; liquidated the trading book; the core book (SPY) keeps its stops", "flattened AAPL (daily loss limit)"])
+    expect(alerts).toContainEqual(expect.objectContaining({ title: "Daily loss limit: liquidated the trading book", fields: expect.objectContaining({ Positions: 1 }) }))
+    expect(broker.openOrders("SPY")).toHaveLength(1)
   })
 
   it("doesn't liquidate when there's nothing to sell", async () => {
@@ -366,6 +392,28 @@ describe("recordDailyStats", () => {
       updated_at: NOW,
     })
     expect(events.find((e) => e.type === "daily.stats")).toMatchObject({ data: { day: "2026-10-26", pnl: 100, pnl_pct: 1, spy_pct: null } })
+  })
+
+  it("splits the day between the core book and the trading book once the core book holds something", async () => {
+    const bar = (t: string, c: number) => ({ t, o: c, h: c, l: c, c, v: 1, vw: c, n: 1 })
+    broker.lastEquity = 10_000
+    // Core: SPY held from yesterday's 500 to 510 (+40), and one DIA share trimmed at 405 against yesterday's 400 (+5).
+    broker.setPosition("SPY", 4, 510, { avg: 480, lastday: 500 })
+    await addPlan("SPY", { book: "core" })
+    broker.snapshots.set("DIA", { dailyBar: bar("2026-10-26T04:00:00Z", 406), prevDailyBar: bar("2026-10-23T04:00:00Z", 400) })
+    await (await db()).orders.insertMany([
+      fill("DIA", "buy", 5, 390, "2026-10-23T14:00:00Z", { client_order_id: "smb-buy-1" }),
+      fill("DIA", "sell", 1, 405, "2026-10-26T15:00:00Z", { client_order_id: "smb-core-sell-1" }),
+      fill("AAPL", "buy", 10, 100, "2026-10-26T15:30:00Z", { client_order_id: "smb-buy-2" }),
+      fill("AAPL", "sell", 10, 103, "2026-10-26T16:00:00Z", { client_order_id: "smb-sell-2" }),
+    ])
+    await (await db()).dailyStats.insertOne(statsDoc("2026-10-23", { books: { core: { value: 2_000, pnl: 0, pnl_pct: 0, realized: 0, holdings: 1 }, trading: { pnl: 0, realized: 0 } } }))
+    broker.cash = 8_000 // equity 8,000 + 2,040 = 10,040: +40 on the day
+    await recordDailyStats("2026-10-26")
+    expect((await (await db()).dailyStats.findOne({ _id: "2026-10-26" }))!.books).toEqual({
+      core: { value: 2_040, pnl: 45, pnl_pct: 2.25, realized: 15, holdings: 1 },
+      trading: { pnl: -5, realized: 30 },
+    })
   })
 
   it("records SPY's move that day as the benchmark", async () => {

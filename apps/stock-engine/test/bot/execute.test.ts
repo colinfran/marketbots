@@ -704,6 +704,44 @@ describe("executeDecisions: adjust_exits", () => {
   })
 })
 
+describe("executeDecisions: beside the core book", () => {
+  /** SPY is a core holding (with its plain stop) next to a trading position in AAPL. */
+  const withCoreBook = async (enabled = true) => {
+    ctx.settings.current.core.enabled = enabled
+    broker.setPosition("SPY", 6, 500)
+    broker.addOrder(alpacaOrder({ symbol: "SPY", side: "sell", type: "stop", qty: "6", stop_price: "425", status: "new", time_in_force: "gtc" }))
+    await (await collections()).plans.insertOne(planDoc("SPY", { book: "core", horizon: "multi_day", stop_loss: 425, take_profit: null }))
+    await holdWithExits("AAPL", 10, 100)
+  }
+
+  it("rejects stock decisions on core holdings and holds only trading positions by default", async () => {
+    await withCoreBook()
+    await execute([decision({ symbol: "SPY", action: "sell", sell_pct: 100 }), decision({ symbol: "SPY", action: "buy", allocation_pct: 5 })])
+    const spy = (await records()).filter((r) => r.symbol === "SPY")
+    expect(spy.map((r) => [r.action, r.status, r.reason])).toEqual([
+      ["sell", "rejected", "SPY is a core book holding: the weekly core review manages it"],
+      ["buy", "rejected", "SPY is a core book holding: the weekly core review manages it"],
+    ])
+    expect(broker.holdings.get("SPY")!.qty).toBe(6)
+    // Only the trading position got a default hold.
+    expect(await recordFor("AAPL")).toMatchObject({ action: "hold", status: "noop" })
+  })
+
+  it("keeps the trading book under 100 − core target − reserve % of equity", async () => {
+    await withCoreBook()
+    // Equity $10,000: the trading book may hold 45% = $4,500; AAPL already uses $1,000.
+    await execute([decision({ symbol: "MSFT", allocation_pct: 20 }), decision({ symbol: "TSLA", allocation_pct: 20, conviction: 6 })])
+    expect(await recordFor("MSFT")).toMatchObject({ status: "executed", qty: 5 }) // $2,000
+    expect(await recordFor("TSLA")).toMatchObject({ status: "executed", qty: 6 }) // the $1,500 left
+  })
+
+  it("treats core holdings as ordinary positions once the book is off", async () => {
+    await withCoreBook(false)
+    await execute([decision({ symbol: "SPY", action: "sell", sell_pct: 100 })])
+    expect(await recordFor("SPY")).toMatchObject({ status: "executed" })
+  })
+})
+
 describe("executeDecisions: bookkeeping", () => {
   it("prices held positions from the broker when snapshots fail", async () => {
     vi.mocked(alpaca.getSnapshots).mockRejectedValue(new Error("data API down"))

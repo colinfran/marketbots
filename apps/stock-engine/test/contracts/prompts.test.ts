@@ -340,6 +340,24 @@ const CORE_LATER: CoreReviewContext = {
 
 const CORE_HOLDING: CoreReviewContext = { ...CORE, kind: "holding", first_review: false, holdings: [CORE.holdings[0]] }
 
+const CORE_ON: Settings = { ...S, core: { ...S.core, enabled: true } }
+
+/** The intraday context while the core book is on: SPY and DIA are core holdings, NVDA the trading book's. */
+const CONTEXT_CORE_ON: MarketContext = {
+  ...contextFor("intraday"),
+  risk: { ...CONTEXT.risk, deployable_cash: 2_793.76, notes: ["CORE BOOK: 50% of equity is kept for the long-term core book; trading (stocks and options) stays under 45% of equity: $1891.8 used, $2793.76 left."] },
+  core: {
+    target_pct: 50,
+    value: 4_100,
+    pct: 39.38,
+    trading_cap_pct: 45,
+    holdings: [
+      { symbol: "SPY", qty: 3, market_value: 1_752.66, weight_pct: 16.83, unrealized_pl_pct: 0.88, stop: 492.23, theme: null },
+      { symbol: "DIA", qty: 4, market_value: 1_883.6, weight_pct: 18.09, unrealized_pl_pct: 0.58, stop: 397.97, theme: null },
+    ],
+  },
+}
+
 const CORE_EVENT = eventSection([{ rule: "held_review", headline: "S&P 500 futures halted limit-down after a surprise Fed hike", severity: 88, symbol: "SPY" }])
 
 const PROMPTS: Record<string, () => string> = {
@@ -364,6 +382,8 @@ const PROMPTS: Record<string, () => string> = {
   "decision-intraday-research-unavailable.txt": () => decisionPrompt("intraday", contextFor("intraday"), { memo: "", error: "research timed out after 180 s" }, S, { wire: dossier().text }),
   "decision-intraday-research-skipped.txt": () => decisionPrompt("intraday", contextFor("intraday"), { memo: "", error: null }, S, { wire: "", researchSkipped: "no unexplained moves or unconfirmed items, and X was read 12 min ago" }),
   "decision-seed.txt": () => decisionPrompt("intraday", contextFor("intraday"), { memo: MEMO, error: null }, S, { seed: { amountUsd: 5_000 }, wire: dossier().text }),
+  "decision-system-core-on.txt": () => decisionSystemPrompt(CORE_ON),
+  "context-core-on.txt": () => renderContext(CONTEXT_CORE_ON, CORE_ON),
   "core-research.txt": () => coreResearchPrompt(CORE),
   "core-research-later.txt": () => coreResearchPrompt(CORE_LATER),
   "core-research-holding.txt": () => coreResearchPrompt(CORE_HOLDING, { event: CORE_EVENT }),

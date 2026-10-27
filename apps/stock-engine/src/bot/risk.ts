@@ -2,6 +2,7 @@ import type { AlpacaAccount } from "@mb/stock-core/alpaca"
 import type { RiskState } from "@mb/stock-core/context"
 import type { Settings } from "@mb/stock-core/settings"
 import { round } from "../market/indicators"
+import { tradingCapPct } from "./books"
 
 export type { RiskState }
 
@@ -10,7 +11,12 @@ export type { RiskState }
  * no matter what Grok asks for.
  */
 
-export const computeRiskState = (account: AlpacaAccount, openPositions: number, tradesToday: number, settings: Settings): RiskState => {
+/**
+ * `tradingExposure` (stocks and options in the trading book, $): while the core book is on, it caps
+ * what the trading book may deploy, so trading stays under 100 − core target − cash reserve % of
+ * equity and the core book keeps room for its target. Open positions count the trading book only.
+ */
+export const computeRiskState = (account: AlpacaAccount, openPositions: number, tradesToday: number, settings: Settings, { tradingExposure }: { tradingExposure?: number } = {}): RiskState => {
   const r = settings.risk
   const startingCapital = settings.account.starting_capital
   const equity = Number(account.equity)
@@ -25,9 +31,15 @@ export const computeRiskState = (account: AlpacaAccount, openPositions: number, 
   const maxPositionPct = profitLock ? r.max_position_pct / 2 : r.max_position_pct
   const tradesRemaining = Math.max(0, r.max_trades_per_day - tradesToday)
   // Cash only: never touch margin buying power.
-  const deployable = Math.max(0, Math.min(cash, equity) - (equity * r.cash_reserve_pct) / 100)
+  let deployable = Math.max(0, Math.min(cash, equity) - (equity * r.cash_reserve_pct) / 100)
 
   const notes: string[] = []
+  if (settings.core.enabled && tradingExposure !== undefined) {
+    const capPct = tradingCapPct(settings)
+    const room = Math.max(0, (equity * capPct) / 100 - tradingExposure)
+    deployable = Math.min(deployable, room)
+    notes.push(`CORE BOOK: ${settings.core.target_pct}% of equity is kept for the long-term core book; trading (stocks and options) stays under ${capPct}% of equity: $${round(tradingExposure)} used, $${round(room)} left.`)
+  }
   if (killSwitch) notes.push(`KILL SWITCH: day P&L ${dayPnlPct.toFixed(2)}% <= -${r.flatten_loss_pct}%. Everything is being liquidated.`)
   else if (circuitBreaker) notes.push(`CIRCUIT BREAKER: day P&L ${dayPnlPct.toFixed(2)}% <= -${r.max_daily_loss_pct}%. No new buys today; only manage/exit positions.`)
   if (profitLock) notes.push(`PROFIT LOCK: up ${dayPnlPct.toFixed(2)}% today. New positions are capped at ${maxPositionPct}% of equity; protect the green day (tighten stops, take profits).`)

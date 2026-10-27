@@ -136,7 +136,7 @@ scheduled ──(due, engine running, regular session)──▶ running ──�
 
 ## Core book (long-term holdings)
 
-A fixed share of equity (`core.target_pct`, 50%) in a handful of long-term holdings, each with a written thesis and invalidation, reviewed weekly instead of every cycle; day and swing trading run with the rest. The yardstick is beating SPY over months. The design and its rollout are in [plans/CORE-BOOK.md](plans/CORE-BOOK.md). It is **off** (`core.enabled: false`) until the owner turns it on in Admin → Core book. Built so far: the settings, the daily ranking and the weekly review. Leave it off until the trading cycles learn to leave core holdings alone (step 4 of the plan); a dry run is safe at any time.
+A fixed share of equity (`core.target_pct`, 50%) in a handful of long-term holdings, each with a written thesis and invalidation, reviewed weekly instead of every cycle; day and swing trading run with the rest. The yardstick is beating SPY over months. The design and its rollout are in [plans/CORE-BOOK.md](plans/CORE-BOOK.md). It is **off** (`core.enabled: false`) until the owner turns it on in Admin → Core book. Built so far: the settings, the daily ranking, the weekly review and its life beside the trading book; the dashboard's views come next. A dry run is safe at any time.
 
 **Settings** (the `core` section; defaults): `enabled` off, `target_pct` 50, `band_pct` 5, `min_holdings` / `max_holdings` 4 / 8, `max_holding_pct` 15 (per stock, % of equity), `max_index_etf_pct` 25 (SPY, QQQ, DIA, IWM, VTI, VOO), `max_theme_pct` 50 (% of the book), `stop_pct` 15, `min_conviction` 7, `max_trades_per_review` 6, `review_weekday` / `review_time_et` mon / 10:15, `universe_size` 100, `themes` (one per line, `AI buildout: NVDA, AVGO, TSM`; tickers optional).
 
@@ -165,6 +165,20 @@ record            core_reviews (context, research, output, every rule checked), 
 - **Execution** (`core-book/execute.ts`): market orders; buys re-read the cash after the sells; every trade is also a `decisions` document (`trigger_kind: "core"`, `report_id` = the review, which the dashboard's report links resolve to the Core page), so the journal, trades and analytics see it.
 - **Adoption**: the first real review takes what the one-time seed bought and still holds into the core book (its plan becomes `book: "core"` with the seed's reasoning as the thesis, the OCO gives way to a core stop `stop_pct` below the average entry), once. That review writes each adopted holding a proper thesis and invalidation; later reviews add notes (`notes`, the last 12) and only raise stops.
 - **Events**: `core.review.started`, `core.review.completed` (each decision's status, trades executed and rejected, cost), plus the usual research, decision, risk-check, order and decision-result events under the review's cycle id.
+
+**Beside the trading book** (`bot/books.ts`; while `core.enabled` is on: switched off, core holdings are ordinary positions again):
+
+| Area | With the core book on |
+| --- | --- |
+| Trading cycles | Core holdings leave OPEN STOCK POSITIONS and show as read-only CORE BOOK lines; a stock decision on one is rejected (`core book` check). Options on them are allowed |
+| `max_open_positions` | Counts trading positions only; the core book has `max_holdings` |
+| Trading buys | Deployable cash is also capped so the trading book (stocks at market plus options at their mark) stays under 100 − `target_pct` − `cash_reserve_pct` % of equity; the cap is in the risk FLAGS |
+| Protection | Core holdings rest on a plain GTC stop; maintenance re-places it (never an OCO) |
+| Overnight cap | `max_overnight_pct` and the intraday-horizon sells count the trading book only |
+| Daily loss limit (`flatten_loss_pct`) | Liquidates the trading book and options; core holdings keep their stops. The owner's *Halt & liquidate* still sells everything |
+| Price-move triggers | Core holdings don't start early intraday cycles |
+| News | `wire/policy.ts withCoreBook`: a core holding never starts a trading event cycle or the emergency exit. Bad news at evaluate severity or above becomes a `core_negative` trigger: a **single-holding review** (its own queue, the event window, the event budget; research 120 s; keep, trim or sell that holding only). Lesser news, price shocks and halt resumptions wait for the weekly review; halt alerts still go out |
+| P&L | Every core order's client id starts `smb-core-` (its stops and liquidations too), so fills carry their book (`OrderFill.book`). `daily_stats.books`: the core book's value at the close and its day's P&L (Alpaca's intraday P&L on the holdings, plus shares sold today from yesterday's close to the sale; % of yesterday's core value), and the trading book's (the rest of the day's P&L), with realized P&L per book |
 
 ## Live stream
 

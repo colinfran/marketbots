@@ -86,3 +86,32 @@ export const stockRules: Rules = async (item, ctx) => {
   }
   return out
 }
+
+/** The rule asking for a single-holding core review; the engine routes it to the core book instead of an event cycle. */
+export const CORE_REVIEW_RULE = "core_negative"
+
+/**
+ * The rules with the core book in mind (docs/plans/CORE-BOOK.md §8). Core holdings (`core()`: empty
+ * while the book is off) never start a trading event cycle: the weekly review manages them. Bad
+ * news about one at evaluate severity or above asks for a single-holding core review
+ * (CORE_REVIEW_RULE) instead, never the emergency exit; a price shock, a halt's resumption or
+ * lesser news waits for the weekly review, whose research covers it. Halt alerts still go out.
+ */
+export const withCoreBook =
+  (rules: Rules, core: () => ReadonlySet<string>): Rules =>
+  async (item, ctx) => {
+    const out = await rules(item, ctx)
+    const held = core()
+    if (!held.size) return out
+    return out.flatMap((c): Candidate[] => {
+      const coreSyms = c.symbols.filter((s) => held.has(s))
+      if (!coreSyms.length) return [c]
+      const rest = c.symbols.filter((s) => !held.has(s))
+      const kept = rest.length ? [{ ...c, symbols: rest }] : []
+      if (c.action === "alert_only") return [...kept, { ...c, symbols: coreSyms }]
+      if (c.rule === "held_negative" && item.severity >= ctx.settings.wire.thresholds.evaluate) {
+        return [...kept, { rule: CORE_REVIEW_RULE, action: "review", symbols: coreSyms, entry: false, alertWhenClosed: true }]
+      }
+      return kept
+    })
+  }

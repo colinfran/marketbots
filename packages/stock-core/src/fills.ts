@@ -1,5 +1,12 @@
-import type { OrderDoc, OrderRole } from "./db"
+import type { Book, OrderDoc, OrderRole } from "./db"
 import { isOptionSymbol, OPTION_MULTIPLIER } from "./options"
+
+/** Every order the core book places (buys, sells, stops, its liquidations) carries this client_order_id prefix. */
+export const CORE_ORDER_PREFIX = "smb-core-"
+
+/** The book an order belongs to: the core book's carry CORE_ORDER_PREFIX (a leg, its parent's). */
+export const orderBook = (doc: Pick<OrderDoc, "client_order_id">, parent?: Pick<OrderDoc, "client_order_id">): Book =>
+  doc.client_order_id?.startsWith(CORE_ORDER_PREFIX) || parent?.client_order_id?.startsWith(CORE_ORDER_PREFIX) ? "core" : "trading"
 
 /**
  * First-in-first-out realized P&L over the bot's fills, shared by the engine (daily stats, the AI's
@@ -59,6 +66,8 @@ export type OrderFill = RealizedFill & {
   structure_id: string | null
   asset_class: OrderDoc["asset_class"]
   underlying: string | null
+  /** The book whose order this was (orderBook). */
+  book: Book
 }
 
 /** Mongo filter for order documents that are fills (spread parents excluded: their legs are the fills). */
@@ -83,6 +92,7 @@ export const fillsFromOrders = (docs: OrderDoc[], parents: OrderDoc[] = []): Ord
       structure_id: doc.structure_id ?? parent?.structure_id ?? null,
       asset_class: doc.asset_class ?? "us_equity",
       underlying: doc.underlying ?? null,
+      book: orderBook(doc, parent),
     }
   })
 }

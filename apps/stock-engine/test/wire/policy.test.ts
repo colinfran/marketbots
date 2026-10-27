@@ -8,7 +8,7 @@ import type { EngineContext } from "../../src/bot/context"
 import { researchPlan, runCycle } from "../../src/bot/cycle"
 import type { EventBus } from "../../src/bus/event-bus"
 import { assembleDossier } from "../../src/wire/dossier"
-import { stockRules, WirePolicy } from "../../src/wire/policy"
+import { CORE_REVIEW_RULE, stockRules, WirePolicy, withCoreBook } from "../../src/wire/policy"
 import { fakeBroker, type FakeBroker } from "../helpers/broker"
 import { makeBus, makeCtx } from "../helpers/ctx"
 import { useTestDb } from "../helpers/db"
@@ -46,7 +46,7 @@ const item = (overrides: Partial<WireItemDoc> = {}): WireItemDoc => {
   }
 }
 
-const setup = async ({ held = ["NVDA"], open = true, settings = DEFAULT_SETTINGS }: { held?: string[]; open?: boolean; settings?: Settings } = {}) => {
+const setup = async ({ held = ["NVDA"], open = true, settings = DEFAULT_SETTINGS, core = new Set<string>() }: { held?: string[]; open?: boolean; settings?: Settings; core?: Set<string> } = {}) => {
   const bus = await makeBus(db.col)
   const request = vi.fn<(f: EventFocus) => "fired" | "queued">(() => "fired")
   const alert = vi.fn(async () => undefined)
@@ -56,7 +56,7 @@ const setup = async ({ held = ["NVDA"], open = true, settings = DEFAULT_SETTINGS
     bus,
     log: silentLogger,
     settings: () => settings,
-    rules: stockRules,
+    rules: withCoreBook(stockRules, () => core),
     engine: () => ({ running: true, killSwitch: false }),
     session: () => ({ open, reason: open ? "regular session" : "outside the regular session" }),
     held: () => held,
@@ -154,6 +154,36 @@ describe("stock policy", () => {
     const { policy, emergency, bus } = await setup({ settings: exit })
     await policy.onItem({ item: item({ category: "bankruptcy", severity: 95, polarity: -1 }), backfill: false, confirmation: false })
     expect(emergency).toHaveBeenCalledWith("NVDA", expect.anything())
+    await bus.stop()
+  })
+})
+
+describe("core book holdings", () => {
+  const core = new Set(["NVDA"])
+
+  it("ask for a single-holding core review on bad news at evaluate severity, never an event cycle or the emergency exit", async () => {
+    const exit = { ...DEFAULT_SETTINGS, wire: { ...DEFAULT_SETTINGS.wire, emergency_action: "exit" as const } }
+    const { policy, request, emergency, bus } = await setup({ held: ["NVDA", "AMD"], core, settings: exit })
+    await policy.onItem({ item: item({ symbols: ["NVDA", "AMD"], category: "bankruptcy", severity: 95, polarity: -1 }), backfill: false, confirmation: false })
+    expect(request.mock.calls.map(([f]) => [f.symbol, f.rule, f.action])).toEqual([
+      ["AMD", "held_negative", "review"],
+      ["NVDA", CORE_REVIEW_RULE, "review"],
+    ])
+    // The trading holding still gets the owner's emergency exit; the core one doesn't.
+    expect(emergency).toHaveBeenCalledOnce()
+    expect(emergency).toHaveBeenCalledWith("AMD", expect.anything())
+    await bus.stop()
+  })
+
+  it("leave lesser news, price shocks and resumed halts to the weekly review, but still alert on a halt", async () => {
+    const { policy, request, alert, bus } = await setup({ core })
+    await policy.onItem({ item: item({ category: "offering", severity: 65, polarity: -1 }), backfill: false, confirmation: false }) // review severity, under evaluate (70)
+    await policy.onItem({ item: item({ kind: "anomaly", category: "price_shock", severity: 75, polarity: -1, meta: { anomaly: "price" } }), backfill: false, confirmation: false })
+    await policy.onItem({ item: item({ category: "halt", kind: "venue", severity: 75, polarity: 0, meta: { resumes_at: "10:15:00" } }), backfill: false, confirmation: false })
+    expect(request).not.toHaveBeenCalled()
+    await policy.onItem({ item: item({ category: "halt", kind: "venue", severity: 75, polarity: -1, meta: { resumes_at: null } }), backfill: false, confirmation: false })
+    expect(alert).toHaveBeenCalledOnce()
+    expect((await triggers()).map((t) => [t.rule, t.action])).toEqual([["halt", "alert_only"]])
     await bus.stop()
   })
 })

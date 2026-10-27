@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { realizedPnl, type Fill } from "../src/fills"
+import type { OrderDoc } from "../src/db"
+import { fillsFromOrders, orderBook, realizedPnl, type Fill } from "../src/fills"
 
 describe("realizedPnl", () => {
   let seq = 0
@@ -91,5 +92,49 @@ describe("realizedPnl for options", () => {
       { id: "b", symbol: "AAPL", side: "buy", qty: 5, price: 90, at: at(1) },
     ])
     expect(result.map((r) => r.realized_pnl)).toEqual([null, null])
+  })
+})
+
+describe("orderBook and fillsFromOrders", () => {
+  const doc = (id: string, client: string, o: Partial<OrderDoc> = {}): OrderDoc => ({
+    _id: id,
+    client_order_id: client,
+    symbol: "SPY",
+    asset_class: "us_equity",
+    underlying: null,
+    side: "buy",
+    type: "market",
+    order_class: "simple",
+    role: "entry",
+    position_intent: null,
+    parent_id: null,
+    qty: 1,
+    filled_qty: 1,
+    filled_avg_price: 500,
+    limit_price: null,
+    stop_price: null,
+    status: "filled",
+    created_at: new Date("2026-10-26T14:00:00Z"),
+    submitted_at: null,
+    filled_at: new Date("2026-10-26T14:00:00Z"),
+    canceled_at: null,
+    trading_day: "2026-10-26",
+    decision_id: null,
+    structure_id: null,
+    synced_at: new Date("2026-10-26T14:00:00Z"),
+    ...o,
+  })
+
+  it("tags the core book's orders by their client order id, and legs by their parent's", () => {
+    expect(orderBook({ client_order_id: "smb-core-stop-1" })).toBe("core")
+    expect(orderBook({ client_order_id: "smb-buy-1" })).toBe("trading")
+    expect(orderBook({ client_order_id: "leg-1" }, { client_order_id: "smb-core-buy-1" })).toBe("core")
+    const fills = fillsFromOrders(
+      [doc("a", "smb-buy-1"), doc("b", "smb-core-stop-2", { side: "sell", filled_at: new Date("2026-10-26T15:00:00Z") })],
+    )
+    expect(fills.map((f) => [f.id, f.book, f.realized_pnl])).toEqual([
+      ["a", "trading", null],
+      ["b", "core", 0],
+    ])
   })
 })

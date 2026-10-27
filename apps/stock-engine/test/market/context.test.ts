@@ -156,6 +156,19 @@ describe("buildContext: a mid-session cycle", () => {
     })
   })
 
+  it("shows core book holdings read-only, apart from the trading positions, while the book is on", async () => {
+    await (await collections()).plans.insertOne(planDoc("AMD", { book: "core", horizon: "multi_day", stop_loss: 127.5, take_profit: null, theme: "AI buildout" }))
+    expect((await buildContext("intraday", session(), NOW)).core).toBeUndefined() // off: AMD is an ordinary position
+    ctx.settings.current.core.enabled = true
+    const built = await buildContext("intraday", session(), NOW)
+    expect(built.positions.map((p) => p.symbol)).toEqual(["NVDA"])
+    expect(built.core).toEqual({ target_pct: 50, value: 750, pct: 7.43, trading_cap_pct: 45, holdings: [{ symbol: "AMD", qty: 5, market_value: 750, weight_pct: 7.43, unrealized_pl_pct: 0, stop: 127.5, theme: "AI buildout" }] })
+    // Trading may hold 45% of $10,100 = $4,545; NVDA uses $1,400.
+    expect(built.risk).toMatchObject({ open_positions: 1, deployable_cash: 3_145 })
+    expect(built.risk.notes[0]).toBe("CORE BOOK: 50% of equity is kept for the long-term core book; trading (stocks and options) stays under 45% of equity: $1400 used, $3145 left.")
+    expect(built.instruments.find((i) => i.symbol === "AMD")).toBeUndefined()
+  })
+
   it("enriches positions with their plans and exit-order status", async () => {
     const ctx = await buildContext("intraday", session(), NOW)
     expect(ctx.positions).toEqual([

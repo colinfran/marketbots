@@ -193,7 +193,7 @@ GROUND RULES (STOCKS)
 11. Overnight risk: don't hold stocks through earnings or another binary event before the next open. In the closing cycle, sell intraday positions; keep one (switch it to "overnight") only if it is profitable, has conviction ≥ 7 and has no binary event before tomorrow's open. Swing holds stay through the close while their daily thesis holds. Total stock exposure carried overnight stays ≤ ${r.max_overnight_pct}% of equity; above that the engine sells the weakest positions.
 12. Respect the risk flags in CONTEXT. With the circuit breaker on, make no buys of any kind. With profit lock on, tighten stops and size down. With no trades remaining, only exit.
 13. Honesty. Never invent data. Cite concrete numbers and times in rationale and evidence. If RESEARCH is missing or thin, say so, lower confidence, and lean defensive.
-14. Learn. Apply the MEMORY lessons from previous days, and if today repeats a past mistake, say so.
+14. Learn. Apply the MEMORY lessons from previous days, and if today repeats a past mistake, say so.${settings.core.enabled ? `\n15. The core book is separate. CORE BOOK in CONTEXT lists long-term holdings a weekly review manages: make no decisions for them and never buy them (options on them are fine). About ${settings.core.target_pct}% of equity is kept for that book, so trading positions (stocks and options) stay under ${100 - settings.core.target_pct - r.cash_reserve_pct}% of equity; deployable cash already reflects it.` : ""}
 
 SWING HOLDS (horizon "multi_day")
 S1. Aim to carry 2–4 swing holds whenever daily setups qualify; the day-trading book works around them. With none open and setups qualifying, building the swing book comes first.
@@ -290,7 +290,7 @@ new buys allowed: ${k.new_buys_allowed ? "YES" : "NO"}${k.notes.length ? `\nFLAG
 
 ## OPEN STOCK POSITIONS (one decision required for each)
 ${lines(ctx.positions, json, "none")}
-
+${ctx.core ? `\n## CORE BOOK (long-term holdings the weekly core review manages: NO decisions for these, and never buy them)\ncore book $${ctx.core.value} = ${ctx.core.pct}% of equity (target ${ctx.core.target_pct}%) | trading stays under ${ctx.core.trading_cap_pct}% of equity\n${lines(ctx.core.holdings, json, "none yet")}\n` : ""}
 ## OPTIONS
 enabled: ${o.enabled ? "YES" : "NO"} | new options positions allowed: ${o.new_positions_allowed ? "YES" : "NO"} | spreads allowed: ${o.allow_spreads ? "YES" : "NO"}
 open premium $${o.premium_open_usd} (${o.premium_open_pct}% of equity, cap ${o.max_total_premium_pct}%) | max premium per new position ${o.max_premium_per_trade_pct}% (≈ $${o.max_premium_per_trade_usd})

@@ -132,6 +132,16 @@ describe("Engine", () => {
     expect(await db.col.cycles.countDocuments({ kind: "event" })).toBe(0)
   })
 
+  it("sends bad news about a core holding to a single-holding core review, not an event cycle", async () => {
+    await command({ type: "pause", reason: "test" })
+    const focus = { symbol: "SPY", rule: "core_negative", action: "review" as const, severity: 80, polarity: -1 as const, item_ids: ["i1"], trigger_id: "t1", headline: "S&P futures limit down" }
+    expect(engine.requestEventCycle(focus)).toBe("queued")
+    expect(engine.requestEventCycle({ ...focus, symbol: "AAPL", rule: "held_negative", trigger_id: "t2" })).toBe("queued")
+    const internals = engine as unknown as { eventQueue: { keys(): string[] }; coreQueue: { keys(): string[] } }
+    expect(internals.coreQueue.keys()).toEqual(["SPY"])
+    expect(internals.eventQueue.keys()).toEqual(["AAPL"])
+  })
+
   it("runs the core review on request only when it can", async () => {
     expect(await command({ type: "core.review" })).toMatchObject({ status: "failed", error: "the core book is off: turn it on in Admin → Settings → Core book, or run a dry run" })
     await command({ type: "settings.update", patch: { core: { enabled: true } }, expected_version: 1 })

@@ -213,6 +213,35 @@ describe("the core review", () => {
     expect((await reviewDoc(second.reviewId)).context!.last_review).toMatchObject({ on: DAY, summary: OUTPUT.summary })
   })
 
+  it("reviews a single holding on news: only that holding, no buys, no adoption", async () => {
+    await db.col.plans.updateMany({}, { $set: { book: "core", take_profit: null, last_reviewed_at: NOW } })
+    const { research, structured } = fakeAi({ output: { ...OUTPUT, holdings: [{ ...OUTPUT.holdings[1], action: "sell" }, OUTPUT.holdings[2], { ...OUTPUT.holdings[0], action: "trim" }] } })
+    const event = "- [held review] DIA: Dow components cut guidance (severity 80)"
+    const result = await settle(
+      runCoreReview(ctx, { kind: "holding", trigger: "news: Dow components cut guidance", dryRun: false, session: session(), entriesBlocked: () => null, ranking: { build: async () => null, latest: async () => RANKING }, symbol: "DIA", event }),
+    )
+    const doc = await reviewDoc(result.reviewId)
+    expect(doc).toMatchObject({ kind: "holding", symbol: "DIA", status: "done", adopted: [], watch: [] })
+    expect(doc.decisions.map((d) => [d.symbol, d.action, d.status])).toEqual([["DIA", "sell", "executed"]])
+    expect(broker.holdings.has("DIA")).toBe(false)
+    expect(broker.holdings.get("SPY")!.qty).toBe(4)
+    expect(broker.holdings.has("NVDA")).toBe(false)
+    expect(doc.context).toMatchObject({ kind: "holding", first_review: false, book: { holdings: 2 } })
+    expect(doc.context!.holdings.map((h) => h.symbol)).toEqual(["DIA"])
+    expect(doc.context!.candidates.map((c) => c.symbol)).toEqual(["DIA"])
+    expect(research.mock.calls[0][0]).toMatchObject({ timeoutMs: 120_000 })
+    expect(research.mock.calls[0][0].prompt).toContain(`THIS IS A SINGLE-HOLDING REVIEW, started by news about a core holding:\n${event}`)
+    expect(structured.mock.calls[0][0].prompt).toContain(`# EVENT (why this review started)\n${event}`)
+    expect(events.find((e) => e.type === "core.review.started")).toMatchObject({ instrument: "DIA", data: { kind: "holding", symbol: "DIA" } })
+  })
+
+  it("skips a single-holding review of something no longer in the book", async () => {
+    fakeAi()
+    const result = await settle(runCoreReview(ctx, { kind: "holding", trigger: "news", dryRun: false, session: session(), entriesBlocked: () => null, ranking: { build: async () => null, latest: async () => RANKING }, symbol: "AAPL", event: "x" }))
+    expect(result.status).toBe("skipped")
+    expect(await reviewDoc(result.reviewId)).toMatchObject({ error: "AAPL is no longer a core holding" })
+  })
+
   it("plans a dry run without placing orders or touching plans", async () => {
     fakeAi()
     const sent = broker.submitted.length

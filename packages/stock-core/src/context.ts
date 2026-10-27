@@ -161,6 +161,9 @@ export type OptionsContext = {
   notes: string[]
 }
 
+/** A core book holding as the trading cycles see it: read-only, the weekly core review manages it. */
+export type CoreLineContext = { symbol: string; qty: number; market_value: number; weight_pct: number; unrealized_pl_pct: number; stop: number | null; theme: string | null }
+
 export type MarketContext = {
   generated_at: string
   now_et: string
@@ -175,7 +178,10 @@ export type MarketContext = {
     minutes_to_close: number | null
   }
   risk: RiskState & { min_conviction: number; max_new_buys_this_cycle: number; rebuy_cooldown_minutes: number }
+  /** Trading positions only, while the core book is on. */
   positions: PositionContext[]
+  /** The core book, while it is on (absent otherwise and on older reports). Trading stays under `trading_cap_pct` of equity. */
+  core?: { target_pct: number; value: number; pct: number; trading_cap_pct: number; holdings: CoreLineContext[] }
   open_orders: { symbol: string; side: string; type: string; qty: number | null; limit_price: number | null; stop_price: number | null; status: string }[]
   benchmarks: Quote[]
   instruments: Instrument[]

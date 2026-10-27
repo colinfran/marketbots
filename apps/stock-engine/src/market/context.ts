@@ -6,6 +6,7 @@ import { daysToExpiry, describeContract, OPTION_MULTIPLIER } from "@mb/stock-cor
 import type { Phase } from "@mb/stock-core/settings"
 import { addDays, formatTime, marketClock, marketDay, marketTime, minutesBetween } from "@mb/stock-core/time"
 import type { TradingContext } from "../bot/context"
+import { coreHeld, tradingCapPct, tradingExposure } from "../bot/books"
 import { loadRealizedFills } from "../bot/orders"
 import { computeRiskState } from "../bot/risk"
 import type { Session } from "../bot/session"
@@ -96,7 +97,11 @@ export const buildContext = async (
     col.decisions.countDocuments({ trading_day: day, status: "executed", action: { $in: ["buy", "sell", "buy_option", "close_option"] } }),
     col.optionPositions.find({ status: { $in: ["open", "closing"] } }).sort({ opened_at: 1 }).toArray(),
   ])
-  const positions = allPositions.filter((p) => (p.asset_class ?? "us_equity") === "us_equity")
+  // While the core book is on, its holdings are the weekly review's: shown read-only, never in `positions`.
+  const core = coreHeld(plans, settings)
+  const stocks = allPositions.filter((p) => (p.asset_class ?? "us_equity") === "us_equity")
+  const positions = stocks.filter((p) => !core.has(p.symbol))
+  const coreLines = stocks.filter((p) => core.has(p.symbol))
   const todayFills = fills.filter((f) => marketDay(f.at) === day)
 
   const briefing = todayReports.find((rep) => rep.phase === "premarket") ?? null
@@ -160,7 +165,7 @@ export const buildContext = async (
     }
   }
 
-  const risk = computeRiskState(account, positions.length, tradesToday, settings)
+  const risk = computeRiskState(account, positions.length, tradesToday, settings, { tradingExposure: tradingExposure(positions, optionDocs) })
   const exitOrderSymbols = new Set(openOrders.filter((o: AlpacaOrder) => o.side === "sell").map((o) => o.symbol))
 
   // ─── Options ────────────────────────────────────────────────────────────
@@ -272,6 +277,25 @@ export const buildContext = async (
         has_exit_orders: exitOrderSymbols.has(p.symbol),
       }
     }),
+    ...(settings.core.enabled
+      ? {
+          core: {
+            target_pct: settings.core.target_pct,
+            value: round(coreLines.reduce((s, p) => s + Number(p.market_value), 0))!,
+            pct: risk.equity > 0 ? round((coreLines.reduce((s, p) => s + Number(p.market_value), 0) / risk.equity) * 100)! : 0,
+            trading_cap_pct: tradingCapPct(settings),
+            holdings: coreLines.map((p) => ({
+              symbol: p.symbol,
+              qty: Number(p.qty),
+              market_value: round(Number(p.market_value))!,
+              weight_pct: risk.equity > 0 ? round((Number(p.market_value) / risk.equity) * 100)! : 0,
+              unrealized_pl_pct: round(Number(p.unrealized_plpc) * 100)!,
+              stop: planBySymbol.get(p.symbol)?.stop_loss ?? null,
+              theme: planBySymbol.get(p.symbol)?.theme ?? null,
+            })),
+          },
+        }
+      : {}),
     open_orders: openOrders.map((ord) => ({
       symbol: ord.symbol,
       side: ord.side,

@@ -7,7 +7,7 @@ import { claimDueSeed, finishSeed } from "@mb/engine-kit/state/seed-runs"
 import { every, withTimeout } from "@mb/engine-kit/util/async"
 import type { TradeUpdate } from "@mb/stock-core/alpaca"
 import type { Command } from "@mb/stock-core/commands"
-import type { CommandDoc, CycleKind, EngineStatusDoc, HistoryRangeKey, MarketSessionInfo, SeedRunDoc } from "@mb/stock-core/db"
+import type { CommandDoc, CoreReviewKind, CycleKind, EngineStatusDoc, HistoryRangeKey, MarketSessionInfo, SeedRunDoc } from "@mb/stock-core/db"
 import type { CycleState, EngineRunStatus } from "@mb/stock-core/events"
 import { roundTo } from "@mb/stock-core/math"
 import { STRATEGY_LABEL } from "@mb/stock-core/options"
@@ -15,6 +15,7 @@ import type { Phase } from "@mb/stock-core/settings"
 import type { EventFocus, WireItemDoc } from "@mb/stock-core/wire"
 import { marketDay, minutesBetween } from "@mb/stock-core/time"
 import { coverageGaps } from "@mb/wire/calendar"
+import { eventSection } from "./ai/prompts"
 import type { AiBudget } from "./ai/budget"
 import type { Alerts } from "./alerts"
 import type { Alpaca, RestHealth } from "./alpaca/client"
@@ -28,6 +29,7 @@ import { coreReviewDue } from "./core-book/schedule"
 import type { EngineContext } from "./bot/context"
 import { runCycle, type CycleOutcome } from "./bot/cycle"
 import { cancelSymbolOrders } from "./bot/execute"
+import { coreHeld } from "./bot/books"
 import { flattenStocks, maintain } from "./bot/maintenance"
 import { closeOptionPosition, liquidateOptions, monitorOptions, reconcileOptions } from "./bot/options"
 import { clientId, syncOrders } from "./bot/orders"
@@ -42,7 +44,7 @@ import type { LivePrices } from "./market/prices"
 import type { EngineStateStore, SettingsStore } from "./state/stores"
 import type { PriceCoverage } from "./market/price-layers"
 import type { StreamServer } from "./stream/server"
-import { stockRules, WirePolicy } from "./wire/policy"
+import { CORE_REVIEW_RULE, stockRules, WirePolicy, withCoreBook } from "./wire/policy"
 import type { Wire } from "./wire/wire"
 
 export const ENGINE_VERSION = "0.1.0"
@@ -141,6 +143,8 @@ export class Engine {
   private readonly reference = new Map<string, number>()
   private readonly triggerCooldown = new Map<string, number>()
   private heldSymbols: string[] = []
+  /** The core book's holdings while it is on (refreshed with the account): the trading cycles and their triggers leave them alone. */
+  private coreSymbols: ReadonlySet<string> = new Set()
   private watchSymbols: string[] = []
   private watchRefreshedAt = 0
   /** Option underlyings held, and today's movers / most actives (the news engine's breadth set). */
@@ -157,6 +161,8 @@ export class Engine {
   private accountRefresh: NodeJS.Timeout | null = null
   /** News-engine event cycles waiting to run, merged by symbol ("MARKET" for market-wide), highest severity kept. */
   private readonly eventQueue: EventCycleQueue
+  /** Single-holding core reviews waiting to run (serious bad news about a core holding), merged by symbol. */
+  private readonly coreQueue: EventCycleQueue
 
   constructor(private readonly d: EngineDeps) {
     this.ctx = {
@@ -191,12 +197,22 @@ export class Engine {
       // Off-hours, the queue simply waits (and expires): the next phase's dossier carries the items anyway.
       gate: () => this.eventWindow().open,
     })
+    this.coreQueue = new EventCycleQueue({
+      col: d.db.col,
+      log: d.log,
+      state: d.state,
+      settings: d.settings,
+      busy: () => !!this.cycle,
+      start: (events) => this.startHoldingReviews(events),
+      expireAfterMs: EVENT_QUEUE_MAX_MS,
+      gate: () => this.eventWindow().open && d.settings.current.core.enabled,
+    })
     this.policy = new WirePolicy({
       col: d.db.col,
       bus: d.bus,
       log: d.log.child({ component: "wire-policy" }),
       settings: () => d.settings.current,
-      rules: stockRules,
+      rules: withCoreBook(stockRules, () => this.coreSymbols),
       engine: () => ({ running: d.state.state.status === "running", killSwitch: d.state.state.kill_switch.engaged }),
       session: () => this.eventWindow(),
       held: () => [...new Set([...this.heldSymbols, ...this.underlyings])],
@@ -230,7 +246,7 @@ export class Engine {
       instance: d.env.ENGINE_INSTANCE,
       version: ENGINE_VERSION,
       run: () => ({ status: this.status, cycle_state: this.cycleState, current_task: this.currentTask }),
-      eventQueue: () => this.eventQueue.keys(),
+      eventQueue: () => [...this.eventQueue.keys(), ...this.coreQueue.keys().map((k) => `core:${k}`)],
       doc: (p) => {
         const { tradeStream, marketStream, prices } = this.d
         const now = Date.now()
@@ -402,6 +418,7 @@ export class Engine {
     this.optionsLevel = account.options_trading_level ?? account.options_approved_level ?? null
     const stocks = positions.filter((p) => (p.asset_class ?? "us_equity") === "us_equity")
     this.heldSymbols = stocks.map((p) => p.symbol)
+    this.coreSymbols = coreHeld(await this.d.db.col.plans.find({ book: "core" }, { projection: { book: 1 } }).toArray(), this.d.settings.current)
     const optionDocs = await this.d.db.col.optionPositions.find({ status: { $in: ["open", "closing"] } }, { projection: { underlying: 1 } }).toArray()
     const underlyings = optionDocs.map((d) => d.underlying)
     this.underlyings = [...new Set(underlyings)]
@@ -477,7 +494,7 @@ export class Engine {
       if (core.due) return this.startCoreReview(session, "schedule", { dryRun: false })
     }
     // News events go before scheduled intraday cycles (the planner's other phases still come first).
-    if ((!this.plan.phase || this.plan.phase === "intraday") && this.eventQueue.drain()) return
+    if ((!this.plan.phase || this.plan.phase === "intraday") && (this.coreQueue.drain() || this.eventQueue.drain())) return
     if (this.plan.phase) return this.startCycle(this.plan.phase, session, "schedule", { kind: "scheduled" })
 
     // Between scheduled intraday cycles, a held stock or option underlying moving sharply triggers an early one.
@@ -499,7 +516,8 @@ export class Engine {
   private async rememberReferencePrices() {
     this.reference.clear()
     const underlyings = (await this.d.db.col.optionPositions.find({ status: "open" }, { projection: { underlying: 1 } }).toArray()).map((d) => d.underlying)
-    for (const symbol of new Set([...this.heldSymbols, ...underlyings])) {
+    // Core holdings move on their own clock: their stops rest at the broker and the weekly review judges them.
+    for (const symbol of new Set([...this.heldSymbols.filter((s) => !this.coreSymbols.has(s)), ...underlyings])) {
       const price = this.d.prices.fresh(symbol, 5 * MIN)
       if (price !== null) this.reference.set(symbol, price)
     }
@@ -549,17 +567,32 @@ export class Engine {
         this.currentPhase = null
         this.ctx.setCycleState("idle")
         // Triggers that arrived meanwhile run now.
-        this.eventQueue.drain()
+        if (!this.coreQueue.drain()) this.eventQueue.drain()
       })
   }
 
   /** Runs a core book review in the cycle slot, so it never overlaps a trading cycle. */
-  private startCoreReview(session: Session, trigger: string, { dryRun }: { dryRun: boolean }) {
-    this.lastCycleAt = Date.now()
+  private startCoreReview(
+    session: Session,
+    trigger: string,
+    { dryRun, kind = "weekly", events = [] }: { dryRun: boolean; kind?: CoreReviewKind; events?: QueuedEvent[] },
+  ) {
+    const startedAt = Date.now()
+    this.lastCycleAt = startedAt
     this.currentPhase = "intraday"
-    this.cycle = runCoreReview(this.ctx, { kind: "weekly", trigger, dryRun, session, entriesBlocked: this.entriesBlocked, ranking: this.coreRanking })
-      .then((r) => {
+    const focus = events[0]
+    this.cycle = runCoreReview(this.ctx, {
+      kind,
+      trigger,
+      dryRun,
+      session,
+      entriesBlocked: this.entriesBlocked,
+      ranking: this.coreRanking,
+      ...(focus?.symbol ? { symbol: focus.symbol, event: eventSection(events.map(({ queued_at: _q, ...e }) => e)) } : {}),
+    })
+      .then(async (r) => {
         this.lastCycle = { id: r.cycleId, phase: "intraday", at: new Date(), status: r.status === "done" ? "succeeded" : r.status === "skipped" ? "skipped" : "failed", headline: r.summary ? r.summary.slice(0, 140) : null }
+        if (events.length) await this.coreQueue.served(events, r.cycleId, startedAt)
       })
       .catch(async (error) => {
         this.d.log.error("core review crashed", { error: errorMessage(error) })
@@ -569,8 +602,18 @@ export class Engine {
         this.cycle = null
         this.currentPhase = null
         this.ctx.setCycleState("idle")
-        this.eventQueue.drain()
+        if (!this.coreQueue.drain()) this.eventQueue.drain()
       })
+  }
+
+  /**
+   * Serious bad news about core holdings: one single-holding review at a time (the queue merges by
+   * symbol); the others wait for the next slot.
+   */
+  private startHoldingReviews(events: QueuedEvent[]) {
+    const [first, ...rest] = events
+    this.startCoreReview(this.session!, `news: ${first.headline.slice(0, 120)}`, { dryRun: false, kind: "holding", events: [first] })
+    for (const e of rest) this.coreQueue.request(e)
   }
 
   /** Whether an event cycle can run now: the regular session, past the opening buffer, more than 3 minutes before the close. */
@@ -588,6 +631,8 @@ export class Engine {
    * by symbol (highest severity kept), and runs the moment the current cycle ends.
    */
   requestEventCycle(focus: EventFocus): "fired" | "queued" {
+    // Bad news about a core holding goes to the core book's single-holding review, not an event cycle.
+    if (focus.rule === CORE_REVIEW_RULE) return this.coreQueue.request(focus)
     return this.eventQueue.request(focus)
   }
 
@@ -709,7 +754,7 @@ export class Engine {
         const position = (await alpaca.getPositions()).find((p) => p.symbol === command.symbol && (p.asset_class ?? "us_equity") === "us_equity")
         if (!position) throw new Error(`no ${command.symbol} position`)
         await cancelSymbolOrders(alpaca, command.symbol)
-        const order = await alpaca.submitOrder({ symbol: command.symbol, qty: position.qty, side: "sell", type: "market", time_in_force: "day", client_order_id: clientId("manual") })
+        const order = await alpaca.submitOrder({ symbol: command.symbol, qty: position.qty, side: "sell", type: "market", time_in_force: "day", client_order_id: clientId(this.coreSymbols.has(command.symbol) ? "core-manual" : "manual") })
         this.d.bus.emit(
           "order.submitted",
           { order_id: order.id, symbol: command.symbol, side: "sell", type: "market", qty: Number(position.qty), limit_price: null, purpose: "manual close", asset_class: "us_equity" },
@@ -763,6 +808,7 @@ export class Engine {
     this.d.marketStream.stop()
     this.d.wire.stop()
     this.eventQueue.stop()
+    this.coreQueue.stop()
     if (this.accountRefresh) clearTimeout(this.accountRefresh)
     // Abort in-flight AI calls; an order already sent to the broker still completes.
     this.abort.abort()

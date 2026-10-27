@@ -108,6 +108,18 @@ describe("computeRiskState", () => {
     expect(computeRiskState(acct(10_000, 10_000, 12_000), 0, 0).deployable_cash).toBe(9_500)
   })
 
+  it("keeps the trading book under 100 − core target − reserve % of equity while the core book is on", () => {
+    const on = { ...DEFAULT_SETTINGS, core: { ...DEFAULT_SETTINGS.core, enabled: true } }
+    // $10,000 equity, $6,000 cash: trading may hold $4,500 and already holds $1,000.
+    const risk = compute(acct(10_000, 10_000, 6_000), 1, 0, on, { tradingExposure: 1_000 })
+    expect(risk.deployable_cash).toBe(3_500)
+    expect(risk.notes).toEqual(["CORE BOOK: 50% of equity is kept for the long-term core book; trading (stocks and options) stays under 45% of equity: $1000 used, $3500 left."])
+    expect(compute(acct(10_000, 10_000, 6_000), 1, 0, on, { tradingExposure: 5_000 }).deployable_cash).toBe(0)
+    // Off, or without the exposure: as before.
+    expect(compute(acct(10_000, 10_000, 6_000), 1, 0, DEFAULT_SETTINGS, { tradingExposure: 1_000 }).deployable_cash).toBe(5_500)
+    expect(compute(acct(10_000, 10_000, 6_000), 1, 0, on).deployable_cash).toBe(5_500)
+  })
+
   it("rounds money to cents", () => {
     const risk = computeRiskState(acct(10_000.127, 9_999.991, 5_000.556), 0, 0)
     expect(risk.equity).toBe(10_000.13)
