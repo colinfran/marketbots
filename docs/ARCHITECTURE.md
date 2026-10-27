@@ -88,17 +88,17 @@ Phases 5–8 add `packages/core`, `packages/engine-kit`, `packages/wire`, `packa
 
 Until those move into shared packages, a change to one copy is made to the other as well (AGENTS.md).
 
-**Planned packages:**
+**Shared packages** (the Phase column says when each one lands; ✓ = exists):
 
 | Package | Phase | Holds | Used by |
 | --- | --- | --- | --- |
-| `@mb/core` | 5 | Pure shared schemas and helpers, no I/O: `math`, `stream-token` (prefix as a parameter), settings base pieces and helpers, the shared command schemas, the event envelope and the events both bots define identically, base collections, indexes and document types, wire types, `metrics`, `indicators`, generic `time` | every app and package |
+| `@mb/core` | 5 ✓ | Pure shared schemas and helpers, no I/O: `math`, `stream-token` (prefix as a parameter), settings base pieces and helpers, the shared command schemas, the event envelope and the events both bots define identically, base collections, indexes and document types, wire types, `metrics`, `indicators`, generic `time` | every app and package |
 | `@mb/engine-kit` | 6 | Engine runtime, generic over each bot's settings, events and commands: log, lease, heartbeat, bus, stream server, command processor, Mongo connect, state stores, alerts, AI budget/repair/runner/prompt parts, `ControlPlane`, `StatusReporter`, `EventCycleQueue`, bootstrap, env base, test helpers | both engines |
 | `@mb/wire` | 7 | The news engine: the mirrored files, shared source helpers, `sharedCatalog()`, a `makeLexicon()` skeleton, and (Phase 10) `enrich/` for article summaries | both engines |
 | `@mb/ui` | 8 | Client-safe React: the shadcn primitives, design tokens (`styles.css`), app-shell components, the live-UI shell driven by a per-bot event catalog, shared page sections | both dashboards |
 | `@mb/web-kit` | 8 | Server-only dashboard helpers: auth factory, database, command routes, shared queries, formatting, metadata, error reporting | both dashboards |
 
-In Phase 5, `crypto-core` and `stock-core` start extending `@mb/core`, and crypto's AI output schema moves from the engine into `crypto-core`. The full module lists are in plan §3.3. Where the two bots' versions of something differ, plan §3.5 says which version wins and in which phase. Behavior changes are kept out of Phases 5–8 and done one by one in Phase 9.
+Since Phase 5, `crypto-core` and `stock-core` build on `@mb/core`: the shared logic lives there once, and each bot core binds its own parameters (the stream-token prefix, its wire categories, its owner-only events, its settings sections). Crypto's AI output schema lives in `crypto-core/src/report.ts`. The full module lists are in plan §3.3. Where the two bots' versions of something differ, plan §3.5 says which version wins and in which phase. Behavior changes are kept out of Phases 5–8 and done one by one in Phase 9.
 
 ## Dependency direction
 

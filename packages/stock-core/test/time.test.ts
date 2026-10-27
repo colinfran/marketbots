@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest"
 import {
-  addDays,
   formatDateTime,
   formatDay,
   formatTime,
@@ -8,7 +7,6 @@ import {
   marketClock,
   marketDay,
   marketTime,
-  minutesBetween,
 } from "../src/time"
 
 // 2026 US DST: starts Sun Mar 8 (02:00 EST → 03:00 EDT), ends Sun Nov 1 (02:00 EDT → 01:00 EST).
@@ -84,37 +82,6 @@ describe("marketTime", () => {
       expect(marketDay(t)).toBe(day)
       expect(marketClock(t)).toBe(hhmm)
     }
-  })
-})
-
-describe("addDays", () => {
-  it("adds and subtracts whole days", () => {
-    expect(addDays("2026-10-26", 1)).toBe("2026-10-27")
-    expect(addDays("2026-10-26", -1)).toBe("2026-10-25")
-    expect(addDays("2026-10-26", 0)).toBe("2026-10-26")
-  })
-
-  it("rolls over months, years and leap days", () => {
-    expect(addDays("2026-10-31", 1)).toBe("2026-11-01")
-    expect(addDays("2026-12-31", 1)).toBe("2027-01-01")
-    expect(addDays("2026-01-01", -1)).toBe("2025-12-31")
-    expect(addDays("2028-02-28", 1)).toBe("2028-02-29")
-    expect(addDays("2027-02-28", 1)).toBe("2027-03-01")
-    expect(addDays("2026-10-26", -45)).toBe("2026-09-11")
-  })
-
-  it("is unaffected by DST", () => {
-    expect(addDays("2026-11-01", 1)).toBe("2026-11-02")
-    expect(addDays("2026-03-08", -1)).toBe("2026-03-07")
-  })
-})
-
-describe("minutesBetween", () => {
-  it("returns signed fractional minutes", () => {
-    const a = new Date("2026-10-26T13:30:00Z")
-    expect(minutesBetween(a, new Date("2026-10-26T14:00:00Z"))).toBe(30)
-    expect(minutesBetween(a, new Date("2026-10-26T13:00:00Z"))).toBe(-30)
-    expect(minutesBetween(a, new Date("2026-10-26T13:30:30Z"))).toBe(0.5)
   })
 })
 

@@ -1,10 +1,10 @@
+import { cryptoReportSchema, normalizeCryptoReport, type CryptoDecision, type CryptoReport } from "@mb/crypto-core/report"
 import { generateText, NoObjectGeneratedError, streamText } from "ai"
 import { describe, expect, it, vi } from "vitest"
 import { gatewayCost } from "../src/ai/budget"
 import { cryptoDecisionPrompt, cryptoResearchPrompt } from "../src/ai/prompts"
 import { repairCryptoReport } from "../src/ai/repair"
 import { AiRunner, hasLiveSearch } from "../src/ai/runner"
-import { cryptoReportSchema, normalizeCryptoReport, type CryptoDecision, type CryptoReport } from "../src/ai/schema"
 import { silentLogger } from "../src/log"
 
 vi.mock("ai", async (importOriginal) => ({ ...(await importOriginal<typeof import("ai")>()), generateText: vi.fn(), streamText: vi.fn() }))

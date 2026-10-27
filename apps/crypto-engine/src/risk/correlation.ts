@@ -1,4 +1,4 @@
-import { correlation, logReturns } from "../market/indicators"
+import { correlation, logReturns } from "@mb/core/indicators"
 
 /**
  * Pairwise correlation of hourly log returns over the last 14 days. Used by the risk engine to

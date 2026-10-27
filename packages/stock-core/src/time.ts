@@ -1,76 +1,25 @@
+import { inTimeZone } from "@mb/core/time"
+
+export { addDays, minutesBetween } from "@mb/core/time"
+
 /**
  * Market-time helpers. US equities run on New York time, so every "day" in this app is an
- * America/New_York calendar date in YYYY-MM-DD form.
+ * America/New_York calendar date in YYYY-MM-DD form. The zone arithmetic is the shared
+ * `inTimeZone` (@mb/core/time); what is New York-specific stays here.
  */
 
 export const MARKET_TZ = "America/New_York"
 
-const partsFormatter = new Intl.DateTimeFormat("en-US", {
-  timeZone: MARKET_TZ,
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-  second: "2-digit",
-  hourCycle: "h23",
-})
-
-type ZonedParts = { year: number; month: number; day: number; hour: number; minute: number; second: number }
-
-const zonedParts = (date: Date): ZonedParts => {
-  const parts = Object.fromEntries(
-    partsFormatter.formatToParts(date).map((p) => [p.type, p.value]),
-  ) as Record<string, string>
-  return {
-    year: Number(parts.year),
-    month: Number(parts.month),
-    day: Number(parts.day),
-    hour: Number(parts.hour),
-    minute: Number(parts.minute),
-    second: Number(parts.second),
-  }
-}
-
-const pad = (n: number) => String(n).padStart(2, "0")
+const market = inTimeZone(MARKET_TZ)
 
 /** The New York trading date for an instant, e.g. "2026-10-26". */
-export const marketDay = (date: Date = new Date()): string => {
-  const p = zonedParts(date)
-  return `${p.year}-${pad(p.month)}-${pad(p.day)}`
-}
+export const marketDay = market.day
 
 /** "HH:MM" New York wall-clock time for an instant. */
-export const marketClock = (date: Date = new Date()): string => {
-  const p = zonedParts(date)
-  return `${pad(p.hour)}:${pad(p.minute)}`
-}
-
-/** Offset of New York from UTC at the given instant, in minutes (e.g. -240 during EDT). */
-const offsetMinutes = (date: Date): number => {
-  const p = zonedParts(date)
-  const asUtc = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second)
-  return Math.round((asUtc - date.getTime()) / 60_000)
-}
+export const marketClock = market.clock
 
 /** Converts a New York wall-clock time ("2026-10-26", "09:30") into an absolute Date. */
-export const marketTime = (day: string, hhmm: string): Date => {
-  const [y, m, d] = day.split("-").map(Number)
-  const [h, min] = hhmm.split(":").map(Number)
-  const guess = Date.UTC(y, m - 1, d, h, min)
-  const first = guess - offsetMinutes(new Date(guess)) * 60_000
-  // Re-check once in case the guess and the answer straddle a DST switch.
-  return new Date(guess - offsetMinutes(new Date(first)) * 60_000)
-}
-
-/** Adds whole days to a YYYY-MM-DD string. */
-export const addDays = (day: string, days: number): string => {
-  const [y, m, d] = day.split("-").map(Number)
-  const date = new Date(Date.UTC(y, m - 1, d + days))
-  return date.toISOString().slice(0, 10)
-}
-
-export const minutesBetween = (from: Date, to: Date): number => (to.getTime() - from.getTime()) / 60_000
+export const marketTime = market.time
 
 const timeFormatter = new Intl.DateTimeFormat("en-US", {
   timeZone: MARKET_TZ,

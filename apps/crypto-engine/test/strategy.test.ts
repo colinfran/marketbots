@@ -4,7 +4,6 @@ import { describe, expect, it } from "vitest"
 import { aggregate, simulate } from "../src/backtest/simulate"
 import { errorMessage, registerSecrets, scrub } from "../src/log"
 import { classifyRegime, computeFeatures } from "../src/market/features"
-import { atr, bollinger, ema, rsi } from "../src/market/indicators"
 import { reviewsDue } from "../src/orchestrator/crypto-cycle"
 import { firstTouch, scoreDecision } from "../src/orchestrator/outcomes"
 import { correlatedWith, correlationMatrix } from "../src/risk/correlation"
@@ -25,16 +24,6 @@ const featureSet = (closes1h: number[]) => {
   const last = closes1h.at(-1)!
   return computeFeatures("BTC/USD", { h1, h4, d1 }, quote({ bid: last * 0.9999, ask: last * 1.0001, mid: last, spreadBps: 2 }))
 }
-
-describe("indicators", () => {
-  it("compute standard values", () => {
-    expect(ema([1, 2, 3, 4, 5], 5)).toBe(3)
-    expect(rsi(Array.from({ length: 20 }, (_, i) => i))).toBe(100)
-    expect(rsi(Array.from({ length: 20 }, () => 5))).toBe(50)
-    expect(bollinger([1, 1, 1, 1], 4)).toEqual({ mid: 1, upper: 1, lower: 1 })
-    expect(atr(candles([10, 10, 10, 10]), 2)).toBeCloseTo(0.04, 2)
-  })
-})
 
 describe("features and screens", () => {
   it("need enough history and see an uptrend", () => {

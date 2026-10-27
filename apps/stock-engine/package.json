@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@ai-sdk/xai": "^5.0.30",
+    "@mb/core": "workspace:*",
     "@mb/stock-core": "workspace:*",
     "ai": "^7.0.153",
     "cheerio": "1.2.0",

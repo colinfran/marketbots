@@ -1,11 +1,13 @@
-import { mean, stdev } from "@mb/crypto-core/math"
-import type { Candle } from "../venues/kraken/rest"
+import { mean, stdev } from "./math"
 
 /**
  * Technical indicators computed in code. LLMs are unreliable at arithmetic, so the AI is handed
  * finished numbers. All functions take oldest-first arrays and return null when there isn't enough
  * history.
  */
+
+/** What the range-based indicators need from a bar or candle. */
+export type HighLowClose = { high: number; low: number; close: number }
 
 export const emaSeries = (values: number[], period: number): number[] => {
   if (values.length < period) return []
@@ -23,8 +25,8 @@ export const ema = (values: number[], period: number): number | null => emaSerie
 
 export const sma = (values: number[], period: number): number | null => (values.length < period ? null : mean(values.slice(-period)))
 
-/** Wilder's RSI. */
-export const rsi = (closes: number[], period = 14): number | null => {
+/** Wilder's RSI. A window with neither gains nor losses reads `flat` (50 by default: no momentum either way). */
+export const rsi = (closes: number[], period = 14, { flat = 50 }: { flat?: number } = {}): number | null => {
   if (closes.length <= period) return null
   let gain = 0
   let loss = 0
@@ -40,14 +42,18 @@ export const rsi = (closes: number[], period = 14): number | null => {
     avgGain = (avgGain * (period - 1) + Math.max(diff, 0)) / period
     avgLoss = (avgLoss * (period - 1) + Math.max(-diff, 0)) / period
   }
-  if (avgLoss === 0) return avgGain === 0 ? 50 : 100
+  if (avgLoss === 0) return avgGain === 0 ? flat : 100
   return 100 - 100 / (1 + avgGain / avgLoss)
 }
 
-/** Wilder's ATR. */
-export const atr = (candles: Candle[], period = 14): number | null => {
+/**
+ * Average true range: Wilder's smoothing by default. `smoothing: "sma"` is instead the plain mean
+ * of the last `period` true ranges.
+ */
+export const atr = (candles: HighLowClose[], period = 14, { smoothing = "wilder" }: { smoothing?: "wilder" | "sma" } = {}): number | null => {
   if (candles.length <= period) return null
   const tr = candles.slice(1).map((c, i) => Math.max(c.high - c.low, Math.abs(c.high - candles[i].close), Math.abs(c.low - candles[i].close)))
+  if (smoothing === "sma") return sma(tr, period)
   let value = mean(tr.slice(0, period))
   for (const t of tr.slice(period)) value = (value * (period - 1) + t) / period
   return value
@@ -71,7 +77,7 @@ export const pctReturn = (closes: number[], n: number): number | null => {
 
 export const logReturns = (closes: number[]) => closes.slice(1).map((c, i) => (closes[i] > 0 && c > 0 ? Math.log(c / closes[i]) : 0))
 
-/** Annualized realized volatility (%) of the last `n` bars, for bars of `barHours` hours. */
+/** Annualized realized volatility (%) of the last `n` bars, for bars of `barHours` hours, over calendar time (365 × 24 hours a year). */
 export const realizedVol = (closes: number[], n: number, barHours: number): number | null => {
   if (closes.length <= n) return null
   const r = logReturns(closes.slice(-(n + 1)))

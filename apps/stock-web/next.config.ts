@@ -1,8 +1,8 @@
 import type { NextConfig } from "next"
 
 const nextConfig: NextConfig = {
-  // The shared package ships TypeScript sources.
-  transpilePackages: ["@mb/stock-core"],
+  // The shared packages ship TypeScript sources.
+  transpilePackages: ["@mb/core", "@mb/stock-core"],
   poweredByHeader: false,
   turbopack: {
     rules: {

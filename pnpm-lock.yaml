@@ -13,6 +13,9 @@ importers:
       '@ai-sdk/xai':
         specifier: ^5.0.30
         version: 5.0.30(zod@4.6.7)
+      '@mb/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@mb/crypto-core':
         specifier: workspace:*
         version: link:../../packages/crypto-core
@@ -156,6 +159,9 @@ importers:
       '@ai-sdk/xai':
         specifier: ^5.0.30
         version: 5.0.30(zod@4.6.7)
+      '@mb/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@mb/stock-core':
         specifier: workspace:*
         version: link:../../packages/stock-core
@@ -316,8 +322,33 @@ importers:
         specifier: ^4.1.12
         version: 4.1.12(@types/node@22.20.5)(vite@8.3.5(@types/node@22.20.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
 
+  packages/core:
+    dependencies:
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
+    devDependencies:
+      '@mb/config':
+        specifier: workspace:*
+        version: link:../config
+      '@types/node':
+        specifier: ^22
+        version: 22.20.5
+      eslint:
+        specifier: ^9
+        version: 9.39.5(jiti@2.7.0)
+      typescript:
+        specifier: ^5
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.12
+        version: 4.1.12(@types/node@22.20.5)(vite@8.3.5(@types/node@22.20.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
+
   packages/crypto-core:
     dependencies:
+      '@mb/core':
+        specifier: workspace:*
+        version: link:../core
       zod:
         specifier: ^4.6.7
         version: 4.6.7
@@ -340,6 +371,9 @@ importers:
 
   packages/stock-core:
     dependencies:
+      '@mb/core':
+        specifier: workspace:*
+        version: link:../core
       zod:
         specifier: ^4.6.7
         version: 4.6.7

@@ -1,14 +1,47 @@
-import type { BacktestParams, Command, CommandType } from "./commands"
+import {
+  BASE_INDEXES,
+  type CollectionMap,
+  type CommandDoc as CommandDocOf,
+  type CycleDocBase,
+  type CycleKind,
+  type EngineStatusBase,
+  type EventDoc as EventDocOf,
+  type IndexSpec,
+  type SettingsDoc as SettingsDocOf,
+  type TokenUsage,
+} from "@mb/core/db"
+import type { BacktestParams, Command } from "./commands"
 import type { CycleState, EngineEvent, EngineRunStatus, EvidenceKind } from "./events"
 import type { PerformanceMetrics, TradeStats } from "./metrics"
 import type { Settings } from "./settings"
 import type { StrategyId } from "./strategies"
-import type { DossierRow, WireStatus } from "./wire"
+import type { DossierRow } from "./wire"
 import type { AccountId, Mode, Venue } from "./venues"
+
+export { utcDay } from "@mb/core/db"
+export type {
+  AiCallDoc,
+  AiTask,
+  AuditDoc,
+  CommandStatus,
+  CycleKind,
+  EngineStateDoc,
+  IndexSpec,
+  LeaseDoc,
+  LoginAttemptDoc,
+  NotificationDoc,
+  SeedAllocation,
+  SeedOrder,
+  SeedRunDoc,
+  SeedRunStatus,
+  TokenUsage,
+} from "@mb/core/db"
 
 /**
  * MongoDB document types and indexes, shared by the engine (the only writer of trading state) and
  * the web app (reads everything; writes only commands, audit entries and owner sign-in records).
+ * The documents both bots keep the same way come from @mb/core/db; this file binds them to
+ * crypto's settings, commands and events and adds crypto's own.
  *
  * Raw market data is not stored: candles come from Kraken on demand and only compact snapshots,
  * decisions and fills are kept. High-volume collections expire automatically (TTL indexes).
@@ -43,20 +76,9 @@ export const COLLECTIONS = {
   authSessions: "auth_sessions",
   authAccounts: "auth_accounts",
   authVerifications: "auth_verifications",
-} as const
+} as const satisfies CollectionMap
 
-export type TokenUsage = { input: number; output: number; total: number }
-
-export type SettingsDoc = { _id: "current"; settings: Settings; version: number; updated_at: Date; updated_by: string }
-
-/** Desired state, changed only by commands (or the engine's own drawdown halt). Survives restarts. */
-export type EngineStateDoc = {
-  _id: "engine"
-  status: "running" | "paused" | "halted"
-  pause_reason: string | null
-  kill_switch: { engaged: boolean; reason: string | null; at: Date | null; by: string | null; liquidate: boolean }
-  updated_at: Date
-}
+export type SettingsDoc = SettingsDocOf<Settings>
 
 export type VenueHealth = {
   rest: "ok" | "degraded" | "down" | "unknown"
@@ -103,66 +125,19 @@ export type SymbolHealth = {
   features: SymbolFeatures | null
 }
 
-/** Observed state: the engine's heartbeat, written every few seconds. */
-export type EngineStatusDoc = {
-  _id: "engine"
-  at: Date
-  instance: string
-  version: string
-  started_at: Date
-  status: EngineRunStatus
-  cycle_state: CycleState
-  current_task: string | null
-  kill_switch: boolean
-  ws_clients: number
-  event_seq: number
+/** Observed state: the engine's heartbeat, written every few seconds. The wire block is absent while the wire is off. */
+export type EngineStatusDoc = EngineStatusBase<EngineRunStatus, CycleState> & {
   kraken: VenueHealth
   paper_wallet: PaperWalletHealth
   symbols: SymbolHealth[]
-  ai: {
-    models: Settings["ai"]["models"]
-    spend_today_usd: number
-    budget_usd: number
-    calls_today: number
-    last_call_at: Date | null
-    last_error: string | null
-    enabled: boolean
-  }
-  system: { cpu_pct: number; rss_mb: number; heap_mb: number; load_avg: number[]; uptime_s: number }
   last_cycle: { id: string; at: Date; status: string; summary: string | null } | null
   next_cycle_at: Date | null
   reconciliation: { ok: boolean; at: Date; issues: string[] } | null
-  errors_last_hour: number
-  /** The news engine (absent before it shipped, or while it is off). */
-  wire?: WireStatus
 }
 
-export type LeaseDoc = { _id: "engine"; holder: string; acquired_at: Date; expires_at: Date }
+export type EventDoc = EventDocOf<EngineEvent>
 
-export type EventDoc = EngineEvent & { _id: number; expires_at: Date }
-
-export type CommandStatus = "pending" | "processing" | "done" | "failed" | "rejected"
-
-export type CommandDoc = {
-  _id: string
-  type: CommandType
-  command: Command
-  status: CommandStatus
-  created_at: Date
-  created_by: string
-  processed_at: Date | null
-  result: string | null
-  error: string | null
-}
-
-export type AuditDoc = {
-  _id: string
-  at: Date
-  actor: string
-  action: string
-  target: string | null
-  details: Record<string, unknown>
-}
+export type CommandDoc = CommandDocOf<Command>
 
 export type AccountDoc = {
   _id: AccountId
@@ -294,34 +269,15 @@ export type RegimeSnapshot = {
   notes: string[]
 }
 
-/** What started a cycle (absent on cycles from before it was recorded). */
-export type CycleKind = "scheduled" | "price_move" | "manual" | "event" | "seed"
-
-export type CycleDoc = {
-  _id: string
-  trigger: string
-  kind?: CycleKind
-  status: "running" | "completed" | "skipped" | "failed"
+export type CycleDoc = CycleDocBase<"running" | "completed" | "skipped" | "failed"> & {
   state: CycleState
-  started_at: Date
-  finished_at: Date | null
-  duration_ms: number | null
   regime: RegimeSnapshot | null
   candidates: CandidateRecord[]
   reviews: string[]
   research_id: string | null
   decision_ids: string[]
-  steps: { at: Date; name: string; ok: boolean; detail: string | null }[]
   summary: string | null
-  error: string | null
-  ai_cost_usd: number
-  settings_version: number
   prompt_version: string
-  /** Event cycles: the trigger and the wire items that started it. */
-  wire_trigger_id?: string | null
-  wire_item_ids?: string[]
-  /** Why Grok research was skipped (research_mode auto), when it was. */
-  research_skip_reason?: string | null
 }
 
 export type ResearchSource = { title: string; url: string; domain: string }
@@ -485,25 +441,6 @@ export type DailyStatsDoc = {
   updated_at: Date
 }
 
-/** research_gap = the short Grok research that only fills gaps the wire dossier leaves. */
-export type AiTask = "research" | "decision" | "research_gap"
-
-export type AiCallDoc = {
-  _id: string
-  at: Date
-  day: string
-  task: AiTask
-  model: string
-  cycle_id: string | null
-  input_tokens: number
-  output_tokens: number
-  cost_usd: number
-  cost_source: "gateway" | "estimate"
-  duration_ms: number
-  ok: boolean
-  error: string | null
-}
-
 export type BacktestTrade = {
   symbol: string
   strategy: StrategyId
@@ -537,63 +474,11 @@ export type BacktestDoc = {
   error: string | null
 }
 
-export type NotificationDoc = {
-  _id: string
-  at: Date
-  level: "info" | "warning" | "error" | "critical"
-  title: string
-  message: string
-  expires_at: Date
-}
-
-export type SeedRunStatus = "scheduled" | "running" | "done" | "failed" | "canceled"
-
-export type SeedAllocation = { symbol: string; weight_pct: number; notional_usd: number; thesis: string }
-
-export type SeedOrder = { symbol: string; decision_id: string | null; status: string; qty: number | null; notional_usd: number | null; reason: string | null }
-
-/**
- * A one-time seed buy, scheduled by the owner. The engine refuses a new one while any run is
- * `done` unless the command sets `force`, so it happens once unless explicitly asked again. A run
- * is a single attempt: a failure is recorded and alerted, never retried automatically.
- */
-export type SeedRunDoc = {
-  _id: string
-  status: SeedRunStatus
-  amount_usd: number
-  /** When it should run. */
-  at: Date
-  created_at: Date
-  created_by: string
-  force: boolean
-  started_at: Date | null
-  cycle_id: string | null
-  result: { allocations: SeedAllocation[]; orders: SeedOrder[]; notes: string[]; rationale: string | null } | null
-  error: string | null
-  done_at: Date | null
-}
-
-/** Rate-limit counter for the dashboard's sign-in endpoints, keyed by a hash of client IP + path. */
-export type LoginAttemptDoc = { _id: string; count: number; first_at: Date; expires_at: Date }
-
-/** Minimal index spec (mirrors the driver's IndexDescription so core needs no driver dependency). */
-export type IndexSpec = {
-  key: Record<string, 1 | -1>
-  name?: string
-  unique?: boolean
-  sparse?: boolean
-  expireAfterSeconds?: number
-  partialFilterExpression?: Record<string, unknown>
-}
-
+/** The shared indexes (@mb/core/db) and crypto's own, in this order. */
 export const INDEXES: Partial<Record<(typeof COLLECTIONS)[keyof typeof COLLECTIONS], IndexSpec[]>> = {
-  events: [
-    { key: { expires_at: 1 }, expireAfterSeconds: 0 },
-    { key: { type: 1, _id: -1 } },
-    { key: { cycle_id: 1 }, sparse: true },
-  ],
-  commands: [{ key: { status: 1, created_at: 1 } }, { key: { created_at: -1 } }],
-  audit_log: [{ key: { at: -1 } }],
+  events: BASE_INDEXES.events,
+  commands: BASE_INDEXES.commands,
+  audit_log: BASE_INDEXES.audit_log,
   positions: [
     { key: { account_id: 1, status: 1 } },
     {
@@ -622,25 +507,13 @@ export const INDEXES: Partial<Record<(typeof COLLECTIONS)[keyof typeof COLLECTIO
   ],
   portfolio_snapshots: [{ key: { account_id: 1, at: -1 } }, { key: { expires_at: 1 }, expireAfterSeconds: 0 }],
   daily_stats: [{ key: { account_id: 1, day: -1 } }],
-  ai_calls: [{ key: { day: 1 } }, { key: { at: -1 } }],
+  ai_calls: BASE_INDEXES.ai_calls,
   backtests: [{ key: { created_at: -1 } }],
-  notifications: [{ key: { at: -1 } }, { key: { expires_at: 1 }, expireAfterSeconds: 0 }],
-  seed_runs: [{ key: { status: 1, at: 1 } }, { key: { created_at: -1 } }],
-  wire_items: [
-    { key: { first_seen_at: -1 } },
-    { key: { symbols: 1, first_seen_at: -1 } },
-    { key: { cluster_id: 1 } },
-    { key: { severity: -1, first_seen_at: -1 } },
-    { key: { source: 1, first_seen_at: -1 } },
-    { key: { notable: 1, first_seen_at: -1 } },
-    { key: { expires_at: 1 }, expireAfterSeconds: 0 },
-  ],
-  wire_triggers: [{ key: { at: -1 } }, { key: { status: 1, at: -1 } }, { key: { expires_at: 1 }, expireAfterSeconds: 0 }],
-  login_attempts: [{ key: { expires_at: 1 }, expireAfterSeconds: 0 }],
-  // Better Auth's own field names (camelCase).
-  auth_sessions: [{ key: { token: 1 } }, { key: { expiresAt: 1 }, expireAfterSeconds: 0 }],
-  auth_verifications: [{ key: { identifier: 1 } }, { key: { expiresAt: 1 }, expireAfterSeconds: 0 }],
+  notifications: BASE_INDEXES.notifications,
+  seed_runs: BASE_INDEXES.seed_runs,
+  wire_items: BASE_INDEXES.wire_items,
+  wire_triggers: BASE_INDEXES.wire_triggers,
+  login_attempts: BASE_INDEXES.login_attempts,
+  auth_sessions: BASE_INDEXES.auth_sessions,
+  auth_verifications: BASE_INDEXES.auth_verifications,
 }
-
-/** UTC calendar day, e.g. "2026-10-25". Daily limits and budgets reset at 00:00 UTC. */
-export const utcDay = (date = new Date()) => date.toISOString().slice(0, 10)

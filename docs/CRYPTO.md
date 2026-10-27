@@ -86,7 +86,7 @@ features (code) → screens (code) → research (Grok + web/X search, streamed) 
 ```
 
 - **Two calls per cycle**, and only when there's something to decide: research (never decides) and decision (never searches). This avoids expensive multi-agent loops.
-- **Structured output** (`apps/engine/src/ai/schema.ts`), validated with zod. On a schema failure: repair in code (string numbers, loose enums, prose around JSON), and if that loses decisions, retry with the exact validation error, at decreasing temperature. An optional fallback model is tried after outages.
+- **Structured output** (`packages/crypto-core/src/report.ts`), validated with zod. On a schema failure: repair in code (string numbers, loose enums, prose around JSON), and if that loses decisions, retry with the exact validation error, at decreasing temperature. An optional fallback model is tried after outages.
 - **Normalization constrains the AI**: only listed symbols, only actions that fit the position state, numbers clamped, and only source URLs that research actually retrieved (anything else is dropped and the claim is downgraded to speculation).
 - **Prompt-injection defense**: all retrieved content is fenced as `<untrusted>` data, with instructions never to follow it; fence-breaking sequences are neutralized; the decision model never has tools.
 - **Calibration humility**: the AI gives `p_target_first`; code shrinks it halfway (configurable) toward the random-walk prior `stop / (stop + target)`, where the gross edge is exactly zero, then subtracts round-trip costs. Conviction is treated as a ranking, not a probability.

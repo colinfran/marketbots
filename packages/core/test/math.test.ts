@@ -1,13 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { krakenFee } from "../src/fees"
 import { floorToStep, roundToStep } from "../src/math"
-
-describe("krakenFee", () => {
-  it("applies a bps rate to the notional", () => {
-    expect(krakenFee(1_000, 40)).toBe(4)
-    expect(krakenFee(250, 26)).toBeCloseTo(0.65)
-  })
-})
 
 describe("rounding helpers", () => {
   it("floors to lot steps without float drift", () => {

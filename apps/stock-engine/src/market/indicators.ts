@@ -1,3 +1,4 @@
+import { atr, ema, rsi, sma } from "@mb/core/indicators"
 import type { Bar, Snapshot } from "@mb/stock-core/alpaca"
 import type { DailyTechnicals, IntradayTechnicals } from "@mb/stock-core/context"
 
@@ -37,46 +38,15 @@ export const snapshotPrice = (snap: Snapshot | undefined): number | null => {
   return trade?.p ?? null
 }
 
-const ema = (values: number[], period: number): number | null => {
-  if (values.length < period) return null
-  const k = 2 / (period + 1)
-  let value = values.slice(0, period).reduce((a, b) => a + b, 0) / period
-  for (const v of values.slice(period)) value = v * k + value * (1 - k)
-  return value
-}
+// The shared indicators (@mb/core/indicators) with stock's own settings, which keep today's values
+// until MARKETBOTS_PLAN Phase 9.4: a flat RSI window reads 100 (not 50), and ATR is the plain mean
+// of the last 14 true ranges (not Wilder's smoothing).
 
-const sma = (values: number[], period: number): number | null =>
-  values.length < period ? null : values.slice(-period).reduce((a, b) => a + b, 0) / period
+/** 14-period RSI; a window without losses reads 100, a flat one included. */
+const stockRsi = (closes: number[]) => rsi(closes, 14, { flat: 100 })
 
-/** Wilder's RSI. */
-const rsi = (closes: number[], period = 14): number | null => {
-  if (closes.length <= period) return null
-  let gain = 0
-  let loss = 0
-  for (let i = 1; i <= period; i++) {
-    const diff = closes[i] - closes[i - 1]
-    if (diff >= 0) gain += diff
-    else loss -= diff
-  }
-  let avgGain = gain / period
-  let avgLoss = loss / period
-  for (let i = period + 1; i < closes.length; i++) {
-    const diff = closes[i] - closes[i - 1]
-    avgGain = (avgGain * (period - 1) + Math.max(diff, 0)) / period
-    avgLoss = (avgLoss * (period - 1) + Math.max(-diff, 0)) / period
-  }
-  if (avgLoss === 0) return 100
-  return 100 - 100 / (1 + avgGain / avgLoss)
-}
-
-const atr = (bars: Bar[], period = 14): number | null => {
-  if (bars.length <= period) return null
-  const ranges = bars.slice(1).map((bar, i) => {
-    const prevClose = bars[i].c
-    return Math.max(bar.h - bar.l, Math.abs(bar.h - prevClose), Math.abs(bar.l - prevClose))
-  })
-  return sma(ranges, period)
-}
+/** 14-period ATR: the mean of the last 14 true ranges. */
+const stockAtr = (bars: Bar[]) => atr(bars.map((b) => ({ high: b.h, low: b.l, close: b.c })), 14, { smoothing: "sma" })
 
 /** Summarises today's regular-session 5-minute bars. */
 export const intradayTechnicals = (bars: Bar[]): IntradayTechnicals | null => {
@@ -105,7 +75,7 @@ export const intradayTechnicals = (bars: Bar[]): IntradayTechnicals | null => {
     opening_range_low: round(Math.min(...openingRange.map((b) => b.l))),
     day_high: round(Math.max(...bars.map((b) => b.h))),
     day_low: round(Math.min(...bars.map((b) => b.l))),
-    rsi14_5m: round(rsi(closes), 1),
+    rsi14_5m: round(stockRsi(closes), 1),
     ema9_5m: round(ema9),
     ema21_5m: round(ema21),
     trend_5m: trend,
@@ -120,7 +90,7 @@ export const dailyTechnicals = (bars: Bar[], price: number | null): DailyTechnic
   const last = price ?? closes[closes.length - 1]
   const sma20 = sma(closes, 20)
   const sma50 = sma(closes, 50)
-  const atr14 = atr(bars)
+  const atr14 = stockAtr(bars)
   const recent = bars.slice(-20)
   return {
     sma20: round(sma20),
@@ -133,6 +103,6 @@ export const dailyTechnicals = (bars: Bar[], price: number | null): DailyTechnic
     atr_pct: atr14 && last ? round((atr14 / last) * 100) : null,
     high_20d: round(Math.max(...recent.map((b) => b.h))),
     low_20d: round(Math.min(...recent.map((b) => b.l))),
-    rsi14_daily: round(rsi(closes), 1),
+    rsi14_daily: round(stockRsi(closes), 1),
   }
 }

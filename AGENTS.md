@@ -42,7 +42,7 @@ Beyond what the rule checks:
 
 ## Adding shared code
 
-Only Phases 5–8 create shared packages; today only `packages/config` exists ([docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#shared-code-today-and-planned)).
+Phases 5–8 create the shared packages; today `packages/config` and `packages/core` (Phase 5) exist ([docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#shared-code-today-and-planned)).
 
 1. **Pick the package** from plan §3.3: `core` (pure, no I/O), `engine-kit` (engine runtime), `wire` (news engine), `ui` (client-safe React), `web-kit` (server-only dashboard helpers).
 2. **Share only what both bots mean the same thing by.** If sharing would need a flag that switches between two behaviors, keep the code per bot. Pass what genuinely differs (a constant, an HMAC prefix, a time zone, a Discord username) in as a parameter; no `if (bot === "crypto")` in shared code, and no bot-specific constants.

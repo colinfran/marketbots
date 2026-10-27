@@ -1,4 +1,3 @@
-import { z } from "zod"
 import {
   CRYPTO_ACTIONS,
   cryptoReportSchema,
@@ -10,7 +9,8 @@ import {
   UNCERTAINTY,
   type CryptoReport,
   type SeedAllocationReport,
-} from "./schema"
+} from "@mb/crypto-core/report"
+import { z } from "zod"
 
 /**
  * Salvages model output that almost matched a schema (same approach as stockmarketbot): JSON
