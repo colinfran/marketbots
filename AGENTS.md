@@ -42,7 +42,7 @@ Beyond what the rule checks:
 
 ## Adding shared code
 
-Phases 5–8 create the shared packages; today `packages/config`, `packages/core` (Phase 5) and `packages/engine-kit` (Phase 6) exist ([docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#shared-code-today-and-planned)).
+Phases 5–8 create the shared packages; today `packages/config`, `packages/core` (Phase 5), `packages/engine-kit` (Phase 6), `packages/ui` and `packages/web-kit` (Phase 8) exist ([docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#shared-code-today-and-planned)).
 
 1. **Pick the package** from plan §3.3: `core` (pure, no I/O), `engine-kit` (engine runtime), `wire` (news engine), `ui` (client-safe React), `web-kit` (server-only dashboard helpers).
 2. **Share only what both bots mean the same thing by.** If sharing would need a flag that switches between two behaviors, keep the code per bot. Pass what genuinely differs (a constant, an HMAC prefix, a time zone, a Discord username) in as a parameter; no `if (bot === "crypto")` in shared code, and no bot-specific constants.
@@ -59,7 +59,7 @@ Phases 5–8 create the shared packages; today `packages/config`, `packages/core
    - For `@mb/ui` (Phase 8), each app's `globals.css` also needs an `@source` for the package: Tailwind v4 doesn't scan workspace symlinks by itself.
 5. **Update the tables** in docs/ARCHITECTURE.md.
 
-**Mirrored code, until it moves:** the 23 files headed `// Mirrored in cryptomarketbot and stockmarketbot: keep in sync.` (`apps/*-engine/src/wire/`, until Phase 7) and the 18 shadcn primitives in `apps/*-web/components/ui/` (until Phase 8) exist once per bot. Change both copies the same way; the only allowed difference in the wire files is the `@mb/crypto-core` / `@mb/stock-core` import.
+**Mirrored code, until it moves:** the 23 files headed `// Mirrored in cryptomarketbot and stockmarketbot: keep in sync.` (`apps/*-engine/src/wire/`, until Phase 7) exist once per bot. Change both copies the same way; the only allowed difference in the wire files is the `@mb/crypto-core` / `@mb/stock-core` import.
 
 ## Refactors preserve behavior, and that is proven
 

@@ -156,8 +156,8 @@ describe("Engine", () => {
     const internals = engine as unknown as { eventQueue: Map<string, { severity: number; item_ids: string[]; trigger_id: string }> }
     expect(internals.eventQueue.get("BTC/USD")).toMatchObject({ severity: 70, item_ids: ["i1", "i2"], trigger_id: "t1" })
     expect(internals.eventQueue.size).toBe(2)
-    // The heartbeat lists what waits.
-    await until(() => queues.some((q) => q?.length === 2))
+    // The heartbeat lists what waits. It runs every 5 s, so allow two beats plus margin on a busy machine.
+    await until(() => queues.some((q) => q?.length === 2), 12_000)
     expect(queues.find((q) => q?.length === 2)).toEqual(["BTC/USD", "MARKET"])
   })
 

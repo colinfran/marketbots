@@ -80,10 +80,9 @@ Phases 5–8 add `packages/core`, `packages/engine-kit`, `packages/wire`, `packa
 
 ## Shared code: today and planned
 
-**Today the only shared package is `packages/config`.** Both bots were moved in unchanged (Phase 2), so each bot's engine, dashboard and core package are still its own, and the code they have in common still exists twice:
+**Shared packages today:** `config`, `core`, `engine-kit`, `ui` and `web-kit` (table below); `wire` comes in Phase 7. Both bots were moved in unchanged (Phase 2) and then refactored onto these packages, and what still exists twice is:
 
 - The 23 news-engine files headed `// Mirrored in cryptomarketbot and stockmarketbot: keep in sync.` in `apps/crypto-engine/src/wire/` and `apps/stock-engine/src/wire/`.
-- The 18 shadcn primitives in `apps/*-web/components/ui/` (identical; stock also has `chart.tsx`).
 - More generally, the plan's comparison (§0) found 33 engine and core files identical apart from the package scope, and 11 more that differ only in a constant.
 
 Until those move into shared packages, a change to one copy is made to the other as well (AGENTS.md).
@@ -95,8 +94,8 @@ Until those move into shared packages, a change to one copy is made to the other
 | `@mb/core` | 5 ✓ | Pure shared schemas and helpers, no I/O: `math`, `stream-token` (prefix as a parameter), settings base pieces and helpers, the shared command schemas, the event envelope and the events both bots define identically, base collections, indexes and document types, wire types, `metrics`, `indicators`, generic `time` | every app and package |
 | `@mb/engine-kit` | 6 ✓ | Engine runtime, generic over each bot's settings, events and commands: log, lease, heartbeat, bus, stream server, command processor, Mongo connect, state stores, alerts, AI budget/repair/runner/prompt parts, `ControlPlane`, `StatusReporter`, `EventCycleQueue`, bootstrap, env base, test helpers | both engines |
 | `@mb/wire` | 7 | The news engine: the mirrored files, shared source helpers, `sharedCatalog()`, a `makeLexicon()` skeleton, and (Phase 10) `enrich/` for article summaries | both engines |
-| `@mb/ui` | 8 | Client-safe React: the shadcn primitives, design tokens (`styles.css`), app-shell components, the live-UI shell driven by a per-bot event catalog, shared page sections | both dashboards |
-| `@mb/web-kit` | 8 | Server-only dashboard helpers: auth factory, database, command routes, shared queries, formatting, metadata, error reporting | both dashboards |
+| `@mb/ui` | 8 ✓ | Client-safe React: the shadcn primitives, design tokens (`styles.css`), app-shell components, the live-UI shell driven by a per-bot event catalog, shared page sections | both dashboards |
+| `@mb/web-kit` | 8 ✓ | Server-only dashboard helpers: auth factory, database, command routes, shared queries, formatting, metadata, error reporting | both dashboards |
 
 Since Phase 5, `crypto-core` and `stock-core` build on `@mb/core`: the shared logic lives there once, and each bot core binds its own parameters (the stream-token prefix, its wire categories, its owner-only events, its settings sections). Crypto's AI output schema lives in `crypto-core/src/report.ts`. The full module lists are in plan §3.3. Where the two bots' versions of something differ, plan §3.5 says which version wins and in which phase. Behavior changes are kept out of Phases 5–8 and done one by one in Phase 9.
 
