@@ -25,6 +25,11 @@ export type DailyTechnicals = {
   pct_from_sma20: number | null
   sma50: number | null
   pct_from_sma50: number | null
+  sma200: number | null
+  pct_from_sma200: number | null
+  /** The highest high of the last 252 sessions (null with less than a year of bars). */
+  high_52w: number | null
+  pct_from_high_52w: number | null
   return_5d_pct: number | null
   return_20d_pct: number | null
   atr14: number | null

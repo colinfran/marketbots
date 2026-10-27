@@ -97,7 +97,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body className="flex min-h-full flex-col">
         <script type="application/ld+json" dangerouslySetInnerHTML={jsonLd(structuredData)} />
         <Providers initialEvents={events}>
-          <SiteHeader owner={viewer.owner} engine={{ online: engine.online, status: engine.status?.status ?? null, cycleState: engine.status?.cycle_state ?? null }} />
+          <SiteHeader owner={viewer.owner} engine={{ online: engine.online, status: engine.status?.status ?? null, cycleState: engine.status?.cycle_state ?? null }} extra={[{ href: "/core", label: "Core" }]} />
           <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:py-8">{children}</main>
           <footer className="text-muted-foreground mx-auto flex w-full max-w-7xl flex-col gap-1 px-4 pb-8 text-xs sm:flex-row sm:justify-between sm:gap-6">
             <p>Paper trading with fake money (an Alpaca paper account) for research and entertainment. Not financial advice; options can lose their entire value.</p>

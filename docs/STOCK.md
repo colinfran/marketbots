@@ -43,12 +43,13 @@ Browser ──https──▶ Vercel (Next.js dashboard) ──▶ MongoDB Atlas 
 | 5 / 60 min | equity history and chart bars for the website |
 | continuous | the news engine: each source on its own interval or stream (below) |
 | daily, before premarket | the scan universe for the news engine's price layers |
+| daily, from the premarket window | the core book's ranking (below) |
 
 Fills arrive instantly over Alpaca's `trade_updates` stream (binary JSON frames on paper). The REST sync still runs every minute, so a dropped connection never loses a fill. Market data comes from the IEX stream (the free plan allows one connection and 30 symbols, so the engine subscribes to held stocks, option underlyings, SPY/QQQ and then the watchlist).
 
 ## One cycle
 
-1. **Context** (code): account, positions, open orders, quotes and technicals (VWAP, RSI, EMA trend, ATR, opening range, 20-day levels) for held, watched, requested and moving symbols, the screener, news, the morning briefing, the previous cycle, recent days and their lessons. Intraday and in the closing cycle it also loads **option chain menus** (below).
+1. **Context** (code): account, positions, open orders, quotes and technicals (VWAP, RSI, EMA trend, ATR, opening range, 20-day levels, the 50- and 200-day averages, the 52-week high) for held, watched, requested and moving symbols, the screener, news, the morning briefing, the previous cycle, recent days and their lessons. Intraday and in the closing cycle it also loads **option chain menus** (below).
 2. **Research** (Grok + `web_search` + `x_search`): a sourced memo. It never decides. Each query, source and chunk of the memo streams as it happens, and the call's `ai_calls` entry counts its searches (each one is billed).
 3. **Decision** (Grok, structured output validated with zod): one fixed schema for every phase. It streams too (the headline and decision count appear as they're written). Schema failures are repaired in code when nothing trade-related is lost, else retried with the exact error at a lower temperature; an optional fallback model covers outages, and takes over at once after a timeout.
 4. **Risk checks and execution** (code): every decision is checked rule by rule and every check is recorded on the decision and streamed. Exits run first, then holds, then entries by conviction.
@@ -133,6 +134,20 @@ scheduled ──(due, engine running, regular session)──▶ running ──�
 - **Risk**: execution goes through the usual stock execution, so every risk check and cap applies. The per-position cap (`risk.max_position_pct`) clamps each buy, so a seed larger than that cap needs at least two holdings; Grok is told so.
 - **Once**: only one run can be scheduled or running, and a new one is refused while any run is `done` unless the command sets `force`. A run is a single attempt: a failure is alerted and never retried. `seed.started` and `seed.completed` go on the live stream.
 
+## Core book (long-term holdings)
+
+A fixed share of equity (`core.target_pct`, 50%) in a handful of long-term holdings, each with a written thesis and invalidation, reviewed weekly instead of every cycle; day and swing trading run with the rest. The yardstick is beating SPY over months. The design and its rollout are in [plans/CORE-BOOK.md](plans/CORE-BOOK.md). It is **off** (`core.enabled: false`) until the owner turns it on in Admin → Core book; built so far: the settings and the daily ranking, which trades nothing.
+
+**Settings** (the `core` section; defaults): `enabled` off, `target_pct` 50, `band_pct` 5, `min_holdings` / `max_holdings` 4 / 8, `max_holding_pct` 15 (per stock, % of equity), `max_index_etf_pct` 25 (SPY, QQQ, DIA, IWM, VTI, VOO), `max_theme_pct` 50 (% of the book), `stop_pct` 15, `min_conviction` 7, `max_trades_per_review` 6, `review_weekday` / `review_time_et` mon / 10:15, `universe_size` 100, `themes` (one per line, `AI buildout: NVDA, AVGO, TSM`; tickers optional).
+
+**The ranking** (`core-book/ranking.ts`, `core-book/data.ts`), built once per trading day from the premarket window on (and again that day if the themes, `universe_size` or benchmarks change), cached under `core:ranking` and shown on the dashboard's Core page:
+
+- **Candidates**: the scan universe's top `universe_size` names by dollar volume, the benchmark ETFs, every theme ticker and every held stock. Funds whose names mark them as leveraged, inverse, volatility or option-income products are left out (a holding never is), as is anything Alpaca doesn't list as an active, tradable US equity.
+- **Data**: a year of consolidated (SIP) daily bars, completed sessions only (380 calendar days; about four pages of one request for ~150 symbols). Per name: the 50- and 200-day averages, 3/6/12-month returns, the 12-month return without the last month (12-1), returns minus SPY's over the same days, distance from the 52-week high, annualized volatility of the last 60 daily returns, the year's worst drawdown, 20-day dollar volume.
+- **Ranking**: a trend filter (price above the 200-day average, the 50-day above the 200-day), then a 0–100 score among the names that pass: the mean percentile of the 12-1 month and 6-month returns, each divided by the volatility. The weekly review will see the top 25 (`CORE_TOP_CANDIDATES`), every theme ticker and every holding.
+
+A failed build is retried after 30 minutes and the last ranking keeps serving.
+
 ## Live stream
 
 The engine runs an authenticated WebSocket server (`/v1/stream`) plus `/healthz` and `/readyz`, published on `127.0.0.1:8788`; the reverse proxy terminates TLS for `engine.stockmarketbot.app`.
@@ -172,7 +187,7 @@ Events are typed (`packages/core/src/events.ts`) and carry a strictly increasing
 | `position_plans` | live stop/target/horizon/thesis per stock |
 | `option_positions` | each options position: legs, entry, exits, live mark, exit and realized P&L |
 | `daily_stats` | per-day equity, P&L vs SPY, wins/losses |
-| `cache` | what the website shows from Alpaca: the account snapshot, equity history, chart bars; also the day's scan universe |
+| `cache` | what the website shows from Alpaca: the account snapshot, equity history, chart bars; also the day's scan universe and the core book's ranking |
 | `wire_items` | every stored news item: normalized text, tickers, category, tier, severity and its parts, cluster, confirmations, price when first seen, notable reasons (TTL `wire.retention_days`, 30) |
 | `wire_triggers` | every trigger candidate the policy produced, with the gate that passed or stopped it and why (TTL `wire.retention_days`) |
 | `seed_runs` | the owner's one-time seed buys: schedule, status, allocations, orders, error |

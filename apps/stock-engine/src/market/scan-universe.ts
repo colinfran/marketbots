@@ -23,7 +23,9 @@ const EXCHANGES = new Set(["NYSE", "NASDAQ", "ARCA", "AMEX", "BATS"])
 const TICKER = /^[A-Z]{1,5}(\.[A-Z])?$/
 const BATCH = 1_000
 const SESSIONS = 20
-const CACHE_ID = "wire:scan_universe"
+/** Where today's universe is kept in the `cache` collection (the core book's ranking reads it too). */
+export const SCAN_UNIVERSE_KEY = "wire:scan_universe"
+const CACHE_ID = SCAN_UNIVERSE_KEY
 /** After a failed build, wait this long before trying again. */
 const RETRY_MS = 30 * 60_000
 

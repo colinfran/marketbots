@@ -1,5 +1,6 @@
 import "server-only"
 import type { Bar, PortfolioHistory } from "@mb/stock-core/alpaca"
+import { CORE_RANKING_KEY, type CoreRanking } from "@mb/stock-core/core-book"
 import type { AccountSnapshot, ChartBars, CycleDoc, DecisionDoc, EngineStatusDoc, OrderDoc, ReportDoc, ResearchResult } from "@mb/stock-core/db"
 import { eventForViewer } from "@mb/stock-core/events"
 import { FILLED_ORDERS, fillsFromOrders, type OrderFill } from "@mb/stock-core/fills"
@@ -118,6 +119,14 @@ export const getLiveAccount = async () => {
 }
 
 export type LiveAccount = NonNullable<Awaited<ReturnType<typeof getLiveAccount>>>
+
+// ─── Core book ───────────────────────────────────────────────────────────────
+
+/** The core book's latest daily ranking (built every trading morning, whether the book is on or not). */
+export const getCoreRanking = async () => {
+  await connection()
+  return (await readCache<CoreRanking>(CORE_RANKING_KEY))?.data ?? null
+}
 
 const HISTORY = [
   { key: "1D", label: "1D" },

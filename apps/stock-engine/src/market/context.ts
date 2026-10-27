@@ -44,6 +44,9 @@ const toQuote = (symbol: string, snap: Snapshot | undefined, day: string): Quote
 
 const newsLookbackHours: Record<Phase, number> = { premarket: 16, intraday: 3, close: 3, postmarket: 6 }
 
+/** Calendar days of daily bars a cycle loads: a year of sessions plus slack for holidays. */
+export const DAILY_LOOKBACK_DAYS = 380
+
 export type BuiltContext = {
   context: MarketContext
   /** Every contract offered to the AI, by symbol (entries must come from here). */
@@ -131,8 +134,8 @@ export const buildContext = async (
     sessionStarted && phase !== "premarket"
       ? safe(alpaca.getBars(barSymbols, "5Min", session.open!, session.close && session.close < now ? session.close : now), {} as Record<string, Bar[]>, "intraday bars")
       : Promise.resolve({} as Record<string, Bar[]>),
-    // 100 calendar days ≈ 68 sessions: enough for the 50-day average swing holds are judged against.
-    safe(alpaca.getBars(barSymbols, "1Day", marketTime(addDays(day, -100), "00:00"), marketTime(day, "00:00")), {} as Record<string, Bar[]>, "daily bars"),
+    // 380 calendar days ≈ 262 sessions: the 200-day average and the 52-week high as well as the 20- and 50-day levels.
+    safe(alpaca.getBars(barSymbols, "1Day", marketTime(addDays(day, -DAILY_LOOKBACK_DAYS), "00:00"), marketTime(day, "00:00")), {} as Record<string, Bar[]>, "daily bars"),
   ])
 
   const newsSince = new Date(now.getTime() - newsLookbackHours[phase] * 3_600_000)

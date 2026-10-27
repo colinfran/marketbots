@@ -148,6 +148,10 @@ describe("dailyTechnicals", () => {
       pct_from_sma20: 8.3,
       sma50: null, // only 25 days
       pct_from_sma50: null,
+      sma200: null,
+      pct_from_sma200: null,
+      high_52w: null,
+      pct_from_high_52w: null,
       return_5d_pct: 4.2, // 119 → 124
       return_20d_pct: 19.23, // 104 → 124
       atr14: 2, // every true range is 2
@@ -162,6 +166,18 @@ describe("dailyTechnicals", () => {
     const t = dailyTechnicals(daily(Array.from({ length: 60 }, (_, i) => 100 + i)), null)! // 100 … 159
     expect(t.sma50).toBe(134.5) // mean of 110 … 159
     expect(t.pct_from_sma50).toBe(18.22)
+  })
+
+  it("adds the 200-day average and the 52-week high once there is a year of days", () => {
+    const year = daily(Array.from({ length: 260 }, (_, i) => 100 + i), (_, c) => ({ h: c + 1 })) // 100 … 359
+    const t = dailyTechnicals(year, 350)!
+    expect(t.sma200).toBe(259.5) // mean of 160 … 359
+    expect(t.pct_from_sma200).toBe(34.87)
+    expect(t.high_52w).toBe(360) // the highest high of the last 252 days
+    expect(t.pct_from_high_52w).toBe(-2.78)
+    const short = dailyTechnicals(daily(Array.from({ length: 249 }, (_, i) => 100 + i)), null)!
+    expect(short.sma200).not.toBeNull()
+    expect(short.high_52w).toBeNull() // under 250 days
   })
 
   it("measures against the live price when given", () => {

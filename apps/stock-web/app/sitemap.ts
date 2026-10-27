@@ -11,6 +11,7 @@ export default async function Sitemap(): Promise<MetadataRoute.Sitemap> {
       { path: "/", fresh: true, changeFrequency: "hourly", priority: 1 },
       { path: "/live", fresh: true, changeFrequency: "always", priority: 0.9 },
       { path: "/holdings", fresh: true, changeFrequency: "hourly", priority: 0.8 },
+      { path: "/core", fresh: true, changeFrequency: "daily", priority: 0.7 },
       { path: "/markets", fresh: true, changeFrequency: "hourly", priority: 0.8 },
       { path: "/research", fresh: true, changeFrequency: "hourly", priority: 0.8 },
       { path: "/journal", fresh: true, changeFrequency: "daily", priority: 0.8 },

@@ -238,12 +238,12 @@ describe("buildContext: a mid-session cycle", () => {
     expect(amd.daily).toBeNull()
   })
 
-  it("requests today's 5-minute bars and 100 days of daily bars", async () => {
+  it("requests today's 5-minute bars and 380 days of daily bars (a year of sessions for the 200-day average and 52-week high)", async () => {
     await buildContext("intraday", session(), NOW)
     const symbols = ["NVDA", "AMD", "AAPL", "META", "TSLA", "SMCI", "INTC", "SPY", "QQQ"]
     expect(broker.barRequests).toEqual([
       { symbols, timeframe: "5Min", start: session().open, end: NOW },
-      { symbols, timeframe: "1Day", start: marketTime("2026-07-18", "00:00"), end: marketTime(DAY, "00:00") },
+      { symbols, timeframe: "1Day", start: marketTime("2025-10-11", "00:00"), end: marketTime(DAY, "00:00") },
     ])
   })
 

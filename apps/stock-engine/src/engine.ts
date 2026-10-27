@@ -22,6 +22,7 @@ import type { MarketStream } from "./alpaca/market-stream"
 import type { TradeStream } from "./alpaca/trade-stream"
 import type { EventBus } from "./bus/event-bus"
 import { CommandProcessor } from "./commands/processor"
+import { CoreRankingStore } from "./core-book/data"
 import type { EngineContext } from "./bot/context"
 import { runCycle, type CycleOutcome } from "./bot/cycle"
 import { cancelSymbolOrders } from "./bot/execute"
@@ -119,6 +120,8 @@ export class Engine {
   readonly ctx: EngineContext
   readonly control: ControlPlane<EngineRunStatus, WireItemDoc>
   readonly policy: WirePolicy
+  /** The core book's daily ranking (built from the premarket window on; display only until the core review uses it). */
+  readonly coreRanking: CoreRankingStore
 
   private readonly abort = new AbortController()
   private stops: (() => void)[] = []
@@ -173,6 +176,7 @@ export class Engine {
       wire: d.wire,
     }
     this.commands = new CommandProcessor(d.db.col, d.bus, d.log.child({ component: "commands" }), (c, doc) => this.handleCommand(c, doc))
+    this.coreRanking = new CoreRankingStore({ col: d.db.col, alpaca: d.alpaca, settings: () => d.settings.current, log: d.log.child({ component: "core-book" }), held: () => this.heldSymbols })
     this.eventQueue = new EventCycleQueue({
       col: d.db.col,
       log: d.log,
@@ -450,6 +454,8 @@ export class Engine {
     const session = await this.refreshSession(now)
     const settings = this.d.settings.current
     this.plan = await planPhase(this.d.db.col, settings, session, now)
+    // In the background: a few REST calls once a day, never blocking a cycle.
+    void this.coreRanking.refresh(session, now)
     if (this.cycle) return
     await this.control.failMissedSeeds(seedDeadline(session, settings.schedule.close_window_minutes), now)
     const st = this.d.state.state

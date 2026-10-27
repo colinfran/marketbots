@@ -19,7 +19,7 @@ export { eventSection } from "@mb/engine-kit/ai/prompt-parts"
  * them, but nothing the model writes can change them.
  */
 
-export const PROMPT_VERSION = "2026-10-27.summaries-1"
+export const PROMPT_VERSION = "2026-10-27.long-term-1"
 
 const PHASE_LABEL: Record<Phase, string> = {
   premarket: "PREMARKET BRIEFING: the market has not opened yet",

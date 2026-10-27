@@ -25,12 +25,14 @@ const NAV = [
   { href: "/about", label: "About" },
 ]
 
-export function SiteHeader({ owner, engine }: { owner: boolean; engine: { online: boolean; status: string | null; cycleState: string | null } }) {
+/** `extra`: pages only this dashboard has (yet), placed after Holdings. */
+export function SiteHeader({ owner, engine, extra = [] }: { owner: boolean; engine: { online: boolean; status: string | null; cycleState: string | null }; extra?: { href: string; label: string }[] }) {
   const { name, Mark } = useKit()
   const pathname = usePathname()
   const router = useRouter()
   const { resolvedTheme, setTheme } = useTheme()
-  const nav = owner ? [...NAV, { href: "/admin", label: "Admin" }] : NAV
+  const pages = [...NAV.slice(0, 3), ...extra, ...NAV.slice(3)]
+  const nav = owner ? [...pages, { href: "/admin", label: "Admin" }] : pages
   const active = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href))
   const logout = async () => {
     await authClient.signOut()

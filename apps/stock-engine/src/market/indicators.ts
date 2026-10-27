@@ -83,6 +83,10 @@ export const intradayTechnicals = (bars: Bar[]): IntradayTechnicals | null => {
   }
 }
 
+/** Sessions in a year; a 52-week high needs nearly all of them (a few holidays' slack). */
+const YEAR_SESSIONS = 252
+const MIN_YEAR_SESSIONS = 250
+
 /** Summarises completed daily bars (oldest first). `price` is the latest price. */
 export const dailyTechnicals = (bars: Bar[], price: number | null): DailyTechnicals | null => {
   if (bars.length < 6) return null
@@ -90,6 +94,8 @@ export const dailyTechnicals = (bars: Bar[], price: number | null): DailyTechnic
   const last = price ?? closes[closes.length - 1]
   const sma20 = sma(closes, 20)
   const sma50 = sma(closes, 50)
+  const sma200 = sma(closes, 200)
+  const high52w = bars.length >= MIN_YEAR_SESSIONS ? Math.max(...bars.slice(-YEAR_SESSIONS).map((b) => b.h)) : null
   const atr14 = stockAtr(bars)
   const recent = bars.slice(-20)
   return {
@@ -97,6 +103,10 @@ export const dailyTechnicals = (bars: Bar[], price: number | null): DailyTechnic
     pct_from_sma20: pctChange(sma20, last),
     sma50: round(sma50),
     pct_from_sma50: pctChange(sma50, last),
+    sma200: round(sma200),
+    pct_from_sma200: pctChange(sma200, last),
+    high_52w: round(high52w),
+    pct_from_high_52w: pctChange(high52w, last),
     return_5d_pct: pctChange(closes[closes.length - 6], last),
     return_20d_pct: closes.length > 20 ? pctChange(closes[closes.length - 21], last) : null,
     atr14: round(atr14),
