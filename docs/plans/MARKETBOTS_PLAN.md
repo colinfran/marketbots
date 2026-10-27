@@ -274,7 +274,7 @@ Each engine injects `CATEGORY_BASE`, its settings type and its bus. `WireDeps` a
 | crypto-engine | 1 GB | ~0.35 GB | 0.32 GB |
 | stock-engine | 1 GB (up from 768 MB: headroom at the open with 1,500 tracked symbols) | 0.3–0.5 GB | 0.28 GB |
 | scraper (one) | 1 GB | 0.15 GB idle, ≤0.5 GB rendering | 2 × 0.12 GB |
-| llm | 2 GB RAM, 2 CPUs; GPU ~3 GB only while loaded | ~0.1 GB idle, <1 GB while loaded; 0 GPU when idle | — |
+| llm | 2 GB RAM, 2 CPUs; GPU ~2.4 GB (llama3.2:3b) only while loaded | ~0.1 GB idle; **at its 2 GB cap while a model is loaded** (mostly reclaimable cache; measured in 10.1), 2 CPUs while generating; 0 GPU when idle | — |
 | **Total** | 5 GB of caps | **~1–1.5 GB typical** (+0.5 GB vs today) | 0.85 GB |
 
 Typical VM use goes from ~4.6 to ~5.2 GiB of 11.6 GiB, so no `.wslconfig` change is needed.
@@ -454,12 +454,23 @@ Tags: **[C]** crypto, **[S]** stock, **[both]**, **[stack]** Docker/infra, **[ow
 
 ### Phase 10: Local article summaries (≈ 2 sessions)
 
-- [ ] 10.1 [stack] Spike:
+- [x] 10.1 [stack] Spike:
   - Start `llm` (`--profile llm`) and confirm the GPU inside the container.
   - Pull `llama3.2:3b`, `qwen3:4b`, `phi4-mini`, `gemma3:4b`.
   - Run all four on 20 real articles from `wire_items` and record faithfulness, latency p50/p95, peak GPU memory and RAM with all other services running.
   - **Go/no-go:** a model within 3.5 GB GPU memory and 6 s p95 that keeps the article's facts. If none qualifies, stop and report.
-- [ ] 10.2 [stack] Scraper `POST /extract` (§3.8) with robots.txt and skip-domain checks; tests against saved article fixtures.
+  - **Result (2026-10-27, `docs/plans/PHASE10_SPIKE.md`): conditional GO for `llama3.2:3b`; the owner must confirm.**
+    - **Within the limits:** p95 3.2 s and 2.4 GB of GPU memory, with valid JSON on all 20 articles.
+    - **Not fully faithful:** it made 3 material errors in 20 articles. A stricter prompt removed the one invented number but not the other 2 errors. No model was fully faithful.
+    - **Alternatives:** none was clearly better. gemma3:4b failed every limit.
+    - **Pinned:** model digest `a80c4f17…5b8b72`; Ollama image `0.40.11@sha256:dea72d1e…` in compose.yml.
+    - **Mitigations for 10.3:**
+      - Use the stricter prompt.
+      - Check every number in a summary against the article.
+      - Select only real articles: skip halts, social posts and odds, and drop texts under 150 words.
+      - Label each summary as a machine summary.
+    - **Until the owner confirms, 10.5 waits:** summaries can be stored and shown (10.3–10.4) but don't go into decision prompts.
+- [x] 10.2 [stack] Scraper `POST /extract` (§3.8) with robots.txt and skip-domain checks; tests against saved article fixtures.
 - [ ] 10.3 [both] `@mb/wire/enrich`: queue, selection, extract → summarize → store, the GPU-only guard, hourly cap, `enrich:summaries` health. Never on the trigger path.
 - [ ] 10.4 [both] `wire.summaries` settings section (defaults: enabled, the 10.1 model, `min_severity` 55, 60/h, skip list), shipped live like the `wire` section was.
 - [ ] 10.5 [both] Dossier rows gain the summary (fenced, capped); bump `PROMPT_VERSION`. Research page and item detail show it.

@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1.7
 #
-# Headless scraper sidecar (MASTER_PLAN Phase 7), shared by both engines. Build from the repository root:
+# Headless scraper sidecar (MASTER_PLAN Phase 7; POST /extract: MARKETBOTS_PLAN §3.8), shared by both
+# engines. Build from the repository root:
 #   docker compose build scraper
 #   docker build -f apps/scraper/Dockerfile .
 #
@@ -14,7 +15,8 @@ ENV NODE_ENV=production \
     HOME=/tmp
 COPY apps/scraper/package.json apps/scraper/package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund
-COPY apps/scraper/server.mjs ./
+COPY apps/scraper/server.mjs apps/scraper/extract.mjs apps/scraper/robots.mjs ./
 USER pwuser
 EXPOSE 8790
-CMD ["node", "server.mjs"]
+# Some news sites (Yahoo Finance) send ~33 KB of response headers; Node's fetch refuses more than 16 KB by default.
+CMD ["node", "--max-http-header-size=65536", "server.mjs"]

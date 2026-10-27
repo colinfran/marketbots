@@ -1,0 +1,20 @@
+# robots.txt for www.newsroom.example
+User-agent: Googlebot
+User-agent: Bingbot
+Disallow: /search
+Allow: /
+
+User-agent: GPTBot
+Disallow: /
+
+User-agent: *
+Disallow: /search
+Disallow: /private/
+Disallow: /*.pdf$
+Disallow: /markets/
+Allow: /markets/news/
+Disallow: /api
+Allow: /api/public
+Disallow:
+
+Sitemap: https://www.newsroom.example/sitemap.xml

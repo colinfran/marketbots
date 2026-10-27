@@ -1,12 +1,20 @@
 import { createServer } from "node:http"
 import { chromium } from "playwright-core"
+import { createExtractor, parseExtractJob, USER_AGENT } from "./extract.mjs"
+import { createRobots } from "./robots.mjs"
 
 /**
  * The headless scraper sidecar (MASTER_PLAN Phase 7): renders pages that need JavaScript for the
- * engines' `headless` news sources (wire/kinds/headless.ts). One container serves both engines.
+ * engines' `headless` news sources (wire/kinds/headless.ts), and extracts news articles as plain
+ * text for the article summaries (MARKETBOTS_PLAN §3.8, extract.mjs). One container serves both
+ * engines.
  *
- *   POST /render { url, wait_for?, timeout_ms?, capture? } → { status, url, html, captured }
- *   GET  /health                                           → { ok, browser, active, queued, … }
+ *   POST /render  { url, wait_for?, timeout_ms?, capture? }    → { status, url, html, captured }
+ *   POST /extract { url, render?, skip_domains?, max_chars? }  → { status: "ok", text, … } | { status, reason }
+ *   GET  /health                                               → { ok, browser, active, queued, … }
+ *
+ * /extract answers 200 for every outcome ("ok", "skipped", "failed"); its renders share the
+ * /render queue and per-caller cap below.
  *
  * `wait_for` is a CSS selector to wait for; without one the page gets a short network-idle wait.
  * `capture` lists URL substrings: the page's own responses that match are returned as text, for
@@ -38,7 +46,7 @@ let launchedAt = 0
 let userAgent = undefined
 let active = 0
 const waiting = []
-const stats = { renders: 0, failures: 0, restarts: 0, started_at: new Date().toISOString() }
+const stats = { renders: 0, failures: 0, restarts: 0, extracts: 0, extracts_skipped: 0, extracts_failed: 0, started_at: new Date().toISOString() }
 
 const log = (msg, extra = {}) => console.log(JSON.stringify({ ts: new Date().toISOString(), level: "info", msg, service: "scraper", ...extra }))
 
@@ -154,6 +162,39 @@ const callerOf = (req) => {
   return req.socket.remoteAddress ?? "unknown"
 }
 
+/** A render for /extract: same queue and per-caller cap as /render. Throws when busy or failed. */
+const renderForExtract = async (url, caller) => {
+  const slot = acquire(caller)
+  if (!slot) throw new Error(`busy: ${waiting.length} renders queued (${queuedBy(caller)} from ${caller})`)
+  await slot
+  try {
+    const result = await render({ url, wait_for: null, timeout_ms: DEFAULT_TIMEOUT_MS, capture: [] })
+    stats.renders += 1
+    return result
+  } catch (e) {
+    stats.failures += 1
+    throw e
+  } finally {
+    release()
+  }
+}
+
+const extract = createExtractor({ robots: createRobots({ userAgent: USER_AGENT }), render: renderForExtract })
+
+const handleExtract = async (req, raw, send) => {
+  const { job, error } = parseExtractJob(raw)
+  if (!job) return send(400, { error })
+  const caller = callerOf(req)
+  const started = Date.now()
+  const result = await extract(job, caller)
+  if (result.status === "ok") stats.extracts += 1
+  else if (result.status === "skipped") stats.extracts_skipped += 1
+  else stats.extracts_failed += 1
+  const detail = result.status === "ok" ? { words: result.words, rendered: result.rendered } : { reason: result.reason }
+  log("extracted", { caller, host: new URL(job.url).host, status: result.status, ms: Date.now() - started, ...detail })
+  send(200, result)
+}
+
 const server = createServer(async (req, res) => {
   const send = (code, body) => {
     res.writeHead(code, { "content-type": "application/json" })
@@ -164,13 +205,14 @@ const server = createServer(async (req, res) => {
     for (const w of waiting) by_caller[w.caller] = (by_caller[w.caller] ?? 0) + 1
     return send(200, { ok: true, browser: !!browser?.isConnected(), active, queued: waiting.length, by_caller, ...stats })
   }
-  if (req.method !== "POST" || req.url !== "/render") return send(404, { error: "not found" })
+  if (req.method !== "POST" || (req.url !== "/render" && req.url !== "/extract")) return send(404, { error: "not found" })
 
   let raw = ""
   for await (const chunk of req) {
     raw += chunk
     if (raw.length > MAX_REQUEST_BYTES) return send(413, { error: "request too large" })
   }
+  if (req.url === "/extract") return handleExtract(req, raw, send)
   const { job, error } = parseJob(raw)
   if (!job) return send(400, { error })
 
