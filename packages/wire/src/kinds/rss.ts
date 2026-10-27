@@ -28,10 +28,13 @@ const text = (v: unknown): string => {
   return ""
 }
 
+/** A date-time with no zone ("2026-10-27 02:16:56", Investing.com's) is UTC: `new Date` alone would read it in the host's zone. */
+const NO_ZONE = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/
+
 const date = (v: unknown): Date | null => {
   const s = text(v).trim()
   if (!s) return null
-  const d = new Date(s)
+  const d = new Date(NO_ZONE.test(s) ? `${s.replace(" ", "T")}Z` : s)
   return Number.isFinite(d.getTime()) ? d : null
 }
 
