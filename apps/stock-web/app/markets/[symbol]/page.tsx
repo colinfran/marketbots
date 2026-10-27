@@ -70,7 +70,7 @@ export default async function SymbolPage({ params }: { params: Promise<{ symbol:
           <CardDescription>Regular-session prices. Markers sit at the actual fill price; hover a bar for the details.</CardDescription>
         </CardHeader>
         <CardContent>
-          <PriceChart ranges={charts} levels={levels} />
+          <PriceChart symbol={symbol} ranges={charts} levels={levels} />
         </CardContent>
       </Card>
 
