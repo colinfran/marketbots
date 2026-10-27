@@ -501,6 +501,32 @@
       ]
     },
     {
+      "type": "core.review.started",
+      "data_keys": [
+        "review_id",
+        "cycle_id",
+        "kind",
+        "trigger",
+        "symbol",
+        "dry_run"
+      ]
+    },
+    {
+      "type": "core.review.completed",
+      "data_keys": [
+        "review_id",
+        "cycle_id",
+        "status",
+        "dry_run",
+        "summary",
+        "decisions",
+        "executed",
+        "rejected",
+        "cost_usd",
+        "error"
+      ]
+    },
+    {
       "type": "error",
       "data_keys": [
         "scope",

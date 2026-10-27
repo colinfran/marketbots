@@ -132,6 +132,15 @@ describe("Engine", () => {
     expect(await db.col.cycles.countDocuments({ kind: "event" })).toBe(0)
   })
 
+  it("runs the core review on request only when it can", async () => {
+    expect(await command({ type: "core.review" })).toMatchObject({ status: "failed", error: "the core book is off: turn it on in Admin → Settings → Core book, or run a dry run" })
+    await command({ type: "settings.update", patch: { core: { enabled: true } }, expected_version: 1 })
+    expect(await command({ type: "core.review" })).toMatchObject({ status: "failed", error: "a core review trades, so it runs only while the market is open (a dry run works any time)" })
+    // A dry run works with the market closed, but still needs the AI.
+    expect(await command({ type: "core.review", dry_run: true })).toMatchObject({ status: "failed", error: "AI is disabled (AI_GATEWAY_API_KEY not set)" })
+    expect(await db.col.coreReviews.countDocuments()).toBe(0)
+  })
+
   it("runs a cycle on request (skipped without an AI key) and refuses a second one", async () => {
     expect(await command({ type: "cycle.run_now", phase: "postmarket" })).toMatchObject({ status: "done", result: "postmarket cycle started" })
     await until(async () => (await db.col.cycles.countDocuments({ phase: "postmarket", status: "skipped" })) === 1)

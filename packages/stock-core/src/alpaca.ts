@@ -114,6 +114,8 @@ export type NewOrder = {
   qty: string
   /** For mleg orders: positive = net debit paid, negative = net credit received. */
   limit_price?: string
+  /** Plain stop orders (the core book's resting stops). */
+  stop_price?: string
   order_class?: "simple" | "bracket" | "oco" | "mleg"
   take_profit?: { limit_price: string }
   stop_loss?: { stop_price: string }

@@ -28,7 +28,8 @@ export const planPhase = async (col: Pick<Collections, "cycles">, settings: Sett
     return { phase: null, reason: "Market is closed today (weekend or holiday)." }
   }
   const s = settings.schedule
-  const today = await col.cycles.find({ trading_day: session.day }, { projection: { phase: 1, status: 1, started_at: 1 } }).toArray()
+  // Core book reviews run in the cycle slot (as "intraday" cycles) but are no phase of the trading day.
+  const today = await col.cycles.find({ trading_day: session.day, kind: { $ne: "core" } }, { projection: { phase: 1, status: 1, started_at: 1 } }).toArray()
   const canRun = (phase: Phase) => {
     const attempts = today.filter((r) => r.phase === phase)
     return !attempts.some((r) => isDone(r.status)) && !attempts.some((r) => r.status === "running") && attempts.length < s.max_phase_attempts

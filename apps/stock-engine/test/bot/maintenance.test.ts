@@ -110,6 +110,30 @@ describe("ensureProtection", () => {
     expect(broker.submitted[0].qty).toBe("7")
   })
 
+  it("gives a core holding a plain GTC stop at its plan's level, with no target", async () => {
+    broker.setPosition("NVDA", 5, 200)
+    await addPlan("NVDA", { book: "core", stop_loss: 170, take_profit: null, horizon: "multi_day", decision_id: "dec-core" })
+    expect(await ensureProtection()).toEqual(["protected NVDA (core): stop 170"])
+    expect(broker.submitted).toEqual([{ symbol: "NVDA", qty: "5", side: "sell", type: "stop", stop_price: "170.00", time_in_force: "gtc", client_order_id: expect.stringMatching(/^smb-core-stop-/) }])
+    expect(await plan("NVDA")).toMatchObject({ book: "core", stop_loss: 170, take_profit: null })
+  })
+
+  it("gives a core holding without a stop the initial core stop (wider than any trading stop)", async () => {
+    broker.setPosition("NVDA", 5, 200, { avg: 190 })
+    await addPlan("NVDA", { book: "core", stop_loss: null, take_profit: null })
+    expect(await ensureProtection()).toEqual(["protected NVDA (core): stop 161.5"]) // 190 × 0.85
+    expect(await plan("NVDA")).toMatchObject({ stop_loss: 161.5 })
+  })
+
+  it("sells a core holding already through its stop", async () => {
+    broker.setPosition("NVDA", 5, 165)
+    await addPlan("NVDA", { book: "core", stop_loss: 170, take_profit: null })
+    const notes = await settle(ensureProtection())
+    expect(notes).toEqual(["flattened NVDA (core: price 165 reached its 170 stop with no stop order)"])
+    expect(broker.holdings.has("NVDA")).toBe(false)
+    expect(alerts).toContainEqual(expect.objectContaining({ level: "warning", title: "NVDA sold: its core stop was hit while unprotected", path: "/core" }))
+  })
+
   it("reports and alerts when protection fails", async () => {
     broker.setPosition("AAPL", 10, 100)
     broker.setPosition("MSFT", 2, 400)

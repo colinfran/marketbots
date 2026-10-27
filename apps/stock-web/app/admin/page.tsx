@@ -1,6 +1,7 @@
 import { STRATEGY_LABEL } from "@mb/stock-core/options"
 import { formatDateTime } from "@mb/stock-core/time"
 import type { Metadata } from "next"
+import Link from "next/link"
 import { redirect } from "next/navigation"
 import { StreamBadge } from "@mb/ui/live"
 import { Badge } from "@mb/ui/components/badge"
@@ -12,7 +13,7 @@ import { SettingsForm } from "@mb/ui/settings-form"
 import { Empty, PageHeader, SectionTitle, StatusBadge, SymbolLink } from "@/components/bits"
 import { CommandButton } from "@/components/command"
 import { getViewer } from "@/lib/auth"
-import { ago, titleCase, usd } from "@/lib/format"
+import { ago, titleCase, usd, WEEKDAY_PLURAL } from "@/lib/format"
 import { getAudit, getCommands, getEngine, getEngineState, getLiveAccount, getNotifications, getRecentEvents, getSeedRuns, getSettings, getSettingsDoc } from "@/lib/queries"
 import { EvaluateForm } from "./evaluate-form"
 import { SETTINGS_SECTIONS } from "./settings-sections"
@@ -122,6 +123,33 @@ export default async function AdminPage() {
           </CardHeader>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            Core book <Badge variant={settings.core.enabled ? "default" : "secondary"}>{settings.core.enabled ? "On" : "Off"}</Badge>
+          </CardTitle>
+          <CardDescription>
+            Long-term holdings with written theses, about {settings.core.target_pct}% of equity, reviewed {WEEKDAY_PLURAL[settings.core.review_weekday]} at {settings.core.review_time_et} ET (turn it on and tune it under Settings → Core book). Running the
+            review now counts as this week&apos;s and trades in the regular session. A dry run does the research and the decision and shows the trades it would make, without placing any; it works while the
+            book is off and outside market hours. Each review costs about $0.50–0.80 of the AI budget. Results are on the{" "}
+            <Link href="/core" className="text-foreground underline underline-offset-2">
+              Core page
+            </Link>
+            .
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-3">
+          <CommandButton command={{ type: "core.review", dry_run: true }} label="Dry run (plan only)" />
+          <CommandButton
+            command={{ type: "core.review" }}
+            label="Run core review now"
+            variant="default"
+            disabled={!settings.core.enabled || !running}
+            confirm={{ title: "Run the core review now?", description: "Research, then a decision on every core holding and any new buys, placed at market within the core book's rules. It counts as this week's review.", action: "Run it" }}
+          />
+        </CardContent>
+      </Card>
 
       <SeedCard
         runs={seedRuns}

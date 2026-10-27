@@ -418,6 +418,13 @@ export class FakeBroker {
       return clone(order)
     }
 
+    // A plain stop rests until a test fills it (fillOrder).
+    if (req.type === "stop") {
+      const order = this.newOrder({ ...base, type: "stop", stop_price: req.stop_price ?? null, status: "new" })
+      this.orders.push(order)
+      return clone(order)
+    }
+
     const fills = this.fillMode === "fill"
     const order = this.newOrder({
       ...base,

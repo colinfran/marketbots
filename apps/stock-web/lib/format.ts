@@ -7,6 +7,9 @@ export { ago, duration, num, pct, titleCase, tone, until, usd } from "@mb/ui/lib
 
 export const qty = (value: number) => (Number.isInteger(value) ? String(value) : value.toFixed(4))
 
+/** The core book's review weekday, as a phrase: "Mondays". */
+export const WEEKDAY_PLURAL: Record<string, string> = { mon: "Mondays", tue: "Tuesdays", wed: "Wednesdays", thu: "Thursdays", fri: "Fridays" }
+
 export const price = (value: number | null | undefined) => (value === null || value === undefined || !Number.isFinite(value) ? "—" : `$${value.toFixed(2)}`)
 
 const WIRE_SOURCE_LABEL: Record<string, string> = { alpaca_news: "Benzinga via Alpaca" }

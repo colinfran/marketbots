@@ -122,6 +122,12 @@ export type LiveAccount = NonNullable<Awaited<ReturnType<typeof getLiveAccount>>
 
 // ─── Core book ───────────────────────────────────────────────────────────────
 
+/** Whether an id is a core book review's (its trades link to it where a cycle report's id would be). */
+export const isCoreReview = async (id: string) => {
+  await connection()
+  return !!(await (await collections()).coreReviews.findOne({ _id: id }, { projection: { _id: 1 } }))
+}
+
 /** The core book's latest daily ranking (built every trading morning, whether the book is on or not). */
 export const getCoreRanking = async () => {
   await connection()
@@ -492,7 +498,7 @@ export const getWireForCycle = async (cycle: Pick<CycleDoc, "kind" | "wire_trigg
 }
 
 /** What started a decision, for the analytics tables. Decisions from before it was recorded have no kind. */
-const KIND_LABEL: Record<string, string> = { scheduled: "Schedule", price_move: "Price move", manual: "Owner (manual)", event: "News event", seed: "Seed buy", unrecorded: "Not recorded (older)" }
+const KIND_LABEL: Record<string, string> = { scheduled: "Schedule", price_move: "Price move", manual: "Owner (manual)", event: "News event", seed: "Seed buy", core: "Core review", unrecorded: "Not recorded (older)" }
 
 /** News-engine analytics: does acting on events pay, how fast is it, and what does research cost now. */
 export const getWireAnalytics = async () => {

@@ -1,9 +1,11 @@
 import type { MarketContext } from "@mb/stock-core/context"
+import type { CoreReviewContext } from "@mb/stock-core/core-book"
 import { DEFAULT_SETTINGS, type Phase, type Settings } from "@mb/stock-core/settings"
 import { formatTime } from "@mb/stock-core/time"
 import type { WireItemDoc } from "@mb/stock-core/wire"
 import { afterAll, beforeAll, describe, it, vi } from "vitest"
 import { decisionPrompt, decisionSystemPrompt, eventSection, PROMPT_VERSION, renderContext, researchGapFillPrompt, researchPrompt, SEED_OWNER_LEAN, seedStopPct } from "../../src/ai/prompts"
+import { CORE_PROMPT_VERSION, coreDecisionPrompt, coreResearchPrompt, coreSystemPrompt } from "../../src/core-book/prompts"
 import { assembleDossier, toRow } from "../../src/wire/dossier"
 import { checkNoOrphans, matchContract, matchJson } from "./snapshot"
 
@@ -250,6 +252,96 @@ const MEMO = `## 1. Tape & macro
 
 const OPTIONS_OFF: Settings = { ...S, options: { ...S.options, enabled: false, allow_spreads: false } }
 
+/** The core book's first weekly review: the seed's SPY and DIA adopted, NVDA and LLY at the top of the ranking, one owner theme. */
+const CORE: CoreReviewContext = {
+  now_et: "10:15 AM",
+  trading_day: "2026-10-27",
+  kind: "weekly",
+  first_review: true,
+  book: {
+    equity: 10_412.35,
+    cash: 5_830.1,
+    cash_reserve_pct: 5,
+    deployable_cash: 5_309.48,
+    target_pct: 50,
+    band_pct: 5,
+    core_value: 4_100,
+    core_pct: 39.38,
+    trading_value: 482.25,
+    trading_pct: 4.63,
+    holdings: 2,
+    min_holdings: 4,
+    max_holdings: 8,
+    max_holding_pct: 15,
+    max_index_etf_pct: 25,
+    index_etfs: ["SPY", "QQQ", "DIA", "IWM", "VTI", "VOO"],
+    max_theme_pct: 50,
+    stop_pct: 15,
+    min_stop_pct: 3,
+    min_weight_pct: 2,
+    min_conviction: 7,
+    max_trades: 6,
+    buys_allowed: true,
+    notes: ["2 holdings, under the minimum of 4: build toward it with buys that make the case"],
+  },
+  holdings: [
+    {
+      symbol: "SPY",
+      name: "SPDR S&P 500 ETF Trust",
+      theme: null,
+      qty: 3,
+      avg_entry: 579.1,
+      price: 584.22,
+      weight_pct: 16.83,
+      pnl_pct: 0.88,
+      stop: 492.23,
+      stop_below_pct: 15.75,
+      opened_on: "2026-10-26",
+      thesis: "Broad US large caps for the long run; earnings growth intact into 2027.",
+      invalidation: "Stop-loss hit.",
+      notes: [{ on: "2026-10-27", action: "adopted", text: "Adopted from the one-time seed into the core book." }],
+      metrics: { price: 584.22, sma50: 571.4, sma200: 548.9, pct_from_sma50: 2.24, pct_from_sma200: 6.43, return_3m_pct: 4.1, return_6m_pct: 8.2, return_12m_pct: 15.8, return_12_1_pct: 13.1, rel_spy_3m_pct: 0, rel_spy_6m_pct: 0, rel_spy_12m_pct: 0, from_52w_high_pct: -0.6, volatility_60d_pct: 10, max_drawdown_1y_pct: -9.1, trend_ok: true, score: 41.7, rank: 31 },
+    },
+    {
+      symbol: "DIA",
+      name: "SPDR Dow Jones Industrial Average ETF Trust",
+      theme: null,
+      qty: 4,
+      avg_entry: 468.2,
+      price: 470.9,
+      weight_pct: 18.09,
+      pnl_pct: 0.58,
+      stop: 397.97,
+      stop_below_pct: 15.49,
+      opened_on: "2026-10-26",
+      thesis: "Blue-chip industrials and financials as ballast.",
+      invalidation: "Stop-loss hit.",
+      notes: [{ on: "2026-10-27", action: "adopted", text: "Adopted from the one-time seed into the core book." }],
+      metrics: null,
+    },
+  ],
+  trading_book: ["SOFI"],
+  candidates: [
+    { symbol: "MU", name: "Micron Technology, Inc.", rank: 1, score: 94.2, trend_ok: true, price: 241.3, pct_from_sma200: 48.2, return_3m_pct: 31.5, return_6m_pct: 84.2, return_12_1_pct: 381.2, rel_spy_6m_pct: 76, rel_spy_12m_pct: 310.4, from_52w_high_pct: -4.2, volatility_60d_pct: 53, max_drawdown_1y_pct: -39.1, themes: ["AI buildout"] },
+    { symbol: "LLY", name: "Eli Lilly & Co.", rank: 2, score: 77.5, trend_ok: true, price: 1_012.4, pct_from_sma200: 14.9, return_3m_pct: 12.1, return_6m_pct: 46.7, return_12_1_pct: 43.5, rel_spy_6m_pct: 38.5, rel_spy_12m_pct: 41.6, from_52w_high_pct: -2.1, volatility_60d_pct: 29.5, max_drawdown_1y_pct: -23.3, themes: [] },
+    { symbol: "SPY", name: "SPDR S&P 500 ETF Trust", rank: 31, score: 41.7, trend_ok: true, price: 584.22, pct_from_sma200: 6.43, return_3m_pct: 4.1, return_6m_pct: 8.2, return_12_1_pct: 13.1, rel_spy_6m_pct: 0, rel_spy_12m_pct: 0, from_52w_high_pct: -0.6, volatility_60d_pct: 10, max_drawdown_1y_pct: -9.1, themes: [] },
+    { symbol: "AVGO", name: "Broadcom Inc.", rank: null, score: null, trend_ok: false, price: 311.8, pct_from_sma200: -2.4, return_3m_pct: -6.3, return_6m_pct: 3.1, return_12_1_pct: 52.4, rel_spy_6m_pct: -5.1, rel_spy_12m_pct: 35.2, from_52w_high_pct: -14.8, volatility_60d_pct: 41.2, max_drawdown_1y_pct: -28.7, themes: ["AI buildout"] },
+  ],
+  ranking_as_of: "2026-10-26",
+  themes: [{ name: "AI buildout", tickers: ["MU", "AVGO", "TSM"] }],
+  last_review: null,
+}
+
+const CORE_LATER: CoreReviewContext = {
+  ...CORE,
+  first_review: false,
+  last_review: { on: "2026-10-26", summary: "Kept SPY and DIA; bought MU for the AI buildout.", watch: [{ symbol: "AVGO", reason: "Custom AI chips.", trigger: "Reclaims its 200-day average after earnings." }] },
+}
+
+const CORE_HOLDING: CoreReviewContext = { ...CORE, kind: "holding", first_review: false, holdings: [CORE.holdings[0]] }
+
+const CORE_EVENT = eventSection([{ rule: "held_review", headline: "S&P 500 futures halted limit-down after a surprise Fed hike", severity: 88, symbol: "SPY" }])
+
 const PROMPTS: Record<string, () => string> = {
   "research-premarket.txt": () => researchPrompt("premarket", contextFor("premarket"), S),
   "research-intraday.txt": () => researchPrompt("intraday", contextFor("intraday"), S),
@@ -272,6 +364,14 @@ const PROMPTS: Record<string, () => string> = {
   "decision-intraday-research-unavailable.txt": () => decisionPrompt("intraday", contextFor("intraday"), { memo: "", error: "research timed out after 180 s" }, S, { wire: dossier().text }),
   "decision-intraday-research-skipped.txt": () => decisionPrompt("intraday", contextFor("intraday"), { memo: "", error: null }, S, { wire: "", researchSkipped: "no unexplained moves or unconfirmed items, and X was read 12 min ago" }),
   "decision-seed.txt": () => decisionPrompt("intraday", contextFor("intraday"), { memo: MEMO, error: null }, S, { seed: { amountUsd: 5_000 }, wire: dossier().text }),
+  "core-research.txt": () => coreResearchPrompt(CORE),
+  "core-research-later.txt": () => coreResearchPrompt(CORE_LATER),
+  "core-research-holding.txt": () => coreResearchPrompt(CORE_HOLDING, { event: CORE_EVENT }),
+  "core-system.txt": () => coreSystemPrompt(CORE, S.account.starting_capital),
+  "core-decision.txt": () => coreDecisionPrompt(CORE, { memo: MEMO, error: null }),
+  "core-decision-later.txt": () => coreDecisionPrompt(CORE_LATER, { memo: MEMO, error: null }),
+  "core-decision-holding.txt": () => coreDecisionPrompt(CORE_HOLDING, { memo: MEMO, error: null }, { event: CORE_EVENT }),
+  "core-decision-research-unavailable.txt": () => coreDecisionPrompt({ ...CORE, book: { ...CORE.book, buys_allowed: false, notes: ["CIRCUIT BREAKER: day P&L -2.6%: no buys today; sells and trims are allowed"] } }, { memo: "", error: "research timed out after 300 s" }),
 }
 
 describe("contracts: prompts", () => {
@@ -291,6 +391,7 @@ describe("contracts: prompts", () => {
     const d = dossier()
     matchJson("prompts/meta.json", {
       prompt_version: PROMPT_VERSION,
+      core_prompt_version: CORE_PROMPT_VERSION,
       seed_owner_lean: SEED_OWNER_LEAN,
       seed_stop_pct_default: seedStopPct(S.risk),
       dossier: {

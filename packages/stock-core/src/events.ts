@@ -149,6 +149,19 @@ export type EventDataMap = {
   "wire.source": Shared["wire.source"]
   "seed.started": Shared["seed.started"]
   "seed.completed": Shared["seed.completed"]
+  "core.review.started": { review_id: string; cycle_id: string; kind: "weekly" | "holding"; trigger: string; symbol: string | null; dry_run: boolean }
+  "core.review.completed": {
+    review_id: string
+    cycle_id: string
+    status: "done" | "failed" | "skipped"
+    dry_run: boolean
+    summary: string | null
+    decisions: { symbol: string; action: string; status: string; reason: string | null }[]
+    executed: number
+    rejected: number
+    cost_usd: number
+    error: string | null
+  }
   error: Shared["error"]
   alert: Shared["alert"]
 }

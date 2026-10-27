@@ -23,6 +23,8 @@ import type { TradeStream } from "./alpaca/trade-stream"
 import type { EventBus } from "./bus/event-bus"
 import { CommandProcessor } from "./commands/processor"
 import { CoreRankingStore } from "./core-book/data"
+import { runCoreReview } from "./core-book/review"
+import { coreReviewDue } from "./core-book/schedule"
 import type { EngineContext } from "./bot/context"
 import { runCycle, type CycleOutcome } from "./bot/cycle"
 import { cancelSymbolOrders } from "./bot/execute"
@@ -330,6 +332,9 @@ export class Engine {
     // A cycle left "running" belonged to a previous process that stopped mid-way.
     const stale = await db.col.cycles.updateMany({ status: "running" }, { $set: { status: "timed_out", finished_at: new Date(), error: "the engine restarted during this cycle" } })
     if (stale.modifiedCount) log.warn("marked interrupted cycles as timed out", { count: stale.modifiedCount })
+    // Likewise a core review: it is never resumed (the weekly slot tries again the next trading day).
+    const staleReviews = await db.col.coreReviews.updateMany({ status: "running" }, { $set: { status: "failed", finished_at: new Date(), error: "the engine restarted during this review" } })
+    if (staleReviews.modifiedCount) await alerts.send("error", "Core review interrupted", "The engine restarted during a core review. Check the core holdings and their stops in Alpaca; the weekly slot tries again the next trading day.", { path: "/core" })
     await this.control.failInterruptedSeed()
 
     await this.refreshSession().catch((e) => log.warn("market calendar unavailable", { error: errorMessage(e) }))
@@ -466,6 +471,11 @@ export class Engine {
       const seed = await claimDueSeed(this.d.db.col, now)
       if (seed) return this.startCycle("intraday", session, "seed", { kind: "seed", seed })
     }
+    // The core book's weekly review, ahead of news events and intraday cycles (the planner's premarket catch-up and closing cycle come first).
+    if (!this.plan.phase || this.plan.phase === "intraday") {
+      const core = await coreReviewDue(this.d.db.col, settings, session, now)
+      if (core.due) return this.startCoreReview(session, "schedule", { dryRun: false })
+    }
     // News events go before scheduled intraday cycles (the planner's other phases still come first).
     if ((!this.plan.phase || this.plan.phase === "intraday") && this.eventQueue.drain()) return
     if (this.plan.phase) return this.startCycle(this.plan.phase, session, "schedule", { kind: "scheduled" })
@@ -539,6 +549,26 @@ export class Engine {
         this.currentPhase = null
         this.ctx.setCycleState("idle")
         // Triggers that arrived meanwhile run now.
+        this.eventQueue.drain()
+      })
+  }
+
+  /** Runs a core book review in the cycle slot, so it never overlaps a trading cycle. */
+  private startCoreReview(session: Session, trigger: string, { dryRun }: { dryRun: boolean }) {
+    this.lastCycleAt = Date.now()
+    this.currentPhase = "intraday"
+    this.cycle = runCoreReview(this.ctx, { kind: "weekly", trigger, dryRun, session, entriesBlocked: this.entriesBlocked, ranking: this.coreRanking })
+      .then((r) => {
+        this.lastCycle = { id: r.cycleId, phase: "intraday", at: new Date(), status: r.status === "done" ? "succeeded" : r.status === "skipped" ? "skipped" : "failed", headline: r.summary ? r.summary.slice(0, 140) : null }
+      })
+      .catch(async (error) => {
+        this.d.log.error("core review crashed", { error: errorMessage(error) })
+        await this.d.alerts.send("error", "Core review crashed", errorMessage(error), { path: "/core" })
+      })
+      .finally(() => {
+        this.cycle = null
+        this.currentPhase = null
+        this.ctx.setCycleState("idle")
         this.eventQueue.drain()
       })
   }
@@ -703,6 +733,18 @@ export class Engine {
         // Charts and equity history are nice to have; a failure there doesn't fail the sync.
         await this.refreshSiteData(true).catch((e) => notes.push(`website data refresh failed: ${errorMessage(e)}`))
         return `synced: ${fills} fills on record, ${snapshot.positions.length} positions${notes.length ? `; ${notes.join("; ")}` : ""}`
+      }
+      case "core.review": {
+        if (this.cycle) throw new Error("a cycle is running; try again when it ends")
+        const session = await this.refreshSession()
+        if (!command.dry_run) {
+          if (!this.d.settings.current.core.enabled) throw new Error("the core book is off: turn it on in Admin → Settings → Core book, or run a dry run")
+          if (state.state.status !== "running" || state.state.kill_switch.engaged) throw new Error(`engine is ${this.status}`)
+          if (!isSessionOpen(session)) throw new Error("a core review trades, so it runs only while the market is open (a dry run works any time)")
+        }
+        if (!this.d.ai.available) throw new Error("AI is disabled (AI_GATEWAY_API_KEY not set)")
+        this.startCoreReview(session, "manual", { dryRun: !!command.dry_run })
+        return command.dry_run ? "core review dry run started: its trades are planned, not placed" : "core review started; it counts as this week's"
       }
       default:
         return this.control.handle(command, by)

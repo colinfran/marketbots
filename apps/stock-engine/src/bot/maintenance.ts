@@ -1,6 +1,9 @@
 import type { AlpacaPosition } from "@mb/stock-core/alpaca"
+import { bookOf, type PositionPlanDoc } from "@mb/stock-core/db"
 import { marketDay, minutesBetween } from "@mb/stock-core/time"
 import { errorMessage } from "@mb/engine-kit/log"
+import { placeCoreStop } from "../core-book/execute"
+import { initialCoreStop } from "../core-book/rules"
 import type { TradingContext } from "./context"
 import { cancelSymbolOrders, heldExitBounds, placeExitOrders, resolveExits } from "./execute"
 import { liquidateOptions, reconcileOptions } from "./options"
@@ -65,6 +68,10 @@ export const ensureProtection = async (ctx: TradingContext): Promise<string[]> =
     if (qty < 1) continue
     const price = Number(position.current_price)
     const plan = planBySymbol.get(position.symbol)
+    if (plan && bookOf(plan) === "core") {
+      notes.push(...(await protectCore(ctx, position, qty, plan)))
+      continue
+    }
     const exits = resolveExits(price, plan?.stop_loss ?? null, plan?.take_profit ?? null, r, heldExitBounds(r))
     if (plan?.stop_loss != null && exits.stop < plan.stop_loss - 0.005) {
       bus.emit("protection.triggered", { symbol: position.symbol, kind: "unprotected_stop", price, structure_id: null }, { summary: `${position.symbol} is through its ${plan.stop_loss} stop with no exit orders; selling`, level: "warn", instrument: position.symbol })
@@ -102,6 +109,31 @@ export const ensureProtection = async (ctx: TradingContext): Promise<string[]> =
     }
   }
   return notes
+}
+
+/**
+ * A core holding with no resting sell order gets its plain GTC stop back, at its plan's level (or
+ * the initial core stop when it has none): no take-profit, and no trading-stop bounds. At or
+ * through its stop, it's sold instead, like a trading position.
+ */
+const protectCore = async (ctx: TradingContext, position: AlpacaPosition, qty: number, plan: PositionPlanDoc): Promise<string[]> => {
+  const { symbol } = position
+  const price = Number(position.current_price)
+  const stop = plan.stop_loss ?? initialCoreStop(Number(position.avg_entry_price), price, ctx.settings.current.core.stop_pct)
+  if (price <= stop) {
+    ctx.bus.emit("protection.triggered", { symbol, kind: "unprotected_stop", price, structure_id: null }, { summary: `${symbol} (core) is through its ${stop} stop with no stop order; selling`, level: "warn", instrument: symbol })
+    const sold = await flatten(ctx, [position], ` (core: price ${price} reached its ${stop} stop with no stop order)`)
+    if (sold[0].startsWith("flattened")) await ctx.alerts.send("warning", `${symbol} sold: its core stop was hit while unprotected`, sold[0], { path: "/core" })
+    return sold
+  }
+  try {
+    await placeCoreStop(ctx, symbol, qty, stop, plan.decision_id)
+    if (plan.stop_loss === null) await ctx.col.plans.updateOne({ _id: symbol }, { $set: { stop_loss: stop, updated_at: new Date() } })
+    return [`protected ${symbol} (core): stop ${stop}`]
+  } catch (error) {
+    await ctx.alerts.send("error", `${symbol} (core) has no stop`, `Placing its stop failed: ${errorMessage(error)}`, { fields: { Shares: qty, Stop: stop }, path: "/core" })
+    return [`could not protect ${symbol} (core): ${errorMessage(error)}`]
+  }
 }
 
 /**

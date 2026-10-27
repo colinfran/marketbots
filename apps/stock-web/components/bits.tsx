@@ -40,10 +40,12 @@ export function PhaseBadge({ phase }: { phase: Phase }) {
   )
 }
 
-/** Marks cycles the news engine or the seed buy started (scheduled and price-move cycles need no badge). */
+const KIND_BADGE: Record<string, string> = { event: "News event", seed: "Seed", core: "Core review" }
+
+/** Marks cycles the news engine, the seed buy or the core book started (scheduled and price-move cycles need no badge). */
 export function CycleKindBadge({ kind }: { kind?: string | null }) {
-  if (kind !== "event" && kind !== "seed") return null
-  return <Badge variant="secondary">{kind === "event" ? "News event" : "Seed"}</Badge>
+  if (!kind || !KIND_BADGE[kind]) return null
+  return <Badge variant="secondary">{KIND_BADGE[kind]}</Badge>
 }
 
 const RESEARCH_MODE_LABEL: Record<string, string> = { full: "full research", gap_fill: "gap-fill research", skipped: "research skipped" }

@@ -67,6 +67,12 @@
       "low",
       "medium",
       "high"
+    ],
+    "core_actions": [
+      "keep",
+      "buy",
+      "trim",
+      "sell"
     ]
   },
   "bot_report": {
@@ -754,6 +760,146 @@
       "premium_pct",
       "stop_loss_pct",
       "take_profit_pct"
+    ]
+  },
+  "core_review": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "summary": {
+        "type": "string",
+        "description": "3-6 sentences in plain English: the plan for the core book and why."
+      },
+      "holdings": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "symbol": {
+              "type": "string",
+              "description": "US-listed ticker in uppercase, e.g. NVDA. No exchange prefix, no $."
+            },
+            "action": {
+              "type": "string",
+              "enum": [
+                "keep",
+                "buy",
+                "trim",
+                "sell"
+              ],
+              "description": "keep = hold it as it is (you may raise its stop). buy = open a NEW core holding (never add to one). trim = sell part of a holding down to target_weight_pct. sell = sell the whole holding."
+            },
+            "target_weight_pct": {
+              "description": "% of total account equity. buy: the size to buy. trim: the weight to trim down to. keep: the weight you'd want it at (no trade). sell: null.",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "conviction": {
+              "type": "number",
+              "description": "1-10. Buys below the minimum in CONTEXT are rejected."
+            },
+            "thesis": {
+              "type": "string",
+              "description": "2-4 sentences: why own this for months, with evidence from RESEARCH (earnings, guidance, capex, demand) and numbers from CONTEXT. For a holding: the case as it stands today."
+            },
+            "invalidation": {
+              "type": "string",
+              "description": "The specific, checkable development that would prove the thesis wrong, e.g. 'hyperscaler capex guidance cut'. Not a price: the stop covers price."
+            },
+            "verdict": {
+              "type": "string",
+              "description": "One sentence for the holding's history: what this review found and why this action."
+            },
+            "theme": {
+              "description": "The owner theme this holding serves, copied exactly from THEMES, or null.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "stop": {
+              "description": "Stop price in dollars. buy: a daily support level below the price, or null for the default. keep: a higher stop to lock in gains, or null to leave it. Never below the current stop.",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "evidence": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "2-5 concrete facts with numbers and dates."
+            }
+          },
+          "required": [
+            "symbol",
+            "action",
+            "target_weight_pct",
+            "conviction",
+            "thesis",
+            "invalidation",
+            "verdict",
+            "theme",
+            "stop",
+            "evidence"
+          ]
+        },
+        "description": "Exactly one entry for every current core holding (keep, trim or sell), plus any new buys."
+      },
+      "watch": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "symbol": {
+              "type": "string",
+              "description": "US-listed ticker in uppercase, e.g. NVDA. No exchange prefix, no $."
+            },
+            "reason": {
+              "type": "string",
+              "description": "One sentence: why it's interesting."
+            },
+            "trigger": {
+              "type": "string",
+              "description": "What would make it a buy at a later review."
+            }
+          },
+          "required": [
+            "symbol",
+            "reason",
+            "trigger"
+          ]
+        },
+        "description": "0-8 names you like but are not buying now; the next review sees them."
+      },
+      "sources": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "title",
+            "url"
+          ]
+        },
+        "description": "URLs actually used, max 10."
+      }
+    },
+    "required": [
+      "summary",
+      "holdings",
+      "watch",
+      "sources"
     ]
   }
 }

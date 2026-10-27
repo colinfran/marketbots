@@ -18,6 +18,7 @@
     "orders": "orders",
     "plans": "position_plans",
     "optionPositions": "option_positions",
+    "coreReviews": "core_reviews",
     "dailyStats": "daily_stats",
     "cache": "cache",
     "loginAttempts": "login_attempts",
@@ -194,6 +195,25 @@
       {
         "key": {
           "closed_at": -1
+        }
+      }
+    ],
+    "core_reviews": [
+      {
+        "key": {
+          "created_at": -1
+        }
+      },
+      {
+        "key": {
+          "kind": 1,
+          "dry_run": 1,
+          "created_at": -1
+        }
+      },
+      {
+        "key": {
+          "cycle_id": 1
         }
       }
     ],

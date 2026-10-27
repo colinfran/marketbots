@@ -42,6 +42,12 @@ export const commandSchema = z.discriminatedUnion("type", [
   seedScheduleCommand,
   seedCancelCommand,
   wireReplayCommand,
+  /**
+   * Runs the core book's weekly review now (it then counts as this week's). A dry run plans the
+   * trades without placing them, and works while the core book is off, so its first review can be
+   * previewed.
+   */
+  z.object({ type: z.literal("core.review"), dry_run: z.boolean().optional() }),
 ])
 
 export type Command = z.infer<typeof commandSchema>
@@ -62,4 +68,5 @@ export const COMMAND_LABEL: Record<CommandType, string> = {
   "seed.schedule": base["seed.schedule"],
   "seed.cancel": base["seed.cancel"],
   "wire.replay": base["wire.replay"],
+  "core.review": "Run core review",
 }

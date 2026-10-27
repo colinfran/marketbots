@@ -16,6 +16,7 @@ import type {
   NotificationDoc,
   SeedRunDoc,
   OptionPositionDoc,
+  CoreReviewDoc,
   OrderDoc,
   PositionPlanDoc,
   ReportDoc,
@@ -49,6 +50,7 @@ export type Collections = {
   orders: Collection<OrderDoc>
   plans: Collection<PositionPlanDoc>
   optionPositions: Collection<OptionPositionDoc>
+  coreReviews: Collection<CoreReviewDoc>
   dailyStats: Collection<DailyStatsDoc>
   cache: Collection<CacheDoc>
 }
@@ -74,6 +76,7 @@ export const collectionsFor = (db: Db): Collections => ({
   orders: db.collection<OrderDoc>(COLLECTIONS.orders),
   plans: db.collection<PositionPlanDoc>(COLLECTIONS.plans),
   optionPositions: db.collection<OptionPositionDoc>(COLLECTIONS.optionPositions),
+  coreReviews: db.collection<CoreReviewDoc>(COLLECTIONS.coreReviews),
   dailyStats: db.collection<DailyStatsDoc>(COLLECTIONS.dailyStats),
   cache: db.collection<CacheDoc>(COLLECTIONS.cache),
 })

@@ -74,6 +74,12 @@ describe("intraday", () => {
     expect(await plan(afterOpen(39.5))).toEqual({ phase: "intraday", reason: "Intraday trading cycle." })
   })
 
+  it("ignores core book reviews, which run in the cycle slot but are no phase of the day", async () => {
+    await briefed()
+    await seed(at("intraday", 10), { ...at("intraday", 35), kind: "core" }, { ...at("intraday", 38, "running"), kind: "core" })
+    expect(await plan(afterOpen(39.5))).toEqual({ phase: "intraday", reason: "Intraday trading cycle." })
+  })
+
   it("measures from the latest successful cycle", async () => {
     await briefed()
     await seed(at("intraday", 10), at("intraday", 40), at("intraday", 70))

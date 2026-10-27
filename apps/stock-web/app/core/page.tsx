@@ -1,10 +1,11 @@
 import { CORE_TOP_CANDIDATES } from "@mb/stock-core/core-book"
-import { CORE_INDEX_ETFS, parseTheme, type Weekday } from "@mb/stock-core/settings"
+import { CORE_INDEX_ETFS, parseTheme } from "@mb/stock-core/settings"
 import { formatDateTime, formatDay } from "@mb/stock-core/time"
 import type { Metadata } from "next"
 import Link from "next/link"
 import { Badge } from "@mb/ui/components/badge"
 import { Empty, PageHeader, SectionTitle, Stat } from "@/components/bits"
+import { WEEKDAY_PLURAL } from "@/lib/format"
 import { getCoreRanking, getSettings } from "@/lib/queries"
 import { pageMetadata } from "@/lib/site"
 import { RankingTable } from "./ranking-table"
@@ -14,8 +15,6 @@ export const metadata: Metadata = pageMetadata({
   description: "StockMarketBot's long-term core book: a share of the account in a handful of holdings with written theses, reviewed weekly, and the momentum ranking it picks from.",
   path: "/core",
 })
-
-const WEEKDAY: Record<Weekday, string> = { mon: "Mondays", tue: "Tuesdays", wed: "Wednesdays", thu: "Thursdays", fri: "Fridays" }
 
 export default async function CorePage() {
   const [ranking, settings] = await Promise.all([getCoreRanking(), getSettings()])
@@ -49,7 +48,7 @@ export default async function CorePage() {
             </span>
           }
         />
-        <Stat label="Review" value={`${WEEKDAY[c.review_weekday]} ${c.review_time_et} ET`} sub={<span className="text-muted-foreground">stops start {c.stop_pct}% below entry and only move up</span>} />
+        <Stat label="Review" value={`${WEEKDAY_PLURAL[c.review_weekday]} ${c.review_time_et} ET`} sub={<span className="text-muted-foreground">stops start {c.stop_pct}% below entry and only move up</span>} />
       </div>
 
       <section className="space-y-3">

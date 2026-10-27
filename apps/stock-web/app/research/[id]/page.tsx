@@ -1,11 +1,11 @@
 import { formatDay } from "@mb/stock-core/time"
 import type { Metadata } from "next"
 import Link from "next/link"
-import { notFound } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 import { ReportView } from "@/components/report-view"
 import { getViewer } from "@/lib/auth"
 import { titleCase } from "@/lib/format"
-import { getCycleEvents, getReport, getReportMeta, getWireForCycle } from "@/lib/queries"
+import { getCycleEvents, getReport, getReportMeta, getWireForCycle, isCoreReview } from "@/lib/queries"
 import { jsonLd, pageMetadata, site } from "@/lib/site"
 
 const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text)
@@ -26,7 +26,11 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 export default async function ReportPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const [data, viewer] = await Promise.all([getReport(id), getViewer()])
-  if (!data) notFound()
+  if (!data) {
+    // A core book review's trades and cycle carry the review's id where a report's would be.
+    if (await isCoreReview(id)) redirect(`/core#review-${id}`)
+    notFound()
+  }
   const [events, wire] = await Promise.all([getCycleEvents(data.report.cycle_id, viewer), getWireForCycle(data.cycle).catch(() => null)])
   const article = {
     "@context": "https://schema.org",

@@ -136,7 +136,7 @@ scheduled ──(due, engine running, regular session)──▶ running ──�
 
 ## Core book (long-term holdings)
 
-A fixed share of equity (`core.target_pct`, 50%) in a handful of long-term holdings, each with a written thesis and invalidation, reviewed weekly instead of every cycle; day and swing trading run with the rest. The yardstick is beating SPY over months. The design and its rollout are in [plans/CORE-BOOK.md](plans/CORE-BOOK.md). It is **off** (`core.enabled: false`) until the owner turns it on in Admin → Core book; built so far: the settings and the daily ranking, which trades nothing.
+A fixed share of equity (`core.target_pct`, 50%) in a handful of long-term holdings, each with a written thesis and invalidation, reviewed weekly instead of every cycle; day and swing trading run with the rest. The yardstick is beating SPY over months. The design and its rollout are in [plans/CORE-BOOK.md](plans/CORE-BOOK.md). It is **off** (`core.enabled: false`) until the owner turns it on in Admin → Core book. Built so far: the settings, the daily ranking and the weekly review. Leave it off until the trading cycles learn to leave core holdings alone (step 4 of the plan); a dry run is safe at any time.
 
 **Settings** (the `core` section; defaults): `enabled` off, `target_pct` 50, `band_pct` 5, `min_holdings` / `max_holdings` 4 / 8, `max_holding_pct` 15 (per stock, % of equity), `max_index_etf_pct` 25 (SPY, QQQ, DIA, IWM, VTI, VOO), `max_theme_pct` 50 (% of the book), `stop_pct` 15, `min_conviction` 7, `max_trades_per_review` 6, `review_weekday` / `review_time_et` mon / 10:15, `universe_size` 100, `themes` (one per line, `AI buildout: NVDA, AVGO, TSM`; tickers optional).
 
@@ -147,6 +147,24 @@ A fixed share of equity (`core.target_pct`, 50%) in a handful of long-term holdi
 - **Ranking**: a trend filter (price above the 200-day average, the 50-day above the 200-day), then a 0–100 score among the names that pass: the mean percentile of the 12-1 month and 6-month returns, each divided by the volatility, floored at 15% (about the market's, so a dollar or bond fund can't outrank stocks on calm alone). Only completed sessions count: a daily bar is stamped at midnight ET and Alpaca's `end` is inclusive, so the bars end a moment before the build day. The weekly review will see the top 25 (`CORE_TOP_CANDIDATES`), every theme ticker and every holding.
 
 A failed build is retried after 30 minutes and the last ranking keeps serving.
+
+**The weekly review** (`core-book/review.ts`), run in the engine's cycle slot so it never overlaps a trading cycle, as a cycle of kind `core` (the phase planner ignores those):
+
+```
+book (code)       account, positions, core plans; the first real review adopts the one-time seed's holdings
+ranking (code)    rebuilt now, so it covers today's holdings and themes
+research (Grok)   each holding's thesis and invalidation, the themes, the top 12 candidates, the backdrop (web + X, 300 s)
+decision (Grok)   coreReviewSchema: keep / buy / trim / sell, target weight, thesis, invalidation, verdict, theme, conviction, stop; a watch list
+rules (code)      core-book/rules.ts, then core-book/execute.ts: sells and trims, then buys by conviction, then keeps
+record            core_reviews (context, research, output, every rule checked), the cycle's steps and events, an alert
+```
+
+- **When** (`core-book/schedule.ts`): `review_weekday` from `review_time_et`, in the regular session after the opening buffer and before the closing window. A slot that can't run (holiday, early close, engine down, a failed or skipped attempt) runs at the same time on the next trading day, until the week's review is done; one attempt a day. The owner's **Run core review now** (Admin, the `core.review` command) counts as the week's review and needs the book on and the market open. A **dry run** (`dry_run: true`) does the research and the decision and records the trades it would make as `planned`, without orders or plan changes; it works while the book is off and outside market hours.
+- **Rules** (`core-book/rules.ts`; every rule evaluated is recorded on the decision): every holding gets exactly one decision (left out = kept); at most `max_trades_per_review` trades; a buy needs trading not blocked, no circuit breaker, research that worked, a symbol in neither book (v1 never adds to a holding, and never buys what the trading book holds), `min_conviction`, the book (after the review's sells and trims) more than `band_pct` under its target, fewer than `max_holdings`, a tradable asset over `risk.min_price`, and at least 2% of equity after its size is clamped to the per-holding cap (`max_holding_pct`, or `max_index_etf_pct` for SPY, QQQ, DIA, IWM, VTI, VOO), the book's room to its target, its theme's room under `max_theme_pct` of the book, and the cash above `risk.cash_reserve_pct`. A trim sells down to its target weight.
+- **Stops**: core holdings rest on a plain GTC stop at Alpaca, no take-profit, so a winner isn't sold at a target. A buy's stop is `stop_pct` below the price unless Grok gives a tighter daily level at least 3% below it; a keep may raise a stop, never lower it. Maintenance gives a core holding without a resting order its stop back (or sells it when the price is already through it).
+- **Execution** (`core-book/execute.ts`): market orders; buys re-read the cash after the sells; every trade is also a `decisions` document (`trigger_kind: "core"`, `report_id` = the review, which the dashboard's report links resolve to the Core page), so the journal, trades and analytics see it.
+- **Adoption**: the first real review takes what the one-time seed bought and still holds into the core book (its plan becomes `book: "core"` with the seed's reasoning as the thesis, the OCO gives way to a core stop `stop_pct` below the average entry), once. That review writes each adopted holding a proper thesis and invalidation; later reviews add notes (`notes`, the last 12) and only raise stops.
+- **Events**: `core.review.started`, `core.review.completed` (each decision's status, trades executed and rejected, cost), plus the usual research, decision, risk-check, order and decision-result events under the review's cycle id.
 
 ## Live stream
 
@@ -184,7 +202,8 @@ Events are typed (`packages/core/src/events.ts`) and carry a strictly increasing
 | `reports` | research memo + sources + queries, structured output, the full context Grok saw, execution summary, cost |
 | `decisions` | each requested action (stock or option), every risk check, what happened, and the order ids |
 | `orders` | every Alpaca order and leg (stocks, option legs, spread parents), synced continuously |
-| `position_plans` | live stop/target/horizon/thesis per stock |
+| `position_plans` | live stop/target/horizon/thesis per stock; core holdings add `book: "core"`, `theme`, `last_reviewed_at` and `notes` (a missing `book` means trading) |
+| `core_reviews` | each core book review: kind, trigger, dry run, the book before and after, what it was shown (`context`), research, Grok's output, every decision with its rule checks and orders, the summary and watch list, cost |
 | `option_positions` | each options position: legs, entry, exits, live mark, exit and realized P&L |
 | `daily_stats` | per-day equity, P&L vs SPY, wins/losses |
 | `cache` | what the website shows from Alpaca: the account snapshot, equity history, chart bars; also the day's scan universe and the core book's ranking |
