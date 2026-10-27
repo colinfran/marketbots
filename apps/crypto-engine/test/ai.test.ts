@@ -1,11 +1,10 @@
 import { cryptoReportSchema, normalizeCryptoReport, type CryptoDecision, type CryptoReport } from "@mb/crypto-core/report"
+import { silentLogger } from "@mb/engine-kit/log"
 import { generateText, NoObjectGeneratedError, streamText } from "ai"
 import { describe, expect, it, vi } from "vitest"
-import { gatewayCost } from "../src/ai/budget"
 import { cryptoDecisionPrompt, cryptoResearchPrompt } from "../src/ai/prompts"
 import { repairCryptoReport } from "../src/ai/repair"
 import { AiRunner, hasLiveSearch } from "../src/ai/runner"
-import { silentLogger } from "../src/log"
 
 vi.mock("ai", async (importOriginal) => ({ ...(await importOriginal<typeof import("ai")>()), generateText: vi.fn(), streamText: vi.fn() }))
 
@@ -231,18 +230,5 @@ describe("AiRunner.structured", () => {
     await expect(new AiRunner(b as never, silentLogger, true).structured(opts())).rejects.toThrow(/timeout/)
     expect(b.estimateByDuration).toHaveBeenCalledWith("decision", "spacexai/grok-4.7", expect.any(Number))
     expect(b.record).toHaveBeenCalledWith(expect.objectContaining({ task: "decision", input_tokens: 0, cost_usd: 0.12, cost_source: "estimate", ok: false }))
-  })
-})
-
-describe("gatewayCost", () => {
-  it("reads string or number costs and ignores junk", () => {
-    expect(gatewayCost({ gateway: { cost: "0.5" } })).toBe(0.5)
-    expect(gatewayCost({ gateway: { totalCost: 0.25 } })).toBe(0.25)
-    expect(gatewayCost({ gateway: { cost: "abc" } })).toBeNull()
-    expect(gatewayCost(undefined)).toBeNull()
-  })
-
-  it("uses marketCost when the gateway bills nothing (own provider key)", () => {
-    expect(gatewayCost({ gateway: { cost: "0", marketCost: "0.00030935" } })).toBe(0.00030935)
   })
 })

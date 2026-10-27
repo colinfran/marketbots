@@ -1,9 +1,9 @@
 // Mirrored in cryptomarketbot and stockmarketbot: keep in sync.
 import type { Settings } from "@mb/stock-core/settings"
 import { CATEGORY_BASE, type NotableReason, type WireItemDoc, type WireSourceHealth, type WireSourceState, type WireStatus } from "@mb/stock-core/wire"
+import { errorMessage, type Logger } from "@mb/engine-kit/log"
 import type { Collections } from "../db/mongo"
 import type { EventBus } from "../bus/event-bus"
-import { errorMessage, type Logger } from "../log"
 import { ClusterIndex } from "./cluster"
 import { WireFetch } from "./fetch"
 import { buildSource } from "./kinds"

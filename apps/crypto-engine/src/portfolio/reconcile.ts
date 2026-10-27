@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto"
 import type { DecisionDoc, OrderDoc } from "@mb/crypto-core/db"
 import { ACCOUNT_ID, baseAsset, MODE, VENUE } from "@mb/crypto-core/venues"
+import { errorMessage, type Logger } from "@mb/engine-kit/log"
 import type { Collections } from "../db/mongo"
 import type { Executor } from "../execution/executor"
-import { errorMessage, type Logger } from "../log"
 import type { CliTrade, KrakenCli } from "../venues/kraken/cli"
 import type { Ledger, PositionMeta } from "./ledger"
 

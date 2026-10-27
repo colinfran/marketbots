@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto"
+import { errorMessage } from "@mb/engine-kit/log"
 import type { AlpacaAsset, AlpacaOrder, AlpacaPosition, Snapshot } from "@mb/stock-core/alpaca"
 import type { ChainContract } from "@mb/stock-core/context"
 import type { CycleKind, DecisionDoc, ExecutionSummary, PositionPlanDoc } from "@mb/stock-core/db"
@@ -8,7 +9,6 @@ import { isOptionAction, type BotReport, type Decision } from "@mb/stock-core/re
 import type { Phase, RiskSettings, Settings } from "@mb/stock-core/settings"
 import { marketDay } from "@mb/stock-core/time"
 import type { Alpaca } from "../alpaca/client"
-import { errorMessage } from "../log"
 import { snapshotPrice } from "../market/indicators"
 import type { TradingContext } from "./context"
 import { executeOptionDecision, type OptionOutcome } from "./options"

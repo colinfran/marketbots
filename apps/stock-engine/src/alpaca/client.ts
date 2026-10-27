@@ -16,7 +16,7 @@ import type {
   PortfolioHistory,
   Snapshot,
 } from "@mb/stock-core/alpaca"
-import { TokenBucket } from "../util/async"
+import { TokenBucket } from "@mb/engine-kit/util/async"
 
 /**
  * Minimal typed client for Alpaca's REST APIs.

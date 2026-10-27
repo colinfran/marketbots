@@ -1,49 +1,33 @@
-import { hostname } from "node:os"
+import { envFields, optional, parseEnv } from "@mb/engine-kit/env"
 import { z } from "zod"
 
 /**
  * Process environment: infrastructure and secrets only. Trading behavior (risk limits, budgets,
  * schedules) lives in the MongoDB settings document so it can be changed from the dashboard with
- * an audit trail.
+ * an audit trail. The variables both engines read come from @mb/engine-kit/env.
  *
  * The engine holds no exchange credentials: market data comes from Kraken's public API and every
  * order executes in a Kraken CLI paper workspace, which needs no keys.
  */
 
-const bool = (fallback: boolean) =>
-  z
-    .string()
-    .optional()
-    .transform((v) => (v === undefined || v === "" ? fallback : ["1", "true", "yes", "on"].includes(v.toLowerCase())))
-
-const optional = z
-  .string()
-  .optional()
-  .transform((v) => (v && v.trim() ? v.trim() : null))
+const base = envFields({ dbName: "cryptomarketbot", streamPort: 8787 })
 
 const envSchema = z.object({
-  NODE_ENV: z.string().default("development"),
-  LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
-  ENGINE_INSTANCE: z.string().default(hostname()),
+  NODE_ENV: base.NODE_ENV,
+  LOG_LEVEL: base.LOG_LEVEL,
+  ENGINE_INSTANCE: base.ENGINE_INSTANCE,
 
-  MONGODB_URI: z.string().min(1, "MONGODB_URI is required"),
-  MONGODB_DB_NAME: z.string().default("cryptomarketbot"),
+  MONGODB_URI: base.MONGODB_URI,
+  MONGODB_DB_NAME: base.MONGODB_DB_NAME,
 
-  /** Shared with the Vercel app, which mints the short-lived stream tokens. */
-  STREAM_TOKEN_SECRET: z.string().min(32, "STREAM_TOKEN_SECRET must be at least 32 characters"),
-  STREAM_HOST: z.string().default("0.0.0.0"),
-  STREAM_PORT: z.coerce.number().int().min(1).max(65_535).default(8787),
-  /** Comma-separated browser origins allowed to open the stream, e.g. https://crypto.example.com */
-  STREAM_ALLOWED_ORIGINS: z
-    .string()
-    .default("")
-    .transform((v) => v.split(",").map((s) => s.trim().replace(/\/$/, "")).filter(Boolean)),
-  /** Set when a reverse proxy sits in front, so per-IP limits use X-Forwarded-For. */
-  STREAM_TRUST_PROXY: bool(false),
-  STREAM_MAX_CLIENTS: z.coerce.number().int().min(1).max(10_000).default(100),
+  STREAM_TOKEN_SECRET: base.STREAM_TOKEN_SECRET,
+  STREAM_HOST: base.STREAM_HOST,
+  STREAM_PORT: base.STREAM_PORT,
+  STREAM_ALLOWED_ORIGINS: base.STREAM_ALLOWED_ORIGINS,
+  STREAM_TRUST_PROXY: base.STREAM_TRUST_PROXY,
+  STREAM_MAX_CLIENTS: base.STREAM_MAX_CLIENTS,
 
-  /** Without it the engine runs but makes no AI calls, so it never opens trades. */
-  AI_GATEWAY_API_KEY: optional,
+  AI_GATEWAY_API_KEY: base.AI_GATEWAY_API_KEY,
 
   /** Path to the Kraken CLI binary (installed in the Docker image at /usr/local/bin/kraken). */
   KRAKEN_CLI_PATH: z.string().default("kraken"),
@@ -56,26 +40,22 @@ const envSchema = z.object({
   /** Optional folder of Kraken OHLCVT CSV files for longer backtests (e.g. XBTUSD_60.csv). */
   BACKTEST_DATA_DIR: optional,
 
-  DISCORD_WEBHOOK_URL: optional,
-  DASHBOARD_URL: optional,
+  DISCORD_WEBHOOK_URL: base.DISCORD_WEBHOOK_URL,
+  DASHBOARD_URL: base.DASHBOARD_URL,
 
-  EVENT_RETENTION_DAYS: z.coerce.number().min(1).max(3650).default(30),
+  EVENT_RETENTION_DAYS: base.EVENT_RETENTION_DAYS,
 
-  /** Seed values for the settings document on first boot (the dashboard owns them afterwards). */
-  GROK_RESEARCH_MODEL: optional,
-  GROK_DECISION_MODEL: optional,
+  GROK_RESEARCH_MODEL: base.GROK_RESEARCH_MODEL,
+  GROK_DECISION_MODEL: base.GROK_DECISION_MODEL,
 
-  /** News engine (MASTER_PLAN §3.10). A source whose key is missing stays off; nothing else breaks. */
-  /** "Name contact-email", required by the SEC's fair-access policy; also the wire's User-Agent. */
-  SEC_USER_AGENT: optional,
-  FINNHUB_API_KEY: optional,
-  FRED_API_KEY: optional,
-  BLS_API_KEY: optional,
+  SEC_USER_AGENT: base.SEC_USER_AGENT,
+  FINNHUB_API_KEY: base.FINNHUB_API_KEY,
+  FRED_API_KEY: base.FRED_API_KEY,
+  BLS_API_KEY: base.BLS_API_KEY,
   COINGECKO_API_KEY: optional,
   ETHERSCAN_API_KEY: optional,
   COINALYZE_API_KEY: optional,
-  /** The headless scraper sidecar (Phase 7), e.g. http://scraper:8790 inside docker compose. Unset: headless sources stay off. */
-  SCRAPER_URL: optional,
+  SCRAPER_URL: base.SCRAPER_URL,
 })
 
 const WIRE_KEYS = ["SEC_USER_AGENT", "FINNHUB_API_KEY", "FRED_API_KEY", "BLS_API_KEY", "COINGECKO_API_KEY", "ETHERSCAN_API_KEY", "COINALYZE_API_KEY", "SCRAPER_URL"] as const
@@ -85,16 +65,8 @@ export const wireEnv = (env: Env): Record<string, string | undefined> => Object.
 
 export type Env = z.infer<typeof envSchema>
 
-export const loadEnv = (source: NodeJS.ProcessEnv = process.env): Env => {
-  // Trim every value: .env files edited on Windows often end lines with \r.
-  const trimmed = Object.fromEntries(Object.entries(source).map(([k, v]) => [k, typeof v === "string" ? v.trim() : v]))
-  const parsed = envSchema.safeParse(trimmed)
-  if (!parsed.success) {
-    const problems = parsed.error.issues.map((i) => `  - ${i.path.join(".")}: ${i.message}`).join("\n")
-    throw new Error(`Invalid engine environment:\n${problems}`)
-  }
-  return parsed.data
-}
+/** Parses the environment; every problem is listed in one readable error. */
+export const loadEnv = (source: NodeJS.ProcessEnv = process.env): Env => parseEnv(envSchema, source)
 
 /** Every secret value, so the logger can scrub it from any string that would otherwise leak it. */
 export const secretValues = (env: Env): string[] =>

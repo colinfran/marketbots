@@ -1,23 +1,20 @@
+import { AiRunner } from "@mb/engine-kit/ai/runner"
+import { silentLogger } from "@mb/engine-kit/log"
+import { makeTestBus } from "@mb/engine-kit/testing/bus"
 import type { EngineStateDoc } from "@mb/stock-core/db"
-import type { EngineEvent } from "@mb/stock-core/events"
+import { EPHEMERAL_EVENTS, type EngineEvent, type EventDataMap } from "@mb/stock-core/events"
 import { DEFAULT_SETTINGS, type Settings, type SettingsPatch, mergeSettings } from "@mb/stock-core/settings"
 import { AiBudget } from "../../src/ai/budget"
-import { AiRunner } from "../../src/ai/runner"
 import type { EngineContext } from "../../src/bot/context"
-import { EventBus } from "../../src/bus/event-bus"
+import type { EventBus } from "../../src/bus/event-bus"
 import type { Collections } from "../../src/db/mongo"
-import { silentLogger } from "../../src/log"
 import { LivePrices } from "../../src/market/prices"
 import type { FakeBroker } from "./broker"
 
 export type SentAlert = { level: string; title: string; message: string; path?: string; fields?: Record<string, unknown> }
 
-/** A real event bus on the test database (events are kept in memory; flushing is up to the test). */
-export const makeBus = async (col: Collections) => {
-  const bus = new EventBus(col, silentLogger, 30)
-  await bus.init()
-  return bus
-}
+/** A real event bus with stock's events on the test database (@mb/engine-kit/testing/bus). */
+export const makeBus = (col: Collections): Promise<EventBus> => makeTestBus<EventDataMap>(col, EPHEMERAL_EVENTS)
 
 /**
  * An engine context for tests: the test database, the fake broker, real settings (optionally

@@ -1,3 +1,5 @@
+import { AiRunner } from "@mb/engine-kit/ai/runner"
+import { silentLogger } from "@mb/engine-kit/log"
 import type { Wire } from "../src/wire/wire"
 import { randomUUID } from "node:crypto"
 import type { Command } from "@mb/stock-core/commands"
@@ -5,7 +7,6 @@ import type { CommandDoc, StreamHealth } from "@mb/stock-core/db"
 import type { EngineEvent } from "@mb/stock-core/events"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import { AiBudget } from "../src/ai/budget"
-import { AiRunner } from "../src/ai/runner"
 import { Alerts } from "../src/alerts"
 import type { MarketStream } from "../src/alpaca/market-stream"
 import type { TradeStream } from "../src/alpaca/trade-stream"
@@ -13,9 +14,8 @@ import type { EventBus } from "../src/bus/event-bus"
 import type { Database } from "../src/db/mongo"
 import { Engine } from "../src/engine"
 import { loadEnv } from "../src/env"
-import { silentLogger } from "../src/log"
 import { LivePrices } from "../src/market/prices"
-import { EngineStateStore, SettingsStore } from "../src/state/stores"
+import { EngineStateStore, loadSettings } from "../src/state/stores"
 import type { StreamServer } from "../src/stream/server"
 import { fakeBroker, type FakeBroker } from "./helpers/broker"
 import { makeBus } from "./helpers/ctx"
@@ -56,7 +56,7 @@ beforeEach(async () => {
   bus.subscribe((e) => events.push(e))
   await db.col.cycles.insertOne(cycleDoc({ _id: "interrupted", status: "running" }))
   const env = loadEnv({ MONGODB_URI: "mongodb://test", ALPACA_API_KEY: "k", ALPACA_SECRET_KEY: "s", STREAM_TOKEN_SECRET: "x".repeat(40), ENGINE_INSTANCE: "test" })
-  const settings = await SettingsStore.load(db.col, env, silentLogger)
+  const settings = await loadSettings(db.col, env, silentLogger)
   const state = await EngineStateStore.load(db.col)
   const budget = new AiBudget(db.col, () => settings.current.ai.daily_budget_usd)
   engine = new Engine({

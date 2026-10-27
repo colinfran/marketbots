@@ -1,3 +1,5 @@
+import { connectMongo, type Database as DatabaseOf } from "@mb/engine-kit/db"
+import type { Logger } from "@mb/engine-kit/log"
 import { COLLECTIONS, INDEXES } from "@mb/stock-core/db"
 import type {
   AiCallDoc,
@@ -20,7 +22,7 @@ import type {
   SettingsDoc,
 } from "@mb/stock-core/db"
 import type { WireItemDoc, WireTriggerDoc } from "@mb/stock-core/wire"
-import { MongoClient, type Collection, type Db } from "mongodb"
+import type { Collection, Db } from "mongodb"
 
 /**
  * The engine's long-lived MongoDB connection. The engine is the only writer of trading state
@@ -51,7 +53,7 @@ export type Collections = {
   cache: Collection<CacheDoc>
 }
 
-export type Database = { client: MongoClient; db: Db; col: Collections }
+export type Database = DatabaseOf<Collections>
 
 export const collectionsFor = (db: Db): Collections => ({
   settings: db.collection<SettingsDoc>(COLLECTIONS.settings),
@@ -76,23 +78,6 @@ export const collectionsFor = (db: Db): Collections => ({
   cache: db.collection<CacheDoc>(COLLECTIONS.cache),
 })
 
-export const ensureIndexes = async (db: Db) => {
-  await Promise.all(
-    Object.entries(INDEXES).map(([name, specs]) =>
-      specs && specs.length ? db.collection(name).createIndexes(specs.map((s) => ({ ...s }))) : Promise.resolve(),
-    ),
-  )
-}
-
-export const connectDatabase = async (uri: string, dbName: string): Promise<Database> => {
-  const client = new MongoClient(uri, {
-    maxPoolSize: 20,
-    serverSelectionTimeoutMS: 15_000,
-    retryWrites: true,
-    appName: "stockmarketbot-engine",
-  })
-  await client.connect()
-  const db = client.db(dbName)
-  await ensureIndexes(db)
-  return { client, db, col: collectionsFor(db) }
-}
+/** Connects to stock's database (@mb/engine-kit/db: indexes ensured, retried until it works). */
+export const connectDatabase = (uri: string, dbName: string, log: Logger): Promise<Database> =>
+  connectMongo({ uri, dbName, appName: "stockmarketbot-engine", indexes: INDEXES, collections: collectionsFor, log })

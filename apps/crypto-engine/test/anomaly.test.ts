@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest"
-import { silentLogger } from "../src/log"
+import { silentLogger } from "@mb/engine-kit/log"
 import { KrakenWs, type MinuteBar } from "../src/venues/kraken/ws"
 import { AnomalyDetector, type Bar } from "../src/wire/anomaly"
 import { signalItem } from "../src/wire/sources/kraken-market"

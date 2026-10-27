@@ -1,3 +1,4 @@
+import { errorMessage } from "@mb/engine-kit/log"
 import type { AlpacaOrder, Bar, Snapshot } from "@mb/stock-core/alpaca"
 import type { ChainContract, Instrument, MarketContext, OptionChainContext, OptionsContext, Quote } from "@mb/stock-core/context"
 import { roundTo } from "@mb/stock-core/math"
@@ -8,7 +9,6 @@ import type { TradingContext } from "../bot/context"
 import { loadRealizedFills } from "../bot/orders"
 import { computeRiskState } from "../bot/risk"
 import type { Session } from "../bot/session"
-import { errorMessage } from "../log"
 import { dailyTechnicals, intradayTechnicals, pctChange, round, snapshotPrice } from "./indicators"
 import { loadChain } from "./options-chain"
 

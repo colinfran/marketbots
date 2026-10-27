@@ -1,8 +1,8 @@
 import type { TradeUpdate } from "@mb/stock-core/alpaca"
 import type { StreamHealth } from "@mb/stock-core/db"
 import WebSocket from "ws"
-import { errorMessage, type Logger } from "../log"
-import { backoffMs } from "../util/async"
+import { errorMessage, type Logger } from "@mb/engine-kit/log"
+import { backoffMs } from "@mb/engine-kit/util/async"
 import type { AlpacaCredentials } from "./client"
 
 /**

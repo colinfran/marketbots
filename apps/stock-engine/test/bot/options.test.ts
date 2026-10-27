@@ -1,3 +1,4 @@
+import { settle, useFakeClock } from "@mb/engine-kit/testing/timers"
 import type { ChainContract } from "@mb/stock-core/context"
 import type { EngineEvent } from "@mb/stock-core/events"
 import type { Decision } from "@mb/stock-core/report"
@@ -12,7 +13,6 @@ import { fakeBroker, type FakeBroker } from "../helpers/broker"
 import { makeCtx, type SentAlert } from "../helpers/ctx"
 import { useTestDb } from "../helpers/db"
 import { account, afterOpen, decision, NVDA_CALL_140, NVDA_CALL_150, NVDA_PUT_120, NVDA_PUT_130, optionPositionDoc, report } from "../helpers/factories"
-import { settle, useFakeClock } from "../helpers/timers"
 
 const NOW = afterOpen(90) // Monday 2026-10-26, 11:00 ET
 const db = useTestDb()

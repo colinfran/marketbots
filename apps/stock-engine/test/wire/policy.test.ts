@@ -1,18 +1,18 @@
+import { silentLogger } from "@mb/engine-kit/log"
+import { settle, useFakeClock } from "@mb/engine-kit/testing/timers"
 import { DEFAULT_SETTINGS, type Settings } from "@mb/stock-core/settings"
 import type { EventFocus, WireItemDoc } from "@mb/stock-core/wire"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import type { AiRunner, ResearchResult } from "../../src/ai/runner"
+import type { AiRunner, ResearchResult } from "@mb/engine-kit/ai/runner"
 import type { EngineContext } from "../../src/bot/context"
 import { researchPlan, runCycle } from "../../src/bot/cycle"
 import type { EventBus } from "../../src/bus/event-bus"
-import { silentLogger } from "../../src/log"
 import { assembleDossier } from "../../src/wire/dossier"
 import { stockRules, WirePolicy } from "../../src/wire/policy"
 import { fakeBroker, type FakeBroker } from "../helpers/broker"
 import { makeBus, makeCtx } from "../helpers/ctx"
 import { useTestDb } from "../helpers/db"
 import { afterOpen, DAY, decision, report, session } from "../helpers/factories"
-import { settle, useFakeClock } from "../helpers/timers"
 
 const db = useTestDb()
 const NOW = new Date("2026-10-27T15:00:00Z")

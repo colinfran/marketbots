@@ -1,7 +1,7 @@
+import { silentLogger } from "@mb/engine-kit/log"
 import { DEFAULT_SETTINGS } from "@mb/stock-core/settings"
 import { afterEach, beforeEach, describe, it, vi } from "vitest"
 import type { Alpaca } from "../../src/alpaca/client"
-import { silentLogger } from "../../src/log"
 import { PriceCoverage } from "../../src/market/price-layers"
 import { CATALOG } from "../../src/wire/catalog"
 import { alpacaNewsSpec, moversSpec } from "../../src/wire/sources/alpaca"

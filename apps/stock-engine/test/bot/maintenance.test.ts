@@ -1,3 +1,4 @@
+import { settle, useFakeClock } from "@mb/engine-kit/testing/timers"
 import type { EngineEvent } from "@mb/stock-core/events"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { Alpaca } from "../../src/alpaca/client"
@@ -9,7 +10,6 @@ import { fakeBroker, type FakeBroker } from "../helpers/broker"
 import { makeCtx, type SentAlert } from "../helpers/ctx"
 import { useTestDb } from "../helpers/db"
 import { afterOpen, alpacaOrder, beforeClose, CLOSE, closedSession, cycleDoc, fill, planDoc, session } from "../helpers/factories"
-import { settle, useFakeClock } from "../helpers/timers"
 
 const NOW = afterOpen(90) // 11:00 ET
 const testDb = useTestDb()

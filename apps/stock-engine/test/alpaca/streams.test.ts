@@ -1,9 +1,9 @@
+import { silentLogger } from "@mb/engine-kit/log"
 import type { TradeUpdate } from "@mb/stock-core/alpaca"
 import { afterEach, describe, expect, it } from "vitest"
 import { WebSocketServer, type WebSocket } from "ws"
 import { MarketStream } from "../../src/alpaca/market-stream"
 import { TradeStream } from "../../src/alpaca/trade-stream"
-import { silentLogger } from "../../src/log"
 import { alpacaOrder } from "../helpers/factories"
 
 /** A local WebSocket server that speaks enough of Alpaca's protocols to test the clients. */

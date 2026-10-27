@@ -1,9 +1,10 @@
+import { settle, useFakeClock } from "@mb/engine-kit/testing/timers"
 import type { CycleDoc } from "@mb/stock-core/db"
 import type { EngineEvent } from "@mb/stock-core/events"
 import type { BotReport } from "@mb/stock-core/report"
 import type { Phase } from "@mb/stock-core/settings"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import type { AiRunner, ResearchResult } from "../../src/ai/runner"
+import type { AiRunner, ResearchResult } from "@mb/engine-kit/ai/runner"
 import type { EngineContext } from "../../src/bot/context"
 import { runCycle } from "../../src/bot/cycle"
 import type { EventBus } from "../../src/bus/event-bus"
@@ -11,7 +12,6 @@ import { fakeBroker, type FakeBroker } from "../helpers/broker"
 import { makeCtx, type SentAlert } from "../helpers/ctx"
 import { useTestDb } from "../helpers/db"
 import { afterOpen, alpacaOrder, DAY, decision, planDoc, report, session } from "../helpers/factories"
-import { settle, useFakeClock } from "../helpers/timers"
 
 const NOW = afterOpen(90) // Monday 11:00 ET
 const db = useTestDb()

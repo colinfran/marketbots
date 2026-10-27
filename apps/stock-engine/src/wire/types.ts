@@ -1,7 +1,7 @@
 // Mirrored in cryptomarketbot and stockmarketbot: keep in sync.
 import type { Settings } from "@mb/stock-core/settings"
 import type { WireCategory, WireKind, WireSourceHealth, WireTier } from "@mb/stock-core/wire"
-import type { Logger } from "../log"
+import type { Logger } from "@mb/engine-kit/log"
 import type { WireFetch } from "./fetch"
 
 /**

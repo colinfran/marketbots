@@ -82,7 +82,7 @@ Phases 5–8 add `packages/core`, `packages/engine-kit`, `packages/wire`, `packa
 
 **Today the only shared package is `packages/config`.** Both bots were moved in unchanged (Phase 2), so each bot's engine, dashboard and core package are still its own, and the code they have in common still exists twice:
 
-- The 24 news-engine files headed `// Mirrored in cryptomarketbot and stockmarketbot: keep in sync.` in `apps/crypto-engine/src/wire/` and `apps/stock-engine/src/wire/`.
+- The 23 news-engine files headed `// Mirrored in cryptomarketbot and stockmarketbot: keep in sync.` in `apps/crypto-engine/src/wire/` and `apps/stock-engine/src/wire/`.
 - The 18 shadcn primitives in `apps/*-web/components/ui/` (identical; stock also has `chart.tsx`).
 - More generally, the plan's comparison (§0) found 33 engine and core files identical apart from the package scope, and 11 more that differ only in a constant.
 
@@ -93,7 +93,7 @@ Until those move into shared packages, a change to one copy is made to the other
 | Package | Phase | Holds | Used by |
 | --- | --- | --- | --- |
 | `@mb/core` | 5 ✓ | Pure shared schemas and helpers, no I/O: `math`, `stream-token` (prefix as a parameter), settings base pieces and helpers, the shared command schemas, the event envelope and the events both bots define identically, base collections, indexes and document types, wire types, `metrics`, `indicators`, generic `time` | every app and package |
-| `@mb/engine-kit` | 6 | Engine runtime, generic over each bot's settings, events and commands: log, lease, heartbeat, bus, stream server, command processor, Mongo connect, state stores, alerts, AI budget/repair/runner/prompt parts, `ControlPlane`, `StatusReporter`, `EventCycleQueue`, bootstrap, env base, test helpers | both engines |
+| `@mb/engine-kit` | 6 ✓ (6.5 in progress) | Engine runtime, generic over each bot's settings, events and commands: log, lease, heartbeat, bus, stream server, command processor, Mongo connect, state stores, alerts, AI budget/repair/runner/prompt parts, `ControlPlane`, `StatusReporter`, `EventCycleQueue`, bootstrap, env base, test helpers | both engines |
 | `@mb/wire` | 7 | The news engine: the mirrored files, shared source helpers, `sharedCatalog()`, a `makeLexicon()` skeleton, and (Phase 10) `enrich/` for article summaries | both engines |
 | `@mb/ui` | 8 | Client-safe React: the shadcn primitives, design tokens (`styles.css`), app-shell components, the live-UI shell driven by a per-bot event catalog, shared page sections | both dashboards |
 | `@mb/web-kit` | 8 | Server-only dashboard helpers: auth factory, database, command routes, shared queries, formatting, metadata, error reporting | both dashboards |

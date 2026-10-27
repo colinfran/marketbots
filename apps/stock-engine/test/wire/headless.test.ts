@@ -1,6 +1,6 @@
 import { DEFAULT_SETTINGS } from "@mb/stock-core/settings"
 import { describe, expect, it, vi } from "vitest"
-import { silentLogger } from "../../src/log"
+import { silentLogger } from "@mb/engine-kit/log"
 import type { WireFetch } from "../../src/wire/fetch"
 import { headlessPoller, type Rendered } from "../../src/wire/kinds/headless"
 import { stockLexicon } from "../../src/wire/lexicon"

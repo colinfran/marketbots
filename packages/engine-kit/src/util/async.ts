@@ -57,7 +57,7 @@ export const withTimeout = <T>(promise: Promise<T>, ms: number, label = "operati
     )
   })
 
-/** A token bucket for client-side rate limiting (Kraken rate limits public calls per IP). */
+/** A token bucket for client-side rate limiting (Kraken limits public calls per IP; Alpaca allows ~200 requests per minute per account). */
 export class TokenBucket {
   private tokens: number
   private last: number

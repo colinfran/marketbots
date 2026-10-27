@@ -1,4 +1,4 @@
-import { errorMessage } from "../log"
+import { errorMessage } from "@mb/engine-kit/log"
 import type { EngineContext } from "./context"
 import { exitPosition } from "./trading"
 

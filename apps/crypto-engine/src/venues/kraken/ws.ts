@@ -1,6 +1,6 @@
 import WebSocket from "ws"
-import { backoffMs } from "../../util/async"
-import { errorMessage, type Logger } from "../../log"
+import { backoffMs } from "@mb/engine-kit/util/async"
+import { errorMessage, type Logger } from "@mb/engine-kit/log"
 import { OrderBook, type Level } from "./book"
 import type { PairInfo } from "./pairs"
 

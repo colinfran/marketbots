@@ -1,5 +1,5 @@
 // Mirrored in cryptomarketbot and stockmarketbot: keep in sync.
-import { TokenBucket } from "../util/async"
+import { TokenBucket } from "@mb/engine-kit/util/async"
 
 /**
  * Per-domain rate limits for everything the news engine fetches, so a free source never sees a
