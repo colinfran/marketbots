@@ -199,8 +199,10 @@ export type CycleDocBase<Status extends string> = {
   /** Event cycles: the trigger and the wire items that started it. */
   wire_trigger_id?: string | null
   wire_item_ids?: string[]
-  /** Why Grok research was skipped (research_mode auto or held_gaps), when it was. */
+  /** Why Grok research was skipped (research_mode auto), when it was. */
   research_skip_reason?: string | null
+  /** Which Grok research the cycle ran (full, gap-fill or none) and why (absent on older cycles and on cycles that stopped before research). */
+  research_plan?: { kind: "full" | "gap" | "none"; reason: string }
 }
 
 export type SeedRunStatus = "scheduled" | "running" | "done" | "failed" | "canceled"

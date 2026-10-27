@@ -131,42 +131,26 @@ export const eventCandidates = (events: EventFocus[], fresh: Features[], held: R
   })
 }
 
-/** How fresh an X read must be for research_mode auto to skip Grok. */
-const X_READ_FRESH_MINUTES = 120
-
 export type ResearchPlan = { kind: "full" | "gap" | "none"; reason: string }
 
 /**
  * Which Grok research a cycle runs. Full whenever the wire is off or
- * unhealthy. auto skips Grok only when our feeds leave no gap: no unexplained moves, no
- * unconfirmed high-severity items, and a recent X read of these same subjects. held_gaps runs
- * the gap-fill only for a gap on a held subject.
+ * unhealthy. auto runs the gap-fill whenever the dossier has a gap on the cycle's subjects (its
+ * candidates and the holdings it reviews) or on the market: an unexplained move, an unconfirmed
+ * high-severity item. It skips Grok otherwise.
  */
-export const researchPlan = async (
-  ctx: Pick<EngineContext, "settings" | "col">,
-  { isEvent, wireHealthy, dossier, subjects, held = [], now = new Date() }: { isEvent: boolean; wireHealthy: boolean; dossier: Dossier | null; subjects: string[]; held?: string[]; now?: Date },
-): Promise<ResearchPlan> => {
+export const researchPlan = (
+  ctx: Pick<EngineContext, "settings">,
+  { isEvent, wireHealthy, dossier }: { isEvent: boolean; wireHealthy: boolean; dossier: Dossier | null },
+): ResearchPlan => {
   const w = ctx.settings.current.wire
   if (isEvent) return w.event_research === "none" ? { kind: "none", reason: "event cycle with event_research none: the dossier is the evidence" } : { kind: "gap", reason: "event check (x_verify)" }
   if (!dossier) return { kind: "full", reason: "news engine off" }
   if (!wireHealthy) return { kind: "full", reason: "news engine unhealthy" }
   if (w.research_mode === "full") return { kind: "full", reason: "research_mode full" }
-  if (w.research_mode === "held_gaps") {
-    const ours = (i: { symbols: string[] }) => i.symbols.some((s) => held.includes(s))
-    const unexplained = dossier.unexplained.filter(ours).length
-    const unconfirmed = dossier.unconfirmed.filter(ours).length
-    return unexplained || unconfirmed
-      ? { kind: "gap", reason: `${unexplained} unexplained moves, ${unconfirmed} unconfirmed items on held pairs` }
-      : { kind: "none", reason: "no unexplained moves or unconfirmed items on held pairs" }
-  }
   if (w.research_mode === "gap_fill") return { kind: "gap", reason: "research_mode gap_fill" }
   if (dossier.unexplained.length || dossier.unconfirmed.length) return { kind: "gap", reason: `${dossier.unexplained.length} unexplained moves, ${dossier.unconfirmed.length} unconfirmed items` }
-  const lastX = await ctx.col.research.findOne(
-    { started_at: { $gte: new Date(now.getTime() - X_READ_FRESH_MINUTES * 60_000) }, x_search: true, error: null, memo: { $ne: "" }, subjects: { $all: subjects } },
-    { sort: { started_at: -1 }, projection: { started_at: 1 } },
-  )
-  if (!lastX) return { kind: "gap", reason: "no X read of these subjects in the last 2 h" }
-  return { kind: "none", reason: `no unexplained moves or unconfirmed items, and X was read ${Math.round((now.getTime() - lastX.started_at.getTime()) / 60_000)} min ago` }
+  return { kind: "none", reason: "no unexplained moves or unconfirmed items in our feeds" }
 }
 
 /** Positions whose thesis should be re-examined now. */
@@ -357,7 +341,7 @@ export const runCryptoCycle = async (ctx: EngineContext, request: CycleRequest):
     ctx.bus.emit("wire.dossier", { cycle_id: cycleId, rows: dossier.rows, total: dossier.items.length }, { summary: `Our research: ${dossier.items.length} items for ${subjects.length} subjects`, cycle_id: cycleId })
   }
   const eventText = isEvent ? eventSection(events) : undefined
-  const plan = await researchPlan(ctx, { isEvent, wireHealthy: !!wire && wire.healthy(), dossier, subjects: subjectSymbols, held: reviews.map((r) => r.position.symbol) })
+  const plan = researchPlan(ctx, { isEvent, wireHealthy: !!wire && wire.healthy(), dossier })
   const estimate = (plan.kind === "full" ? await ctx.budget.estimate("research") : plan.kind === "gap" ? await ctx.budget.estimate("research_gap") : 0) + (await ctx.budget.estimate("decision"))
   // Scheduled cycles leave the event reserve alone; event cycles may use the whole budget.
   const reservePct = !isEvent && settings.wire.mode === "live" ? settings.wire.event_budget_reserve_pct : 0
@@ -414,8 +398,8 @@ export const runCryptoCycle = async (ctx: EngineContext, request: CycleRequest):
     mode: plan.kind === "full" ? "full" : plan.kind === "gap" ? "gap_fill" : "skipped",
     ...(dossier ? { dossier: dossier.rows } : {}),
   })
+  await ctx.col.cycles.updateOne({ _id: cycleId }, { $set: { research_plan: plan, ...(plan.kind === "none" ? { research_skip_reason: plan.reason } : {}) } })
   if (plan.kind === "none") {
-    await ctx.col.cycles.updateOne({ _id: cycleId }, { $set: { research_skip_reason: plan.reason } })
     await cycleStep(ctx.col, cycleId, "research", true, `skipped: ${plan.reason}`)
   } else {
     ctx.bus.emit(

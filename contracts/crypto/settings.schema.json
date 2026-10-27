@@ -426,8 +426,7 @@
             "enum": [
               "full",
               "gap_fill",
-              "auto",
-              "held_gaps"
+              "auto"
             ]
           },
           "thresholds": {
@@ -1113,8 +1112,7 @@
             "enum": [
               "full",
               "gap_fill",
-              "auto",
-              "held_gaps"
+              "auto"
             ]
           },
           "thresholds": {

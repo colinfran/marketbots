@@ -307,34 +307,25 @@ describe("dossier", () => {
 })
 
 describe("research modes", () => {
-  const ctxFor = (wire: Partial<Settings["wire"]>) => ({ col: db.col, settings: { current: { ...DEFAULT_SETTINGS, wire: { ...DEFAULT_SETTINGS.wire, ...wire } }, version: 1 } as unknown as SettingsStore })
+  const ctxFor = (wire: Partial<Settings["wire"]>) => ({ settings: { current: { ...DEFAULT_SETTINGS, wire: { ...DEFAULT_SETTINGS.wire, ...wire } }, version: 1 } as unknown as SettingsStore })
   const empty = assembleDossier([], { symbols: ["BTC/USD"], since: NOW, now: NOW, price: () => null, timeLabel: () => "", reviewThreshold: 55 })
 
-  it("falls back to full research when the wire is off or unhealthy, and follows the mode otherwise", async () => {
-    expect((await researchPlan(ctxFor({}), { isEvent: false, wireHealthy: true, dossier: null, subjects: ["BTC/USD"] })).kind).toBe("full")
-    expect((await researchPlan(ctxFor({}), { isEvent: false, wireHealthy: false, dossier: empty, subjects: ["BTC/USD"] })).kind).toBe("full")
-    expect((await researchPlan(ctxFor({ research_mode: "gap_fill" }), { isEvent: false, wireHealthy: true, dossier: empty, subjects: ["BTC/USD"] })).kind).toBe("gap")
-    expect((await researchPlan(ctxFor({ event_research: "none" }), { isEvent: true, wireHealthy: true, dossier: empty, subjects: ["BTC/USD"] })).kind).toBe("none")
-    expect((await researchPlan(ctxFor({}), { isEvent: true, wireHealthy: true, dossier: empty, subjects: ["BTC/USD"] })).kind).toBe("gap")
+  it("falls back to full research when the wire is off or unhealthy, and follows the mode otherwise", () => {
+    expect(researchPlan(ctxFor({}), { isEvent: false, wireHealthy: true, dossier: null }).kind).toBe("full")
+    expect(researchPlan(ctxFor({}), { isEvent: false, wireHealthy: false, dossier: empty }).kind).toBe("full")
+    expect(researchPlan(ctxFor({ research_mode: "gap_fill" }), { isEvent: false, wireHealthy: true, dossier: empty }).kind).toBe("gap")
+    expect(researchPlan(ctxFor({ event_research: "none" }), { isEvent: true, wireHealthy: true, dossier: empty }).kind).toBe("none")
+    expect(researchPlan(ctxFor({}), { isEvent: true, wireHealthy: true, dossier: empty }).kind).toBe("gap")
   })
 
-  it("auto skips Grok only with no gaps and a recent X read of the same subjects", async () => {
-    const plan = () => researchPlan(ctxFor({ research_mode: "auto" }), { isEvent: false, wireHealthy: true, dossier: empty, subjects: ["BTC/USD"], now: NOW })
-    expect(await plan()).toMatchObject({ kind: "gap", reason: expect.stringContaining("no X read") })
-    await db.col.research.insertOne({ _id: "r1", cycle_id: "c", subjects: ["BTC/USD", "ETH/USD"], memo: "memo", sources: [], queries: [], model: "m", prompt_version: "v", x_search: true, started_at: new Date(NOW.getTime() - 30 * 60_000), duration_ms: 1, usage: { input: 0, output: 0, total: 0 }, cost_usd: 0, error: null })
-    expect(await plan()).toMatchObject({ kind: "none", reason: expect.stringContaining("30 min ago") })
-  })
-
-  it("held_gaps runs the gap-fill only for a gap on a held pair", async () => {
+  it("auto runs the gap-fill for a gap on a candidate, a holding or the market, and skips Grok otherwise (no X-freshness rule)", () => {
     const moved = withRoot(item({ kind: "anomaly", category: "price_shock", tier: 1, symbols: ["ETH/USD"], url: null, meta: { anomaly: "price" } }))
     const rumor = withRoot(item({ symbols: ["SOL/USD"], tier: 3, url: "https://rumor.test/sol" }))
-    const gaps = assembleDossier([moved, rumor], { symbols: ["ETH/USD", "SOL/USD"], since: new Date(NOW.getTime() - HOUR), now: NOW, price: () => null, timeLabel: () => "", reviewThreshold: 55 })
-    expect([gaps.unexplained.length, gaps.unconfirmed.length]).toEqual([1, 1])
-    const plan = (held: string[], dossier = gaps) => researchPlan(ctxFor({}), { isEvent: false, wireHealthy: true, dossier, subjects: ["ETH/USD", "SOL/USD"], held, now: NOW })
-    expect(await plan(["ETH/USD"])).toEqual({ kind: "gap", reason: "1 unexplained moves, 0 unconfirmed items on held pairs" })
-    expect(await plan(["SOL/USD"])).toMatchObject({ kind: "gap", reason: expect.stringContaining("1 unconfirmed items") })
-    expect(await plan([])).toMatchObject({ kind: "none" })
-    expect(await plan(["ETH/USD"], empty)).toMatchObject({ kind: "none" })
+    const o = { symbols: ["ETH/USD", "SOL/USD"], since: new Date(NOW.getTime() - HOUR), now: NOW, price: () => null, timeLabel: () => "", reviewThreshold: 55 }
+    const plan = (dossier: typeof empty) => researchPlan(ctxFor({ research_mode: "auto" }), { isEvent: false, wireHealthy: true, dossier })
+    expect(plan(assembleDossier([moved], o))).toEqual({ kind: "gap", reason: "1 unexplained moves, 0 unconfirmed items" })
+    expect(plan(assembleDossier([rumor], o))).toEqual({ kind: "gap", reason: "0 unexplained moves, 1 unconfirmed items" })
+    expect(plan(empty)).toEqual({ kind: "none", reason: "no unexplained moves or unconfirmed items in our feeds" })
   })
 })
 
@@ -421,7 +412,17 @@ describe("event cycle", () => {
     const decision = await db.col.decisions.findOne({ symbol: "BTC/USD" })
     expect(decision).toMatchObject({ trigger_kind: "event", strategy_id: "event_driven", wire_item_ids: ["item-1"] })
     expect(decision!.risk?.checks.map((c) => c.name)).toContain("edge_after_costs")
-    expect(await db.col.cycles.findOne({ _id: r.cycleId })).toMatchObject({ kind: "event", wire_trigger_id: "trig-1", wire_item_ids: ["item-1"] })
+    expect(await db.col.cycles.findOne({ _id: r.cycleId })).toMatchObject({ kind: "event", wire_trigger_id: "trig-1", wire_item_ids: ["item-1"], research_plan: { kind: "gap", reason: "event check (x_verify)" } })
+  })
+
+  it("records which research it ran and why, also when it skips Grok", async () => {
+    const { ctx, research, focus } = await setup()
+    ctx.settings = { current: { ...ctx.settings.current, wire: { ...ctx.settings.current.wire, event_research: "none" } }, version: 1 } as unknown as SettingsStore
+    const r = await runCryptoCycle(ctx, { kind: "event", trigger: "event: entry event BTC/USD", events: [focus] })
+    expect(r.status).toBe("completed")
+    expect(research).not.toHaveBeenCalled()
+    const reason = "event cycle with event_research none: the dossier is the evidence"
+    expect(await db.col.cycles.findOne({ _id: r.cycleId })).toMatchObject({ research_plan: { kind: "none", reason }, research_skip_reason: reason })
   })
 
   it("streams the model's reasoning and the decision as it's written, tagged with the cycle and never stored", async () => {

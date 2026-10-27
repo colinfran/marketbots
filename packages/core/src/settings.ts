@@ -77,11 +77,8 @@ export type WireSummariesSettings = z.infer<typeof wireSummariesSettings>
  */
 export const wireSettingsBase = z.object({
   mode: z.enum(["off", "shadow", "live"]),
-  /**
-   * full = Grok researches as before; gap_fill = Grok only fills what the wire lacks; auto = gap_fill, skipped when there's no
-   * gap; held_gaps = the wire alone, and gap_fill only when what we hold has a gap (an unexplained move or an unconfirmed item).
-   */
-  research_mode: z.enum(["full", "gap_fill", "auto", "held_gaps"]),
+  /** full = Grok researches as before; gap_fill = Grok only fills what the wire lacks; auto = gap_fill, skipped when there's no gap. */
+  research_mode: z.enum(["full", "gap_fill", "auto"]),
   /** Severity (0-100) for: annotating the dossier, a held-position review, a new-entry evaluation, critical. Ascending. */
   thresholds: z.object({ annotate: int(0, 100), review: int(0, 100), evaluate: int(0, 100), critical: int(0, 100) }),
   /** Event-driven entries need a tier-1 source, two tier-2 domains, or tier 2 plus a matching market move. */

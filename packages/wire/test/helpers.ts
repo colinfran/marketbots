@@ -3,7 +3,7 @@ import type { WireSettingsBase } from "@mb/core/settings"
 /** The `wire` settings both bots ship with (their DEFAULT_SETTINGS.wire, shared fields only). */
 export const WIRE_SETTINGS: WireSettingsBase = {
   mode: "live",
-  research_mode: "held_gaps",
+  research_mode: "auto",
   thresholds: { annotate: 30, review: 55, evaluate: 70, critical: 85 },
   entry_confirmation: true,
   unexplained_move_entries: false,

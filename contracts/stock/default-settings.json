@@ -94,7 +94,7 @@
   },
   "wire": {
     "mode": "live",
-    "research_mode": "held_gaps",
+    "research_mode": "auto",
     "thresholds": {
       "annotate": 30,
       "review": 55,

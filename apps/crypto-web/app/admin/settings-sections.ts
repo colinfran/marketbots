@@ -73,7 +73,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     title: "News engine",
     fields: [
       { path: "wire.mode", label: "Mode (off = scheduled cycles only; shadow = log triggers, act on none)", kind: "select", options: ["live", "shadow", "off"] },
-      { path: "wire.research_mode", label: "Grok research (held_gaps: only for a gap on a held pair; auto: skipped when our feeds leave no gap)", kind: "select", options: ["held_gaps", "auto", "gap_fill", "full"] },
+      { path: "wire.research_mode", label: "Grok research (auto: only when our feeds leave a gap on a candidate, a holding or the market)", kind: "select", options: ["auto", "gap_fill", "full"] },
       { path: "wire.thresholds.annotate", label: "Severity: annotate", kind: "number" },
       { path: "wire.thresholds.review", label: "Severity: review a holding", kind: "number" },
       { path: "wire.thresholds.evaluate", label: "Severity: evaluate an entry", kind: "number" },

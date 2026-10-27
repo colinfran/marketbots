@@ -241,7 +241,7 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   wire: {
     mode: "live",
-    research_mode: "held_gaps",
+    research_mode: "auto",
     thresholds: { annotate: 30, review: 55, evaluate: 70, critical: 85 },
     entry_confirmation: true,
     unexplained_move_entries: false,

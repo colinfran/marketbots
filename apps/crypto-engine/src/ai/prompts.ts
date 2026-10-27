@@ -100,7 +100,7 @@ export type CryptoDecisionInput = {
   wire?: string
   /** What started an event cycle. */
   event?: string
-  /** Set when Grok research was skipped on purpose (research_mode auto or held_gaps): why. */
+  /** Set when Grok research was skipped on purpose (research_mode auto): why. */
   researchSkipped?: string | null
 }
 
@@ -155,7 +155,7 @@ ${research}
 }
 
 /**
- * Gap-fill research (research_mode gap_fill / auto / held_gaps, and event checks): Grok already has the wire
+ * Gap-fill research (research_mode gap_fill / auto, and event checks): Grok already has the wire
  * dossier and must not repeat it. It only does what our feeds can't: read X, explain moves our
  * feeds can't, verify single-source claims, and catch anything critical the dossier missed.
  */

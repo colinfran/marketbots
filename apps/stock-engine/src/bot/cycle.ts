@@ -54,44 +54,27 @@ export type CycleOptions = {
   events?: EventFocus[]
 }
 
-/** How fresh an X read must be for research_mode auto to skip Grok. */
-const X_READ_FRESH_MINUTES = 120
-
 export type ResearchPlan = { kind: "full" | "gap" | "none"; reason: string }
 
 /**
  * Which Grok research a cycle runs. Full whenever the wire is off or
- * unhealthy. auto skips Grok only when our feeds leave no gap (no unexplained moves, no
- * unconfirmed high-severity items) and X was read recently; premarket and postmarket always get
- * at least the gap-fill. held_gaps runs the gap-fill only for a gap on a held or requested symbol
- * (`focus`), in any phase. The owner's one-time seed always gets the full research.
+ * unhealthy. auto runs the gap-fill whenever the dossier has a gap on anything the cycle could
+ * trade, or on the market (an unexplained move, an unconfirmed high-severity item), in any phase,
+ * and skips Grok otherwise. The owner's one-time seed always gets the full research.
  */
-export const researchPlan = async (
-  ctx: Pick<EngineContext, "settings" | "col">,
-  { phase, isEvent, isSeed = false, wireHealthy, dossier, focus = [], now = new Date() }: { phase: Phase; isEvent: boolean; isSeed?: boolean; wireHealthy: boolean; dossier: Dossier | null; focus?: string[]; now?: Date },
-): Promise<ResearchPlan> => {
+export const researchPlan = (
+  ctx: Pick<EngineContext, "settings">,
+  { isEvent, isSeed = false, wireHealthy, dossier }: { isEvent: boolean; isSeed?: boolean; wireHealthy: boolean; dossier: Dossier | null },
+): ResearchPlan => {
   const w = ctx.settings.current.wire
   if (isSeed) return { kind: "full", reason: "one-time seed" }
   if (isEvent) return w.event_research === "none" ? { kind: "none", reason: "event cycle with event_research none: the dossier is the evidence" } : { kind: "gap", reason: "event check (x_verify)" }
   if (!dossier) return { kind: "full", reason: "news engine off" }
   if (!wireHealthy) return { kind: "full", reason: "news engine unhealthy" }
   if (w.research_mode === "full") return { kind: "full", reason: "research_mode full" }
-  if (w.research_mode === "held_gaps") {
-    const ours = (i: { symbols: string[] }) => i.symbols.some((s) => focus.includes(s))
-    const unexplained = dossier.unexplained.filter(ours).length
-    const unconfirmed = dossier.unconfirmed.filter(ours).length
-    return unexplained || unconfirmed
-      ? { kind: "gap", reason: `${unexplained} unexplained moves, ${unconfirmed} unconfirmed items on held or requested symbols` }
-      : { kind: "none", reason: "no unexplained moves or unconfirmed items on held or requested symbols" }
-  }
-  if (w.research_mode === "gap_fill" || phase === "premarket" || phase === "postmarket") return { kind: "gap", reason: w.research_mode === "gap_fill" ? "research_mode gap_fill" : `${phase} always checks X` }
+  if (w.research_mode === "gap_fill") return { kind: "gap", reason: "research_mode gap_fill" }
   if (dossier.unexplained.length || dossier.unconfirmed.length) return { kind: "gap", reason: `${dossier.unexplained.length} unexplained moves, ${dossier.unconfirmed.length} unconfirmed items` }
-  const lastX = await ctx.col.reports.findOne(
-    { created_at: { $gte: new Date(now.getTime() - X_READ_FRESH_MINUTES * 60_000) }, "research.x_search": true, "research.error": null, "research.memo": { $ne: "" } },
-    { sort: { created_at: -1 }, projection: { created_at: 1 } },
-  )
-  if (!lastX) return { kind: "gap", reason: "no X read in the last 2 h" }
-  return { kind: "none", reason: `no unexplained moves or unconfirmed items, and X was read ${Math.round((now.getTime() - lastX.created_at.getTime()) / 60_000)} min ago` }
+  return { kind: "none", reason: "no unexplained moves or unconfirmed items in our feeds" }
 }
 
 /** How old a failed attempt's research may be for the scheduler's retry of the phase to reuse it. */
@@ -249,8 +232,7 @@ export const runCycle = async (
       bus.emit("wire.dossier", { cycle_id: cycleId, rows: dossier.rows, total: dossier.items.length }, { summary: `Our research: ${dossier.items.length} items`, ...meta })
     }
     const eventText = isEvent ? eventSection(events) : undefined
-    const focus = [...new Set([...requested, ...context.positions.map((p) => p.symbol), ...context.options.positions.map((p) => p.underlying)])]
-    const plan = await researchPlan(ctx, { phase, isEvent, isSeed: !!seed, wireHealthy: !!wire && wire.healthy(), dossier, focus })
+    const plan = researchPlan(ctx, { isEvent, isSeed: !!seed, wireHealthy: !!wire && wire.healthy(), dossier })
     const estimate = (plan.kind === "full" ? await ctx.budget.estimate("research") : plan.kind === "gap" ? await ctx.budget.estimate("research_gap") : 0) + (await ctx.budget.estimate("decision"))
     // Scheduled cycles leave the event reserve alone; event cycles (and the owner's seed) may use the whole budget.
     const reservePct = !isEvent && !seed && settings.wire.mode === "live" ? settings.wire.event_budget_reserve_pct : 0
@@ -264,6 +246,7 @@ export const runCycle = async (
 
     // ─── Research ───────────────────────────────────────────────────────
     const researchId = randomUUID()
+    const focus = [...new Set([...requested, ...context.positions.map((p) => p.symbol), ...context.options.positions.map((p) => p.underlying)])]
     const mode = plan.kind === "full" ? "full" : plan.kind === "gap" ? "gap_fill" : "skipped"
     const reuse = retriable && plan.kind !== "none" ? await reusableResearch(ctx, { cycleId, day: session.day, phase, mode }) : null
     const researching = plan.kind !== "none" && !reuse
@@ -307,8 +290,8 @@ export const runCycle = async (
               : `${plan.kind === "gap" ? "gap-fill, " : ""}${r.sources.length} sources, ${r.queries.length} searches${r.x_search ? "" : " (web only)"}, ${Math.round(r.duration_ms / 1000)}s`,
     )
     aiCost += research.cost_usd ?? 0
-    if (plan.kind === "none") await col.cycles.updateOne({ _id: cycleId }, { $set: { research_skip_reason: plan.reason } })
-    else if (researching) {
+    await col.cycles.updateOne({ _id: cycleId }, { $set: { research_plan: plan, ...(plan.kind === "none" ? { research_skip_reason: plan.reason } : {}) } })
+    if (researching) {
       bus.emit(
         "research.completed",
         { research_id: researchId, sources: research.sources.length, queries: research.queries.length, duration_ms: research.duration_ms, cost_usd: roundTo(research.cost_usd ?? 0, 4), error: research.error },

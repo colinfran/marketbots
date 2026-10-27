@@ -159,37 +159,29 @@ describe("stock policy", () => {
 })
 
 describe("stock research modes", () => {
-  const ctxFor = (wire: Partial<Settings["wire"]>) => ({ col: db.col, settings: { current: { ...DEFAULT_SETTINGS, wire: { ...DEFAULT_SETTINGS.wire, ...wire } }, version: 1 } }) as unknown as Pick<EngineContext, "settings" | "col">
+  const ctxFor = (wire: Partial<Settings["wire"]>) => ({ settings: { current: { ...DEFAULT_SETTINGS, wire: { ...DEFAULT_SETTINGS.wire, ...wire } }, version: 1 } }) as unknown as Pick<EngineContext, "settings">
   const empty = assembleDossier([], { symbols: ["NVDA"], since: NOW, now: NOW, price: () => null, timeLabel: () => "", reviewThreshold: 55 })
-  it("is full without a healthy wire, gap-fill in premarket, and skipped in auto only with a fresh X read", async () => {
-    const auto = ctxFor({ research_mode: "auto" })
-    expect((await researchPlan(auto, { phase: "intraday", isEvent: false, wireHealthy: false, dossier: empty })).kind).toBe("full")
-    expect((await researchPlan(auto, { phase: "premarket", isEvent: false, wireHealthy: true, dossier: empty })).kind).toBe("gap")
-    expect((await researchPlan(auto, { phase: "intraday", isEvent: false, wireHealthy: true, dossier: empty, now: NOW })).kind).toBe("gap")
-    await db.col.reports.insertOne({ _id: "r", cycle_id: "c", phase: "intraday", trading_day: DAY, created_at: new Date(NOW.getTime() - 20 * 60_000), research: { memo: "m", sources: [], queries: [], model: "m", x_search: true, duration_ms: 1, error: null, usage: { input: 0, output: 0, total: 0 } } } as never)
-    expect(await researchPlan(auto, { phase: "intraday", isEvent: false, wireHealthy: true, dossier: empty, now: NOW })).toMatchObject({ kind: "none" })
-    expect((await researchPlan(ctxFor({ event_research: "none" }), { phase: "intraday", isEvent: true, wireHealthy: true, dossier: empty })).kind).toBe("none")
+  it("is full without a healthy wire, and follows the mode otherwise", () => {
+    expect(researchPlan(ctxFor({}), { isEvent: false, wireHealthy: false, dossier: empty }).kind).toBe("full")
+    expect(researchPlan(ctxFor({}), { isEvent: false, wireHealthy: true, dossier: null }).kind).toBe("full")
+    expect(researchPlan(ctxFor({ research_mode: "gap_fill" }), { isEvent: false, wireHealthy: true, dossier: empty }).kind).toBe("gap")
+    expect(researchPlan(ctxFor({ event_research: "none" }), { isEvent: true, wireHealthy: true, dossier: empty }).kind).toBe("none")
+    expect(researchPlan(ctxFor({}), { isEvent: true, wireHealthy: true, dossier: empty }).kind).toBe("gap")
   })
 
-  it("held_gaps runs the gap-fill only for a gap on a held or requested symbol, in any phase", async () => {
+  it("auto runs the gap-fill for a gap on any subject or the market, and skips Grok otherwise (no X-freshness rule)", () => {
     const moved = item({ symbols: ["NVDA"], kind: "anomaly", category: "price_shock", polarity: 1, url: null, meta: { anomaly: "price" } })
-    const rumor = item({ symbols: ["ACME"], source: "rss:blog", tier: 3, kind: "news", url: "https://blog.test/a" })
-    const gaps = assembleDossier([moved, rumor], { symbols: ["NVDA", "ACME"], since: new Date(NOW.getTime() - 3_600_000), now: NOW, price: () => null, timeLabel: () => "", reviewThreshold: 55 })
-    expect([gaps.unexplained.length, gaps.unconfirmed.length]).toEqual([1, 1])
-    const plan = (focus: string[], phase: "premarket" | "intraday" | "postmarket" = "intraday", dossier = gaps) =>
-      researchPlan(ctxFor({}), { phase, isEvent: false, wireHealthy: true, dossier, focus, now: NOW })
-    expect(await plan(["NVDA"])).toEqual({ kind: "gap", reason: "1 unexplained moves, 0 unconfirmed items on held or requested symbols" })
-    expect(await plan(["ACME"])).toMatchObject({ kind: "gap", reason: expect.stringContaining("1 unconfirmed items") })
-    expect(await plan(["AAPL"])).toMatchObject({ kind: "none" })
-    expect(await plan(["NVDA"], "premarket", empty)).toMatchObject({ kind: "none" })
-    expect(await plan([], "postmarket", empty)).toMatchObject({ kind: "none" })
-    expect((await researchPlan(ctxFor({}), { phase: "intraday", isEvent: false, wireHealthy: false, dossier: gaps, focus: [] })).kind).toBe("full")
+    const rumor = item({ symbols: [], source: "rss:blog", tier: 3, kind: "news", url: "https://blog.test/a" })
+    const o = { symbols: ["NVDA", "ACME"], since: new Date(NOW.getTime() - 3_600_000), now: NOW, price: () => null, timeLabel: () => "", reviewThreshold: 55 }
+    const auto = ctxFor({ research_mode: "auto" })
+    expect(researchPlan(auto, { isEvent: false, wireHealthy: true, dossier: assembleDossier([moved], o) })).toEqual({ kind: "gap", reason: "1 unexplained moves, 0 unconfirmed items" })
+    expect(researchPlan(auto, { isEvent: false, wireHealthy: true, dossier: assembleDossier([rumor], o) })).toEqual({ kind: "gap", reason: "0 unexplained moves, 1 unconfirmed items" })
+    expect(researchPlan(auto, { isEvent: false, wireHealthy: true, dossier: empty })).toEqual({ kind: "none", reason: "no unexplained moves or unconfirmed items in our feeds" })
   })
 
-  it("always gives the one-time seed the full research", async () => {
-    await db.col.reports.insertOne({ _id: "r", cycle_id: "c", phase: "intraday", trading_day: DAY, created_at: new Date(NOW.getTime() - 20 * 60_000), research: { memo: "m", sources: [], queries: [], model: "m", x_search: true, duration_ms: 1, error: null, usage: { input: 0, output: 0, total: 0 } } } as never)
-    expect(await researchPlan(ctxFor({}), { phase: "intraday", isEvent: false, isSeed: true, wireHealthy: true, dossier: empty, now: NOW })).toEqual({ kind: "full", reason: "one-time seed" })
-    expect((await researchPlan(ctxFor({ research_mode: "gap_fill" }), { phase: "intraday", isEvent: false, isSeed: true, wireHealthy: true, dossier: empty, now: NOW })).kind).toBe("full")
+  it("always gives the one-time seed the full research", () => {
+    expect(researchPlan(ctxFor({}), { isEvent: false, isSeed: true, wireHealthy: true, dossier: empty })).toEqual({ kind: "full", reason: "one-time seed" })
+    expect(researchPlan(ctxFor({ research_mode: "gap_fill" }), { isEvent: false, isSeed: true, wireHealthy: true, dossier: empty }).kind).toBe("full")
   })
 })
 
@@ -227,6 +219,6 @@ describe("stock event cycle", () => {
     expect(research.mock.calls[0][0]).toMatchObject({ prompt: expect.stringContaining("THIS CYCLE WAS STARTED BY AN EVENT"), timeoutMs: 45_000 })
     expect(structured.mock.calls[0][0]).toMatchObject({ prompt: expect.stringContaining("# EVENT (why this cycle started)"), timeoutMs: 90_000 })
     expect(await db.col.decisions.findOne({ symbol: "AAPL" })).toMatchObject({ trigger_kind: "event", wire_item_ids: ["item-1"], status: "executed" })
-    expect(await db.col.cycles.findOne({ _id: r.cycleId })).toMatchObject({ kind: "event", wire_trigger_id: "trig-1" })
+    expect(await db.col.cycles.findOne({ _id: r.cycleId })).toMatchObject({ kind: "event", wire_trigger_id: "trig-1", research_plan: { kind: "gap", reason: "event check (x_verify)" } })
   })
 })
