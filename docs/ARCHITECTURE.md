@@ -11,7 +11,7 @@ The platform view of marketbots: how the two bots run side by side, what the rep
 | Dashboard | `apps/crypto-web` → Vercel, cryptomarketbot.app | `apps/stock-web` → Vercel, stockmarketbot.app |
 | Live stream | `wss://engine.cryptomarketbot.app/v1/stream` | `wss://engine.stockmarketbot.app/v1/stream` |
 | Database (Atlas) | `cryptomarketbot` | `stockmarketbot` |
-| Config | `crypto.env` | `stock.env` |
+| Config | `.env.crypto` | `.env.stock` |
 | Design doc | [CRYPTO.md](CRYPTO.md) | [STOCK.md](STOCK.md) |
 
 The rules behind the layout:
@@ -74,7 +74,7 @@ marketbots/
 ├─ docs/               ARCHITECTURE.md (this file), CRYPTO.md, STOCK.md, SERVER.md
 ├─ compose.yml         the marketbots stack
 ├─ compose.smoke.yml   boot test of new images beside the live stack
-├─ crypto.env.example  stock.env.example
+├─ .env.crypto.example  .env.stock.example
 ├─ AGENTS.md           conventions for changing this repo
 └─ package.json  pnpm-workspace.yaml  pnpm-lock.yaml
 ```
@@ -127,7 +127,7 @@ Every deploy is gated by `pnpm typecheck && pnpm test && pnpm lint && pnpm build
 
 ## Configuration
 
-One env file per bot at the repo root, `crypto.env` and `stock.env`, under the variable names the code already used. The engine container reads its file through compose, which also sets `STREAM_HOST`, `STREAM_PORT`, `SCRAPER_URL` and `LLM_URL`. Local dev reads the same file, then `<bot>.local.env`. The file's SHARED and DASHBOARD sections are what goes into the bot's Vercel project. Details: [SERVER.md §3](SERVER.md#3-the-env-files).
+One env file per bot at the repo root, `.env.crypto` and `.env.stock`, under the variable names the code already used. The engine container reads its file through compose, which also sets `STREAM_HOST`, `STREAM_PORT`, `SCRAPER_URL` and `LLM_URL`. Local dev reads the same file, then `.env.<bot>.local`. The file's SHARED and DASHBOARD sections are what goes into the bot's Vercel project. Details: [SERVER.md §3](SERVER.md#3-the-env-files).
 
 Live trading settings are not configuration: they live in each bot's database and change only from its dashboard's Admin page.
 
@@ -152,6 +152,6 @@ Both were copied unchanged from the old repos' `docs/ARCHITECTURE.md`, so their 
 | `packages/core`, `@cmb/core`, `@smb/core` | `packages/crypto-core` / `packages/stock-core`, `@mb/crypto-core` / `@mb/stock-core` |
 | `apps/scraper`, one per bot | `apps/scraper`, one for both |
 | "Mirrored in cryptomarketbot and stockmarketbot" | `packages/wire` (`@mb/wire`), once for both |
-| `docker-compose.yml`, `.env` | `compose.yml`, `crypto.env` / `stock.env` |
+| `docker-compose.yml`, `.env` | `compose.yml`, `.env.crypto` / `.env.stock` |
 
 When a change adds or changes a shared package, update the tables in this file; per-bot behavior goes in CRYPTO.md or STOCK.md.

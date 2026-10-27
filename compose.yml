@@ -35,7 +35,7 @@ services:
       dockerfile: apps/crypto-engine/Dockerfile
     image: marketbots-crypto-engine:latest
     container_name: marketbots-crypto-engine
-    env_file: crypto.env
+    env_file: .env.crypto
     environment:
       STREAM_HOST: 0.0.0.0
       STREAM_PORT: 8787
@@ -60,7 +60,7 @@ services:
       dockerfile: apps/stock-engine/Dockerfile
     image: marketbots-stock-engine:latest
     container_name: marketbots-stock-engine
-    env_file: stock.env
+    env_file: .env.stock
     environment:
       STREAM_HOST: 0.0.0.0
       STREAM_PORT: 8788

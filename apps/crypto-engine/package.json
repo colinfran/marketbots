@@ -4,12 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch --env-file-if-exists=../../crypto.env --env-file-if-exists=../../crypto.local.env src/main.ts",
+    "dev": "tsx watch --env-file-if-exists=../../.env.crypto --env-file-if-exists=../../.env.crypto.local src/main.ts",
     "start": "node --enable-source-maps dist/main.js",
     "build": "node build.mjs",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json",
-    "backtest": "tsx --env-file-if-exists=../../crypto.env --env-file-if-exists=../../crypto.local.env src/backtest/cli.ts",
+    "backtest": "tsx --env-file-if-exists=../../.env.crypto --env-file-if-exists=../../.env.crypto.local src/backtest/cli.ts",
     "lint": "eslint"
   },
   "dependencies": {

@@ -59,13 +59,13 @@ packages/stock-core/    stock schemas and types
 contracts/              behavior snapshots per bot
 docs/                   architecture, per-bot design, server runbook
 compose.yml             the marketbots stack: both engines, the scraper, the local LLM
-crypto.env.example      every crypto variable, by where it's used (copy to crypto.env)
-stock.env.example       every stock variable, by where it's used (copy to stock.env)
+.env.crypto.example     every crypto variable, by where it's used (copy to .env.crypto)
+.env.stock.example      every stock variable, by where it's used (copy to .env.stock)
 ```
 
 ## Development
 
-Node 22.12+ and pnpm 10. Copy `crypto.env.example` to `crypto.env` and `stock.env.example` to `stock.env` at the repo root, and put local overrides (a `_dev` database, no Discord, fake Alpaca keys) in `crypto.local.env` / `stock.local.env`. See [docs/SERVER.md §3](docs/SERVER.md#3-the-env-files).
+Node 22.12+ and pnpm 10. Copy `.env.crypto.example` to `.env.crypto` and `.env.stock.example` to `.env.stock` at the repo root, and put local overrides (a `_dev` database, no Discord, fake Alpaca keys) in `.env.crypto.local` / `.env.stock.local`. See [docs/SERVER.md §3](docs/SERVER.md#3-the-env-files).
 
 ```bash
 pnpm install
@@ -80,7 +80,7 @@ pnpm dev:stock-web        # stock dashboard (next dev)
 pnpm backtest -- --symbols BTC/USD,ETH/USD,SOL/USD --strategies trend,momentum --interval 240
 ```
 
-`build`, `test`, `typecheck` and `lint` run in every workspace package (`pnpm -r`). The dev scripts read `<bot>.env`, then `<bot>.local.env`. The scraper sits outside the pnpm workspace (own npm lockfile) and is built only as its Docker image.
+`build`, `test`, `typecheck` and `lint` run in every workspace package (`pnpm -r`). The dev scripts read `.env.<bot>`, then `.env.<bot>.local`. The scraper sits outside the pnpm workspace (own npm lockfile) and is built only as its Docker image.
 
 ## Docs
 

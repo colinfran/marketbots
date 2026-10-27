@@ -8,11 +8,11 @@ What runs where:
 
 | Where | What | Config |
 | --- | --- | --- |
-| Windows server, Docker stack `marketbots` | `crypto-engine` on 127.0.0.1:8787 (with the Kraken CLI paper wallet), `stock-engine` on 127.0.0.1:8788, `scraper` (no host port), `llm` (Ollama on the GPU, no host port, `--profile llm`) | `compose.yml`, `crypto.env`, `stock.env` at the repo root |
+| Windows server, Docker stack `marketbots` | `crypto-engine` on 127.0.0.1:8787 (with the Kraken CLI paper wallet), `stock-engine` on 127.0.0.1:8788, `scraper` (no host port), `llm` (Ollama on the GPU, no host port, `--profile llm`) | `compose.yml`, `.env.crypto`, `.env.stock` at the repo root |
 | Caddy on the Windows host | `engine.cryptomarketbot.app` → 127.0.0.1:8787, `engine.stockmarketbot.app` → 127.0.0.1:8788 (WebSocket) | `C:\Caddy\Caddyfile` |
 | Vercel | two projects: `apps/crypto-web` at cryptomarketbot.app, `apps/stock-web` at stockmarketbot.app | each project's environment variables |
 | MongoDB Atlas | one cluster, databases `cryptomarketbot` and `stockmarketbot` | `MONGODB_URI` |
-| Alpaca | the stock bot's paper account | `stock.env` (engine only) |
+| Alpaca | the stock bot's paper account | `.env.stock` (engine only) |
 
 The two engines are independent: separate images, containers, ports, env files, databases, leases and stream secrets. Deploying, restarting or crashing one never touches the other. At runtime they share only the scraper, the LLM and the server's IP address.
 
@@ -39,7 +39,7 @@ The two engines are independent: separate images, containers, ports, env files, 
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-**News API keys** (optional, free): listed in the ENGINE section of each `.env.example`. A source whose key is empty stays off.
+**News API keys** (optional, free): listed in the ENGINE section of each `.env.<bot>.example`. A source whose key is empty stays off.
 
 ---
 
@@ -79,10 +79,10 @@ cd C:\Users\colin\Documents\GitHub
 git clone https://github.com/colinfran/marketbots.git
 cd marketbots
 git config core.autocrlf false        # the repo is LF only (.gitattributes)
-Copy-Item crypto.env.example crypto.env
-Copy-Item stock.env.example stock.env
-notepad crypto.env
-notepad stock.env
+Copy-Item .env.crypto.example .env.crypto
+Copy-Item .env.stock.example .env.stock
+notepad .env.crypto
+notepad .env.stock
 ```
 
 **The wallet volume**: on this server `cryptomarketbot_kraken-paper` already exists and holds the live paper wallet (§6). Only on a brand-new server, create it once with `docker volume create cryptomarketbot_kraken-paper`; the engine creates the workspace on first boot.
@@ -93,7 +93,7 @@ notepad stock.env
 
 ### 3.1 One file per bot
 
-`crypto.env` and `stock.env` at the repo root hold everything the bot's engine and dashboard read, under the same variable names as before the merge. Both are git-ignored and kept out of Docker build contexts (`.dockerignore`); only the `.env.example` files are committed. Each file has three sections:
+`.env.crypto` and `.env.stock` at the repo root hold everything the bot's engine and dashboard read, under the same variable names as before the merge. Both are git-ignored and kept out of Docker build contexts (`.dockerignore`); only the `.env.<bot>.example` files are committed. Each file has three sections:
 
 | Section | Read by |
 | --- | --- |
@@ -103,7 +103,7 @@ notepad stock.env
 
 - **Engine container**: compose loads the whole file (`env_file`). The engine also receives the DASHBOARD values and ignores them (an accepted trade-off).
 - **Vercel** can't read the file. The SHARED and DASHBOARD values are set in the Vercel project (§3.4).
-- **Local dev**: the `pnpm dev:*` scripts read the file, then `<bot>.local.env` (§3.5).
+- **Local dev**: the `pnpm dev:*` scripts read the file, then `.env.<bot>.local` (§3.5).
 
 ### 3.2 What compose sets itself
 
@@ -139,7 +139,7 @@ Set for Production and Preview, with the same values as the bot's env file. Verc
 | `USESEND_API_KEY` | DASHBOARD | the useSend key |
 | `ENGINE_STREAM_URL` | DASHBOARD | `wss://engine.cryptomarketbot.app/v1/stream` |
 | `NEXT_PUBLIC_DISPLAY_TIMEZONE` | DASHBOARD | `America/Los_Angeles` |
-| `SITE_URL`, `OWNER_EMAIL`, `USESEND_BASE_URL`, `USESEND_FROM_EMAIL` | DASHBOARD | optional; the defaults are in `crypto.env.example` |
+| `SITE_URL`, `OWNER_EMAIL`, `USESEND_BASE_URL`, `USESEND_FROM_EMAIL` | DASHBOARD | optional; the defaults are in `.env.crypto.example` |
 
 **Stock** (the stockmarketbot.app project):
 
@@ -152,22 +152,22 @@ Set for Production and Preview, with the same values as the bot's env file. Verc
 | `USESEND_API_KEY` | DASHBOARD | the useSend key |
 | `ENGINE_STREAM_URL` | DASHBOARD | `wss://engine.stockmarketbot.app/v1/stream` |
 | `DISCORD_WEBHOOK_URL` | DASHBOARD | optional: unhandled dashboard errors go to Discord (the engine reads the same variable for its alerts) |
-| `SITE_URL`, `OWNER_EMAIL`, `USESEND_BASE_URL`, `USESEND_FROM_EMAIL` | DASHBOARD | optional; the defaults are in `stock.env.example` |
+| `SITE_URL`, `OWNER_EMAIL`, `USESEND_BASE_URL`, `USESEND_FROM_EMAIL` | DASHBOARD | optional; the defaults are in `.env.stock.example` |
 
 Nothing from the ENGINE sections goes to Vercel: the dashboards hold no broker or AI keys. Vercel sets `VERCEL_PROJECT_PRODUCTION_URL` itself (the default for `SITE_URL`); sign in on the production domain, not on preview URLs.
 
 ### 3.5 Local dev overrides
 
-`crypto.local.env` and `stock.local.env` (git-ignored) are read after the main file, and their values win. Local engines must not touch live state:
+`.env.crypto.local` and `.env.stock.local` (git-ignored) are read after the main file, and their values win. Local engines must not touch live state:
 
 ```ini
-# crypto.local.env
+# .env.crypto.local
 MONGODB_DB_NAME=cryptomarketbot_dev
 DISCORD_WEBHOOK_URL=
 ```
 
 ```ini
-# stock.local.env
+# .env.stock.local
 MONGODB_DB_NAME=stockmarketbot_dev
 DISCORD_WEBHOOK_URL=
 ALPACA_API_KEY=fake-key
@@ -231,7 +231,7 @@ docker compose ps                                          # every service and i
 docker compose logs -f --since 1h crypto-engine            # follow one engine
 docker compose logs --since 24h stock-engine | Select-String '"level":"error"'
 docker compose restart stock-engine                        # same image, same env
-docker compose up -d stock-engine                          # after editing stock.env
+docker compose up -d stock-engine                          # after editing .env.stock
 docker compose stop crypto-engine                          # one engine; the other keeps running
 docker compose start crypto-engine
 docker stats --no-stream marketbots-crypto-engine marketbots-stock-engine marketbots-scraper
@@ -365,7 +365,7 @@ Both engines moved from their old compose projects (`stockmarketbot`, `cryptomar
 
 **Before:**
 - The images are built (`docker compose build`) and boot-tested (§6.3).
-- `crypto.env` / `stock.env` are filled in (the old server `.env` values, same names).
+- `.env.crypto` / `.env.stock` are filled in (the old server `.env` values, same names).
 - No seed run is scheduled or running, and no cycle is running (Admin).
 - **Stock**: a weekend or after 20:00 ET. Stops rest at Alpaca; options exits need the engine.
 - **Crypto**: a quiet hour. Stops are watched only by the engine, but the swap takes a minute or two.
@@ -509,7 +509,7 @@ docker compose --profile llm stop llm
 
 | Symptom | Likely cause / fix |
 | --- | --- |
-| `env file ...\stock.env not found` from any compose command | Both `crypto.env` and `stock.env` must exist at the repo root, even to start one engine. |
+| `env file ...\.env.stock not found` from any compose command | Both `.env.crypto` and `.env.stock` must exist at the repo root, even to start one engine. |
 | `external volume "cryptomarketbot_kraken-paper" not found` | The wallet volume is missing. Don't create an empty one on this server: check `docker volume ls`, then restore a backup (§6.2). |
 | `port is already allocated` on `docker compose up` | Another container holds 8787/8788, usually an old engine (`docker ps`). Stop it. Don't move the port: Caddy targets it. |
 | `Invalid engine environment` in logs | A required variable is missing or too short (secrets need 32+ characters). Fix the env file, then `docker compose up -d <bot>-engine`. |
