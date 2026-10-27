@@ -1,7 +1,11 @@
+import { appendFileSync, mkdirSync, readdirSync, statSync, unlinkSync } from "node:fs"
+import { join } from "node:path"
+
 /**
- * Structured JSON logging to stdout (Docker's json-file driver rotates it). Two layers keep
- * secrets out of logs: keys that look sensitive are masked, and every registered secret value is
- * replaced wherever it appears in a string (e.g. inside an error message or a URL).
+ * Structured JSON logging to stdout (Docker's json-file driver rotates it) and, optionally, to
+ * day files that outlive the container (`dailyLogFiles`). Two layers keep secrets out of logs:
+ * keys that look sensitive are masked, and every registered secret value is replaced wherever it
+ * appears in a string (e.g. inside an error message or a URL).
  */
 
 export type LogLevel = "debug" | "info" | "warn" | "error"
@@ -45,7 +49,9 @@ export type Logger = {
   child: (fields: Fields) => Logger
 }
 
-export const createLogger = (level: LogLevel = "info", base: Fields = {}, write: (line: string) => void = (l) => process.stdout.write(`${l}\n`)): Logger => {
+export const toStdout = (line: string) => void process.stdout.write(`${line}\n`)
+
+export const createLogger = (level: LogLevel = "info", base: Fields = {}, write: (line: string) => void = toStdout): Logger => {
   const min = LEVELS[level]
   const emit = (lvl: LogLevel, msg: string, fields?: Fields) => {
     if (LEVELS[lvl] < min) return
@@ -71,3 +77,63 @@ export const silentLogger: Logger = {
 }
 
 export const errorMessage = (error: unknown) => scrub(error instanceof Error ? error.message : String(error))
+
+export type LogFileOptions = {
+  /** Day files older than this many days are deleted (default 90). */
+  retentionDays?: number
+  /** A day's file stops growing past this size (default 25 MB), so a runaway loop can't fill the disk. */
+  maxBytes?: number
+  now?: () => Date
+}
+
+const DAY_FILE = /^\d{4}-\d{2}-\d{2}\.log$/
+const DAY_MS = 86_400_000
+
+/**
+ * Appends every line to one file per UTC day in `dir` (`2026-10-27.log`). In compose `dir` is a
+ * host folder, so the history outlives the container: a deploy replaces the container and its
+ * Docker log, and the new engine carries on in the same day's file. Each line is appended
+ * synchronously and the file closed again (engines log a few lines a minute), so the lines right
+ * before an exit are kept and no file stays open. Old files are pruned at the start of each day. A
+ * folder that can't be written never stops the engine: the problem is printed once to stdout, and
+ * the next day tries again.
+ */
+export const dailyLogFiles = (dir: string, { retentionDays = 90, maxBytes = 25 * 1024 * 1024, now = () => new Date() }: LogFileOptions = {}) => {
+  let day = ""
+  let path = ""
+  let size = 0
+  let broken = false
+  let warned = false
+  const notice = (msg: string, fields: Fields = {}) => JSON.stringify({ ts: now().toISOString(), level: "warn", msg, ...fields })
+
+  const startDay = (today: string) => {
+    day = today
+    path = join(dir, `${today}.log`)
+    broken = false
+    mkdirSync(dir, { recursive: true })
+    size = statSync(path, { throwIfNoEntry: false })?.size ?? 0
+    warned = false
+    const oldest = new Date(Date.parse(today) - retentionDays * DAY_MS).toISOString().slice(0, 10)
+    try {
+      for (const name of readdirSync(dir)) if (DAY_FILE.test(name) && name.slice(0, 10) < oldest) unlinkSync(join(dir, name))
+    } catch {
+      // Pruning is best effort; today's file is what matters.
+    }
+  }
+
+  return (line: string) => {
+    const today = now().toISOString().slice(0, 10)
+    try {
+      if (today !== day) startDay(today)
+      if (broken || size >= maxBytes) return
+      const full = size + Buffer.byteLength(line) + 1 > maxBytes
+      const text = `${full ? notice("log file full; the rest of today's lines are only in Docker's log", { max_bytes: maxBytes }) : line}\n`
+      appendFileSync(path, text)
+      size = full ? maxBytes : size + Buffer.byteLength(text)
+    } catch (error) {
+      broken = true
+      if (!warned) toStdout(notice("log file not writable; logging to stdout only", { dir, error: errorMessage(error) }))
+      warned = true
+    }
+  }
+}

@@ -41,12 +41,16 @@ services:
       STREAM_PORT: 8787
       SCRAPER_URL: http://scraper:8790
       LLM_URL: http://llm:11434
+      LOG_DIR: /logs
     ports:
       # Loopback only: Caddy on the host forwards wss://engine.cryptomarketbot.app here.
       - "127.0.0.1:8787:8787"
     volumes:
       # The Kraken CLI paper wallet (balances + trade journal). Losing it means a paper reset.
       - kraken-paper:/data/kraken
+      # The log history, one file per UTC day, on the host disk: a deploy replaces Docker's log,
+      # not this. docs/SERVER.md §5.2.
+      - ./logs/crypto-engine:/logs
       # Optional: Kraken OHLCVT CSV files for longer backtests (set BACKTEST_DATA_DIR=/data/ohlc).
       # - ./data/ohlc:/data/ohlc:ro
     stop_grace_period: 30s
@@ -66,9 +70,13 @@ services:
       STREAM_PORT: 8788
       SCRAPER_URL: http://scraper:8790
       LLM_URL: http://llm:11434
+      LOG_DIR: /logs
     ports:
       # Loopback only: Caddy on the host forwards wss://engine.stockmarketbot.app here.
       - "127.0.0.1:8788:8788"
+    volumes:
+      # The log history (see crypto-engine).
+      - ./logs/stock-engine:/logs
     stop_grace_period: 30s
     # Up from 768 MB: headroom at the open with ~1,500 tracked symbols.
     mem_limit: 1g

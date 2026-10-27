@@ -3,7 +3,7 @@ import type { Collection } from "mongodb"
 import type { Database } from "./db"
 import type { BaseEnv } from "./env"
 import { Lease } from "./lease"
-import { createLogger, errorMessage, registerSecrets, type Fields, type Logger } from "./log"
+import { createLogger, dailyLogFiles, errorMessage, registerSecrets, toStdout, type Fields, type Logger } from "./log"
 import { EngineStateStore } from "./state/stores"
 import type { StreamServerOptions } from "./stream"
 
@@ -19,6 +19,9 @@ import type { StreamServerOptions } from "./stream"
  * SIGTERM / SIGINT (docker stop, Ctrl+C) shut down gracefully: stop taking new work, let an
  * in-flight cycle finish (up to 20s), flush events, release the lease. A bad environment (or any
  * error before the engine runs) prints one line and exits 1, so Docker restarts the container.
+ *
+ * With LOG_DIR set, every log line also goes to that day's file there (`dailyLogFiles`), which
+ * outlives the container.
  */
 
 /** What the bootstrap needs from the engine. */
@@ -82,18 +85,27 @@ export type BootHost = Pick<NodeJS.Process, "on" | "exit" | "pid">
 
 export type BootOptions = {
   host?: BootHost
-  /** Where log lines go (default: stdout). */
+  /** Where log lines go instead of stdout (LOG_DIR's day files still get them). */
   write?: (line: string) => void
 }
 
 const run = async <Env extends BaseEnv, Col extends CoreCol, Bus extends BootBus, Settings, Alerts, Stream extends BootStream, E extends BootEngine>(
   b: EngineBinding<Env, Col, Bus, Settings, Alerts, Stream, E>,
   host: BootHost,
-  write: ((line: string) => void) | undefined,
+  write: (line: string) => void,
+  boot: { log?: Logger },
 ) => {
   const env = b.loadEnv()
   registerSecrets(b.secretValues(env))
-  const log = createLogger(env.LOG_LEVEL, { service: "engine", instance: env.ENGINE_INSTANCE }, write)
+  const file = env.LOG_DIR ? dailyLogFiles(env.LOG_DIR) : null
+  const out = file
+    ? (line: string) => {
+        write(line)
+        file(line)
+      }
+    : write
+  const log = createLogger(env.LOG_LEVEL, { service: "engine", instance: env.ENGINE_INSTANCE }, out)
+  boot.log = log
   log.info(`starting ${b.name} engine`, { version: b.version, node: process.version, ...b.startFields?.(env) })
 
   const shutdownSignal = new AbortController()
@@ -162,13 +174,15 @@ const run = async <Env extends BaseEnv, Col extends CoreCol, Bus extends BootBus
 /** Boots the engine (see the top of this file). Never rejects: a fatal error exits the process with code 1. */
 export const bootstrap = async <Env extends BaseEnv, Col extends CoreCol, Bus extends BootBus, Settings, Alerts, Stream extends BootStream, E extends BootEngine>(
   binding: EngineBinding<Env, Col, Bus, Settings, Alerts, Stream, E>,
-  { host = process, write }: BootOptions = {},
+  { host = process, write = toStdout }: BootOptions = {},
 ): Promise<void> => {
+  const boot: { log?: Logger } = {}
   try {
-    await run(binding, host, write)
+    await run(binding, host, write, boot)
   } catch (error) {
-    // The logger may not exist yet (bad env); print plainly and exit non-zero so Docker restarts us.
-    console.error(`[engine] fatal: ${error instanceof Error ? error.message : String(error)}`)
+    // Exit non-zero so Docker restarts us. Before the logger exists (bad env), print plainly.
+    if (boot.log) boot.log.error("engine failed to start; exiting", { error: errorMessage(error) })
+    else console.error(`[engine] fatal: ${error instanceof Error ? error.message : String(error)}`)
     host.exit(1)
   }
 }

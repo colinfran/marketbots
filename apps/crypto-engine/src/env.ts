@@ -15,6 +15,7 @@ const base = envFields({ dbName: "cryptomarketbot", streamPort: 8787 })
 const envSchema = z.object({
   NODE_ENV: base.NODE_ENV,
   LOG_LEVEL: base.LOG_LEVEL,
+  LOG_DIR: base.LOG_DIR,
   ENGINE_INSTANCE: base.ENGINE_INSTANCE,
 
   MONGODB_URI: base.MONGODB_URI,

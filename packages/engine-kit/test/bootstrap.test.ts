@@ -1,4 +1,7 @@
 import { EventEmitter } from "node:events"
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { z } from "zod"
 import { bootstrap, type BootCore, type BootHost } from "../src/bootstrap"
@@ -12,7 +15,8 @@ const db = useTestDb()
 type Col = typeof db.col
 
 const envSchema = z.object({ ...envFields({ dbName: "kit_boot", streamPort: 8799 }), EXTRA: z.string().default("x") })
-const testEnv = () => parseEnv(envSchema, { MONGODB_URI: "mongodb://boot-test", STREAM_TOKEN_SECRET: "s".repeat(40), ENGINE_INSTANCE: "kit", LOG_LEVEL: "debug" })
+const testEnv = (extra: Record<string, string> = {}) =>
+  parseEnv(envSchema, { MONGODB_URI: "mongodb://boot-test", STREAM_TOKEN_SECRET: "s".repeat(40), ENGINE_INSTANCE: "kit", LOG_LEVEL: "debug", ...extra })
 
 /** A bot whose every piece records when it is made, started and stopped. */
 const testBot = (steps: string[]) => {
@@ -193,5 +197,41 @@ describe("bootstrap", () => {
     expect(printed).toEqual([expect.stringMatching(/^\[engine\] fatal: Invalid engine environment:\n {2}- MONGODB_URI: /)])
     expect(exits).toEqual([1])
     expect(steps).toEqual(["env"])
+  })
+
+  it("logs a startup failure once the logger exists, and exits 1", async () => {
+    const { binding } = testBot([])
+    const { host, exits } = testHost()
+    const { lines, write } = logLines()
+    const printed = vi.spyOn(console, "error").mockImplementation(() => {})
+    await bootstrap(
+      {
+        ...binding,
+        connectDatabase: async () => {
+          throw new Error("could not reach MongoDB")
+        },
+      },
+      { host, write },
+    )
+    expect(lines.at(-1)).toMatchObject({ level: "error", msg: "engine failed to start; exiting", error: "could not reach MongoDB" })
+    expect(printed).not.toHaveBeenCalled()
+    expect(exits).toEqual([1])
+  })
+
+  it("with LOG_DIR, also writes every line to that day's file", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "mb-boot-logs-"))
+    try {
+      const { binding } = testBot([])
+      const { host, exits } = testHost()
+      const { lines, write } = logLines()
+      await bootstrap({ ...binding, loadEnv: () => testEnv({ LOG_DIR: dir }) }, { host, write })
+      host.emit("SIGTERM")
+      await vi.waitFor(() => expect(exits).toEqual([0]), { timeout: 5_000, interval: 20 })
+      const filed = readdirSync(dir).flatMap((name) => readFileSync(join(dir, name), "utf8").trim().split("\n"))
+      expect(filed.map((l) => JSON.parse(l))).toEqual(lines)
+      expect(lines.map((l) => l.msg)).toEqual(expect.arrayContaining(["starting TestBot engine", "engine running", "engine stopped"]))
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })

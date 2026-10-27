@@ -23,6 +23,9 @@ coverage/
 # wallet backups (compose service wallet-backup)
 /backups/
 
+# engine log history (compose bind mounts, LOG_DIR)
+/logs/
+
 # local data (backtest CSVs etc.)
 /data/
 

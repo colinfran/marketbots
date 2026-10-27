@@ -27,6 +27,8 @@ export const optional = z
 export const envFields = ({ dbName, streamPort }: { dbName: string; streamPort: number }) => ({
   NODE_ENV: z.string().default("development"),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
+  /** A folder for the log history, one file per UTC day; in compose, logs/<service>/ on the host. Unset: stdout only. */
+  LOG_DIR: optional,
   ENGINE_INSTANCE: z.string().default(hostname()),
 
   MONGODB_URI: z.string().min(1, "MONGODB_URI is required"),

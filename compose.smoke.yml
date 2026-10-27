@@ -61,6 +61,8 @@ services:
       SCRAPER_URL: http://scraper:8790
       LLM_URL: http://llm:11434
       ENGINE_INSTANCE: smoke
+      # The log files go to tmpfs here, never to the live stack's logs/ folder.
+      LOG_DIR: /tmp/logs
     ports:
       - "127.0.0.1:18787:8787"
     volumes:
@@ -85,6 +87,7 @@ services:
       SCRAPER_URL: http://scraper:8790
       LLM_URL: http://llm:11434
       ENGINE_INSTANCE: smoke
+      LOG_DIR: /tmp/logs
     ports:
       - "127.0.0.1:18788:8788"
 

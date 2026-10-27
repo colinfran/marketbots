@@ -230,6 +230,8 @@ docker compose up -d --build                   # everything whose image or confi
 docker compose ps                                          # every service and its health
 docker compose logs -f --since 1h crypto-engine            # follow one engine
 docker compose logs --since 24h stock-engine | Select-String '"level":"error"'
+Get-Content logs\crypto-engine\2026-10-27.log -Tail 50 -Wait   # the history, across deploys (below)
+Select-String '"level":"error"' logs\stock-engine\*.log    # every error in the kept history
 docker compose restart stock-engine                        # same image, same env
 docker compose up -d stock-engine                          # after editing .env.stock
 docker compose stop crypto-engine                          # one engine; the other keeps running
@@ -240,7 +242,8 @@ docker stats --no-stream marketbots-crypto-engine marketbots-stock-engine market
 - Containers come back on their own after a crash or a reboot (`restart: unless-stopped`) once Docker Desktop is running. A container stopped by hand stays stopped across reboots.
 - `docker compose down` stops and removes every container in the stack, both engines included. Volumes survive it. **Never add `-v`** (§6).
 - Compose leaves the `llm` service alone unless `--profile llm` is given, so add it to `stop` or `down` when the LLM is running.
-- Logs are JSON lines, capped per container at 5 × 10 MB (scraper 3 × 10 MB).
+- Logs are JSON lines. Docker's copy is capped per container at 5 × 10 MB (scraper 3 × 10 MB), and it goes when the container is replaced, so at every deploy.
+- The engines also append every line to `logs\<service>\<UTC date>.log` in the repo folder (`LOG_DIR`; git-ignored, on the Windows disk). A deploy, a Docker reset or a WSL reset leaves it alone: the new container carries on in the same day's file. Files older than 90 days are deleted, and a day's file stops at 25 MB (Docker's copy still gets every line). The scraper's logs are only in Docker's copy.
 
 ### 5.3 Health endpoints
 
