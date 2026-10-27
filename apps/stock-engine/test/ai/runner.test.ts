@@ -37,8 +37,8 @@ describe("AiRunner.research", () => {
   it("streams queries, sources, the memo and reasoning, and records the gateway's cost", async () => {
     stream.mockReturnValueOnce(
       fakeStream([
-        { type: "tool-call", toolName: "x_search", input: { query: "$NVDA earnings" } },
-        { type: "tool-call", toolName: "web_search", input: { query: "nvidia guidance" } },
+        { type: "tool-call", toolCallId: "t1", toolName: "x_search", input: { query: "$NVDA earnings" } },
+        { type: "tool-call", toolCallId: "t2", toolName: "web_search", input: { query: "nvidia guidance" } },
         { type: "reasoning-delta", text: "Checking whether guidance beat consensus." },
         { type: "source", sourceType: "url", url: "https://www.reuters.com/nvda", title: "Nvidia beats" },
         { type: "source", sourceType: "url", url: "javascript:alert(1)", title: "bad" },
@@ -59,7 +59,30 @@ describe("AiRunner.research", () => {
     expect(progress.onText).toHaveBeenCalledWith(expect.any(Number), expect.stringContaining("Tape & macro"))
     expect(progress.onReasoning).toHaveBeenCalledWith("Checking whether guidance beat consensus.".length, "Checking whether guidance beat consensus.")
     expect(Object.keys((stream.mock.calls[0][0] as { tools: object }).tools)).toEqual(["web_search", "x_search"])
-    expect(b.record).toHaveBeenCalledWith(expect.objectContaining({ task: "research", cost_usd: 0.031, cost_source: "gateway", ok: true }))
+    expect(b.record).toHaveBeenCalledWith(expect.objectContaining({ task: "research", searches: 2, cost_usd: 0.031, cost_source: "gateway", ok: true }))
+  })
+
+  it("reads each query from the call's raw arguments (xAI's search tools declare no input fields), and counts every search", async () => {
+    stream.mockReturnValueOnce(
+      fakeStream([
+        { type: "tool-input-delta", id: "t1", delta: '{"query":"nvda ' },
+        { type: "tool-input-delta", id: "t1", delta: 'guidance"}' },
+        { type: "tool-call", toolCallId: "t1", toolName: "web_search", input: {} },
+        { type: "tool-call", toolCallId: "t2", toolName: "web_search", input: {} },
+        { type: "tool-result", toolCallId: "t2", toolName: "web_search", output: { action: { type: "search", query: "nvda price target" } } },
+        { type: "tool-call", toolCallId: "t3", toolName: "x_search", input: {} },
+        { type: "text-delta", text: "memo" },
+      ]),
+    )
+    const b = budget()
+    const onQuery = vi.fn()
+    const r = await new AiRunner(b, silentLogger, true).research({ ...researchOpts(), progress: { onQuery } })
+    expect(r.queries).toEqual(["nvda guidance", "nvda price target"])
+    expect(onQuery.mock.calls).toEqual([
+      ["nvda guidance", "web_search"],
+      ["nvda price target", "web_search"],
+    ])
+    expect(b.record).toHaveBeenCalledWith(expect.objectContaining({ task: "research", searches: 3 }))
   })
 
   it("falls back to web-only search, then the fallback model, and never throws", async () => {

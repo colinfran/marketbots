@@ -168,6 +168,8 @@ export type AiCallDoc = {
   cycle_id: string | null
   input_tokens: number
   output_tokens: number
+  /** Research calls: the web and X tool calls Grok made, each billed (absent on decisions and older docs). */
+  searches?: number
   cost_usd: number
   cost_source: "gateway" | "estimate"
   duration_ms: number

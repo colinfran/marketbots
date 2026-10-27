@@ -49,7 +49,7 @@ Fills arrive instantly over Alpaca's `trade_updates` stream (binary JSON frames 
 ## One cycle
 
 1. **Context** (code): account, positions, open orders, quotes and technicals (VWAP, RSI, EMA trend, ATR, opening range, 20-day levels) for held, watched, requested and moving symbols, the screener, news, the morning briefing, the previous cycle, recent days and their lessons. Intraday and in the closing cycle it also loads **option chain menus** (below).
-2. **Research** (Grok + `web_search` + `x_search`): a sourced memo. It never decides. Each query, source and chunk of the memo streams as it happens.
+2. **Research** (Grok + `web_search` + `x_search`): a sourced memo. It never decides. Each query, source and chunk of the memo streams as it happens, and the call's `ai_calls` entry counts its searches (each one is billed).
 3. **Decision** (Grok, structured output validated with zod): one fixed schema for every phase. It streams too (the headline and decision count appear as they're written). Schema failures are repaired in code when nothing trade-related is lost, else retried with the exact error at a lower temperature; an optional fallback model covers outages, and takes over at once after a timeout.
 4. **Risk checks and execution** (code): every decision is checked rule by rule and every check is recorded on the decision and streamed. Exits run first, then holds, then entries by conviction.
 5. **Record**: the report (memo, structured output, the exact context, execution summary, cost), the decisions, the cycle's steps.
@@ -172,7 +172,7 @@ Events are typed (`packages/core/src/events.ts`) and carry a strictly increasing
 | `wire_items` | every stored news item: normalized text, tickers, category, tier, severity and its parts, cluster, confirmations, price when first seen, notable reasons (TTL `wire.retention_days`, 30) |
 | `wire_triggers` | every trigger candidate the policy produced, with the gate that passed or stopped it and why (TTL `wire.retention_days`) |
 | `seed_runs` | the owner's one-time seed buys: schedule, status, allocations, orders, error |
-| `ai_calls`, `notifications`, `login_attempts` | AI spend (budget), alerts, sign-in rate limits |
+| `ai_calls`, `notifications`, `login_attempts` | AI spend (budget; research calls also count their searches), alerts, sign-in rate limits |
 | `auth_*` | owner sign-in (Better Auth magic links, only `OWNER_EMAIL`), written by the dashboard |
 
 ## Testing

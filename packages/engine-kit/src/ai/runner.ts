@@ -74,6 +74,14 @@ const queryOf = (input: unknown): string | null => {
   return typeof q === "string" && q.trim() ? cleanLine(q, 200) : null
 }
 
+const parseJson = (text: string | undefined): unknown => {
+  try {
+    return text ? JSON.parse(text) : null
+  } catch {
+    return null
+  }
+}
+
 /** A structured call that failed this close to its time limit timed out (timers can fire a moment early). */
 const TIMEOUT_SLACK_MS = 1_000
 
@@ -108,12 +116,12 @@ export class AiRunner {
     return this.enabled
   }
 
-  /** Records the call against the daily budget and returns the cost it was charged. */
-  private async record(task: AiTask, model: string, cycleId: string | null, usage: TokenUsage, cost: number | null, toolCalls: number, started: number, error: string | null) {
+  /** Records the call against the daily budget and returns the cost it was charged. `searches` is null for calls without tools. */
+  private async record(task: AiTask, model: string, cycleId: string | null, usage: TokenUsage, cost: number | null, searches: number | null, started: number, error: string | null) {
     const durationMs = Date.now() - started
     // A call cut off by a timeout or abort reports no usage, but the provider still bills what it generated.
     const unreported = cost === null && usage.total === 0 && error !== null
-    const costUsd = cost ?? (unreported ? await this.budget.estimateByDuration(task, model, durationMs).catch(() => 0) : estimateCost(usage.input, usage.output, toolCalls))
+    const costUsd = cost ?? (unreported ? await this.budget.estimateByDuration(task, model, durationMs).catch(() => 0) : estimateCost(usage.input, usage.output, searches ?? 0))
     await this.budget
       .record({
         task,
@@ -121,6 +129,7 @@ export class AiRunner {
         cycle_id: cycleId,
         input_tokens: usage.input,
         output_tokens: usage.output,
+        ...(searches !== null ? { searches } : {}),
         cost_usd: costUsd,
         cost_source: cost !== null ? "gateway" : "estimate",
         duration_ms: durationMs,
@@ -176,6 +185,18 @@ export class AiRunner {
       const attemptStarted = Date.now()
       const sources = new Map<string, ResearchSource>()
       const queries: string[] = []
+      // xAI's search tools declare no input fields, so the SDK hands each call's input back as {}: the
+      // query is read from the call's raw arguments, else from a web search's result.
+      const rawInputs = new Map<string, string>()
+      const queried = new Set<string>()
+      const addQuery = (callId: string, input: unknown, tool: string) => {
+        const q = queryOf(input)
+        if (!q || queried.has(callId)) return
+        queried.add(callId)
+        queries.push(q)
+        opts.progress?.onQuery?.(q, tool)
+      }
+      let searches = 0
       const reasoning = reasoningReporter(opts.progress?.onReasoning)
       let text = ""
       let usage = ZERO
@@ -210,12 +231,14 @@ export class AiRunner {
               sources.set(url, source)
               opts.progress?.onSource?.(source)
             }
+          } else if (part.type === "tool-input-delta") {
+            rawInputs.set(part.id, (rawInputs.get(part.id) ?? "") + part.delta)
           } else if (part.type === "tool-call") {
-            const q = queryOf(part.input)
-            if (q) {
-              queries.push(q)
-              opts.progress?.onQuery?.(q, part.toolName)
-            }
+            searches += 1
+            addQuery(part.toolCallId, part.input, part.toolName)
+            addQuery(part.toolCallId, parseJson(rawInputs.get(part.toolCallId)), part.toolName)
+          } else if (part.type === "tool-result") {
+            addQuery(part.toolCallId, (part.output as { action?: unknown } | null)?.action, part.toolName)
           } else if (part.type === "finish-step") {
             const c = gatewayCost(part.providerMetadata)
             if (c !== null) cost = (cost ?? 0) + c
@@ -227,7 +250,7 @@ export class AiRunner {
         }
         const memo = cleanText(text, this.memoMaxChars)
         if (!memo) throw new Error("research returned an empty memo")
-        totalCost += await this.record(opts.task ?? "research", step.model, opts.cycleId, usage, cost, queries.length, attemptStarted, null)
+        totalCost += await this.record(opts.task ?? "research", step.model, opts.cycleId, usage, cost, searches, attemptStarted, null)
         totalUsage = addUsage(totalUsage, usage)
         return {
           memo,
@@ -242,7 +265,7 @@ export class AiRunner {
         }
       } catch (error) {
         lastError = errorMessage(error).slice(0, 600)
-        totalCost += await this.record(opts.task ?? "research", step.model, opts.cycleId, usage, cost, queries.length, attemptStarted, lastError)
+        totalCost += await this.record(opts.task ?? "research", step.model, opts.cycleId, usage, cost, searches, attemptStarted, lastError)
         totalUsage = addUsage(totalUsage, usage)
         this.log.warn("research attempt failed", { attempt: i + 1, model: step.model, x_search: step.withX, error: lastError })
       }
@@ -305,7 +328,7 @@ export class AiRunner {
           const result = await generateText(call)
           const usage = toUsage(result.totalUsage ?? result.usage)
           const callCost = gatewayCost(result.providerMetadata)
-          totalCost += await this.record(opts.task, model, opts.cycleId, usage, callCost, 0, started, null)
+          totalCost += await this.record(opts.task, model, opts.cycleId, usage, callCost, null, started, null)
           totalUsage = addUsage(totalUsage, usage)
           return { output: result.output as T, attempts: attempt, repaired: false, model, cost_usd: totalCost, usage: totalUsage }
         }
@@ -331,7 +354,7 @@ export class AiRunner {
         }
         const output = (await result.output) as T
         const usage = toUsage(await result.totalUsage)
-        totalCost += await this.record(opts.task, model, opts.cycleId, usage, cost, 0, started, null)
+        totalCost += await this.record(opts.task, model, opts.cycleId, usage, cost, null, started, null)
         totalUsage = addUsage(totalUsage, usage)
         return { output, attempts: attempt, repaired: false, model, cost_usd: totalCost, usage: totalUsage }
       } catch (error) {
@@ -342,14 +365,14 @@ export class AiRunner {
           usage = toUsage(error.usage)
           const repaired = opts.repair(error.text)
           if (repaired && (repaired.dropped === 0 || isLast)) {
-            totalCost += await this.record(opts.task, model, opts.cycleId, usage, cost, 0, started, null)
+            totalCost += await this.record(opts.task, model, opts.cycleId, usage, cost, null, started, null)
             totalUsage = addUsage(totalUsage, usage)
             this.log.warn("structured output repaired in code", { task: opts.task, attempt, dropped: repaired.dropped })
             return { output: repaired.report, attempts: attempt, repaired: true, model, cost_usd: totalCost, usage: totalUsage }
           }
         }
         const message = describeError(error)
-        totalCost += await this.record(opts.task, model, opts.cycleId, usage, cost, 0, started, message)
+        totalCost += await this.record(opts.task, model, opts.cycleId, usage, cost, null, started, message)
         totalUsage = addUsage(totalUsage, usage)
         this.log.warn("structured attempt failed", { task: opts.task, attempt, model, error: message })
         // The SDK words a timeout several ways (its own, or an abort during its retry back-off), so a
