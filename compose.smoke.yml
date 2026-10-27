@@ -1,7 +1,7 @@
 # Boot test for new engine images, beside the live stack (MARKETBOTS_PLAN 3.4, 6.7, 7.4).
 #
 #   docker compose build                                            build the images first
-#   docker compose -f compose.smoke.yml up -d                       boot both engines
+#   docker compose -f compose.smoke.yml up -d                       boot both engines (MB_TAG=<tag> for other images)
 #   docker compose -f compose.smoke.yml ps / logs -f crypto-engine
 #   docker compose -f compose.smoke.yml down && docker volume rm marketbots-smoke_wallet
 #
@@ -50,7 +50,7 @@ services:
 
   crypto-engine:
     <<: *engine
-    image: marketbots-crypto-engine:latest
+    image: marketbots-crypto-engine:${MB_TAG:-latest}
     environment:
       MONGODB_URI: mongodb://mongo:27017
       MONGODB_DB_NAME: cryptomarketbot_staging
@@ -72,7 +72,7 @@ services:
 
   stock-engine:
     <<: *engine
-    image: marketbots-stock-engine:latest
+    image: marketbots-stock-engine:${MB_TAG:-latest}
     environment:
       MONGODB_URI: mongodb://mongo:27017
       MONGODB_DB_NAME: stockmarketbot_staging
@@ -87,7 +87,7 @@ services:
       - "127.0.0.1:18788:8788"
 
   scraper:
-    image: marketbots-scraper:latest
+    image: marketbots-scraper:${MB_TAG:-latest}
     init: true
     read_only: true
     tmpfs:
