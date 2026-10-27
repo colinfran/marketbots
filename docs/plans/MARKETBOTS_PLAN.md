@@ -216,7 +216,7 @@ Each engine injects `CATEGORY_BASE`, its settings type and its bus. `WireDeps` a
   - "Include files outside the root directory" on (the apps use `packages/*`).
   - Node 22; pnpm is detected from the root lockfile.
   - Env vars, domains and auth don't change.
-- **Ignored Build Step** in each project, so a push that only touches the other bot doesn't rebuild this one. For crypto: `git diff --quiet "$VERCEL_GIT_PREVIOUS_SHA" HEAD -- apps/crypto-web packages/core packages/crypto-core packages/ui packages/web-kit packages/config pnpm-lock.yaml`, where exit 0 means skip. Build anyway when the previous SHA isn't set.
+- **Ignored Build Step** in each project, so a push that only touches the other bot doesn't rebuild this one. For crypto: `[ -n "$VERCEL_GIT_PREVIOUS_SHA" ] && git diff --quiet "$VERCEL_GIT_PREVIOUS_SHA" HEAD -- :/apps/crypto-web :/packages/core :/packages/crypto-core :/packages/ui :/packages/web-kit :/packages/config :/pnpm-lock.yaml || exit 1`, where exit 0 means skip; it builds when the previous SHA isn't set. The `:/` prefix anchors each path at the repo root: Vercel runs the command from the Root Directory, where a plain `apps/crypto-web` would never match and every build would be skipped (found 2026-10-26; full commands in `docs/SERVER.md`).
 - **Nothing changes for visitors during the build-out.** Until the re-link, Vercel keeps building from the old repos.
 - **Bad deploys:** Vercel's instant rollback covers them, as today.
 
@@ -400,7 +400,7 @@ Tags: **[C]** crypto, **[S]** stock, **[both]**, **[stack]** Docker/infra, **[ow
   - **Stock (decision 3):** boot test only, with **fake** Alpaca keys and a throwaway local MongoDB. It must reach healthy, take the lease, open the stream and log Alpaca auth errors without crashing. The live keys are never used while the old engine runs: Alpaca's free market-data stream allows one connection per account, so they would knock out the live engine's prices.
   - **Tonight's shortcut:** both boot tests use a throwaway `mongo:8.0` container instead of an Atlas staging database, and last a few minutes, not an hour. Nothing is written to Atlas.
 - [ ] 3.5 [owner, optional] A temporary Vercel project per dashboard linked to the new repo, to see a green preview build of the monorepo before re-linking the real projects. Delete them afterwards.
-- [ ] 3.6 [both] Docs: `docs/SERVER.md` replaces both `WINDOWS_SERVER_SETUP.md` files (one stack, one runbook, which values go into Vercel).
+- [x] 3.6 [both] Docs: `docs/SERVER.md` replaces both `WINDOWS_SERVER_SETUP.md` files (one stack, one runbook, which values go into Vercel).
 
 **Done when:** both images pass the smoke test, and both dashboards build from the new repo.
 
