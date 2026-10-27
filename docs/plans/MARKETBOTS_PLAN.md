@@ -361,7 +361,7 @@ Tags: **[C]** crypto, **[S]** stock, **[both]**, **[stack]** Docker/infra, **[ow
   - Vitest presets: an engine preset (memory-server global setup) and a web preset (`@` alias).
 - [x] 1.4 [stack] `crypto.env.example` and `stock.env.example`: today's `.env.example` per bot, with the header saying the engine reads the file through compose and the dashboard section goes into Vercel.
 - [x] 1.5 [stack] Copy this plan and `MASTER_PLAN.md` into `docs/plans/`.
-- [ ] 1.6 [owner] Create the GitHub repo `colinfran/marketbots` (private). The owner pushes, as today.
+- [x] 1.6 [owner] Create the GitHub repo `colinfran/marketbots` (private). The owner pushes, as today. *(Done by the owner 2026-10-27; main pushed.)*
 
 ### Phase 2: Move both bots in unchanged (≈ 1 session)
 
@@ -407,7 +407,7 @@ Tags: **[C]** crypto, **[S]** stock, **[both]**, **[stack]** Docker/infra, **[ow
 ### Phase 4: Swap over (≈ ½ session)
 
 - [x] 4.1 [both] Swap the engines per the §5 runbook: **stock first** (weekend or after 20:00 ET), **then crypto** (quiet hour; the swap takes a minute or two).
-- [ ] 4.2 [owner] Re-link both Vercel projects to the new repo (§3.7), set the Ignored Build Step, deploy. Check both dashboards: signed in, stream connects, a `pause`/`resume` round trip works.
+- [x] 4.2 [owner] Re-link both Vercel projects to the new repo (§3.7), set the Ignored Build Step, deploy. Check both dashboards: signed in, stream connects, a `pause`/`resume` round trip works. *(Re-linked by the owner 2026-10-27.)*
 - [x] 4.3 [both] Remove the old scraper containers. Keep the old compose projects stopped (not removed) for 14 days, then remove them with owner approval.
 - [ ] 4.4 [owner] Archive both old GitHub repos, read-only, once Vercel no longer builds from them.
 - [x] 4.5 Update memory: the repo, the stack, and where progress lives.
@@ -446,9 +446,9 @@ Tags: **[C]** crypto, **[S]** stock, **[both]**, **[stack]** Docker/infra, **[ow
 
 ### Phase 9: Deliberate improvements (owner approves each; one commit and deploy each)
 
-- [ ] 9.1 [C] Event-queue expiry and gate hooks, as in stock (a trigger queued while paused no longer fires on resume).
-- [ ] 9.2 [C] Streamed decisions + reasoning deltas + per-attempt gateway cost (runner `stream: true`, live UI shows decision progress).
-- [ ] 9.3 [both] One chart library (rec. `lightweight-charts`); shared `PriceChart`, `EquityChart`, `PnlChart` in `@mb/ui`. Screenshots first.
+- [x] 9.1 [C] Event-queue expiry and gate hooks, as in stock (a trigger queued while paused no longer fires on resume). *(Owner approved 2026-10-27; merged `6856fc5`.)*
+- [x] 9.2 [C] Streamed decisions + reasoning deltas + per-attempt gateway cost (runner `stream: true`, live UI shows decision progress). *(Owner approved 2026-10-27; merged `6856fc5`. Push the dashboards before deploying the crypto engine.)*
+- [x] 9.3 [both] One chart library (rec. `lightweight-charts`); shared `PriceChart`, `EquityChart`, `PnlChart` in `@mb/ui`. Screenshots first. *(Owner approved 2026-10-27; merged `bb838e5`.)*
 - [ ] 9.4 [S] Optional: standard Wilder ATR and flat-series RSI 50 (changes indicator values in stock prompts; bump `PROMPT_VERSION`).
 - [ ] 9.5 [C] Any `common`/`odds` adoptions that 7.2 held back.
 
@@ -473,7 +473,7 @@ Tags: **[C]** crypto, **[S]** stock, **[both]**, **[stack]** Docker/infra, **[ow
 - [x] 10.2 [stack] Scraper `POST /extract` (§3.8) with robots.txt and skip-domain checks; tests against saved article fixtures.
 - [x] 10.3 [both] `@mb/wire/enrich`: queue, selection, extract → summarize → store, the GPU-only guard, hourly cap, `enrich:summaries` health. Never on the trigger path.
 - [x] 10.4 [both] `wire.summaries` settings section (defaults: enabled, the 10.1 model, `min_severity` 55, 60/h, skip list), shipped live like the `wire` section was.
-- [ ] 10.5 [both] Dossier rows gain the summary (fenced, capped); bump `PROMPT_VERSION`. Research page and item detail show it. *(Display half done 2026-10-27; the prompt half waits for the owner to confirm the 10.1 model.)*
+- [x] 10.5 [both] Dossier rows gain the summary (fenced, capped); bump `PROMPT_VERSION`. Research page and item detail show it. *(Display half 2026-10-27; prompt half `646165f` after the owner confirmed llama3.2:3b: the 8 best-ranked items carry their checked summary, versions `crypto-v5` and `2026-10-27.summaries-1`.)*
 - [ ] 10.6 Watch for 2 days: GPU memory over time, summaries per hour, failures by reason, effect on Grok research spend.
 
 ### Phase 11: Later and optional
