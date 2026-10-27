@@ -1,11 +1,11 @@
 import { formatTime } from "@mb/stock-core/time"
 import type { Metadata } from "next"
 import Link from "next/link"
+import { ActivityFeed, StreamBadge } from "@mb/ui/live"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@mb/ui/components/card"
+import { NewsThatMatters } from "@mb/ui/wire"
 import { CycleKindBadge, PageHeader, PhaseBadge, SectionTitle, StatusBadge } from "@/components/bits"
 import { LiveCycleTrail } from "@/components/live/cycle-trail"
-import { ActivityFeed, StreamBadge } from "@/components/live/live-ui"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { NewsThatMatters } from "@/components/wire"
 import { getViewer } from "@/lib/auth"
 import { duration } from "@/lib/format"
 import { getCycleEvents, getCycles, getNotableItems, getWireForCycle } from "@/lib/queries"
@@ -72,7 +72,7 @@ export default async function LivePage() {
               <span className="text-muted-foreground text-xs">{duration(c.duration_ms)}</span>
               <span className="text-muted-foreground text-xs">{c.kind === "event" ? c.trigger.replace(/^event:\s*/, "") : c.trigger}</span>
               {c.report_id ? (
-                <Link prefetch href={`/research/${c.report_id}`} className="ml-auto text-xs font-medium hover:underline">
+                <Link href={`/research/${c.report_id}`} className="ml-auto text-xs font-medium hover:underline">
                   Report
                 </Link>
               ) : (

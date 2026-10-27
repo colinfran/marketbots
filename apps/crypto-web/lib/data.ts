@@ -1,36 +1,45 @@
 import "server-only"
 import type { DecisionDoc, EngineStatusDoc } from "@mb/crypto-core/db"
-import type { WireItemDoc, WireTriggerDoc } from "@mb/crypto-core/wire"
-import { eventForViewer, type EngineEvent } from "@mb/crypto-core/events"
+import { eventForViewer } from "@mb/crypto-core/events"
 import { brierScore, calibrationTable, drawdownSeries, performanceMetrics, tradeStats } from "@mb/crypto-core/metrics"
 import { ACCOUNT_ID } from "@mb/crypto-core/venues"
+import { createQueries, decisionLatency, ITEM_PROJECTION, toRowView, type EngineSummary as EngineSummaryOf } from "@mb/web-kit/queries"
 import { connection } from "next/server"
-import type { TriggerView, WireRowView } from "@/components/wire"
-import type { Viewer } from "./auth"
 import { collections } from "./db"
 
 /**
  * Read queries for the dashboard. Each awaits `connection()`, so pages render at request time
  * with live data (never prerendered at build). Only plain, serializable values leave this file.
+ * The queries both dashboards share come from @mb/web-kit/queries; crypto's own follow.
  */
 
-/** The engine counts as online if its heartbeat is fresher than this. */
-const HEARTBEAT_STALE_MS = 30_000
+export type EngineSummary = EngineSummaryOf<EngineStatusDoc>
 
-export type EngineSummary = { status: EngineStatusDoc | null; online: boolean; heartbeatAgeS: number | null }
-
-export const getEngine = async (): Promise<EngineSummary> => {
-  await connection()
-  const { engineStatus } = await collections()
-  const status = await engineStatus.findOne({ _id: "engine" })
-  const age = status ? (Date.now() - status.at.getTime()) / 1000 : null
-  return { status, online: age !== null && age * 1000 < HEARTBEAT_STALE_MS, heartbeatAgeS: age === null ? null : Math.round(age) }
-}
-
-export const getEngineState = async () => {
-  await connection()
-  return (await collections()).engineState.findOne({ _id: "engine" })
-}
+export const {
+  getEngine,
+  getEngineState,
+  getAudit,
+  getCommands,
+  getSeedRuns,
+  getNotifications,
+  getRecentEvents,
+  getCycleEvents,
+  getAiCosts,
+  getWireItems,
+  getNotableItems,
+  getWireItemsById,
+  getWireFacets,
+  toTriggerViews,
+  getWireTriggers,
+  getWireActivity,
+} = createQueries({
+  collections,
+  eventForViewer,
+  // Idle cycles end with a debug-level cycle.completed; it's included so live views know the cycle is over.
+  recentEventsFilter: { $or: [{ level: { $ne: "debug" } }, { type: "cycle.completed" }] },
+  // A trigger links to the research page of the cycle it started.
+  triggerLinks: async (cycleIds) => new Map(cycleIds.map((id) => [id, `/research/${id}`])),
+})
 
 export const getAccount = async () => {
   await connection()
@@ -197,51 +206,6 @@ export const getDay = async (day: string) => {
   return { stats, cycles: research, decisions: decisionDocs, fills: fillDocs, closed }
 }
 
-export const getAudit = async (limit = 100) => {
-  await connection()
-  return (await collections()).audit.find({}).sort({ at: -1 }).limit(limit).toArray()
-}
-
-export const getCommands = async (limit = 30) => {
-  await connection()
-  return (await collections()).commands.find({}).sort({ created_at: -1 }).limit(limit).toArray()
-}
-
-/** One-time seed runs, newest first (the Admin card shows the current or last one). */
-export const getSeedRuns = async (limit = 5) => {
-  await connection()
-  return (await collections()).seedRuns.find({}).sort({ created_at: -1 }).limit(limit).toArray()
-}
-
-export const getNotifications = async (limit = 30) => {
-  await connection()
-  return (await collections()).notifications.find({}).sort({ at: -1 }).limit(limit).toArray()
-}
-
-/**
- * Recent persisted events, filtered for the viewer (initial history for the activity feed). Idle
- * cycles end with a debug-level cycle.completed; it's included so live views know the cycle is over.
- */
-export const getRecentEvents = async (viewer: Viewer, { limit = 80, levels }: { limit?: number; levels?: EngineEvent["level"][] } = {}): Promise<EngineEvent[]> => {
-  await connection()
-  const { events } = await collections()
-  const docs = await events.find(levels ? { level: { $in: levels } } : { $or: [{ level: { $ne: "debug" } }, { type: "cycle.completed" }] }).sort({ _id: -1 }).limit(limit).toArray()
-  return docs
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    .map(({ _id, expires_at, ...e }) => eventForViewer(e as EngineEvent, viewer.owner ? "owner" : "public"))
-    .filter((e): e is EngineEvent => e !== null)
-}
-
-/** Every stored event of one cycle, oldest first (the live cycle trail). */
-export const getCycleEvents = async (cycleId: string, viewer: Viewer): Promise<EngineEvent[]> => {
-  await connection()
-  const docs = await (await collections()).events.find({ cycle_id: cycleId }).sort({ _id: 1 }).limit(2_000).toArray()
-  return docs
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    .map(({ _id, expires_at, ...e }) => eventForViewer(e as EngineEvent, viewer.owner ? "owner" : "public"))
-    .filter((e): e is EngineEvent => e !== null)
-}
-
 export const getBacktests = async (limit = 20) => {
   await connection()
   return (await collections()).backtests.find({}, { projection: { trades: 0 } }).sort({ created_at: -1 }).limit(limit).toArray()
@@ -250,19 +214,6 @@ export const getBacktests = async (limit = 20) => {
 export const getBacktest = async (id: string) => {
   await connection()
   return (await collections()).backtests.findOne({ _id: id })
-}
-
-export const getAiCosts = async (days = 30) => {
-  await connection()
-  const { aiCalls } = await collections()
-  const since = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10)
-  return aiCalls
-    .aggregate<{ _id: string; cost: number; calls: number; failures: number }>([
-      { $match: { day: { $gte: since } } },
-      { $group: { _id: "$day", cost: { $sum: "$cost_usd" }, calls: { $sum: 1 }, failures: { $sum: { $cond: ["$ok", 0, 1] } } } },
-      { $sort: { _id: 1 } },
-    ])
-    .toArray()
 }
 
 /**
@@ -369,82 +320,6 @@ export const getLatestDecisions = async () => {
   return Object.fromEntries(rows.map((r) => [r._id, r]))
 }
 
-// ─── News engine ("wire") ────────────────────────────────────────────────────
-
-const toRowView = (i: WireItemDoc): WireRowView => ({
-  id: i._id,
-  title: i.title,
-  url: i.url,
-  source: i.source,
-  domain: i.domain,
-  tier: i.tier,
-  category: i.category,
-  kind: i.kind,
-  symbols: i.symbols,
-  severity: i.severity,
-  first_seen_at: i.first_seen_at.toISOString(),
-  notable: i.notable,
-  notable_reasons: i.notable_reasons,
-  price_at_seen: i.price_at_seen,
-})
-
-const ITEM_PROJECTION = { summary: 0, severity_parts: 0, meta: 0, confirmations: 0 } as const
-
-export type WireFilter = { symbol?: string; category?: string; minSeverity?: number; source?: string; hours?: number; limit?: number }
-
-/** Items our feeds stored, newest first (cluster roots only: copies are confirmations on them). */
-export const getWireItems = async ({ symbol, category, minSeverity, source, hours = 72, limit = 100 }: WireFilter = {}) => {
-  await connection()
-  const filter: Record<string, unknown> = { first_seen_at: { $gte: new Date(Date.now() - hours * 3_600_000) } }
-  if (symbol) filter.symbols = symbol
-  if (category) filter.category = category
-  if (source) filter.source = source
-  if (minSeverity) filter.severity = { $gte: minSeverity }
-  const docs = await (await collections()).wireItems.find(filter, { projection: ITEM_PROJECTION }).sort({ first_seen_at: -1 }).limit(limit).toArray()
-  return docs.filter((d) => d.cluster_id === d._id).map(toRowView)
-}
-
-/** What the Live page may show: items the engine marked notable in the last `hours`. */
-export const getNotableItems = async (hours = 6, limit = 10) => {
-  await connection()
-  const docs = await (await collections()).wireItems.find({ notable: true, first_seen_at: { $gte: new Date(Date.now() - hours * 3_600_000) } }, { projection: ITEM_PROJECTION }).sort({ first_seen_at: -1 }).limit(limit).toArray()
-  return docs.map(toRowView)
-}
-
-/** Categories and sources seen recently, for the filters. */
-export const getWireFacets = async (hours = 72) => {
-  await connection()
-  const { wireItems } = await collections()
-  const since = { first_seen_at: { $gte: new Date(Date.now() - hours * 3_600_000) } }
-  const [categories, sources] = await Promise.all([wireItems.distinct("category", since), wireItems.distinct("source", since)])
-  return { categories: categories.sort(), sources: sources.sort() }
-}
-
-const toTriggerView = (t: WireTriggerDoc, titles: Map<string, string>): TriggerView => ({
-  id: t._id,
-  at: t.at.toISOString(),
-  rule: t.rule,
-  action: t.action,
-  status: t.status,
-  reason: t.reason,
-  symbols: t.symbols,
-  severity: t.severity,
-  cycle_id: t.cycle_id,
-  item_title: titles.get(t.item_ids[0] ?? "") ?? null,
-})
-
-const withTitles = async (triggers: WireTriggerDoc[]) => {
-  const ids = [...new Set(triggers.flatMap((t) => t.item_ids))]
-  const items = ids.length ? await (await collections()).wireItems.find({ _id: { $in: ids } }, { projection: { title: 1 } }).toArray() : []
-  const titles = new Map(items.map((i) => [i._id, i.title]))
-  return triggers.map((t) => toTriggerView(t, titles))
-}
-
-export const getWireTriggers = async (limit = 40) => {
-  await connection()
-  return withTitles(await (await collections()).wireTriggers.find({}).sort({ at: -1 }).limit(limit).toArray())
-}
-
 /** A cycle's wire context: what started it (event cycles) and the dossier the AI was given. */
 export const getWireForCycle = async (cycleId: string) => {
   await connection()
@@ -454,7 +329,7 @@ export const getWireForCycle = async (cycleId: string) => {
   const items = cycle?.wire_item_ids?.length ? (await wireItems.find({ _id: { $in: cycle.wire_item_ids } }, { projection: ITEM_PROJECTION }).toArray()).map(toRowView) : []
   return {
     kind: cycle?.kind ?? null,
-    trigger: trigger ? (await withTitles([trigger]))[0] : null,
+    trigger: trigger ? (await toTriggerViews([trigger]))[0] : null,
     items,
     dossier: memo?.dossier ?? [],
     mode: memo?.mode ?? null,
@@ -462,28 +337,16 @@ export const getWireForCycle = async (cycleId: string) => {
   }
 }
 
-/** Items by id (decision pages' "Triggered by"). */
-export const getWireItemsById = async (ids: string[]) => {
-  await connection()
-  if (!ids.length) return []
-  return (await (await collections()).wireItems.find({ _id: { $in: ids } }, { projection: ITEM_PROJECTION }).toArray()).map(toRowView)
-}
-
 /** News-engine analytics: does acting on events pay, how fast is it, and what does research cost now. */
 export const getWireAnalytics = async () => {
   await connection()
-  const { decisions, wireItems, wireTriggers, cycles, aiCalls } = await collections()
+  const { decisions, wireItems } = await collections()
   const week = new Date(Date.now() - 7 * 86_400_000)
   const month = new Date(Date.now() - 30 * 86_400_000)
-  const [scored, items, triggers, eventCycles, eventDecisions, calls] = await Promise.all([
+  const [scored, activity, eventDecisions] = await Promise.all([
     decisions.find({ outcome: { $ne: null } }, { projection: { trigger_kind: 1, outcome: 1, wire_item_ids: 1 } }).toArray(),
-    wireItems.countDocuments({ first_seen_at: { $gte: week } }),
-    wireTriggers.countDocuments({ at: { $gte: week }, status: { $in: ["fired", "queued"] } }),
-    cycles.countDocuments({ kind: "event", started_at: { $gte: week } }),
+    getWireActivity(),
     decisions.find({ trigger_kind: "event", created_at: { $gte: month } }, { projection: { created_at: 1, wire_item_ids: 1, risk: 1, execution: 1 } }).toArray(),
-    aiCalls
-      .aggregate<{ _id: { day: string; task: string }; cost: number }>([{ $match: { at: { $gte: new Date(Date.now() - 14 * 86_400_000) } } }, { $group: { _id: { day: "$day", task: "$task" }, cost: { $sum: "$cost_usd" } } }])
-      .toArray(),
   ])
   const rate = (list: { outcome: DecisionDoc["outcome"] }[]) => {
     const judged = list.filter((d) => d.outcome?.correct === true || d.outcome?.correct === false)
@@ -500,32 +363,18 @@ export const getWireAnalytics = async () => {
     const cat = d.wire_item_ids?.length ? itemById.get(d.wire_item_ids[0])?.category : undefined
     if (cat) byCategory.set(cat, [...(byCategory.get(cat) ?? []), d])
   }
-  const latencies = eventDecisions
-    .map((d) => {
-      const seen = (d.wire_item_ids ?? []).map((id) => itemById.get(id)?.first_seen_at.getTime()).filter((t): t is number => typeof t === "number")
-      return seen.length ? (d.created_at.getTime() - Math.min(...seen)) / 1000 : null
-    })
-    .filter((s): s is number => s !== null)
-    .sort((a, b) => a - b)
-  const days = [...new Set(calls.map((c) => c._id.day))].sort()
   return {
     byKind: [...byKind].map(([kind, list]) => ({ kind, ...rate(list) })),
     byCategory: [...byCategory].map(([category, list]) => ({ category, ...rate(list) })).sort((a, b) => b.decisions - a.decisions),
     funnel: {
-      items,
-      triggers,
-      eventCycles,
+      items: activity.items,
+      triggers: activity.triggers,
+      eventCycles: activity.eventCycles,
       decisions: eventDecisions.filter((d) => d.created_at >= week).length,
       approved: eventDecisions.filter((d) => d.created_at >= week && d.risk?.approved).length,
       filled: eventDecisions.filter((d) => d.created_at >= week && (d.execution.status === "filled" || d.execution.status === "partial")).length,
     },
-    medianLatencyS: latencies.length ? latencies[Math.floor(latencies.length / 2)] : null,
-    latencySamples: latencies.length,
-    researchSpend: days.map((day) => ({
-      day,
-      research: calls.filter((c) => c._id.day === day && c._id.task === "research").reduce((s, c) => s + c.cost, 0),
-      gap: calls.filter((c) => c._id.day === day && c._id.task === "research_gap").reduce((s, c) => s + c.cost, 0),
-      decision: calls.filter((c) => c._id.day === day && c._id.task === "decision").reduce((s, c) => s + c.cost, 0),
-    })),
+    ...decisionLatency(eventDecisions, (id) => itemById.get(id)?.first_seen_at),
+    researchSpend: activity.researchSpend,
   }
 }

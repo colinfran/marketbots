@@ -3,8 +3,8 @@ import { daysToExpiry, describeContract, isOptionSymbol, STRATEGY_LABEL } from "
 import { formatDateTime, formatTime, marketDay } from "@mb/stock-core/time"
 import { ZapIcon } from "lucide-react"
 import Link from "next/link"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mb/ui/components/table"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@mb/ui/components/tooltip"
 import { price, qty, titleCase, usd } from "@/lib/format"
 import type { DecisionRow, LiveAccount, ReportSummary, TradeRow } from "@/lib/queries"
 import { ActionBadge, Delta, Empty, PhaseBadge, ResearchModeBadge, StatusBadge, SymbolLink } from "./bits"
@@ -208,7 +208,7 @@ export function DecisionsTable({ decisions, showDay = false }: { decisions: Deci
             return (
               <TableRow key={d._id} className="align-top">
                 <TableCell className="text-muted-foreground whitespace-nowrap">
-                  <Link prefetch href={`/research/${d.report_id}`} className="hover:underline">
+                  <Link href={`/research/${d.report_id}`} className="hover:underline">
                     {showDay ? formatDateTime(d.created_at) : formatTime(d.created_at)}
                   </Link>
                 </TableCell>
@@ -312,7 +312,7 @@ export function TradesTable({ trades, showDay = true }: { trades: TradeRow[]; sh
                 </TableCell>
                 <TableCell className="text-muted-foreground text-xs whitespace-normal">
                   {t.report_id ? (
-                    <Link prefetch href={`/research/${t.report_id}`} className="hover:text-foreground hover:underline">
+                    <Link href={`/research/${t.report_id}`} className="hover:text-foreground hover:underline">
                       {t.rationale}
                     </Link>
                   ) : (
@@ -333,7 +333,7 @@ export function ReportList({ reports, showDay = true }: { reports: ReportSummary
   return (
     <div className="divide-y rounded-xl border">
       {reports.map((r) => (
-        <Link prefetch key={r._id} href={`/research/${r._id}`} className="hover:bg-muted/50 flex flex-col gap-1.5 p-4 transition-colors sm:flex-row sm:items-center sm:gap-4">
+        <Link key={r._id} href={`/research/${r._id}`} className="hover:bg-muted/50 flex flex-col gap-1.5 p-4 transition-colors sm:flex-row sm:items-center sm:gap-4">
           <div className="flex shrink-0 items-center gap-2 sm:w-48">
             <PhaseBadge phase={r.phase} />
             <span className="text-muted-foreground text-xs whitespace-nowrap">{showDay ? formatDateTime(r.created_at) : formatTime(r.created_at)}</span>
@@ -380,7 +380,7 @@ export function DayRows({
           {days.map(({ day, stats, decisions }) => (
             <TableRow key={day}>
               <TableCell>
-                <Link prefetch href={`/journal/${day}`} className="font-medium hover:underline">
+                <Link href={`/journal/${day}`} className="font-medium hover:underline">
                   {new Date(`${day}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}
                 </Link>
               </TableCell>

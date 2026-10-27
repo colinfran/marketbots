@@ -2,14 +2,14 @@ import { formatDateTime, formatTime, marketDay } from "@mb/stock-core/time"
 import { ArrowRightIcon } from "lucide-react"
 import type { Metadata } from "next"
 import Link from "next/link"
+import { ActivityFeed, CurrentWork } from "@mb/ui/live"
+import { Badge } from "@mb/ui/components/badge"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@mb/ui/components/card"
 import { Delta, Empty, PhaseBadge, SectionTitle, Stat, StatusBadge } from "@/components/bits"
 import { DailyPnlChart, EquityChart } from "@/components/charts"
 import { EngineCard } from "@/components/engine-card"
-import { ActivityFeed, CurrentWork } from "@/components/live/live-ui"
 import { MarketStatus } from "@/components/market-status"
 import { DecisionsTable, OptionsTable, PositionsTable, TradesTable } from "@/components/tables"
-import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { titleCase, usd } from "@/lib/format"
 import { getCycles, getEngine, getEquitySeries, getLatestReport, getLiveAccount, getSettings, listDailyStats, listDecisions, listTrades } from "@/lib/queries"
 import { pageMetadata, site } from "@/lib/site"
@@ -123,7 +123,7 @@ export default async function DashboardPage() {
               <p>
                 <span className="font-medium">Next focus:</span> <span className="text-muted-foreground">{latest.report.next_focus}</span>
               </p>
-              <Link prefetch href={`/research/${latest._id}`} className="inline-flex items-center gap-1 font-medium hover:underline">
+              <Link href={`/research/${latest._id}`} className="inline-flex items-center gap-1 font-medium hover:underline">
                 Full report <ArrowRightIcon className="size-3.5" />
               </Link>
             </CardContent>
@@ -152,7 +152,7 @@ export default async function DashboardPage() {
       <section>
         <SectionTitle
           action={
-            <Link prefetch href="/holdings" className="text-muted-foreground text-sm hover:underline">
+            <Link href="/holdings" className="text-muted-foreground text-sm hover:underline">
               All holdings
             </Link>
           }
@@ -164,7 +164,7 @@ export default async function DashboardPage() {
       <section>
         <SectionTitle
           action={
-            <Link prefetch href="/trades?tab=options" className="text-muted-foreground text-sm hover:underline">
+            <Link href="/trades?tab=options" className="text-muted-foreground text-sm hover:underline">
               All options
             </Link>
           }
@@ -176,7 +176,7 @@ export default async function DashboardPage() {
       <section>
         <SectionTitle
           action={
-            <Link prefetch href={`/journal/${today}`} className="text-muted-foreground text-sm hover:underline">
+            <Link href={`/journal/${today}`} className="text-muted-foreground text-sm hover:underline">
               Today&apos;s journal
             </Link>
           }
@@ -188,7 +188,7 @@ export default async function DashboardPage() {
       <section>
         <SectionTitle
           action={
-            <Link prefetch href="/trades" className="text-muted-foreground text-sm hover:underline">
+            <Link href="/trades" className="text-muted-foreground text-sm hover:underline">
               All trades
             </Link>
           }

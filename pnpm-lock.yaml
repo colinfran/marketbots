@@ -80,6 +80,12 @@ importers:
       '@mb/crypto-core':
         specifier: workspace:*
         version: link:../../packages/crypto-core
+      '@mb/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
+      '@mb/web-kit':
+        specifier: workspace:*
+        version: link:../../packages/web-kit
       better-auth:
         specifier: ^1.7.13
         version: 1.7.13(mongodb@7.7.0(socks@2.8.10))(next@16.4.3(@types/node@22.20.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@4.1.12(@types/node@22.20.5)(vite@8.3.5(@types/node@22.20.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)))
@@ -232,6 +238,12 @@ importers:
       '@mb/stock-core':
         specifier: workspace:*
         version: link:../../packages/stock-core
+      '@mb/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
+      '@mb/web-kit':
+        specifier: workspace:*
+        version: link:../../packages/web-kit
       better-auth:
         specifier: ^1.7.13
         version: 1.7.13(mongodb@7.7.0(socks@2.8.10))(next@16.4.3(@types/node@22.20.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@4.1.12(@types/node@22.20.5)(vite@8.3.5(@types/node@22.20.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)))
@@ -433,6 +445,119 @@ importers:
       '@types/node':
         specifier: ^22
         version: 22.20.5
+      eslint:
+        specifier: ^9
+        version: 9.39.5(jiti@2.7.0)
+      typescript:
+        specifier: ^5
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.12
+        version: 4.1.12(@types/node@22.20.5)(vite@8.3.5(@types/node@22.20.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
+
+  packages/ui:
+    dependencies:
+      '@mb/core':
+        specifier: workspace:*
+        version: link:../core
+      better-auth:
+        specifier: ^1.7.13
+        version: 1.7.13(mongodb@7.7.0(socks@2.8.10))(next@16.4.3(@types/node@22.20.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@4.1.12(@types/node@22.20.5)(vite@8.3.5(@types/node@22.20.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)))
+      class-variance-authority:
+        specifier: ^0.7.1
+        version: 0.7.1
+      cn:
+        specifier: ^0.5.0
+        version: 0.5.0
+      lucide-react:
+        specifier: ^1.61.0
+        version: 1.61.0(@types/react@19.3.0)(react@19.3.0)
+      next:
+        specifier: 16.4.3
+        version: 16.4.3(@babel/core@7.29.7)(@types/node@22.20.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      next-themes:
+        specifier: ^0.4.6
+        version: 0.4.6(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      radix-ui:
+        specifier: ^1.8.1
+        version: 1.8.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      react:
+        specifier: 19.3.0
+        version: 19.3.0
+      react-dom:
+        specifier: 19.3.0
+        version: 19.3.0(react@19.3.0)
+      shadcn:
+        specifier: ^4.22.1
+        version: 4.22.1
+      tailwindcss:
+        specifier: ^4
+        version: 4.3.3
+      tw-animate-css:
+        specifier: ^1.4.0
+        version: 1.4.0
+    devDependencies:
+      '@mb/config':
+        specifier: workspace:*
+        version: link:../config
+      '@types/node':
+        specifier: ^22
+        version: 22.20.5
+      '@types/react':
+        specifier: ^19
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: ^19
+        version: 19.3.0(@types/react@19.3.0)
+      eslint:
+        specifier: ^9
+        version: 9.39.5(jiti@2.7.0)
+      typescript:
+        specifier: ^5
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.12
+        version: 4.1.12(@types/node@22.20.5)(vite@8.3.5(@types/node@22.20.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
+
+  packages/web-kit:
+    dependencies:
+      '@better-auth/mongo-adapter':
+        specifier: ^1.7.13
+        version: 1.7.13(@better-auth/core@1.7.13(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-call@1.4.4(zod@4.6.7))(jose@6.2.13)(kysely@0.29.7)(nanostores@1.5.5))(@better-auth/utils@0.5.1)(mongodb@7.7.0(socks@2.8.10))
+      '@mb/core':
+        specifier: workspace:*
+        version: link:../core
+      better-auth:
+        specifier: ^1.7.13
+        version: 1.7.13(mongodb@7.7.0(socks@2.8.10))(next@16.4.3(@types/node@22.20.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@4.1.12(@types/node@22.20.5)(vite@8.3.5(@types/node@22.20.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)))
+      mongodb:
+        specifier: ^7.7.0
+        version: 7.7.0(socks@2.8.10)
+      next:
+        specifier: 16.4.3
+        version: 16.4.3(@babel/core@7.29.7)(@types/node@22.20.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      react:
+        specifier: 19.3.0
+        version: 19.3.0
+      react-dom:
+        specifier: 19.3.0
+        version: 19.3.0(react@19.3.0)
+      server-only:
+        specifier: 0.0.1
+        version: 0.0.1
+    devDependencies:
+      '@mb/config':
+        specifier: workspace:*
+        version: link:../config
+      '@types/node':
+        specifier: ^22
+        version: 22.20.5
+      '@types/react':
+        specifier: ^19
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: ^19
+        version: 19.3.0(@types/react@19.3.0)
       eslint:
         specifier: ^9
         version: 9.39.5(jiti@2.7.0)

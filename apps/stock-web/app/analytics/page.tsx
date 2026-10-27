@@ -2,10 +2,11 @@ import { formatDateTime } from "@mb/stock-core/time"
 import { SETUP_INFO } from "@mb/stock-core/setups"
 import type { Metadata } from "next"
 import Link from "next/link"
+import { AiCostRows, NewsFunnelCard, SpendByTaskCard } from "@mb/ui/analytics"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@mb/ui/components/card"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mb/ui/components/table"
 import { Delta, Empty, PageHeader, SectionTitle, Stat, SymbolLink } from "@/components/bits"
 import { CumulativePnlChart, DailyPnlChart, EquityChart } from "@/components/charts"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { num, pct, titleCase, usd } from "@/lib/format"
 import { cumulativePnl, getAiCosts, getEquitySeries, getLiveAccount, getSettings, getSetupStats, getWireAnalytics, listDailyStats, listTrades, summarizeBySymbol } from "@/lib/queries"
 import { pageMetadata } from "@/lib/site"
@@ -141,7 +142,7 @@ export default async function AnalyticsPage() {
         <section>
           <SectionTitle
             action={
-              <Link prefetch href="/strategies" className="text-muted-foreground text-sm hover:underline">
+              <Link href="/strategies" className="text-muted-foreground text-sm hover:underline">
                 All setups
               </Link>
             }
@@ -233,19 +234,7 @@ export default async function AnalyticsPage() {
                   <TableHead className="text-right">Cost</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
-                {[...costs]
-                  .reverse()
-                  .slice(0, 14)
-                  .map((c) => (
-                    <TableRow key={c._id}>
-                      <TableCell className="font-mono text-xs">{c._id}</TableCell>
-                      <TableCell className="text-right font-mono text-xs tabular-nums">{c.calls}</TableCell>
-                      <TableCell className="text-right font-mono text-xs tabular-nums">{c.failures}</TableCell>
-                      <TableCell className="text-right font-mono text-xs tabular-nums">${c.cost.toFixed(2)}</TableCell>
-                    </TableRow>
-                  ))}
-              </TableBody>
+              <AiCostRows costs={costs} />
             </Table>
           </div>
         )}
@@ -254,32 +243,7 @@ export default async function AnalyticsPage() {
       <section>
         <SectionTitle>News engine</SectionTitle>
         <div className="grid gap-4 lg:grid-cols-3">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Last 7 days: from news to fills</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-1 text-sm">
-              {(
-                [
-                  ["Items stored", w.funnel.items],
-                  ["Triggers acted on", w.funnel.triggers],
-                  ["Event cycles", w.funnel.eventCycles],
-                  ["Event decisions", w.funnel.decisions],
-                  ["Approved by risk", w.funnel.approved],
-                  ["Filled", w.funnel.filled],
-                ] as const
-              ).map(([label, n]) => (
-                <p key={label} className="flex justify-between">
-                  <span className="text-muted-foreground">{label}</span>
-                  <span className="font-mono tabular-nums">{n}</span>
-                </p>
-              ))}
-              <p className="text-muted-foreground pt-2 text-xs">
-                Median time from first seeing an item to the decision:{" "}
-                {w.medianLatencyS === null ? "no event decisions yet" : `${Math.round(w.medianLatencyS)} s (${w.latencySamples} decisions, last 30 days)`}
-              </p>
-            </CardContent>
-          </Card>
+          <NewsFunnelCard funnel={w.funnel} medianLatencyS={w.medianLatencyS} latencySamples={w.latencySamples} />
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Outcomes by what started the trade</CardTitle>
@@ -316,38 +280,13 @@ export default async function AnalyticsPage() {
               )}
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Grok spend per day by task</CardTitle>
-              <CardDescription>Gap-fill research and skipped research came with the news engine.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {w.researchSpend.length === 0 ? (
-                <Empty>No AI calls yet.</Empty>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-xs">Day (ET)</TableHead>
-                      <TableHead className="text-right text-xs">Research</TableHead>
-                      <TableHead className="text-right text-xs">Gap-fill</TableHead>
-                      <TableHead className="text-right text-xs">Decisions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {[...w.researchSpend].reverse().map((d) => (
-                      <TableRow key={d.day}>
-                        <TableCell className="font-mono text-xs">{d.day}</TableCell>
-                        <TableCell className="text-right font-mono text-xs tabular-nums">${d.research.toFixed(2)}</TableCell>
-                        <TableCell className="text-right font-mono text-xs tabular-nums">${d.gap.toFixed(2)}</TableCell>
-                        <TableCell className="text-right font-mono text-xs tabular-nums">${d.decision.toFixed(2)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
+          <SpendByTaskCard
+            title="Grok spend per day by task"
+            description="Gap-fill research and skipped research came with the news engine."
+            dayLabel="Day (ET)"
+            days={w.researchSpend}
+            empty="No AI calls yet."
+          />
         </div>
       </section>
     </div>

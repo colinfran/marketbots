@@ -2,8 +2,8 @@
 
 import { useState } from "react"
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Line, LineChart, ReferenceLine, XAxis, YAxis } from "recharts"
+import { Tabs, TabsList, TabsTrigger } from "@mb/ui/components/tabs"
 import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/chart"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { CumulativePoint, PriceRange, PriceRow } from "@/lib/queries"
 import { pct, price, qty, usd } from "@/lib/format"
 

@@ -4,9 +4,9 @@ import { PHASES, type Phase } from "@mb/stock-core/settings"
 import { BrainIcon, LoaderIcon } from "lucide-react"
 import Link from "next/link"
 import { useState } from "react"
+import { Button } from "@mb/ui/components/button"
+import { Input } from "@mb/ui/components/input"
 import { CommandResult, useCommand } from "@/components/command"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 
 /** Owner: run a cycle now, optionally putting specific tickers in front of the AI (watch it work on /live). */
 export function EvaluateForm({ disabled }: { disabled: boolean }) {
@@ -44,7 +44,7 @@ export function EvaluateForm({ disabled }: { disabled: boolean }) {
       {!valid && <p className="text-loss text-xs">Up to 5 tickers, like NVDA or BRK.B.</p>}
       <CommandResult result={result} error={error} />
       {result && (
-        <Link prefetch href="/live" className="text-muted-foreground text-xs hover:underline">
+        <Link href="/live" className="text-muted-foreground text-xs hover:underline">
           Watch it live
         </Link>
       )}

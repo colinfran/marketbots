@@ -1,8 +1,9 @@
-import { appIcon } from "@/lib/og"
+import { APPLE_ICON_SIZE } from "@mb/web-kit/og"
+import { appleIcon } from "@/lib/og"
 
-export const size = { width: 180, height: 180 }
+export const size = APPLE_ICON_SIZE
 export const contentType = "image/png"
 
 export default function AppleIcon() {
-  return appIcon(180)
+  return appleIcon()
 }

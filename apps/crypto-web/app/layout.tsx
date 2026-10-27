@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
+import { SiteHeader } from "@mb/ui/site-header"
 import { Providers } from "@/components/providers"
-import { SiteHeader } from "@/components/site-header"
 import { getViewer } from "@/lib/auth"
 import { getEngine, getRecentEvents } from "@/lib/data"
 import { jsonLd, site } from "@/lib/site"

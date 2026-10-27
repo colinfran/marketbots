@@ -1,11 +1,11 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { notFound } from "next/navigation"
+import { LivePrice } from "@mb/ui/live"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@mb/ui/components/card"
 import { Delta, SectionTitle, Stat } from "@/components/bits"
 import { PriceChart, type PriceLevel } from "@/components/charts"
-import { LivePrice } from "@/components/live/live-ui"
 import { DecisionsTable, OptionsTable, TradesTable } from "@/components/tables"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { price, qty, titleCase, usd } from "@/lib/format"
 import { getSymbolPage, summarizeBySymbol } from "@/lib/queries"
 import { pageMetadata } from "@/lib/site"
@@ -36,7 +36,7 @@ export default async function SymbolPage({ params }: { params: Promise<{ symbol:
   return (
     <div className="space-y-8">
       <div>
-        <Link prefetch href="/markets" className="text-muted-foreground text-sm hover:underline">
+        <Link href="/markets" className="text-muted-foreground text-sm hover:underline">
           ← Markets
         </Link>
         <h1 className="mt-2 flex flex-wrap items-baseline gap-3 font-mono text-2xl font-semibold tracking-tight">

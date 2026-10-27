@@ -1,8 +1,8 @@
 import type { Metadata } from "next"
 import Link from "next/link"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@mb/ui/components/tabs"
 import { Delta, PageHeader, PaperBadge, Stat } from "@/components/bits"
 import { TradesTable } from "@/components/tables"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { listTrades } from "@/lib/queries"
 import { pageMetadata } from "@/lib/site"
 import { OptionsTab } from "./options-tab"
@@ -33,7 +33,7 @@ export default async function TradesPage({ searchParams }: { searchParams: Promi
           <>
             Every fill, stocks and option legs, including stop-loss and take-profit exits the broker triggered on its own. Realized P&L uses first-in, first-out lots (options ×
             100 per contract). What the bot holds now is on{" "}
-            <Link prefetch href="/holdings" className="text-foreground underline underline-offset-2">
+            <Link href="/holdings" className="text-foreground underline underline-offset-2">
               Holdings
             </Link>
             .

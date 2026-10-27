@@ -1,30 +1,8 @@
 import "server-only"
+import { dashboardEnv } from "@mb/web-kit/env"
 
 /**
- * Server-side environment for the dashboard (Vercel). Nothing here is ever sent to the browser:
- * the only value a browser sees is the public engine stream URL, handed out with each token.
+ * Server-side environment for the dashboard (Vercel), with CryptoMarketBot's defaults (@mb/web-kit/env).
+ * Nothing here is ever sent to the browser.
  */
-
-const read = (name: string) => {
-  const v = process.env[name]?.trim()
-  return v ? v : null
-}
-
-export const env = {
-  mongoUri: () => read("MONGODB_URI"),
-  mongoDb: () => read("MONGODB_DB_NAME") ?? "cryptomarketbot",
-  /** Signs owner session cookies (32+ chars). Better Auth reads it itself; this only checks it's set. */
-  betterAuthSecret: () => read("BETTER_AUTH_SECRET"),
-  /** The only address that can sign in. Nobody else gets a sign-in link or an account. */
-  ownerEmail: () => read("OWNER_EMAIL") ?? "colin.franceschini@gmail.com",
-  /** useSend delivers the sign-in emails. */
-  usesendApiKey: () => read("USESEND_API_KEY"),
-  usesendBaseUrl: () => read("USESEND_BASE_URL") ?? "https://franceschini.email",
-  usesendFrom: () => read("USESEND_FROM_EMAIL") ?? "CryptoMarketBot <no-reply@colinfran.com>",
-  /** Shared with the engine; signs the short-lived stream tokens. */
-  streamTokenSecret: () => read("STREAM_TOKEN_SECRET"),
-  /** Public WebSocket URL of the engine behind your reverse proxy, e.g. wss://engine.example.com/v1/stream */
-  engineStreamUrl: () => read("ENGINE_STREAM_URL"),
-  /** Public URL of the dashboard; sign-in links point here. Defaults to the Vercel production domain. */
-  siteUrl: () => read("SITE_URL") ?? (read("VERCEL_PROJECT_PRODUCTION_URL") ? `https://${read("VERCEL_PROJECT_PRODUCTION_URL")}` : null),
-}
+export const env = dashboardEnv({ dbName: "cryptomarketbot", appName: "CryptoMarketBot" })

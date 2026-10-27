@@ -3,8 +3,8 @@
 import { BrainIcon, LoaderIcon } from "lucide-react"
 import Link from "next/link"
 import { useState } from "react"
+import { Button } from "@mb/ui/components/button"
 import { CommandResult, useCommand } from "@/components/command"
-import { Button } from "@/components/ui/button"
 
 /** Owner: put a pair in front of the AI right now (watch it work on the AI research page). */
 export function EvaluateForm({ universe, disabled }: { universe: string[]; disabled: boolean }) {

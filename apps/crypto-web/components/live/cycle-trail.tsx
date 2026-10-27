@@ -1,15 +1,16 @@
 "use client"
 
 import type { EngineEvent, EventDataMap } from "@mb/crypto-core/events"
-import type { DossierRow } from "@mb/crypto-core/wire"
-import { CheckIcon, CircleDashedIcon, ExternalLinkIcon, GlobeIcon, LoaderIcon, SearchIcon, XIcon, ZapIcon } from "lucide-react"
+import { Excerpt, plural, Step as SharedStep, type StepStatus } from "@mb/ui/cycle-trail"
+import { useNow } from "@mb/ui/live"
+import { useStream } from "@mb/ui/stream"
+import { DossierRows } from "@mb/ui/wire"
+import { CheckIcon, ExternalLinkIcon, GlobeIcon, LoaderIcon, SearchIcon, XIcon, ZapIcon } from "lucide-react"
 import Link from "next/link"
 import { useMemo } from "react"
 import { ActionBadge, StatusBadge, SymbolLink } from "@/components/bits"
+import { STATE_LABEL } from "@/components/kit"
 import { ago, duration, num, time, titleCase, usd } from "@/lib/format"
-import { cn } from "@/lib/utils"
-import { STATE_LABEL, useNow } from "./live-ui"
-import { useStream } from "./stream"
 
 /**
  * The whole thinking process of one cycle, built from its events: the market scan and what it
@@ -20,6 +21,9 @@ import { useStream } from "./stream"
 
 type Data<T extends keyof EventDataMap> = EventDataMap[T]
 const data = <T extends keyof EventDataMap>(e: EngineEvent | undefined) => e?.data as Data<T> | undefined
+
+/** Crypto greys out skipped steps as well as pending ones. */
+const Step = (props: React.ComponentProps<typeof SharedStep>) => <SharedStep muted={props.status === "pending" || props.status === "skipped"} {...props} />
 
 type DecisionGroup = { proposed: Data<"ai.decision.proposed">; risk?: Data<"risk.checked">; at: string }
 
@@ -118,74 +122,6 @@ const buildTrail = (cycleId: string, events: EngineEvent[]): Trail => {
     }
   }
   return t
-}
-
-type StepStatus = "pending" | "active" | "done" | "failed" | "skipped"
-
-const plural = (n: number, word: string, many = `${word}s`) => `${n} ${n === 1 ? word : many}`
-
-function StepIcon({ status }: { status: StepStatus }) {
-  if (status === "done") return <CheckIcon className="text-gain size-4" aria-label="done" />
-  if (status === "failed") return <XIcon className="text-loss size-4" aria-label="failed" />
-  if (status === "active") return <LoaderIcon className="size-4 motion-safe:animate-spin" aria-label="in progress" />
-  return <CircleDashedIcon className="text-muted-foreground size-4" aria-label={status} />
-}
-
-function Step({ n, title, status, aside, children }: { n: number; title: string; status: StepStatus; aside?: React.ReactNode; children?: React.ReactNode }) {
-  return (
-    <li className="relative pb-6 pl-8 last:pb-0">
-      <span className="bg-border absolute top-6 bottom-0 left-[11px] w-px" aria-hidden />
-      <span className={cn("bg-background absolute top-0 left-0 flex size-6 items-center justify-center rounded-full border", status === "active" && "border-foreground")}>
-        <StepIcon status={status} />
-      </span>
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className={cn("text-sm font-semibold", (status === "pending" || status === "skipped") && "text-muted-foreground")}>
-          {n}. {title}
-        </h3>
-        {aside && <span className="text-muted-foreground text-xs">{aside}</span>}
-      </div>
-      {children && <div className="mt-2 space-y-3 text-sm">{children}</div>}
-    </li>
-  )
-}
-
-/** Items the AI was given from our feeds: severity, symbols, source, title. */
-function DossierRows({ rows }: { rows: DossierRow[] }) {
-  return (
-    <ul className="space-y-1 text-xs">
-      {rows.map((row) => (
-        <li key={row.id} className="flex gap-2">
-          <span className="text-muted-foreground w-6 shrink-0 text-right font-mono tabular-nums" title="severity">
-            {row.severity}
-          </span>
-          <span className="min-w-0">
-            {row.url ? (
-              <a href={row.url} target="_blank" rel="noopener noreferrer nofollow" className="hover:underline">
-                {row.title}
-              </a>
-            ) : (
-              row.title
-            )}
-            <span className="text-muted-foreground">
-              {" "}
-              · {row.symbols.join(", ") || "market"} · {row.source} · T{row.tier}
-            </span>
-          </span>
-        </li>
-      ))}
-    </ul>
-  )
-}
-
-function Excerpt({ label, text }: { label: string; text: string }) {
-  return (
-    <div className="bg-muted/40 rounded-md p-3">
-      <p className="text-muted-foreground mb-1 flex items-center gap-1.5 text-xs font-medium">
-        <SearchIcon className="size-3" aria-hidden /> {label}
-      </p>
-      <p className="text-muted-foreground line-clamp-4 text-xs leading-relaxed whitespace-pre-wrap">…{text}</p>
-    </div>
-  )
 }
 
 export function CycleTrailView({ trail, live }: { trail: Trail; live: boolean }) {
@@ -322,7 +258,7 @@ export function CycleTrailView({ trail, live }: { trail: Trail; live: boolean })
                   </ul>
                 </div>
               )}
-              {running && !r.completed && r.progress && <Excerpt label={`Writing the research memo (${r.progress.chars.toLocaleString("en-US")} chars)`} text={r.progress.excerpt} />}
+              {running && !r.completed && r.progress && <Excerpt icon={SearchIcon} label={`Writing the research memo (${r.progress.chars.toLocaleString("en-US")} chars)`} text={r.progress.excerpt} />}
               {r.completed?.error && <p className="text-loss text-xs">Research failed: {r.completed.error}. The decision used market data only.</p>}
             </>
           )}
@@ -425,7 +361,7 @@ type StoredCycle = { status: string; summary: string | null; error: string | nul
  * engines older than the idle-cycle completion event).
  */
 export function LiveCycleTrail({ cycleId, initialEvents, stored }: { cycleId: string | null; initialEvents: EngineEvent[]; stored?: StoredCycle | null }) {
-  const { events } = useStream()
+  const { events } = useStream<EngineEvent>()
   const latestStart = events.find((e) => e.type === "cycle.started")
   // Follow a cycle that started after the page loaded.
   const id = latestStart?.cycle_id && (!cycleId || Date.parse(latestStart.ts) >= Date.parse(initialEvents.find((e) => e.type === "cycle.started")?.ts ?? "0")) ? latestStart.cycle_id : cycleId

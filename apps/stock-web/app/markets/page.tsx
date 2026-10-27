@@ -1,10 +1,10 @@
 import { SETUP_INFO, type Setup } from "@mb/stock-core/setups"
 import type { Metadata } from "next"
 import Link from "next/link"
+import { LivePrice } from "@mb/ui/live"
+import { Badge } from "@mb/ui/components/badge"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mb/ui/components/table"
 import { ActionBadge, Empty, PageHeader, SymbolLink } from "@/components/bits"
-import { LivePrice } from "@/components/live/live-ui"
-import { Badge } from "@/components/ui/badge"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { ago, price, titleCase } from "@/lib/format"
 import { getEngine, getLatestDecisions, getLatestReport, getLiveAccount, getSettings } from "@/lib/queries"
 import { pageMetadata } from "@/lib/site"
@@ -47,7 +47,7 @@ export default async function MarketsPage() {
               <>
                 {" "}
                 (
-                <Link prefetch href={`/research/${report._id}`} className="hover:underline">
+                <Link href={`/research/${report._id}`} className="hover:underline">
                   {titleCase(report.phase)}, {ago(report.created_at)}
                 </Link>
                 )
@@ -107,7 +107,7 @@ export default async function MarketsPage() {
                     <TableCell className="text-right tabular-nums">{w ? `${w.conviction}/10` : "—"}</TableCell>
                     <TableCell className="text-sm">
                       {d ? (
-                        <Link prefetch href={`/research/${d.report_id}`} className="inline-flex items-center gap-1.5 hover:underline">
+                        <Link href={`/research/${d.report_id}`} className="inline-flex items-center gap-1.5 hover:underline">
                           <ActionBadge action={d.action} /> <span className="text-muted-foreground text-xs">{ago(d.at)}</span>
                         </Link>
                       ) : (

@@ -1,8 +1,8 @@
 import type { Metadata } from "next"
 import Link from "next/link"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@mb/ui/components/tabs"
 import { Delta, PageHeader, PaperBadge, Stat } from "@/components/bits"
 import { ClosedPositionsTable, FillsTable, OrdersTable } from "@/components/tables"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { getClosedPositions, getFills, getOrders, getRealizedSummary } from "@/lib/data"
 import { pageMetadata } from "@/lib/site"
 

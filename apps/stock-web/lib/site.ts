@@ -1,3 +1,5 @@
+import { pageMetadataFor } from "@mb/web-kit/metadata"
+
 /** Site identity used for SEO metadata, structured data, the sitemap and share images. */
 export const site = {
   name: "StockMarketBot",
@@ -38,41 +40,7 @@ export const site = {
   },
 } as const
 
-/** Serializes JSON-LD safely for an inline <script> tag. */
-export const jsonLd = (data: unknown) => ({ __html: JSON.stringify(data).replace(/</g, "\\u003c") })
+export { clip, jsonLd } from "@mb/web-kit/metadata"
 
-/**
- * Full per-page metadata. Next merges `openGraph`/`twitter` shallowly, so each page sets the
- * whole block (plus its own canonical URL) rather than relying on the root layout.
- */
-export const pageMetadata = ({
-  title,
-  description,
-  path,
-  type = "website",
-  publishedTime,
-}: {
-  title: string
-  description: string
-  path: string
-  type?: "website" | "article"
-  publishedTime?: string
-}) => {
-  const shareTitle = title.includes(site.name) ? title : `${title} · ${site.name}`
-  return {
-    title,
-    description,
-    alternates: { canonical: path },
-    openGraph: {
-      type,
-      url: path,
-      siteName: site.name,
-      title: shareTitle,
-      description,
-      locale: "en_US",
-      images: [site.ogImage],
-      ...(type === "article" ? { publishedTime, authors: [site.author.url] } : {}),
-    },
-    twitter: { card: "summary_large_image" as const, title: shareTitle, description, images: [site.ogImage] },
-  }
-}
+/** Full per-page metadata (@mb/web-kit/metadata), with this site's name, author and default share image. */
+export const pageMetadata = pageMetadataFor(site)
