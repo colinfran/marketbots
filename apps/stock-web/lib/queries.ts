@@ -1,42 +1,53 @@
 import "server-only"
 import type { Bar, PortfolioHistory } from "@mb/stock-core/alpaca"
 import type { AccountSnapshot, ChartBars, CycleDoc, DecisionDoc, EngineStatusDoc, OrderDoc, ReportDoc, ResearchResult } from "@mb/stock-core/db"
-import { eventForViewer, type EngineEvent } from "@mb/stock-core/events"
+import { eventForViewer } from "@mb/stock-core/events"
 import { FILLED_ORDERS, fillsFromOrders, type OrderFill } from "@mb/stock-core/fills"
 import { SETUPS } from "@mb/stock-core/report"
 import { DEFAULT_SETTINGS, settingsSchema, type Phase, type Settings } from "@mb/stock-core/settings"
 import type { Setup } from "@mb/stock-core/setups"
 import { marketDay } from "@mb/stock-core/time"
-import type { WireItemDoc, WireTriggerDoc } from "@mb/stock-core/wire"
+import { createQueries, decisionLatency, ITEM_PROJECTION, toRowView, type EngineSummary as EngineSummaryOf, type TriggerView, type WireRowView } from "@mb/web-kit/queries"
 import { connection } from "next/server"
-import type { TriggerView, WireRowView } from "@/components/wire"
-import type { Viewer } from "./auth"
 import { collections } from "./db"
 
 /**
  * Read queries for the dashboard and JSON API. Everything comes from MongoDB: the engine writes
  * the books and copies the Alpaca data the site shows (account, equity history, chart bars) into
  * the `cache` collection. Each query awaits `connection()`, so pages render at request time.
+ * The queries both dashboards share come from @mb/web-kit/queries; stock's own follow.
  */
 
 // ─── Engine ──────────────────────────────────────────────────────────────────
 
-/** The engine counts as online if its heartbeat is fresher than this. */
-const HEARTBEAT_STALE_MS = 30_000
+export type EngineSummary = EngineSummaryOf<EngineStatusDoc>
 
-export type EngineSummary = { status: EngineStatusDoc | null; online: boolean; heartbeatAgeS: number | null }
-
-export const getEngine = async (): Promise<EngineSummary> => {
-  await connection()
-  const status = await (await collections()).engineStatus.findOne({ _id: "engine" })
-  const age = status ? (Date.now() - status.at.getTime()) / 1000 : null
-  return { status, online: age !== null && age * 1000 < HEARTBEAT_STALE_MS, heartbeatAgeS: age === null ? null : Math.round(age) }
-}
-
-export const getEngineState = async () => {
-  await connection()
-  return (await collections()).engineState.findOne({ _id: "engine" })
-}
+export const {
+  getEngine,
+  getEngineState,
+  getAudit,
+  getCommands,
+  getSeedRuns,
+  getNotifications,
+  getRecentEvents,
+  getCycleEvents,
+  getAiCosts,
+  getWireItems,
+  getNotableItems,
+  getWireFacets,
+  toTriggerViews,
+  getWireTriggers,
+  getWireActivity,
+} = createQueries({
+  collections,
+  eventForViewer,
+  // A trigger links to the report of the cycle it started (the research page is keyed by report).
+  triggerLinks: async (cycleIds) => {
+    if (!cycleIds.length) return new Map<string, string>()
+    const cycles = await (await collections()).cycles.find({ _id: { $in: cycleIds } }, { projection: { report_id: 1 } }).toArray()
+    return new Map(cycles.flatMap((c) => (c.report_id ? [[c._id, `/research/${c.report_id}`] as const] : [])))
+  },
+})
 
 export const getSettingsDoc = async () => {
   await connection()
@@ -50,56 +61,9 @@ export const getSettings = async (): Promise<Settings> => {
   return parsed.success ? parsed.data : DEFAULT_SETTINGS
 }
 
-export const getAudit = async (limit = 100) => {
-  await connection()
-  return (await collections()).audit.find({}).sort({ at: -1 }).limit(limit).toArray()
-}
-
-export const getCommands = async (limit = 30) => {
-  await connection()
-  return (await collections()).commands.find({}).sort({ created_at: -1 }).limit(limit).toArray()
-}
-
-export const getNotifications = async (limit = 30) => {
-  await connection()
-  return (await collections()).notifications.find({}).sort({ at: -1 }).limit(limit).toArray()
-}
-
-const toEvent = ({ _id, expires_at, ...e }: { _id: number; expires_at: Date } & Record<string, unknown>) => {
-  void _id
-  void expires_at
-  return e as unknown as EngineEvent
-}
-
-/** Recent persisted events, filtered for the viewer (initial history for the activity feed). */
-export const getRecentEvents = async (viewer: Viewer, { limit = 80, levels }: { limit?: number; levels?: EngineEvent["level"][] } = {}): Promise<EngineEvent[]> => {
-  await connection()
-  const docs = await (await collections()).events.find(levels ? { level: { $in: levels } } : {}).sort({ _id: -1 }).limit(limit).toArray()
-  return docs.map((d) => eventForViewer(toEvent(d as never), viewer.owner ? "owner" : "public")).filter((e): e is EngineEvent => e !== null)
-}
-
-/** Every stored event of one cycle, oldest first: the full trail of what the AI did. */
-export const getCycleEvents = async (cycleId: string, viewer: Viewer): Promise<EngineEvent[]> => {
-  await connection()
-  const docs = await (await collections()).events.find({ cycle_id: cycleId }).sort({ _id: 1 }).limit(2_000).toArray()
-  return docs.map((d) => eventForViewer(toEvent(d as never), viewer.owner ? "owner" : "public")).filter((e): e is EngineEvent => e !== null)
-}
-
 export const getCycles = async (limit = 30) => {
   await connection()
   return (await collections()).cycles.find({}).sort({ started_at: -1 }).limit(limit).toArray()
-}
-
-export const getAiCosts = async (days = 30) => {
-  await connection()
-  const since = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10)
-  return (await collections()).aiCalls
-    .aggregate<{ _id: string; cost: number; calls: number; failures: number }>([
-      { $match: { day: { $gte: since } } },
-      { $group: { _id: "$day", cost: { $sum: "$cost_usd" }, calls: { $sum: 1 }, failures: { $sum: { $cond: ["$ok", 0, 1] } } } },
-      { $sort: { _id: 1 } },
-    ])
-    .toArray()
 }
 
 // ─── Account ─────────────────────────────────────────────────────────────────
@@ -502,93 +466,7 @@ export const getSetupStats = async () => {
   return { setups: [...bySetup].map(([key, t]) => ({ key, ...t })), books: BOOKS.map((b) => ({ ...b, ...byBook.get(b.key)! })) }
 }
 
-/** One-time seed runs, newest first (the Admin card shows the current or last one). */
-export const getSeedRuns = async (limit = 5) => {
-  await connection()
-  return (await collections()).seedRuns.find({}).sort({ created_at: -1 }).limit(limit).toArray()
-}
-
 // ─── News engine ("wire") ────────────────────────────────────────────────────
-
-const toRowView = (i: WireItemDoc): WireRowView => ({
-  id: i._id,
-  title: i.title,
-  url: i.url,
-  source: i.source,
-  domain: i.domain,
-  tier: i.tier,
-  category: i.category,
-  kind: i.kind,
-  symbols: i.symbols,
-  severity: i.severity,
-  first_seen_at: i.first_seen_at.toISOString(),
-  notable: i.notable,
-  notable_reasons: i.notable_reasons,
-  price_at_seen: i.price_at_seen,
-})
-
-/** Summaries never leave the database: Benzinga items (alpaca_news) may show only headline, source and link (MASTER_PLAN 0.6). */
-const ITEM_PROJECTION = { summary: 0, severity_parts: 0, meta: 0, confirmations: 0 } as const
-
-export type WireFilter = { symbol?: string; category?: string; minSeverity?: number; source?: string; hours?: number; limit?: number }
-
-/** Items our feeds stored, newest first (cluster roots only: copies are confirmations on them). */
-export const getWireItems = async ({ symbol, category, minSeverity, source, hours = 72, limit = 100 }: WireFilter = {}) => {
-  await connection()
-  const filter: Record<string, unknown> = { first_seen_at: { $gte: new Date(Date.now() - hours * 3_600_000) } }
-  if (symbol) filter.symbols = symbol
-  if (category) filter.category = category
-  if (source) filter.source = source
-  if (minSeverity) filter.severity = { $gte: minSeverity }
-  const docs = await (await collections()).wireItems.find(filter, { projection: ITEM_PROJECTION }).sort({ first_seen_at: -1 }).limit(limit).toArray()
-  return docs.filter((d) => d.cluster_id === d._id).map(toRowView)
-}
-
-/** What the Live page may show: items the engine marked notable in the last `hours`. */
-export const getNotableItems = async (hours = 6, limit = 10) => {
-  await connection()
-  const docs = await (await collections()).wireItems.find({ notable: true, first_seen_at: { $gte: new Date(Date.now() - hours * 3_600_000) } }, { projection: ITEM_PROJECTION }).sort({ first_seen_at: -1 }).limit(limit).toArray()
-  return docs.map(toRowView)
-}
-
-/** Categories and sources seen recently, for the filters. */
-export const getWireFacets = async (hours = 72) => {
-  await connection()
-  const { wireItems } = await collections()
-  const since = { first_seen_at: { $gte: new Date(Date.now() - hours * 3_600_000) } }
-  const [categories, sources] = await Promise.all([wireItems.distinct("category", since), wireItems.distinct("source", since)])
-  return { categories: categories.sort(), sources: sources.sort() }
-}
-
-/** Trigger docs for display, with the first item's title and the report of the cycle each one started. */
-const toTriggerViews = async (triggers: WireTriggerDoc[]): Promise<TriggerView[]> => {
-  const { wireItems, cycles } = await collections()
-  const itemIds = [...new Set(triggers.flatMap((t) => t.item_ids.slice(0, 1)))]
-  const cycleIds = [...new Set(triggers.flatMap((t) => (t.cycle_id ? [t.cycle_id] : [])))]
-  const [items, cycleDocs] = await Promise.all([
-    itemIds.length ? wireItems.find({ _id: { $in: itemIds } }, { projection: { title: 1 } }).toArray() : [],
-    cycleIds.length ? cycles.find({ _id: { $in: cycleIds } }, { projection: { report_id: 1 } }).toArray() : [],
-  ])
-  const titles = new Map(items.map((i) => [i._id, i.title]))
-  const reports = new Map(cycleDocs.map((c) => [c._id, c.report_id]))
-  return triggers.map((t) => ({
-    id: t._id,
-    at: t.at.toISOString(),
-    rule: t.rule,
-    action: t.action,
-    status: t.status,
-    reason: t.reason,
-    symbols: t.symbols,
-    severity: t.severity,
-    report_id: t.cycle_id ? (reports.get(t.cycle_id) ?? null) : null,
-    item_title: titles.get(t.item_ids[0] ?? "") ?? null,
-  }))
-}
-
-export const getWireTriggers = async (limit = 40) => {
-  await connection()
-  return toTriggerViews(await (await collections()).wireTriggers.find({}).sort({ at: -1 }).limit(limit).toArray())
-}
 
 export type WireCycleContext = { trigger: TriggerView | null; items: WireRowView[] }
 
@@ -613,16 +491,11 @@ export const getWireAnalytics = async () => {
   const db = await collections()
   const week = new Date(Date.now() - 7 * 86_400_000)
   const month = new Date(Date.now() - 30 * 86_400_000)
-  const [fills, decisions, structures, items, triggers, eventCycles, calls] = await Promise.all([
+  const [fills, decisions, structures, activity] = await Promise.all([
     loadFills(),
     db.decisions.find({}, { projection: { action: 1, status: 1, checks: 1, created_at: 1, trigger_kind: 1, wire_item_ids: 1 } }).toArray(),
     db.optionPositions.find({}, { projection: { decision_id: 1 } }).toArray(),
-    db.wireItems.countDocuments({ first_seen_at: { $gte: week } }),
-    db.wireTriggers.countDocuments({ at: { $gte: week }, status: { $in: ["fired", "queued"] } }),
-    db.cycles.countDocuments({ kind: "event", started_at: { $gte: week } }),
-    db.aiCalls
-      .aggregate<{ _id: { day: string; task: string }; cost: number }>([{ $match: { at: { $gte: new Date(Date.now() - 14 * 86_400_000) } } }, { $group: { _id: { day: "$day", task: "$task" }, cost: { $sum: "$cost_usd" } } }])
-      .toArray(),
+    getWireActivity(),
   ])
 
   const ids = [...new Set(decisions.flatMap((d) => d.wire_item_ids ?? []))]
@@ -639,31 +512,23 @@ export const getWireAnalytics = async () => {
   })
 
   const eventDecisions = decisions.filter((d) => d.trigger_kind === "event")
-  const latencies = eventDecisions
-    .filter((d) => d.created_at >= month)
-    .map((d) => {
-      const seen = (d.wire_item_ids ?? []).map((id) => itemById.get(id)?.first_seen_at.getTime()).filter((t): t is number => typeof t === "number")
-      return seen.length ? (d.created_at.getTime() - Math.min(...seen)) / 1000 : null
-    })
-    .filter((s): s is number => s !== null)
-    .sort((a, b) => a - b)
   const weekDecisions = eventDecisions.filter((d) => d.created_at >= week)
   const filled = new Set(fills.flatMap((f) => (f.decision_id ? [f.decision_id] : [])))
-  const days = [...new Set(calls.map((c) => c._id.day))].sort()
-  const spend = (day: string, task: string) => calls.filter((c) => c._id.day === day && c._id.task === task).reduce((s, c) => s + c.cost, 0)
   return {
     byKind: [...byKind].map(([kind, t]) => ({ kind, label: KIND_LABEL[kind] ?? kind, ...t })).sort((a, b) => b.entries - a.entries),
     byCategory: [...byCategory].map(([category, t]) => ({ category, ...t })).sort((a, b) => b.entries - a.entries),
     funnel: {
-      items,
-      triggers,
-      eventCycles,
+      items: activity.items,
+      triggers: activity.triggers,
+      eventCycles: activity.eventCycles,
       decisions: weekDecisions.length,
       approved: weekDecisions.filter((d) => d.status !== "noop" && d.status !== "rejected" && d.checks?.length && d.checks.every((c) => c.ok)).length,
       filled: weekDecisions.filter((d) => filled.has(d._id)).length,
     },
-    medianLatencyS: latencies.length ? latencies[Math.floor(latencies.length / 2)] : null,
-    latencySamples: latencies.length,
-    researchSpend: days.map((day) => ({ day, research: spend(day, "research"), gap: spend(day, "research_gap"), decision: spend(day, "decision") })),
+    ...decisionLatency(
+      eventDecisions.filter((d) => d.created_at >= month),
+      (id) => itemById.get(id)?.first_seen_at,
+    ),
+    researchSpend: activity.researchSpend,
   }
 }

@@ -15,7 +15,7 @@ import {
 } from "lightweight-charts"
 import { useTheme } from "next-themes"
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsTrigger } from "@mb/ui/components/tabs"
 import { dateTime, pct, price, qty, usd } from "@/lib/format"
 
 /**

@@ -14,6 +14,8 @@
     "@better-auth/mongo-adapter": "^1.7.13",
     "@colinfran/analytics": "^0.1.2",
     "@mb/stock-core": "workspace:*",
+    "@mb/ui": "workspace:*",
+    "@mb/web-kit": "workspace:*",
     "better-auth": "^1.7.13",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.5.0",

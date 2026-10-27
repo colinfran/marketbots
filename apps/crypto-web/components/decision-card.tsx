@@ -1,8 +1,8 @@
 import type { DecisionDoc } from "@mb/crypto-core/db"
 import Link from "next/link"
+import { Badge } from "@mb/ui/components/badge"
+import { Card, CardContent, CardHeader, CardTitle } from "@mb/ui/components/card"
 import { ActionBadge, EvidenceList, KV, StatusBadge, SymbolLink } from "@/components/bits"
-import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { dateTime, num, pct, price, qty, titleCase, usd } from "@/lib/format"
 import { cn } from "@/lib/utils"
 

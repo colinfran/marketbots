@@ -1,0 +1,55 @@
+import { Badge } from "./components/badge"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/card"
+import { titleCase } from "./lib/format"
+
+/** What the card needs from a bot's engine summary (both bots' `engine_status` have these fields). */
+export type EngineCardEngine = {
+  online: boolean
+  heartbeatAgeS: number | null
+  status: { status: string; kill_switch: boolean; ai: { spend_today_usd: number; budget_usd: number } } | null
+}
+
+/**
+ * The engine at a glance: run state, AI spend, the bot's own health rows (venue or broker,
+ * market), an optional note, and the latest cycle (`latest`, laid out by each app).
+ */
+export function EngineCard({ engine, rows, note, latest }: { engine: EngineCardEngine; rows: [string, React.ReactNode][]; note?: React.ReactNode; latest?: React.ReactNode }) {
+  const s = engine.status
+  const all: [string, React.ReactNode][] = s
+    ? [
+        [
+          "AI spend today",
+          <span key="spend" className="font-mono tabular-nums">
+            ${s.ai.spend_today_usd.toFixed(2)} / ${s.ai.budget_usd}
+          </span>,
+        ],
+        ...rows,
+      ]
+    : []
+  return (
+    <Card>
+      <CardHeader>
+        <CardDescription>Engine</CardDescription>
+        <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+          {engine.online ? titleCase(s?.status ?? "unknown") : "Offline"}
+          {s?.kill_switch && <Badge variant="destructive">Kill switch</Badge>}
+          {!engine.online && <span className="text-muted-foreground text-xs font-normal">last heartbeat {engine.heartbeatAgeS === null ? "never" : `${engine.heartbeatAgeS}s ago`}</span>}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4 text-sm">
+        {all.length > 0 && (
+          <dl className="text-muted-foreground grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+            {all.map(([label, value]) => (
+              <div key={label} className="contents">
+                <dt>{label}</dt>
+                <dd className="text-foreground text-right">{value}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
+        {note}
+        {latest && <div className="border-t pt-3">{latest}</div>}
+      </CardContent>
+    </Card>
+  )
+}

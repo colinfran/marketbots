@@ -1,8 +1,8 @@
 import type { CycleDoc, DailyStatsDoc, DecisionDoc, FillDoc, OrderDoc, PositionDoc } from "@mb/crypto-core/db"
 import Link from "next/link"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mb/ui/components/table"
 import { ActionBadge, Delta, Empty, StatusBadge, SymbolLink } from "@/components/bits"
 import { CommandButton } from "@/components/command"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { ago, dateTime, duration, formatDay, num, price, qty, titleCase, usd } from "@/lib/format"
 
 /** Data tables. Each is also the accessible table view of the corresponding chart. */

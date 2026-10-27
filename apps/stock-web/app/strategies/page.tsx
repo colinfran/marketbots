@@ -1,8 +1,8 @@
 import { SETUP_INFO } from "@mb/stock-core/setups"
 import type { Metadata } from "next"
 import Link from "next/link"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@mb/ui/components/card"
 import { Delta, PageHeader, SectionTitle, Stat } from "@/components/bits"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { getSettings, getSetupStats, type SetupTally } from "@/lib/queries"
 import { pageMetadata } from "@/lib/site"
 

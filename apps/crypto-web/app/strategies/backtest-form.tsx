@@ -3,10 +3,10 @@
 import { BACKTEST_STRATEGIES } from "@mb/crypto-core/commands"
 import { LoaderIcon } from "lucide-react"
 import { useState } from "react"
+import { Button } from "@mb/ui/components/button"
+import { Input } from "@mb/ui/components/input"
+import { Label } from "@mb/ui/components/label"
 import { CommandResult, useCommand } from "@/components/command"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { titleCase } from "@/lib/format"
 
 type BacktestStrategy = (typeof BACKTEST_STRATEGIES)[number]

@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import Link from "next/link"
+import { Card, CardContent, CardHeader, CardTitle } from "@mb/ui/components/card"
 import { PageHeader } from "@/components/bits"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { usd } from "@/lib/format"
 import { getSettings } from "@/lib/queries"
 import { pageMetadata } from "@/lib/site"

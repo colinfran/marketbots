@@ -1,0 +1,174 @@
+import type { EngineStatusBase } from "@mb/core/db"
+import type { WireSourceHealth } from "@mb/core/wire"
+import { cn } from "cn"
+import { Empty, KV, SectionTitle } from "./bits"
+import { Badge } from "./components/badge"
+import { Card, CardContent, CardHeader, CardTitle } from "./components/card"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./components/table"
+import { ago, duration, num, titleCase } from "./lib/format"
+
+/**
+ * The building blocks of the Admin page's system health: the engine, AI, server and stream cards,
+ * the news-source table and the recent problems. Each app lays them out with its own venue or
+ * broker cards and its own price table.
+ */
+
+type Status = EngineStatusBase<string, string>
+
+/** Green (up) or red (down). */
+export const HealthDot = ({ ok }: { ok: boolean }) => <span className={cn("inline-block size-2 rounded-full", ok ? "bg-up" : "bg-down")} aria-hidden />
+
+/** The engine card. The bot fills in what it's doing (`activity`), its last cycle, and any rows before it. */
+export function EngineHealthCard({
+  engine,
+  dateTime,
+  activity,
+  lastCycle,
+  children,
+}: {
+  engine: { online: boolean; heartbeatAgeS: number | null; status: Status }
+  dateTime: (value: Date) => string
+  activity: React.ReactNode
+  lastCycle: React.ReactNode
+  children?: React.ReactNode
+}) {
+  const s = engine.status
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <HealthDot ok={engine.online} /> Engine
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <KV label="State">{engine.online ? titleCase(s.status) : "offline"}</KV>
+        <KV label="Activity">{activity}</KV>
+        <KV label="Last heartbeat">{engine.heartbeatAgeS === null ? "—" : `${engine.heartbeatAgeS}s ago`}</KV>
+        <KV label="Kill switch">{s.kill_switch ? <Badge variant="destructive">engaged</Badge> : "off"}</KV>
+        <KV label="Up since">{dateTime(s.started_at)}</KV>
+        <KV label="Version / host">
+          {s.version} / {s.instance}
+        </KV>
+        {children}
+        <KV label="Last cycle">{lastCycle}</KV>
+        <KV label="Errors (1h)">{s.errors_last_hour}</KV>
+      </CardContent>
+    </Card>
+  )
+}
+
+export function AiHealthCard({ ai }: { ai: Status["ai"] }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <HealthDot ok={ai.enabled && !ai.last_error} /> AI (Grok via Vercel AI Gateway)
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <KV label="Enabled">{ai.enabled ? "yes" : "no (AI_GATEWAY_API_KEY missing)"}</KV>
+        <KV label="Research model">{ai.models.research}</KV>
+        <KV label="Decision model">{ai.models.decision}</KV>
+        <KV label="Fallback">{ai.models.fallback ?? "none"}</KV>
+        <KV label="Spend today">
+          ${num(ai.spend_today_usd, 3)} / ${ai.budget_usd} ({ai.calls_today} calls)
+        </KV>
+        <KV label="Last call">{ago(ai.last_call_at)}</KV>
+        {ai.last_error && <p className="text-loss mt-2 line-clamp-3 text-xs">{ai.last_error}</p>}
+      </CardContent>
+    </Card>
+  )
+}
+
+export function ServerHealthCard({ system }: { system: Status["system"] }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Server resources</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <KV label="CPU (engine)">{num(system.cpu_pct, 1)}%</KV>
+        <KV label="Memory (RSS / heap)">
+          {system.rss_mb} / {system.heap_mb} MB
+        </KV>
+        <KV label="Load average">{system.load_avg.join(" · ")}</KV>
+        <KV label="Process uptime">{duration(system.uptime_s * 1000)}</KV>
+      </CardContent>
+    </Card>
+  )
+}
+
+/** The live stream card; `children` are the bot's extra rows. */
+export function StreamHealthCard({ status, children }: { status: Pick<Status, "ws_clients" | "event_seq">; children?: React.ReactNode }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Live stream</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <KV label="Connected dashboards">{status.ws_clients}</KV>
+        <KV label="Last event seq">{status.event_seq}</KV>
+        {children}
+      </CardContent>
+    </Card>
+  )
+}
+
+/** Every news source with its health. `note` renders the last column (the bot's notes and errors). */
+export function WireSourcesSection({ wire, note }: { wire: NonNullable<Status["wire"]>; note: (source: WireSourceHealth) => React.ReactNode }) {
+  return (
+    <section>
+      <SectionTitle>
+        News engine sources · mode {wire.mode} · {wire.items_last_hour} items in the last hour · {wire.triggers_today} triggers today
+        {wire.event_queue.length ? ` · queued: ${wire.event_queue.join(", ")}` : ""}
+      </SectionTitle>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Source</TableHead>
+            <TableHead>State</TableHead>
+            <TableHead className="text-right">Items 24h</TableHead>
+            <TableHead className="text-right">Dropped 24h</TableHead>
+            <TableHead className="text-right">Lag</TableHead>
+            <TableHead>Last OK</TableHead>
+            <TableHead>Note</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {wire.sources.map((w) => (
+            <TableRow key={w.id}>
+              <TableCell className="font-mono text-xs">{w.id}</TableCell>
+              <TableCell className={cn("text-sm", (w.state === "degraded" || w.state === "down") && "text-loss")}>{w.state}</TableCell>
+              <TableCell className="text-right font-mono text-sm tabular-nums">{w.items_24h}</TableCell>
+              <TableCell className="text-right font-mono text-sm tabular-nums">{w.dropped_24h}</TableCell>
+              <TableCell className="text-right font-mono text-sm tabular-nums">{w.lag_s === null ? "—" : duration(w.lag_s * 1000)}</TableCell>
+              <TableCell className="text-muted-foreground text-xs">{ago(w.last_ok_at)}</TableCell>
+              {note(w)}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </section>
+  )
+}
+
+/** Recent warnings and errors; `timeClassName` sizes the time column for the bot's date format. */
+export function ProblemsSection({ problems, dateTime, timeClassName }: { problems: { seq: number; ts: string; level: string; summary: string }[]; dateTime: (value: string) => string; timeClassName: string }) {
+  return (
+    <section>
+      <SectionTitle>Recent warnings & errors</SectionTitle>
+      {problems.length === 0 ? (
+        <Empty>Nothing recent.</Empty>
+      ) : (
+        <ul className="space-y-1 text-sm">
+          {problems.map((e) => (
+            <li key={e.seq} className="flex gap-3">
+              <span className={cn("text-muted-foreground shrink-0 font-mono text-xs", timeClassName)}>{dateTime(e.ts)}</span>
+              <span className={e.level === "error" ? "text-loss" : ""}>{e.summary}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+}

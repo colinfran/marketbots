@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import { redirect } from "next/navigation"
-import { LoginForm } from "./login-form"
+import { LoginForm } from "@mb/ui/login-form"
 import { getViewer } from "@/lib/auth"
 
 export const metadata: Metadata = { title: "Owner sign in", robots: { index: false, follow: false } }

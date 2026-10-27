@@ -21,31 +21,19 @@ import type {
   SettingsDoc,
 } from "@mb/stock-core/db"
 import type { WireItemDoc, WireTriggerDoc } from "@mb/stock-core/wire"
-import { MongoClient, type Db } from "mongodb"
+import { createDb } from "@mb/web-kit/db"
 import { env } from "./env"
 
 /**
- * MongoDB (Atlas) access for the dashboard. The dashboard reads everything the engine writes and
- * writes only three things: commands, audit entries and owner sign-in records (via Better Auth).
- * One client is reused per serverless instance (and across hot reloads in dev). It connects on
- * first use and reconnects on its own after a failure.
+ * MongoDB (Atlas) access for the dashboard (@mb/web-kit/db). The dashboard reads everything the
+ * engine writes and writes only three things: commands, audit entries and owner sign-in records
+ * (via Better Auth). One client is reused per serverless instance (and across hot reloads in dev).
  */
-
-declare global {
-  var _smbMongo: MongoClient | undefined
-}
-
-export const mongoClient = (): MongoClient => {
-  const uri = env.mongoUri()
-  if (!uri) throw new Error("MONGODB_URI is not set")
-  return (globalThis._smbMongo ??= new MongoClient(uri, { maxPoolSize: 10, appName: "stockmarketbot-web" }))
-}
-
-export const db = async (): Promise<Db> => mongoClient().db(env.mongoDb())
-
-export const collections = async () => {
-  const d = await db()
-  return {
+export const { mongoClient, db, collections } = createDb({
+  globalKey: "_smbMongo",
+  appName: "stockmarketbot-web",
+  env,
+  collections: (d) => ({
     settings: d.collection<SettingsDoc>(COLLECTIONS.settings),
     engineState: d.collection<EngineStateDoc>(COLLECTIONS.engineState),
     engineStatus: d.collection<EngineStatusDoc>(COLLECTIONS.engineStatus),
@@ -66,5 +54,5 @@ export const collections = async () => {
     dailyStats: d.collection<DailyStatsDoc>(COLLECTIONS.dailyStats),
     cache: d.collection<CacheDoc>(COLLECTIONS.cache),
     loginAttempts: d.collection<LoginAttemptDoc>(COLLECTIONS.loginAttempts),
-  }
-}
+  }),
+})

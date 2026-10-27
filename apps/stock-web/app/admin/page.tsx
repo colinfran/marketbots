@@ -2,19 +2,20 @@ import { STRATEGY_LABEL } from "@mb/stock-core/options"
 import { formatDateTime } from "@mb/stock-core/time"
 import type { Metadata } from "next"
 import { redirect } from "next/navigation"
+import { StreamBadge } from "@mb/ui/live"
+import { Badge } from "@mb/ui/components/badge"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@mb/ui/components/card"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mb/ui/components/table"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@mb/ui/components/tabs"
+import { SeedCard } from "@mb/ui/seed-card"
+import { SettingsForm } from "@mb/ui/settings-form"
 import { Empty, PageHeader, SectionTitle, StatusBadge, SymbolLink } from "@/components/bits"
 import { CommandButton } from "@/components/command"
-import { StreamBadge } from "@/components/live/live-ui"
-import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { getViewer } from "@/lib/auth"
 import { ago, titleCase, usd } from "@/lib/format"
 import { getAudit, getCommands, getEngine, getEngineState, getLiveAccount, getNotifications, getRecentEvents, getSeedRuns, getSettings, getSettingsDoc } from "@/lib/queries"
 import { EvaluateForm } from "./evaluate-form"
-import { SeedCard } from "./seed-card"
-import { SettingsForm } from "./settings-form"
+import { SETTINGS_SECTIONS } from "./settings-sections"
 import { SystemHealth } from "./system-health"
 
 export const metadata: Metadata = { title: "Admin", robots: { index: false, follow: false } }
@@ -218,7 +219,7 @@ export default async function AdminPage() {
         {/* Kept mounted so unsaved edits survive switching tabs. */}
         <TabsContent value="settings" forceMount className="mt-4 data-[state=inactive]:hidden">
           <Card>
-            <CardContent>{doc ? <SettingsForm settings={settings} version={doc.version} /> : <Empty>Settings are created when the engine first starts.</Empty>}</CardContent>
+            <CardContent>{doc ? <SettingsForm sections={SETTINGS_SECTIONS} settings={settings} version={doc.version} /> : <Empty>Settings are created when the engine first starts.</Empty>}</CardContent>
           </Card>
         </TabsContent>
         <TabsContent value="logs" className="mt-4 space-y-8">

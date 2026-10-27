@@ -13,6 +13,8 @@
   "dependencies": {
     "@better-auth/mongo-adapter": "^1.7.13",
     "@mb/crypto-core": "workspace:*",
+    "@mb/ui": "workspace:*",
+    "@mb/web-kit": "workspace:*",
     "@colinfran/analytics": "^0.1.2",
     "better-auth": "^1.7.13",
     "class-variance-authority": "^0.7.1",
