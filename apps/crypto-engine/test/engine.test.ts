@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto"
 import type { Command } from "@mb/crypto-core/commands"
 import type { CommandDoc } from "@mb/crypto-core/db"
 import type { EngineEvent } from "@mb/crypto-core/events"
-import { silentLogger } from "@mb/engine-kit/log"
-import { afterEach, beforeEach, describe, expect, it } from "vitest"
+import { createLogger, silentLogger } from "@mb/engine-kit/log"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { AiBudget } from "../src/ai/budget"
 import { AiRunner } from "../src/ai/runner"
 import { Alerts } from "../src/alerts"
@@ -28,6 +28,7 @@ let bus: EventBus
 let engine: Engine
 let events: EngineEvent[]
 let queues: (string[] | undefined)[]
+let lines: Record<string, unknown>[]
 
 const until = async (check: () => Promise<boolean> | boolean, ms = 5_000) => {
   const start = Date.now()
@@ -47,10 +48,22 @@ const command = async (c: Command): Promise<CommandDoc> => {
 
 const focus = { symbol: "BTC/USD", rule: "held_negative", action: "review" as const, severity: 70, polarity: -1 as const, item_ids: ["i1"], trigger_id: "t1", headline: "BTC exchange hack" }
 
+/** The trigger record the wire policy writes when it queues a focus. */
+const queuedTrigger = (id: string) =>
+  db.col.wireTriggers.insertOne({ _id: id, at: new Date(), rule: "held_negative", action: "review", status: "queued", reason: "queued behind a running cycle or the minimum gap", item_ids: ["i1"], symbols: ["BTC/USD"], severity: 70, cycle_id: null, queue_wait_ms: null, expires_at: new Date(Date.now() + 86_400_000) })
+
+type Internals = {
+  eventQueue: Map<string, { severity: number; item_ids: string[]; trigger_id: string }>
+  /** The 30-second scheduler tick: after a resume, the first one drains the event queue. */
+  schedule: () => Promise<void>
+}
+const internals = () => engine as unknown as Internals
+
 beforeEach(async () => {
   bus = await makeBus(db.col)
   events = []
   queues = []
+  lines = []
   bus.subscribe((e) => events.push(e))
   await db.col.cycles.insertOne({ _id: "interrupted", status: "running" } as never)
   const env = loadEnv({ MONGODB_URI: "mongodb://test", STREAM_TOKEN_SECRET: "x".repeat(40), ENGINE_INSTANCE: "test" })
@@ -62,7 +75,7 @@ beforeEach(async () => {
   const ledger = new Ledger(db.col, bus)
   engine = new Engine({
     env,
-    log: silentLogger,
+    log: createLogger("info", {}, (line) => lines.push(JSON.parse(line))),
     db: { col: db.col } as Database,
     bus,
     settings,
@@ -95,6 +108,7 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
+  vi.useRealTimers()
   await engine.shutdown("test over")
   await bus.stop()
 })
@@ -148,17 +162,56 @@ describe("Engine", () => {
     expect(events.filter((e) => e.type === "engine.status").map((e) => e.summary)).toEqual(["Engine running: startup complete", "Engine paused: lunch", "Engine running: resumed from the dashboard"])
   })
 
-  it("holds news triggers while it can't run them, merged by symbol, with no expiry", async () => {
+  it("holds news triggers while it can't run them, merged by symbol", async () => {
     await command({ type: "pause", reason: "test" })
     expect(engine.requestEventCycle(focus)).toBe("queued")
     expect(engine.requestEventCycle({ ...focus, severity: 60, item_ids: ["i2"], trigger_id: "t2" })).toBe("queued")
     expect(engine.requestEventCycle({ ...focus, symbol: null, severity: 50, item_ids: ["i3"], trigger_id: "t3" })).toBe("queued")
-    const internals = engine as unknown as { eventQueue: Map<string, { severity: number; item_ids: string[]; trigger_id: string }> }
-    expect(internals.eventQueue.get("BTC/USD")).toMatchObject({ severity: 70, item_ids: ["i1", "i2"], trigger_id: "t1" })
-    expect(internals.eventQueue.size).toBe(2)
+    expect(internals().eventQueue.get("BTC/USD")).toMatchObject({ severity: 70, item_ids: ["i1", "i2"], trigger_id: "t1" })
+    expect(internals().eventQueue.size).toBe(2)
     // The heartbeat lists what waits. It runs every 5 s, so allow two beats plus margin on a busy machine.
     await until(() => queues.some((q) => q?.length === 2), 12_000)
     expect(queues.find((q) => q?.length === 2)).toEqual(["BTC/USD", "MARKET"])
+  })
+
+  it("drops a trigger queued while paused once it has waited 30 minutes, so resuming never runs it", async () => {
+    // Only the clock is faked (and keeps ticking), so the jump below moves every timestamp alike.
+    vi.useFakeTimers({ toFake: ["Date"], shouldAdvanceTime: true })
+    await command({ type: "pause", reason: "test" })
+    await queuedTrigger("t1")
+    expect(engine.requestEventCycle(focus)).toBe("queued")
+    vi.setSystemTime(Date.now() + 31 * 60_000)
+    expect(await command({ type: "resume" })).toMatchObject({ status: "done", result: "running" })
+    await internals().schedule()
+    expect(internals().eventQueue.size).toBe(0)
+    await until(async () => (await db.col.wireTriggers.findOne({ _id: "t1" }))?.status === "suppressed")
+    expect(await db.col.wireTriggers.findOne({ _id: "t1" })).toMatchObject({ reason: "expired: waited 31 min in the queue", cycle_id: null, queue_wait_ms: null })
+    expect(lines.filter((l) => l.msg === "event trigger expired")).toEqual([expect.objectContaining({ level: "info", symbol: "BTC/USD", rule: "held_negative", reason: "expired: waited 31 min in the queue" })])
+    // The scheduled scan that was due runs instead; no event cycle ever starts.
+    await until(async () => (await db.col.cycles.countDocuments({ kind: "scheduled" })) === 1)
+    expect(await db.col.cycles.countDocuments({ kind: "event" })).toBe(0)
+    expect(events.filter((e) => e.type === "cycle.started").map((e) => (e.data as { trigger: string }).trigger)).toEqual(["scheduled"])
+  })
+
+  it("runs a trigger queued while paused when trading resumes within 30 minutes", async () => {
+    vi.useFakeTimers({ toFake: ["Date"], shouldAdvanceTime: true })
+    await command({ type: "pause", reason: "test" })
+    await queuedTrigger("t1")
+    expect(engine.requestEventCycle(focus)).toBe("queued")
+    vi.setSystemTime(Date.now() + 29 * 60_000)
+    expect(await command({ type: "resume" })).toMatchObject({ status: "done", result: "running" })
+    await internals().schedule()
+    expect(internals().eventQueue.size).toBe(0)
+    await until(async () => (await db.col.cycles.countDocuments({ kind: "event" })) === 1)
+    const cycle = (await db.col.cycles.findOne({ kind: "event" }))!
+    expect(cycle).toMatchObject({ trigger: "event: held negative BTC/USD", wire_trigger_id: "t1", wire_item_ids: ["i1"] })
+    // Once the cycle ends, the trigger records which cycle served it and how long it waited.
+    await until(async () => (await db.col.wireTriggers.findOne({ _id: "t1" }))?.cycle_id === cycle._id)
+    const served = (await db.col.wireTriggers.findOne({ _id: "t1" }))!
+    expect(served.status).toBe("queued")
+    expect(served.queue_wait_ms).toBeGreaterThanOrEqual(29 * 60_000)
+    expect(served.queue_wait_ms).toBeLessThan(30 * 60_000)
+    expect(lines.some((l) => l.msg === "event trigger expired")).toBe(false)
   })
 
   it("halts with the kill switch and stays paused after release", async () => {

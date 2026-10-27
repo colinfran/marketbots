@@ -44,6 +44,15 @@ export const ENGINE_VERSION = "0.1.0"
 /** A seed that couldn't start within this long of its time (engine down or paused) is failed, not run late. */
 const SEED_MAX_LATE_MINUTES = 120
 
+/**
+ * A news trigger waits at most this long for its event cycle (as in stock). It outlasts the
+ * slowest normal cycle it can queue behind (two research attempts of research_timeout_seconds
+ * plus three decision attempts of decision_timeout_seconds: about 18 minutes at the defaults);
+ * a longer wait means trading was paused or halted, and news that old shouldn't start a cycle.
+ * Its items stay in the wire dossier that later cycles read.
+ */
+const EVENT_QUEUE_MAX_MS = 30 * 60_000
+
 /** Crypto's words in the shared control results and seed alerts (@mb/engine-kit/control/plane). */
 const WORDING: ControlWording = {
   paused: "paused: no new decisions or entries; stops and targets stay active",
@@ -90,7 +99,7 @@ export type EngineDeps = {
  *
  * The parts both bots share come from @mb/engine-kit/control: the owner's controls and the run
  * status (`control`), the heartbeat (`reporter`) and the news engine's event-cycle queue
- * (`eventQueue`, no expiry and no gate for crypto yet).
+ * (`eventQueue`: triggers expire after 30 minutes; no gate, since crypto trades around the clock).
  */
 export class Engine {
   cycleState: CycleState = "idle"
@@ -153,8 +162,12 @@ export class Engine {
       settings: d.settings,
       busy: () => !!this.cycle,
       start: (events, trigger) => this.runCycle({ kind: "event", trigger, events: events.map(({ queued_at: _q, ...e }) => e) }, events),
-      // A trigger waits until trading runs, however long that takes (expiry is MARKETBOTS_PLAN 9.1).
-      expireAfterMs: null,
+      // A trigger queued behind a cycle, the minimum gap, a pause or the kill switch is dropped
+      // unrun after 30 minutes (marked suppressed, "expired: …"), so a resume never fires stale news.
+      expireAfterMs: EVENT_QUEUE_MAX_MS,
+      // No gate: crypto trades 24/7, and the queue already waits for running, no kill switch, no
+      // cycle in progress and the minimum gap. Venue or reconciliation trouble is handled inside
+      // the cycle (entries blocked), as for scheduled scans.
     })
     this.policy = new WirePolicy({
       col: d.db.col,
@@ -223,7 +236,8 @@ export class Engine {
   /**
    * A news-engine trigger asks for a focused cycle. It starts at once when nothing is running and
    * the minimum gap since the last event cycle has passed; otherwise it waits, merged by symbol
-   * (highest severity kept), and runs the moment the current cycle ends.
+   * (highest severity kept), and runs the moment the current cycle ends, or is dropped unrun once
+   * it has waited 30 minutes.
    */
   requestEventCycle(focus: EventFocus): "fired" | "queued" {
     return this.eventQueue.request(focus)
