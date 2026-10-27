@@ -17,7 +17,6 @@ In both, Grok (through the Vercel AI Gateway) researches and decides, and determ
 flowchart LR
     browser[Browser]
     dashboards[Vercel dashboards]
-    caddy[Caddy on Windows host]
     crypto[Crypto engine]
     stock[Stock engine]
     atlas[(MongoDB Atlas<br/>separate database per bot)]
@@ -27,9 +26,8 @@ flowchart LR
 
     browser -->|HTTPS| dashboards
     dashboards -->|Read data and write commands| atlas
-    browser -->|Engine WebSocket stream| caddy
-    caddy --> crypto
-    caddy --> stock
+    browser -->|Engine WebSocket stream| crypto
+    browser -->|Engine WebSocket stream| stock
     crypto -->|Own trading state| atlas
     stock -->|Own trading state| atlas
     crypto --> scraper
