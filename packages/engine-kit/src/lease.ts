@@ -1,4 +1,5 @@
-import type { Collections } from "./db/mongo"
+import type { LeaseDoc } from "@mb/core/db"
+import type { Collection } from "mongodb"
 import { errorMessage, type Logger } from "./log"
 import { sleep } from "./util/async"
 
@@ -16,7 +17,7 @@ export class Lease {
   private timer: NodeJS.Timeout | null = null
 
   constructor(
-    private readonly col: Pick<Collections, "lease">,
+    private readonly col: { lease: Collection<LeaseDoc> },
     private readonly holder: string,
     private readonly log: Logger,
   ) {}

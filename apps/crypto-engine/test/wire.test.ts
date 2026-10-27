@@ -1,10 +1,10 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { DEFAULT_SETTINGS, type Settings } from "@mb/crypto-core/settings"
+import { HttpError } from "@mb/engine-kit/util/http"
 import { describe, expect, it, vi } from "vitest"
-import { silentLogger } from "../src/log"
-import { SettingsStore } from "../src/state/stores"
-import { HttpError } from "../src/util/http"
+import { silentLogger } from "@mb/engine-kit/log"
+import { loadSettings } from "../src/state/stores"
 import { CATALOG } from "../src/wire/catalog"
 import { ClusterIndex, jaccard, titleTokens } from "../src/wire/cluster"
 import { WireFetch } from "../src/wire/fetch"
@@ -318,7 +318,7 @@ describe("wire settings", () => {
   it("migrates a stored settings document from before the wire existed", async () => {
     const { wire: _wire, ...old } = DEFAULT_SETTINGS
     await db.col.settings.insertOne({ _id: "current", settings: old as Settings, version: 7, updated_at: NOW, updated_by: "owner" })
-    const store = await SettingsStore.load(db.col, { GROK_RESEARCH_MODEL: null, GROK_DECISION_MODEL: null }, silentLogger)
+    const store = await loadSettings(db.col, { GROK_RESEARCH_MODEL: null, GROK_DECISION_MODEL: null }, silentLogger)
     expect(store.current.wire).toEqual(DEFAULT_SETTINGS.wire)
     expect(store.version).toBe(8)
   })

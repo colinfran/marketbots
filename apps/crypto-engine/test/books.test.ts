@@ -1,9 +1,8 @@
+import { silentLogger } from "@mb/engine-kit/log"
 import { describe, expect, it } from "vitest"
 import { AiBudget } from "../src/ai/budget"
-import { CommandProcessor } from "../src/commands/processor"
 import { Executor } from "../src/execution/executor"
 import { PaperWalletExecution } from "../src/execution/paper-wallet"
-import { silentLogger } from "../src/log"
 import type { MarketHub } from "../src/market/hub"
 import { Ledger } from "../src/portfolio/ledger"
 import { reconcileWallet } from "../src/portfolio/reconcile"
@@ -137,53 +136,6 @@ describe("reconcileWallet", () => {
     const result = await reconcile()
     expect(result.ok).toBe(false)
     expect(result.issues[0]).toMatch(/^USD: wallet/)
-  })
-})
-
-describe("EventBus", () => {
-  it("assigns increasing seqs, persists, and replays from memory and the database", async () => {
-    const bus = await makeBus(db.col)
-    const a = bus.emit("alert", { level: "info", title: "a", message: "a" }, { summary: "a" })
-    const b = bus.emit("alert", { level: "info", title: "b", message: "b" }, { summary: "b" })
-    const tick = bus.emit("market.ticker", { symbol: "BTC/USD", bid: 1, ask: 2, last: 1.5, change_pct: null }, { summary: "t" })
-    expect(b.seq).toBeGreaterThan(a.seq)
-    expect(tick.seq).toBe(0)
-    await bus.flush()
-    expect(await db.col.events.countDocuments()).toBe(2)
-    expect((await bus.replay(a.seq)).events.map((e) => e.summary)).toEqual(["b"])
-    // A new bus (engine restart) continues after the stored seqs and replays from MongoDB.
-    const restarted = await makeBus(db.col)
-    const c = restarted.emit("alert", { level: "info", title: "c", message: "c" }, { summary: "c" })
-    expect(c.seq).toBeGreaterThan(b.seq)
-    expect((await restarted.replay(0)).events.map((e) => e.summary)).toEqual(["a", "b", "c"])
-    await bus.stop()
-    await restarted.stop()
-  })
-})
-
-describe("CommandProcessor", () => {
-  it("re-validates, executes, and expires stale risk-increasing commands", async () => {
-    const bus = await makeBus(db.col)
-    const handled: string[] = []
-    const processor = new CommandProcessor(db.col, bus, silentLogger, async (c) => {
-      handled.push(c.type)
-      return "ok"
-    })
-    const now = new Date()
-    const old = new Date(Date.now() - 60 * 60_000)
-    await db.col.commands.insertMany([
-      { _id: "1", type: "pause", command: { type: "pause" }, status: "pending", created_at: old, created_by: "owner", processed_at: null, result: null, error: null },
-      { _id: "2", type: "resume", command: { type: "resume" }, status: "pending", created_at: old, created_by: "owner", processed_at: null, result: null, error: null },
-      { _id: "3", type: "settings.update", command: { type: "settings.update", patch: {}, expected_version: -1 } as never, status: "pending", created_at: now, created_by: "owner", processed_at: null, result: null, error: null },
-    ])
-    await processor.drain()
-    expect(handled).toEqual(["pause"])
-    const docs = Object.fromEntries((await db.col.commands.find().toArray()).map((d) => [d._id, d]))
-    expect(docs["1"].status).toBe("done")
-    expect(docs["2"]).toMatchObject({ status: "rejected", error: expect.stringMatching(/expired/) })
-    expect(docs["3"].status).toBe("rejected")
-    expect(await db.col.audit.countDocuments()).toBe(3)
-    await bus.stop()
   })
 })
 

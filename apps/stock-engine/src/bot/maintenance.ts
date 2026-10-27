@@ -1,6 +1,6 @@
 import type { AlpacaPosition } from "@mb/stock-core/alpaca"
 import { marketDay, minutesBetween } from "@mb/stock-core/time"
-import { errorMessage } from "../log"
+import { errorMessage } from "@mb/engine-kit/log"
 import type { TradingContext } from "./context"
 import { cancelSymbolOrders, heldExitBounds, placeExitOrders, resolveExits } from "./execute"
 import { liquidateOptions, reconcileOptions } from "./options"

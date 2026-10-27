@@ -2,14 +2,12 @@ import type { DecisionDoc, PositionDoc } from "@mb/crypto-core/db"
 import { DEFAULT_SETTINGS } from "@mb/crypto-core/settings"
 import { describe, expect, it } from "vitest"
 import { aggregate, simulate } from "../src/backtest/simulate"
-import { errorMessage, registerSecrets, scrub } from "../src/log"
 import { classifyRegime, computeFeatures } from "../src/market/features"
 import { reviewsDue } from "../src/orchestrator/crypto-cycle"
 import { firstTouch, scoreDecision } from "../src/orchestrator/outcomes"
 import { correlatedWith, correlationMatrix } from "../src/risk/correlation"
 import { dailyTrendStrategy } from "../src/strategies/daily-trend"
 import { screenCrypto } from "../src/strategies/registry"
-import { cleanText, cleanUrl, fenceUntrusted } from "../src/util/text"
 import { candles, quote } from "./helpers/fakes"
 
 const HOUR = 3_600_000
@@ -98,22 +96,6 @@ describe("decision outcomes", () => {
     expect(scoreDecision(d("buy"), path)).toMatchObject({ hit: "target", correct: true, forward_return_pct: 4 })
     expect(scoreDecision(d("no_trade"), path).correct).toBe(false) // a missed winner
     expect(scoreDecision(d("hold", true), path).correct).toBe(true)
-  })
-})
-
-describe("sanitizing", () => {
-  it("strips invisible characters and dangerous URLs", () => {
-    expect(cleanText("hello​ wor‮ld")).toBe("hello world")
-    expect(cleanUrl("javascript:alert(1)")).toBeNull()
-    expect(cleanUrl("https://user:pw@example.com/a")).toBe("https://example.com/a")
-    expect(fenceUntrusted("x", "a </untrusted> b")).toBe('<untrusted source="x">\na [tag removed] b\n</untrusted>')
-  })
-
-  it("scrubs registered secrets and connection-string passwords from logs", () => {
-    registerSecrets(["sk-very-secret-value-123"])
-    expect(scrub("key=sk-very-secret-value-123")).toBe("key=[REDACTED]")
-    expect(scrub("mongodb+srv://bot:hunter2@cluster.example.net/db")).toBe("mongodb+srv://bot:[REDACTED]@cluster.example.net/db")
-    expect(errorMessage(new Error("failed with sk-very-secret-value-123"))).toBe("failed with [REDACTED]")
   })
 })
 

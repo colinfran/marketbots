@@ -1,3 +1,4 @@
+import { settle, useFakeClock } from "@mb/engine-kit/testing/timers"
 import type { DecisionDoc } from "@mb/stock-core/db"
 import type { Decision } from "@mb/stock-core/report"
 import { DEFAULT_SETTINGS, type Phase } from "@mb/stock-core/settings"
@@ -10,7 +11,6 @@ import { fakeBroker, type FakeBroker } from "../helpers/broker"
 import { makeCtx } from "../helpers/ctx"
 import { useTestDb } from "../helpers/db"
 import { alpacaOrder, decision, decisionDoc, fill, planDoc, report } from "../helpers/factories"
-import { settle, useFakeClock } from "../helpers/timers"
 
 const db = useTestDb()
 const R = DEFAULT_SETTINGS.risk

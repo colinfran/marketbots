@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process"
-import { errorMessage, type Logger } from "../../log"
+import { errorMessage, type Logger } from "@mb/engine-kit/log"
 
 /**
  * Wrapper around the official Kraken CLI's paper trading (github.com/krakenfx/kraken-cli). A

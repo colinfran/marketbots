@@ -1,7 +1,9 @@
+import { EPHEMERAL_EVENTS, type EventDataMap } from "@mb/crypto-core/events"
+import { silentLogger } from "@mb/engine-kit/log"
+import { makeTestBus } from "@mb/engine-kit/testing/bus"
 import { vi } from "vitest"
-import { EventBus } from "../../src/bus/event-bus"
+import type { EventBus } from "../../src/bus/event-bus"
 import type { Collections } from "../../src/db/mongo"
-import { silentLogger } from "../../src/log"
 import type { Quote } from "../../src/market/hub"
 import { KrakenCli, type ExecFn } from "../../src/venues/kraken/cli"
 import type { PairInfo } from "../../src/venues/kraken/pairs"
@@ -154,11 +156,8 @@ export class FakeWallet {
   }
 }
 
-export const makeBus = async (col: Pick<Collections, "events">) => {
-  const bus = new EventBus(col, silentLogger, 30)
-  await bus.init()
-  return bus
-}
+/** A real event bus with crypto's events on the test database (@mb/engine-kit/testing/bus). */
+export const makeBus = (col: Pick<Collections, "events">): Promise<EventBus> => makeTestBus<EventDataMap>(col, EPHEMERAL_EVENTS)
 
 /** Deterministic hourly candles from a price path. */
 export const candles = (closes: number[], stepMs = 3_600_000, start = Date.UTC(2026, 0, 1)): Candle[] =>

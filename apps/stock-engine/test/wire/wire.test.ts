@@ -1,11 +1,11 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
+import { silentLogger } from "@mb/engine-kit/log"
 import { DEFAULT_SETTINGS, type Settings } from "@mb/stock-core/settings"
 import { describe, expect, it, vi } from "vitest"
 import type { Alpaca } from "../../src/alpaca/client"
 import { MarketStream, type MinuteBar } from "../../src/alpaca/market-stream"
-import { silentLogger } from "../../src/log"
-import { SettingsStore } from "../../src/state/stores"
+import { loadSettings } from "../../src/state/stores"
 import { CATALOG } from "../../src/wire/catalog"
 import { parseFeed } from "../../src/wire/kinds/rss"
 import { stockLexicon } from "../../src/wire/lexicon"
@@ -176,7 +176,7 @@ describe("stock wire pipeline", () => {
 
     const { wire: _w, ...old } = DEFAULT_SETTINGS
     await db.col.settings.insertOne({ _id: "current", settings: old as Settings, version: 3, updated_at: NOW, updated_by: "owner" })
-    const store = await SettingsStore.load(db.col, { GROK_RESEARCH_MODEL: null, GROK_DECISION_MODEL: null } as never, silentLogger)
+    const store = await loadSettings(db.col, { GROK_RESEARCH_MODEL: null, GROK_DECISION_MODEL: null } as never, silentLogger)
     expect(store.current.wire).toEqual(DEFAULT_SETTINGS.wire)
   })
 })

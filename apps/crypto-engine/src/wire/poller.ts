@@ -1,8 +1,8 @@
 // Mirrored in cryptomarketbot and stockmarketbot: keep in sync.
 import type { WireSourceHealth, WireSourceState, WireTier } from "@mb/crypto-core/wire"
-import { errorMessage } from "../log"
-import { sleep } from "../util/async"
-import { HttpError } from "../util/http"
+import { errorMessage } from "@mb/engine-kit/log"
+import { sleep } from "@mb/engine-kit/util/async"
+import { HttpError } from "@mb/engine-kit/util/http"
 import type { Emit, RawItem, SourceContext, SourceSpec, WireSource } from "./types"
 
 /**

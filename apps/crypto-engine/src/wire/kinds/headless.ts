@@ -1,5 +1,5 @@
 // Mirrored in cryptomarketbot and stockmarketbot: keep in sync.
-import { HttpError } from "../../util/http"
+import { HttpError } from "@mb/engine-kit/util/http"
 import type { PollFn } from "../poller"
 import type { SourceContext, SourceSpec } from "../types"
 import { parseHtml } from "./html"

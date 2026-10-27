@@ -1,5 +1,5 @@
 import { marketClock, marketDay } from "@mb/stock-core/time"
-import { HttpError } from "../../util/http"
+import { HttpError } from "@mb/engine-kit/util/http"
 import type { SourceContext } from "../types"
 
 /**

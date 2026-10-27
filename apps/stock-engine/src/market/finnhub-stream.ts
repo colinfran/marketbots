@@ -1,6 +1,6 @@
 import WebSocket from "ws"
-import { errorMessage, type Logger } from "../log"
-import { backoffMs } from "../util/async"
+import { errorMessage, type Logger } from "@mb/engine-kit/log"
+import { backoffMs } from "@mb/engine-kit/util/async"
 
 /**
  * Layer D of the stock price coverage (MASTER_PLAN §3.13): Finnhub's trade WebSocket (free key).

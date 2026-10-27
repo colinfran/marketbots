@@ -1,14 +1,16 @@
-import { signStreamToken } from "@mb/crypto-core/stream-token"
+import { streamTokens } from "@mb/core/stream-token"
 import { afterEach, describe, expect, it } from "vitest"
 import WebSocket from "ws"
 import { silentLogger } from "../src/log"
-import { StreamServer } from "../src/stream/server"
-import { useTestDb } from "./helpers/db"
-import { makeBus } from "./helpers/fakes"
+import { StreamServer } from "../src/stream"
+import { makeTestBus } from "../src/testing/bus"
+import { TEST_STREAM_SECRET as SECRET } from "../src/testing/env"
+import { EPHEMERAL, OWNER_ONLY, useTestDb, type TestEvents } from "./helpers/bot"
 
-const SECRET = "test-stream-secret-0123456789-abcdefghij"
+// A bot's own tokens: the server only accepts tokens signed with its HMAC prefix.
+const { sign: signStreamToken, verify: verifyToken } = streamTokens("test-stream.")
 const db = useTestDb()
-let server: StreamServer | null = null
+let server: StreamServer<TestEvents> | null = null
 
 afterEach(async () => {
   await server?.stop()
@@ -16,8 +18,8 @@ afterEach(async () => {
 })
 
 const start = async (allowedOrigins: string[] = []) => {
-  const bus = await makeBus(db.col)
-  server = new StreamServer(bus, silentLogger, { host: "127.0.0.1", port: 0, secret: SECRET, allowedOrigins, trustProxy: false, maxClients: 10, ready: () => true })
+  const bus = await makeTestBus<TestEvents>(db.col, EPHEMERAL)
+  server = new StreamServer(bus, silentLogger, { host: "127.0.0.1", port: 0, secret: SECRET, allowedOrigins, trustProxy: false, maxClients: 10, ready: () => true }, { verifyToken, ownerOnly: OWNER_ONLY })
   await server.start()
   return { bus, url: `ws://127.0.0.1:${server.address!.port}/v1/stream`, base: `http://127.0.0.1:${server.address!.port}` }
 }

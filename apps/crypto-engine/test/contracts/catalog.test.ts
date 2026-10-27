@@ -1,7 +1,7 @@
 import { DEFAULT_SETTINGS } from "@mb/crypto-core/settings"
+import { silentLogger } from "@mb/engine-kit/log"
 import { describe, it } from "vitest"
 import type { MarketHub } from "../../src/market/hub"
-import { silentLogger } from "../../src/log"
 import { CATALOG } from "../../src/wire/catalog"
 import { CoinbasePremium } from "../../src/wire/sources/coinbase-ws"
 import { KrakenMarketSignals } from "../../src/wire/sources/kraken-market"

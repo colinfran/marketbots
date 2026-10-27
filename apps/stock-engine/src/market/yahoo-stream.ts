@@ -1,6 +1,6 @@
 import WebSocket from "ws"
-import { errorMessage, type Logger } from "../log"
-import { backoffMs } from "../util/async"
+import { errorMessage, type Logger } from "@mb/engine-kit/log"
+import { backoffMs } from "@mb/engine-kit/util/async"
 
 /**
  * Layer C of the stock price coverage (MASTER_PLAN §3.13): Yahoo Finance's streamer WebSocket, the

@@ -3,10 +3,10 @@ import { randomUUID } from "node:crypto"
 import { utcDay } from "@mb/stock-core/db"
 import type { Settings } from "@mb/stock-core/settings"
 import type { EventFocus, WireItemDoc, WireTriggerAction, WireTriggerDoc, WireTriggerStatus } from "@mb/stock-core/wire"
+import { errorMessage, type Logger } from "@mb/engine-kit/log"
 import type { AiBudget } from "../ai/budget"
 import type { EventBus } from "../bus/event-bus"
 import type { Collections } from "../db/mongo"
-import { errorMessage, type Logger } from "../log"
 import { isConfirmed } from "./notable"
 
 /**

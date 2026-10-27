@@ -1,5 +1,5 @@
 import type { OrderPurpose, PositionDoc } from "@mb/crypto-core/db"
-import { errorMessage } from "../log"
+import { errorMessage } from "@mb/engine-kit/log"
 import type { ExecutionReport } from "../execution/executor"
 import { roundPrice, roundQty } from "../venues/kraken/pairs"
 import type { EngineContext } from "./context"

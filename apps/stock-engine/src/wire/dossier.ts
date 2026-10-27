@@ -1,7 +1,7 @@
 // Mirrored in cryptomarketbot and stockmarketbot: keep in sync.
 import type { DossierRow, WireItemDoc } from "@mb/stock-core/wire"
+import { fenceUntrusted } from "@mb/engine-kit/util/text"
 import type { Collections } from "../db/mongo"
-import { fenceUntrusted } from "../util/text"
 import { upcomingMacro } from "./calendar"
 import { isConfirmed } from "./notable"
 

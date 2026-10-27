@@ -1,4 +1,4 @@
-import { sleep, TokenBucket } from "../../util/async"
+import { sleep, TokenBucket } from "@mb/engine-kit/util/async"
 import { requestText } from "../../util/http"
 import type { KrakenAssetPair, KrakenEnvelope, KrakenOhlcRow, KrakenSystemStatus, KrakenTicker } from "./types"
 

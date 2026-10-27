@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest"
-import { silentLogger } from "../src/log"
+import { silentLogger } from "@mb/engine-kit/log"
 import { bookChecksum, OrderBook } from "../src/venues/kraken/book"
 import { KrakenCli, KrakenCliError, normalizePair } from "../src/venues/kraken/cli"
 import { formatQty, minimumViolation, parsePairs, roundQty, toV2Symbol } from "../src/venues/kraken/pairs"

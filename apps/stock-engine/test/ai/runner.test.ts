@@ -1,10 +1,10 @@
+import { AiRunner, hasLiveSearch } from "@mb/engine-kit/ai/runner"
+import { silentLogger } from "@mb/engine-kit/log"
 import { botReportSchema, type BotReport } from "@mb/stock-core/report"
 import { NoObjectGeneratedError, streamText } from "ai"
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { gatewayCost, type AiBudget } from "../../src/ai/budget"
+import type { AiBudget } from "../../src/ai/budget"
 import { repairReport } from "../../src/ai/repair"
-import { AiRunner, hasLiveSearch } from "../../src/ai/runner"
-import { silentLogger } from "../../src/log"
 import { decision, report } from "../helpers/factories"
 
 vi.mock("ai", async (importOriginal) => ({ ...(await importOriginal<typeof import("ai")>()), streamText: vi.fn() }))
@@ -175,18 +175,5 @@ describe("AiRunner.structured", () => {
 
   it("refuses to run without a key", async () => {
     await expect(new AiRunner(budget(), silentLogger, false).structured(opts())).rejects.toThrow("AI is disabled")
-  })
-})
-
-describe("gatewayCost", () => {
-  it("reads string or number costs and ignores junk", () => {
-    expect(gatewayCost({ gateway: { cost: "0.5" } })).toBe(0.5)
-    expect(gatewayCost({ gateway: { totalCost: 0.25 } })).toBe(0.25)
-    expect(gatewayCost({ gateway: { cost: "abc" } })).toBeNull()
-    expect(gatewayCost(undefined)).toBeNull()
-  })
-
-  it("uses marketCost when the gateway bills nothing (own provider key)", () => {
-    expect(gatewayCost({ gateway: { cost: "0", marketCost: "0.00030935" } })).toBe(0.00030935)
   })
 })

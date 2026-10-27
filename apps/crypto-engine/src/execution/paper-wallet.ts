@@ -1,6 +1,6 @@
 import type { OrderDoc } from "@mb/crypto-core/db"
+import { UncertainRequestError } from "@mb/engine-kit/util/http"
 import type { MarketHub } from "../market/hub"
-import { UncertainRequestError } from "../util/http"
 import { KrakenCliError, type KrakenCli } from "../venues/kraken/cli"
 import { formatQty } from "../venues/kraken/pairs"
 import type { SubmitResult, VenueExecution } from "./executor"

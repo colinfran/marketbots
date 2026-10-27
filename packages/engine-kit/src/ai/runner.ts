@@ -1,6 +1,6 @@
 import { xai } from "@ai-sdk/xai"
-import type { AiTask, ResearchSource, TokenUsage } from "@mb/stock-core/db"
-import { NoObjectGeneratedError, Output, parsePartialJson, streamText, type LanguageModelUsage } from "ai"
+import type { AiTask, TokenUsage } from "@mb/core/db"
+import { generateText, NoObjectGeneratedError, Output, parsePartialJson, streamText, type LanguageModelUsage } from "ai"
 import type { z } from "zod"
 import { errorMessage, type Logger } from "../log"
 import { cleanLine, cleanText, cleanUrl, domainOf } from "../util/text"
@@ -11,9 +11,10 @@ import { estimateCost, gatewayCost, type AiBudget } from "./budget"
  * Web and X search are xAI's server-side tools, so Grok runs the searches itself; other gateway
  * models can be configured for decisions, but research needs a model with live search tools.
  *
- * Both calls stream, so the dashboard can show the work as it happens: research streams its
- * search queries, sources and the memo as it's written; the decision streams its structured
- * output (headline, then each decision) and, when the provider returns them, reasoning summaries.
+ * Research streams its search queries, sources and the memo as it's written, so the dashboard can
+ * show the work as it happens. The structured decision streams too (headline, then each decision,
+ * and reasoning summaries when the provider returns them), unless the bot runs it non-streamed
+ * (`stream: false`), where one generateText call returns the whole answer and its cost.
  */
 
 const toUsage = (usage: LanguageModelUsage | undefined): TokenUsage => ({
@@ -31,6 +32,9 @@ export const hasLiveSearch = (model: string) => /^(xai|spacexai)\//.test(model)
 
 /** How often streaming progress is reported (the feed doesn't need every token). */
 const PROGRESS_MS = 1_500
+
+/** A web source research cited. */
+export type ResearchSource = { title: string; url: string; domain: string }
 
 export type ResearchProgress = {
   onQuery?: (query: string, tool: string) => void
@@ -57,6 +61,13 @@ export type ResearchResult = {
   error: string | null
 }
 
+export type AiRunnerOptions = {
+  /** Stream structured (decision) calls. Default true; false runs each attempt as one generateText call. */
+  stream?: boolean
+  /** Longest research memo kept, in characters. Default 16,000. */
+  memoMaxChars?: number
+}
+
 const queryOf = (input: unknown): string | null => {
   const i = input as { query?: unknown; queries?: unknown; search_query?: unknown } | null
   const q = i?.query ?? i?.search_query ?? (Array.isArray(i?.queries) ? i.queries.join(" | ") : null)
@@ -77,11 +88,18 @@ const reasoningReporter = (report?: (chars: number, excerpt: string) => void) =>
 }
 
 export class AiRunner {
+  private readonly stream: boolean
+  private readonly memoMaxChars: number
+
   constructor(
-    private readonly budget: AiBudget,
+    private readonly budget: Pick<AiBudget, "record" | "estimateByDuration">,
     private readonly log: Logger,
     private readonly enabled: boolean,
-  ) {}
+    { stream = true, memoMaxChars = 16_000 }: AiRunnerOptions = {},
+  ) {
+    this.stream = stream
+    this.memoMaxChars = memoMaxChars
+  }
 
   get available() {
     return this.enabled
@@ -204,7 +222,7 @@ export class AiRunner {
             throw part.error instanceof Error ? part.error : new Error(String(part.error))
           }
         }
-        const memo = cleanText(text, 16_000)
+        const memo = cleanText(text, this.memoMaxChars)
         if (!memo) throw new Error("research returned an empty memo")
         totalCost += await this.record(opts.task ?? "research", step.model, opts.cycleId, usage, cost, queries.length, attemptStarted, null)
         totalUsage = addUsage(totalUsage, usage)
@@ -230,10 +248,10 @@ export class AiRunner {
   }
 
   /**
-   * Structured decision, streamed, with up to three attempts at decreasing temperature. A schema
-   * failure is first repaired in code; if the repair lost items and there's another attempt left,
-   * the model is asked again with the exact validation error. The last attempt switches to the
-   * fallback model when the primary keeps failing for non-schema reasons (outage, timeouts).
+   * Structured decision with up to three attempts at decreasing temperature. A schema failure is
+   * first repaired in code; if the repair lost items and there's another attempt left, the model
+   * is asked again with the exact validation error. The last attempt switches to the fallback
+   * model when the primary keeps failing for non-schema reasons (outage, timeouts).
    */
   async structured<T>(opts: {
     task: AiTask
@@ -248,6 +266,7 @@ export class AiRunner {
     repair: (text: string | undefined) => { report: T; dropped: number } | null
     timeoutMs: number
     signal?: AbortSignal
+    /** Streamed calls only. */
     progress?: StructuredProgress
   }): Promise<{ output: T; attempts: number; repaired: boolean; model: string; cost_usd: number; usage: TokenUsage }> {
     if (!this.enabled) throw new Error("AI is disabled (AI_GATEWAY_API_KEY not set)")
@@ -265,9 +284,10 @@ export class AiRunner {
       if (isLast && opts.fallback && schemaFailures === 0 && lastError) model = opts.fallback
       const started = Date.now()
       const reasoning = reasoningReporter(opts.progress?.onReasoning)
+      // The gateway cost reported so far: per finished step when streamed. A failed non-streamed call reports none.
       let cost: number | null = null
       try {
-        const result = streamText({
+        const call = {
           model,
           instructions: opts.system,
           prompt: opts.prompt + feedback,
@@ -276,7 +296,16 @@ export class AiRunner {
           maxRetries: 2,
           abortSignal: opts.signal,
           timeout: { totalMs: opts.timeoutMs },
-        })
+        }
+        if (!this.stream) {
+          const result = await generateText(call)
+          const usage = toUsage(result.totalUsage ?? result.usage)
+          const callCost = gatewayCost(result.providerMetadata)
+          totalCost += await this.record(opts.task, model, opts.cycleId, usage, callCost, 0, started, null)
+          totalUsage = addUsage(totalUsage, usage)
+          return { output: result.output as T, attempts: attempt, repaired: false, model, cost_usd: totalCost, usage: totalUsage }
+        }
+        const result = streamText(call)
         let text = ""
         let lastProgress = 0
         for await (const part of result.fullStream) {

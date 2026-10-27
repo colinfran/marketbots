@@ -1,3 +1,5 @@
+import { Lease } from "@mb/engine-kit/lease"
+import { createLogger, errorMessage, registerSecrets } from "@mb/engine-kit/log"
 import { AiBudget } from "./ai/budget"
 import { AiRunner } from "./ai/runner"
 import { Alerts } from "./alerts"
@@ -7,14 +9,11 @@ import { Engine, ENGINE_VERSION } from "./engine"
 import { loadEnv, secretValues, wireEnv } from "./env"
 import { Executor } from "./execution/executor"
 import { PaperWalletExecution } from "./execution/paper-wallet"
-import { Lease } from "./lease"
-import { createLogger, errorMessage, registerSecrets } from "./log"
 import { CandleCache } from "./market/candles"
 import { MarketHub } from "./market/hub"
 import { Ledger } from "./portfolio/ledger"
-import { EngineStateStore, SettingsStore } from "./state/stores"
+import { EngineStateStore, loadSettings } from "./state/stores"
 import { StreamServer } from "./stream/server"
-import { backoffMs, sleep } from "./util/async"
 import { DEFAULT_USER_AGENT } from "./util/http"
 import { KrakenCli } from "./venues/kraken/cli"
 import { KrakenRest } from "./venues/kraken/rest"
@@ -43,23 +42,14 @@ const main = async () => {
   log.info("starting CryptoMarketBot engine", { version: ENGINE_VERSION, node: process.version, workspace: env.KRAKEN_WORKSPACE })
 
   const shutdownSignal = new AbortController()
-  let db
-  for (let attempt = 1; ; attempt++) {
-    try {
-      db = await connectDatabase(env.MONGODB_URI, env.MONGODB_DB_NAME)
-      break
-    } catch (error) {
-      log.warn("MongoDB connection failed; retrying", { attempt, error: errorMessage(error) })
-      await sleep(Math.max(2_000, backoffMs(attempt, 2_000, 30_000)))
-    }
-  }
+  const db = await connectDatabase(env.MONGODB_URI, env.MONGODB_DB_NAME, log)
 
   const lease = new Lease(db.col, `${env.ENGINE_INSTANCE}:${process.pid}`, log.child({ component: "lease" }))
   await lease.acquire(shutdownSignal.signal)
 
   const bus = new EventBus(db.col, log.child({ component: "events" }), env.EVENT_RETENTION_DAYS)
   await bus.init()
-  const settings = await SettingsStore.load(db.col, env, log)
+  const settings = await loadSettings(db.col, env, log)
   const state = await EngineStateStore.load(db.col)
   const alerts = new Alerts(db.col, bus, log.child({ component: "alerts" }), env.DISCORD_WEBHOOK_URL, env.DASHBOARD_URL)
 

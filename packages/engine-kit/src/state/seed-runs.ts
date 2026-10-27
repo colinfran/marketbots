@@ -1,7 +1,6 @@
-// Mirrored in cryptomarketbot and stockmarketbot: keep in sync.
 import { randomUUID } from "node:crypto"
-import type { SeedRunDoc } from "@mb/stock-core/db"
-import type { Collections } from "../db/mongo"
+import type { SeedRunDoc } from "@mb/core/db"
+import type { Collection } from "mongodb"
 
 /**
  * Lifecycle of the owner's one-time seed buy (the `seed_runs` collection):
@@ -15,7 +14,7 @@ import type { Collections } from "../db/mongo"
  * enforced. A run is a single attempt; nothing here ever retries one.
  */
 
-type SeedCol = Pick<Collections, "seedRuns">
+type SeedCol = { seedRuns: Collection<SeedRunDoc> }
 
 const MINUTE = 60_000
 /** A schedule time this far in the past is a mistake, not a request to buy right now. */

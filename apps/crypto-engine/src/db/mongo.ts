@@ -22,7 +22,9 @@ import type {
   SnapshotDoc,
 } from "@mb/crypto-core/db"
 import type { WireItemDoc, WireTriggerDoc } from "@mb/crypto-core/wire"
-import { MongoClient, type Collection, type Db } from "mongodb"
+import { connectMongo, type Database as DatabaseOf } from "@mb/engine-kit/db"
+import type { Logger } from "@mb/engine-kit/log"
+import type { Collection, Db } from "mongodb"
 
 /**
  * The engine's long-lived MongoDB connection. The engine is the only writer of trading state
@@ -55,7 +57,7 @@ export type Collections = {
   wireTriggers: Collection<WireTriggerDoc>
 }
 
-export type Database = { client: MongoClient; db: Db; col: Collections }
+export type Database = DatabaseOf<Collections>
 
 export const collectionsFor = (db: Db): Collections => ({
   settings: db.collection<SettingsDoc>(COLLECTIONS.settings),
@@ -82,23 +84,6 @@ export const collectionsFor = (db: Db): Collections => ({
   wireTriggers: db.collection<WireTriggerDoc>(COLLECTIONS.wireTriggers),
 })
 
-export const ensureIndexes = async (db: Db) => {
-  await Promise.all(
-    Object.entries(INDEXES).map(([name, specs]) =>
-      specs && specs.length ? db.collection(name).createIndexes(specs.map((s) => ({ ...s }))) : Promise.resolve(),
-    ),
-  )
-}
-
-export const connectDatabase = async (uri: string, dbName: string): Promise<Database> => {
-  const client = new MongoClient(uri, {
-    maxPoolSize: 20,
-    serverSelectionTimeoutMS: 15_000,
-    retryWrites: true,
-    appName: "cryptomarketbot-engine",
-  })
-  await client.connect()
-  const db = client.db(dbName)
-  await ensureIndexes(db)
-  return { client, db, col: collectionsFor(db) }
-}
+/** Connects to crypto's database (@mb/engine-kit/db: indexes ensured, retried until it works). */
+export const connectDatabase = (uri: string, dbName: string, log: Logger): Promise<Database> =>
+  connectMongo({ uri, dbName, appName: "cryptomarketbot-engine", indexes: INDEXES, collections: collectionsFor, log })

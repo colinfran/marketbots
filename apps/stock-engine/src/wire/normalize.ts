@@ -1,6 +1,6 @@
 // Mirrored in cryptomarketbot and stockmarketbot: keep in sync.
 import { createHash } from "node:crypto"
-import { cleanLine, cleanUrl, domainOf } from "../util/text"
+import { cleanLine, cleanUrl, domainOf } from "@mb/engine-kit/util/text"
 import type { RawItem } from "./types"
 
 /**

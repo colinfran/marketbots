@@ -421,12 +421,12 @@ Tags: **[C]** crypto, **[S]** stock, **[both]**, **[stack]** Docker/infra, **[ow
 
 ### Phase 6: `@mb/engine-kit` (≈ 1–2 sessions)
 
-- [ ] 6.1 Move the identical modules as-is: `log`, `lease`, `heartbeat`, `bus`, `stream`, `util/*`.
-- [ ] 6.2 Move the parameterized ones: `commands` processor, `db` connect, `state/*`, `ai/budget`, `env` base, the `ai/repair` primitives, prompt parts.
-- [ ] 6.3 `alerts` (stock's version; crypto's Discord messages gain fields and retry: **listed behavior change, low risk**).
-- [ ] 6.4 `ai/runner` (stock's version; crypto calls it with `stream: false`).
+- [x] 6.1 Move the identical modules as-is: `log`, `lease`, `heartbeat`, `bus`, `stream`, `util/*`.
+- [x] 6.2 Move the parameterized ones: `commands` processor, `db` connect, `state/*`, `ai/budget`, `env` base, the `ai/repair` primitives, prompt parts.
+- [x] 6.3 `alerts` (stock's version; crypto's Discord messages gain fields and retry: **listed behavior change, low risk**).
+- [x] 6.4 `ai/runner` (stock's version; crypto calls it with `stream: false`).
 - [ ] 6.5 Cut `ControlPlane`, `StatusReporter`, `EventCycleQueue` and `bootstrap` out of both `engine.ts` / `main.ts`. Each engine keeps its domain loops. Crypto's queue keeps "no expiry" for now.
-- [ ] 6.6 `testing` helpers shared by both engines.
+- [x] 6.6 `testing` helpers shared by both engines.
 - [ ] 6.7 Gate as in 5.4, plus a boot of both engines against the staging databases (as in 3.4) before deploying.
 
 ### Phase 7: `@mb/wire` (≈ 1 session)
@@ -568,6 +568,7 @@ Answered by the owner on 2026-10-26, 23:15 PT:
 
 | Date | Repo | Commit | What | Ported |
 |---|---|---|---|---|
+| 2026-10-26 23:28 PT | cryptomarketbot | `1f52260` | Owner committed the draft `MARKETBOTS_PLAN.md` (docs only) | Not needed: `docs/plans/MARKETBOTS_PLAN.md` here is the live copy |
 
 **Progress log:**
 
@@ -582,3 +583,4 @@ Answered by the owner on 2026-10-26, 23:15 PT:
 | 2026-10-27 00:30 PT | 2.5 | Contract snapshots for both bots: 75 crypto + 84 stock files, +78 / +87 tests, reproducible byte for byte. Gaps: the repair schemas aren't exported (covered by unit tests), crypto prompt inputs are assembled inline in the cycle code (hand-copied fixtures), and stock prompt times depend on Node's `Intl` time-zone data. Known load-sensitive test: stock `engine.test.ts` "pauses, resumes and applies settings…" can time out on a busy machine (passes alone). |
 | 2026-10-27 00:40 PT | 10.1–10.2 | `/extract` with 60 tests; 25/33 real URLs ok. Spike: conditional GO for `llama3.2:3b` (see 10.1); 10.5 waits for the owner. The llm service is stopped; models kept in the `ollama-models` volume. |
 | 2026-10-27 00:50 PT | Phase 5 (5.1–5.3; deploy pending) | `@mb/core`: math, stream-token, wire, events (`BaseEventDataMap`, 23 events), commands, settings, db, metrics, indicators, time. The bot cores bind their parameters and keep their key order: no `.extend()` and no `Base & {…}` types, because both reorder the snapshots. Stock indicators keep today's values via options (`rsi` flat 100, `atr` SMA); 96,000 random comparisons were bit-identical. Tokens verify both ways between old and new code, and a token from one bot never verifies in the other. Snapshots unchanged; tests 986 → 998. Engine deploy after the seeds (5.4). |
+| 2026-10-27 01:40 PT | 6.1–6.4, 6.6 (deploy pending) | `@mb/engine-kit`: log, heartbeat, lease, util/*, bus, stream, commands, db (retry moved in), state stores, seed runs, ai/budget, ai/repair, ai/runner (stock's; crypto binds stream false and its 12,000-char memo cap, a difference the plan missed), prompt parts, alerts (stock's), env, testing. Each engine keeps a thin same-named subclass at the old path, so call sites didn't change. Crypto alert change (6.3): icon prefixes on warn/error/critical titles, one retry on 429/5xx/network, "…" truncation, and a log line per alert, so the runbook's "0 warn/error lines" check now sees `alert:` lines. Snapshots unchanged; tests 998 → 998 (16 moved, 7 duplicates removed, 7 new). |
