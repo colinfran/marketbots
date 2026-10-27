@@ -1,10 +1,9 @@
-// Mirrored in cryptomarketbot and stockmarketbot: keep in sync.
 import { createServer } from "node:http"
 import { chromium } from "playwright-core"
 
 /**
  * The headless scraper sidecar (MASTER_PLAN Phase 7): renders pages that need JavaScript for the
- * engine's `headless` news sources (wire/kinds/headless.ts).
+ * engines' `headless` news sources (wire/kinds/headless.ts). One container serves both engines.
  *
  *   POST /render { url, wait_for?, timeout_ms?, capture? } → { status, url, html, captured }
  *   GET  /health                                           → { ok, browser, active, queued, … }
@@ -13,14 +12,17 @@ import { chromium } from "playwright-core"
  * `capture` lists URL substrings: the page's own responses that match are returned as text, for
  * pages whose table is filled from a JSON call. One browser is reused, with a fresh context per
  * render; at most MAX_CONCURRENT renders run at once and up to MAX_QUEUE wait (beyond that: 503).
+ * Each caller (the `X-Client` header, else the engine container's address) may hold at most
+ * MAX_QUEUE_PER_CALLER of the waiting places, so one bot can never starve the other.
  * Images, media and fonts are never loaded. The browser is replaced every 6 h once idle, and at
- * once if it dies. The container publishes no port: only the engine reaches it, over the compose
+ * once if it dies. The container publishes no port: only the engines reach it, over the compose
  * network.
  */
 
 const PORT = Number(process.env.PORT ?? 8790)
-const MAX_CONCURRENT = 2
+const MAX_CONCURRENT = 3
 const MAX_QUEUE = 16
+const MAX_QUEUE_PER_CALLER = 8
 const RESTART_MS = 6 * 3_600_000
 const DEFAULT_TIMEOUT_MS = 30_000
 const MAX_TIMEOUT_MS = 60_000
@@ -72,20 +74,22 @@ const maybeRestart = () => {
 }
 setInterval(maybeRestart, 60_000).unref()
 
-/** A render slot, or null when the queue is full. */
-const acquire = () => {
+const queuedBy = (caller) => waiting.filter((w) => w.caller === caller).length
+
+/** A render slot, or null when the queue (or this caller's share of it) is full. */
+const acquire = (caller) => {
   if (active < MAX_CONCURRENT) {
     active += 1
     return Promise.resolve()
   }
-  if (waiting.length >= MAX_QUEUE) return null
-  return new Promise((resolve) => waiting.push(resolve))
+  if (waiting.length >= MAX_QUEUE || queuedBy(caller) >= MAX_QUEUE_PER_CALLER) return null
+  return new Promise((resolve) => waiting.push({ caller, resolve }))
 }
 
 /** Hands the slot to the next waiting render, or frees it. */
 const release = () => {
   const next = waiting.shift()
-  if (next) next()
+  if (next) next.resolve()
   else {
     active -= 1
     maybeRestart()
@@ -143,13 +147,22 @@ const parseJob = (raw) => {
   return { job: { url: url.toString(), wait_for: typeof body.wait_for === "string" && body.wait_for ? body.wait_for : null, timeout_ms: body.timeout_ms, capture } }
 }
 
+/** Who is asking: the X-Client header (e.g. "crypto", "stock"), else the caller's address. */
+const callerOf = (req) => {
+  const header = String(req.headers["x-client"] ?? "").trim().toLowerCase()
+  if (/^[a-z0-9_-]{1,32}$/.test(header)) return header
+  return req.socket.remoteAddress ?? "unknown"
+}
+
 const server = createServer(async (req, res) => {
   const send = (code, body) => {
     res.writeHead(code, { "content-type": "application/json" })
     res.end(JSON.stringify(body))
   }
   if (req.method === "GET" && req.url === "/health") {
-    return send(200, { ok: true, browser: !!browser?.isConnected(), active, queued: waiting.length, ...stats })
+    const by_caller = {}
+    for (const w of waiting) by_caller[w.caller] = (by_caller[w.caller] ?? 0) + 1
+    return send(200, { ok: true, browser: !!browser?.isConnected(), active, queued: waiting.length, by_caller, ...stats })
   }
   if (req.method !== "POST" || req.url !== "/render") return send(404, { error: "not found" })
 
@@ -161,19 +174,20 @@ const server = createServer(async (req, res) => {
   const { job, error } = parseJob(raw)
   if (!job) return send(400, { error })
 
-  const slot = acquire()
-  if (!slot) return send(503, { error: `busy: ${waiting.length} renders queued` })
+  const caller = callerOf(req)
+  const slot = acquire(caller)
+  if (!slot) return send(503, { error: `busy: ${waiting.length} renders queued (${queuedBy(caller)} from ${caller})` })
   await slot
   const started = Date.now()
   try {
     const result = await render(job)
     stats.renders += 1
-    log("rendered", { host: new URL(job.url).host, status: result.status, ms: Date.now() - started, html: result.html.length, captured: result.captured.length })
+    log("rendered", { caller, host: new URL(job.url).host, status: result.status, ms: Date.now() - started, html: result.html.length, captured: result.captured.length })
     send(200, result)
   } catch (e) {
     stats.failures += 1
     const message = String(e?.message ?? e).split("\n")[0].slice(0, 300)
-    log("render failed", { host: new URL(job.url).host, ms: Date.now() - started, error: message })
+    log("render failed", { caller, host: new URL(job.url).host, ms: Date.now() - started, error: message })
     send(502, { error: message })
   } finally {
     release()

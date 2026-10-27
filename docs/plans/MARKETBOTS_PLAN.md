@@ -1,6 +1,6 @@
 # Marketbots plan: one repo, two bots, one Docker stack
 
-> Written 2026-10-26 for owner review. Revised the same day: the owner dropped the local database and the move off Vercel, so **MongoDB Atlas and both Vercel dashboards stay as they are**. **Status: Phases 0–2 done (2.5 deferred to after the swap); Phase 3 in progress.** This copy (`marketbots/docs/plans/MARKETBOTS_PLAN.md`) is the one to tick; the draft in the cryptomarketbot working tree is superseded.
+> Written 2026-10-26 for owner review. Revised the same day: the owner dropped the local database and the move off Vercel, so **MongoDB Atlas and both Vercel dashboards stay as they are**. **Status: Phases 0–2 done (2.5 deferred to after the swap); Phases 3–4 done for the engines (2026-10-26 23:47 PT): both run in the `marketbots` stack. Waiting on the owner: 1.6 (GitHub repo), 4.2 (Vercel re-link), 4.4 (archive the old repos).** This copy (`marketbots/docs/plans/MARKETBOTS_PLAN.md`) is the one to tick; the draft in the cryptomarketbot working tree is superseded.
 >
 > Sources: both repos at `cryptomarketbot@35319cc` and `stockmarketbot@a0a18f2` (full file-by-file comparison of `apps/web`, `apps/engine`, `packages/core`), both `docs/ARCHITECTURE.md`, `MASTER_PLAN.md`, the running server (`docker ps`/`stats`, `C:\Caddy\Caddyfile`, hardware).
 
@@ -386,15 +386,16 @@ Tags: **[C]** crypto, **[S]** stock, **[both]**, **[stack]** Docker/infra, **[ow
   A test fails on any diff. *(Tonight: deferred until after the swap, still before Phase 5. The code doesn't change in between, so the snapshots still capture today's behavior.)*
 - [x] 2.6 [both] Gate: everything green, test counts equal to the 0.3 baseline. Commit "Move both bots in unchanged".
 - **Not carried over:** `claude_prompt_grok_vercel_ai_gateway (1).txt` and `.DS_Store` (they stay in the archived repos).
+- **Lesson (2026-10-26):** archive the whole tree (`git archive HEAD <path>`), not a subtree (`HEAD:<path>`). A subtree has no root `.gitattributes`, so on Windows the global `core.autocrlf=true` writes CRLF. Blobs were normalized on commit; a fresh checkout fixed the working tree.
 
 ### Phase 3: The Docker stack (≈ 1 session)
 
-- [ ] 3.1 [stack] `compose.yml` as in §3.11. Every service is resource-capped and hardened where the image allows.
-- [ ] 3.2 [both] Engine Dockerfiles for the monorepo:
+- [x] 3.1 [stack] `compose.yml` as in §3.11. Every service is resource-capped and hardened where the image allows.
+- [x] 3.2 [both] Engine Dockerfiles for the monorepo:
   - Build stage: `pnpm fetch` (lockfile only, cache-friendly), then copy sources, then `pnpm install --offline --frozen-lockfile --filter @mb/<bot>-engine...`, then esbuild. The runtime image is unchanged: `node:22-bookworm-slim` pinned by digest, tini, non-root, healthcheck.
   - Crypto keeps the checksummed Kraken CLI stage and `/data/kraken`.
-- [ ] 3.3 [stack] Merged scraper: one service, concurrency 3, per-caller queue cap, 1 GB.
-- [ ] 3.4 [both] Smoke test of the new images, using a separate compose project name and other ports so the live engines aren't touched:
+- [x] 3.3 [stack] Merged scraper: one service, concurrency 3, per-caller queue cap, 1 GB.
+- [x] 3.4 [both] Smoke test of the new images, using a separate compose project name and other ports so the live engines aren't touched:
   - **Crypto:** against a fresh `cryptomarketbot_staging` database on Atlas, with a **copy** of the wallet volume, no AI key and no Discord, for about an hour. Check boot, lease, indexes, stream and source health.
   - **Stock (decision 3):** boot test only, with **fake** Alpaca keys and a throwaway local MongoDB. It must reach healthy, take the lease, open the stream and log Alpaca auth errors without crashing. The live keys are never used while the old engine runs: Alpaca's free market-data stream allows one connection per account, so they would knock out the live engine's prices.
   - **Tonight's shortcut:** both boot tests use a throwaway `mongo:8.0` container instead of an Atlas staging database, and last a few minutes, not an hour. Nothing is written to Atlas.
@@ -405,9 +406,9 @@ Tags: **[C]** crypto, **[S]** stock, **[both]**, **[stack]** Docker/infra, **[ow
 
 ### Phase 4: Swap over (≈ ½ session)
 
-- [ ] 4.1 [both] Swap the engines per the §5 runbook: **stock first** (weekend or after 20:00 ET), **then crypto** (quiet hour; the swap takes a minute or two).
+- [x] 4.1 [both] Swap the engines per the §5 runbook: **stock first** (weekend or after 20:00 ET), **then crypto** (quiet hour; the swap takes a minute or two).
 - [ ] 4.2 [owner] Re-link both Vercel projects to the new repo (§3.7), set the Ignored Build Step, deploy. Check both dashboards: signed in, stream connects, a `pause`/`resume` round trip works.
-- [ ] 4.3 [both] Remove the old scraper containers. Keep the old compose projects stopped (not removed) for 14 days, then remove them with owner approval.
+- [x] 4.3 [both] Remove the old scraper containers. Keep the old compose projects stopped (not removed) for 14 days, then remove them with owner approval.
 - [ ] 4.4 [owner] Archive both old GitHub repos, read-only, once Vercel no longer builds from them.
 - [ ] 4.5 Update memory: the repo, the stack, and where progress lives.
 
@@ -563,3 +564,6 @@ Answered by the owner on 2026-10-26, 23:15 PT:
 |---|---|---|
 | 2026-10-26 | — | Plan written from a full comparison of both repos and the server. Revised the same day: Atlas and Vercel stay (owner). Nothing executed. |
 | 2026-10-26 23:30 PT | Phase 0 (0.1–0.4) | Owner's §7 answers recorded. Baselines above, all green. Seeds confirmed scheduled. Two Phase 2 notes added: exclude the two tracked stray files from `git archive`, and rename the scraper's package scope. Live containers untouched. |
+| 2026-10-26 23:30 PT | Phases 1–2 (2.5 deferred) | Scaffold, then both bots moved in from `35319cc` / `a0a18f2`. The lockfile was seeded from crypto's, so every direct dependency matches both old lockfiles (`recharts` pinned back to stock's 3.8.0). Transitive differences: `victory-vendor` 37.3.6 → 37.4.1 (recharts' d3, dashboard only), plus three build-tool patches crypto already ran; stock's stale `@vitest/coverage-v8` was dropped. Gate green: 206 / 615 tests, equal to the baselines. Lint now covers the engines and cores too (import boundaries only; checked with a probe file). `crypto.env` / `stock.env` were copied from the old `.env` files (git-ignored). Docs carried over unchanged as `docs/CRYPTO.md` and `docs/STOCK.md`. |
+| 2026-10-26 23:40 PT | Phase 3 (3.1–3.4) | `compose.yml`; Dockerfiles use `pnpm fetch` + `--offline` install and the runtime `node:22-bookworm-slim` digest the old images used (`de170b39…`). The scraper runs 3 renders at once, with at most 8 of 16 queue places per caller (`X-Client`, else the container address). `compose.smoke.yml` is the reusable boot test. Smoke results: both engines healthy in under 30 s, lease taken, authenticated stream opened (bad token refused with 4003), stock logged Alpaca 401s without crashing, about 200 MiB each. **Finding:** the crypto engine resets the paper workspace when its database is fresh. It only ever gets the wallet copy in the smoke test; never start the live wallet against a new database name. |
+| 2026-10-26 23:47 PT | Phase 4 (4.1, 4.3) | **Stock swapped at 23:45 PT, crypto at 23:46 PT.** Each new engine was healthy in about 10 s and took the lease at once (the old one released it on shutdown). Stock: Alpaca REST, trade and data streams connected, 94/96 sources ok. Crypto: reconciliation clean, wallet ok on `cryptomarketbot_kraken-paper`, no workspace reset, 78/80 sources ok. Only `macro_ff` and `gdelt` are degraded (known per-IP rate limits), and there are 0 warn/error log lines. Both answer through Caddy. Both seeds are still `scheduled` (13:30 / 13:45 UTC) and run on the new engines. This also deployed MASTER_PLAN Phase 7 (new sources, newsletters, `SCRAPER_URL`). Old scraper containers removed; old engines `Exited (0)`, kept for rollback until 2026-11-09. Pre-swap state was captured from Atlas (status, broker, wallet, lease, seeds). |

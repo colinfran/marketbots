@@ -1,0 +1,101 @@
+# Boot test for new engine images, beside the live stack (MARKETBOTS_PLAN 3.4, 6.7, 7.4).
+#
+#   docker compose build                                            build the images first
+#   docker compose -f compose.smoke.yml up -d                       boot both engines
+#   docker compose -f compose.smoke.yml ps / logs -f crypto-engine
+#   docker compose -f compose.smoke.yml down && docker volume rm marketbots-smoke_wallet
+#
+# (Not `down -v`: this file also declares the LIVE wallet volume. It is external, so compose
+# shouldn't remove it, but there is no reason to rely on that.)
+#
+# Safe beside the live engines by construction: its own project name, a throwaway local MongoDB
+# (nothing touches Atlas), loopback ports 18787/18788, a COPY of the paper wallet, fake Alpaca
+# keys (the live ones would knock out the live engine's market-data stream: one connection per
+# account), and no AI, Discord, email or news API keys.
+#
+# The crypto engine resets the paper workspace when its database is fresh ("paper workspace reset
+# to match a fresh database"), which is why it only ever gets the copy here. Never start the live
+# wallet volume against a new or renamed database.
+
+name: marketbots-smoke
+
+x-engine: &engine
+  read_only: true
+  tmpfs:
+    - /tmp
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  mem_limit: 1g
+  depends_on:
+    mongo:
+      condition: service_started
+
+services:
+  mongo:
+    image: mongo:8.0
+    tmpfs:
+      - /data/db
+    mem_limit: 1g
+
+  # Copies the live wallet (read-only) into a throwaway volume, so the smoke engine can't touch it.
+  wallet-copy:
+    image: node:22-bookworm-slim@sha256:de170b39439eb0e5a3444ad7d60b015614a381e10fecae2e30ec9e735122f38d
+    user: "0"
+    command: ["sh", "-c", "rm -rf /to/* /to/.[!.]* 2>/dev/null; cp -a /from/. /to/ && echo copied"]
+    volumes:
+      - live-wallet:/from:ro
+      - wallet:/to
+
+  crypto-engine:
+    <<: *engine
+    image: marketbots-crypto-engine:latest
+    environment:
+      MONGODB_URI: mongodb://mongo:27017
+      MONGODB_DB_NAME: cryptomarketbot_staging
+      STREAM_TOKEN_SECRET: smoke-test-secret-0123456789abcdef0123456789abcdef
+      STREAM_ALLOWED_ORIGINS: http://localhost:3000
+      STREAM_PORT: 8787
+      KRAKEN_WORKSPACE: cryptomarketbot
+      SCRAPER_URL: http://scraper:8790
+      ENGINE_INSTANCE: smoke
+    ports:
+      - "127.0.0.1:18787:8787"
+    volumes:
+      - wallet:/data/kraken
+    depends_on:
+      mongo:
+        condition: service_started
+      wallet-copy:
+        condition: service_completed_successfully
+
+  stock-engine:
+    <<: *engine
+    image: marketbots-stock-engine:latest
+    environment:
+      MONGODB_URI: mongodb://mongo:27017
+      MONGODB_DB_NAME: stockmarketbot_staging
+      ALPACA_API_KEY: SMOKE-FAKE-KEY
+      ALPACA_SECRET_KEY: SMOKE-FAKE-SECRET
+      STREAM_TOKEN_SECRET: smoke-test-secret-0123456789abcdef0123456789abcdef
+      STREAM_ALLOWED_ORIGINS: http://localhost:3000
+      STREAM_PORT: 8788
+      SCRAPER_URL: http://scraper:8790
+      ENGINE_INSTANCE: smoke
+    ports:
+      - "127.0.0.1:18788:8788"
+
+  scraper:
+    image: marketbots-scraper:latest
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    mem_limit: 1g
+
+volumes:
+  live-wallet:
+    external: true
+    name: cryptomarketbot_kraken-paper
+  wallet:

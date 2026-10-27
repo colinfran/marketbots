@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 #
-# Headless scraper sidecar (MASTER_PLAN Phase 7). Build from the repository root:
+# Headless scraper sidecar (MASTER_PLAN Phase 7), shared by both engines. Build from the repository root:
 #   docker compose build scraper
 #   docker build -f apps/scraper/Dockerfile .
 #

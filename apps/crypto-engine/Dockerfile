@@ -1,24 +1,28 @@
 # syntax=docker/dockerfile:1.7
 #
-# CryptoMarketBot engine image. Build from the repository root:
-#   docker compose build            (uses docker-compose.yml)
-#   docker build -f apps/engine/Dockerfile .
+# Crypto engine image. Build from the repository root:
+#   docker compose build crypto-engine      (uses compose.yml)
+#   docker build -f apps/crypto-engine/Dockerfile .
 #
 # Linux image (Docker Desktop / WSL2 on Windows runs it as-is). Debian-based because the
 # official Kraken CLI release is built against glibc.
 
+ARG NODE_IMAGE=node:22-bookworm-slim@sha256:de170b39439eb0e5a3444ad7d60b015614a381e10fecae2e30ec9e735122f38d
+
 # ── 1. Build the engine bundle ────────────────────────────────────────────────
-FROM node:22-bookworm-slim AS build
+FROM ${NODE_IMAGE} AS build
 WORKDIR /repo
 RUN corepack enable
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
-COPY packages/core/package.json packages/core/
-COPY apps/engine/package.json apps/engine/
-# The web app's manifest keeps the workspace lockfile consistent; its code isn't needed here.
-COPY apps/web/package.json apps/web/
-RUN pnpm install --frozen-lockfile --filter "@mb/crypto-engine..."
-COPY packages/core packages/core
-COPY apps/engine apps/engine
+# Every locked package, from the lockfile alone: this layer survives source edits.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm fetch
+COPY packages packages
+COPY apps/crypto-engine apps/crypto-engine
+# The other apps' manifests keep the workspace lockfile consistent; their code isn't needed here.
+COPY apps/crypto-web/package.json apps/crypto-web/
+COPY apps/stock-engine/package.json apps/stock-engine/
+COPY apps/stock-web/package.json apps/stock-web/
+RUN pnpm install --offline --frozen-lockfile --filter "@mb/crypto-engine..."
 RUN pnpm --filter @mb/crypto-engine build
 
 # ── 2. Fetch the official Kraken CLI, pinned and checksum-verified ────────────
@@ -40,7 +44,7 @@ RUN set -eu; \
   install -m 0755 "/tmp/kraken-cli-${target}/kraken" /usr/local/bin/kraken
 
 # ── 3. Runtime ────────────────────────────────────────────────────────────────
-FROM node:22-bookworm-slim
+FROM ${NODE_IMAGE}
 ENV NODE_ENV=production \
     KRAKEN_CLI_PATH=/usr/local/bin/kraken \
     # Everything the Kraken CLI writes (the paper wallet journal) lives on the /data/kraken volume.
@@ -57,7 +61,7 @@ COPY --from=kraken-cli /usr/local/bin/kraken /usr/local/bin/kraken
 # Fail the build now, not at runtime, if the CLI can't run on this base image.
 RUN kraken --version
 WORKDIR /app
-COPY --from=build --chown=node:node /repo/apps/engine/dist ./dist
+COPY --from=build --chown=node:node /repo/apps/crypto-engine/dist ./dist
 USER node
 EXPOSE 8787
 VOLUME ["/data/kraken"]
