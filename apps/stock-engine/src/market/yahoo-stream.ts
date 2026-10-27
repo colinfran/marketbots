@@ -3,7 +3,7 @@ import { errorMessage, type Logger } from "@mb/engine-kit/log"
 import { backoffMs } from "@mb/engine-kit/util/async"
 
 /**
- * Layer C of the stock price coverage (MASTER_PLAN §3.13): Yahoo Finance's streamer WebSocket, the
+ * Layer C of the stock price coverage: Yahoo Finance's streamer WebSocket, the
  * unofficial keyless feed yfinance uses. It streams consolidated prices tick by tick for every
  * symbol subscribed on one connection. Checked from the trading server on 2026-10-26: one
  * connection took 1,505 symbols, and each message is {"type":"pricing","message":<base64

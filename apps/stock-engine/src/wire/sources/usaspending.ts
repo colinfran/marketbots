@@ -4,7 +4,7 @@ import { companyDirectoryOrAliases, type CompanyDirectory } from "./companies"
 import { dayStart, isoDay, num, usd } from "./common"
 
 /**
- * Large federal contracts (MASTER_PLAN §4.2 wave 2, `usaspending`; USAspending.gov API, keyless):
+ * Large federal contracts (`usaspending`; USAspending.gov API, keyless):
  * new contract awards (types A–D) of $100M or more signed in the last 30 days, whose recipient maps
  * to a listed company (sources/companies.ts: the SEC directory plus subsidiaries such as Optum,
  * Raytheon, Sikorsky, Electric Boat). Tier 1, the company's own symbol.

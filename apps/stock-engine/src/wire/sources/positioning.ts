@@ -3,7 +3,7 @@ import type { RawItem, SourceContext, SourceSpec } from "../types"
 import { count, etNow, isMissing, median, previousWeekdays, watched } from "./common"
 
 /**
- * Positioning (MASTER_PLAN §4.2 wave 2): context for the dossier, never a trigger.
+ * Positioning: context for the dossier, never a trigger.
  *
  *   cot          CFTC Traders in Financial Futures (Socrata, keyless): E-mini S&P 500, Nasdaq-100
  *                and VIX futures. One market-wide item per weekly report and market: leveraged

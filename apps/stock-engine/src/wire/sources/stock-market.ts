@@ -8,7 +8,7 @@ import type { BoardBar } from "../../market/price-board"
 import type { Emit, RawItem, SourceSpec, WireSource } from "../types"
 
 /**
- * Our own market data as news (MASTER_PLAN §3.6 and §3.13, stocks): each closed minute's bars from
+ * Our own market data as news: each closed minute's bars from
  * the PriceBoard (the best of the free price layers per symbol) feed the mirrored AnomalyDetector,
  * judged against SPY (a move the whole market shares is not news about one stock). SPY's own
  * 5-minute move is the market-wide shock.

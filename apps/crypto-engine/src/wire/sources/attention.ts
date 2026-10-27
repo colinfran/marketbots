@@ -24,8 +24,8 @@ import type { RawItem, SourceContext, SourceSpec } from "../types"
 import { num, settleAll, universeBases } from "./common"
 
 /**
- * Retail attention (MASTER_PLAN §4.1 wave 2): all `sentiment_spike`, tier 3, low severity, and
- * annotate only (§3.5). Each source reports a change, never a level: a coin entering a trending
+ * Retail attention: all `sentiment_spike`, tier 3, low severity, and
+ * annotate only. Each source reports a change, never a level: a coin entering a trending
  * list, mentions or message rates jumping, an app climbing the charts, pageviews far above normal,
  * the Fear & Greed index entering or leaving an extreme. The building blocks both bots use are in
  * @mb/wire/sources/attention.
@@ -60,7 +60,7 @@ export const apewisdomItems = (body: { results?: ApeResult[] }, w: MetricWatcher
 
 type StMessage = { id: number; created_at: string }
 
-/** The universe coins StockTwits streams are read for (more need the owner's approval, Phase 6.5). */
+/** The universe coins StockTwits streams are read for (more need the owner's approval). */
 export const STOCKTWITS_STREAMS = ["BTC", "ETH"]
 const ST_RATE_RULE: MetricRule = { id: "rate", kind: "spike", windowMin: 24 * 60, ratio: 4, minSamples: 30, min: 30 }
 

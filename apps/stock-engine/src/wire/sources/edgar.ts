@@ -6,7 +6,7 @@ import type { RawItem, SourceContext, SourceSpec } from "../types"
 import { companyDirectory } from "./companies"
 
 /**
- * SEC EDGAR "latest filings" Atom feeds, one per form group (MASTER_PLAN §4.2). Each entry's
+ * SEC EDGAR "latest filings" Atom feeds, one per form group. Each entry's
  * title carries the form, company and CIK; its summary lists the 8-K item numbers. The CIK maps
  * to a ticker through the SEC's company_tickers.json (reloaded daily); filings by companies
  * without a listed ticker are dropped. SEC fair access: a descriptive User-Agent (the wire's) and

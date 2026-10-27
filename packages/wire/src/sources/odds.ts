@@ -4,9 +4,9 @@ import type { RawItem, SourceContext, SourceSpec } from "../types"
 import { num, settleAll } from "./common"
 
 /**
- * Prediction-market odds (MASTER_PLAN §4.1 and §4.2, wave 2): a market's probability moving at
+ * Prediction-market odds: a market's probability moving at
  * least `odds_swing_pts` points within an hour → `odds_swing`, market-wide (annotate;
- * `market_review` only at critical severity while something is held, §3.5).
+ * `market_review` only at critical severity while something is held).
  *
  *   odds:polymarket  Gamma API events under the bot's tags, filtered by its selection rule (an
  *                    event listed under two tags counts once).

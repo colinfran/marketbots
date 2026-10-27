@@ -1,5 +1,5 @@
 /**
- * One price view across the free feeds (MASTER_PLAN §3.13), for the news engine only. Order
+ * One price view across the free feeds, for the news engine only. Order
  * prices, stops and every risk check keep using the broker's own data.
  *
  *   A  Alpaca IEX trades (the 30-symbol MarketStream)            ticks

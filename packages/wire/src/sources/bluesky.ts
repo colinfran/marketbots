@@ -5,7 +5,7 @@ import { backoffMs } from "@mb/engine-kit/util/async"
 import type { Emit, RawItem, SourceContext, SourceSpec, WireSource } from "../types"
 
 /**
- * Bluesky through Jetstream (MASTER_PLAN §4, wave 2): a keyless WebSocket of every post by the
+ * Bluesky through Jetstream: a keyless WebSocket of every post by the
  * accounts we follow (`wantedDids`), as JSON. Each bot lists its curated accounts in its catalog
  * (owner-approved) and a keyword filter; only posts that match it enter the pipeline.
  *

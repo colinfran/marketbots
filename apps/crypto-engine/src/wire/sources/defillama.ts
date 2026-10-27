@@ -3,7 +3,7 @@ import type { RawItem, SourceContext, SourceSpec } from "../types"
 import { num, universeBases, usd } from "./common"
 
 /**
- * DefiLlama's free endpoints (MASTER_PLAN §4.1 wave 2):
+ * DefiLlama's free endpoints:
  *
  *   defillama          chain TVL (`/v2/chains`): a chain losing ≥ `tvl_drop_pct` within an hour is
  *                      how an exploit often shows up first → `tvl_drop`, which the policy turns

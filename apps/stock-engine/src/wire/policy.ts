@@ -7,7 +7,7 @@ import { WirePolicy as WirePolicyOf, type Candidate, type Rules as RulesOf } fro
 export type { Candidate } from "@mb/wire/trigger"
 
 /**
- * The stock trigger rules (MASTER_PLAN §3.5). They only say what an item could justify; the
+ * The stock trigger rules. They only say what an item could justify; the
  * shared gates in @mb/wire/trigger decide whether it fires now, waits, or is held back, and record
  * why. Event cycles run only in the regular session (the engine's session gate): outside it,
  * bad news about a holding still sends an alert at once, and everything lands in the next phase's
@@ -26,7 +26,7 @@ const ENTRY = new Set(["m_and_a", "fda", "earnings", "guidance", "index_change",
 const POLICY = new Set(["policy_shock", "macro_release"])
 
 /**
- * Context that only goes in the dossier (§3.5): odds swings (unless critical, below), attention
+ * Context that only goes in the dossier: odds swings (unless critical, below), attention
  * spikes, insider buying including `insider_cluster` (an idea for the next cycle, `meta.insider`),
  * congressional trades (disclosed weeks late, `meta.congress`), and our own readings
  * (`meta.metric`: VIX, yields, weak auctions, EIA, COT, short volume). None of these starts a

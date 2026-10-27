@@ -8,7 +8,7 @@ import { companyDirectoryOrAliases, normalizeName, shortName } from "./companies
 import { BROWSER_HEADERS, tracked, watched } from "./common"
 
 /**
- * Outlets that need more than the generic RSS kind (MASTER_PLAN §4.2 wave 2):
+ * Outlets that need more than the generic RSS kind:
  *
  *   rss:seekingalpha   Seeking Alpha market currents, whose items name their ticker in a
  *                      <category domain=".../symbol/X">

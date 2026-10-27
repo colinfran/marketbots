@@ -21,7 +21,7 @@ type Thresholds = { review: number; evaluate: number }
 type WireItemDoc = WireItemDocOf<string>
 type Item = Pick<WireItemDoc,"_id" | "cluster_id" | "tier" | "kind" | "confirmations" | "severity_parts" | "first_seen_at" | "severity" | "symbols">
 
-/** Entry confirmation (§2 rule 2): tier 1, two independent tier-2 domains, or tier 2 plus a matching price/volume move. */
+/** Entry confirmation: tier 1, two independent tier-2 domains, or tier 2 plus a matching price/volume move. */
 export const isConfirmed = (item: Pick<WireItemDoc, "tier" | "confirmations" | "severity_parts" | "kind">) => {
   if (item.tier === 1 || item.kind === "anomaly") return true
   const domains = new Set(item.confirmations.map((c) => c.domain)).size

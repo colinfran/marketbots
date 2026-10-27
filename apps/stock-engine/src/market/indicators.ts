@@ -38,9 +38,9 @@ export const snapshotPrice = (snap: Snapshot | undefined): number | null => {
   return trade?.p ?? null
 }
 
-// The shared indicators (@mb/core/indicators) with stock's own settings, which keep today's values
-// until MARKETBOTS_PLAN Phase 9.4: a flat RSI window reads 100 (not 50), and ATR is the plain mean
-// of the last 14 true ranges (not Wilder's smoothing).
+// The shared indicators (@mb/core/indicators) with stock's own settings, which keep its values from
+// before the move: a flat RSI window reads 100 (not 50), and ATR is the plain mean of the last 14
+// true ranges (not Wilder's smoothing). Switching changes the indicator values in stock prompts.
 
 /** 14-period RSI; a window without losses reads 100, a flat one included. */
 const stockRsi = (closes: number[]) => rsi(closes, 14, { flat: 100 })

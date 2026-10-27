@@ -2,8 +2,8 @@ import type { RawItem, SourceContext, SourceSpec } from "../types"
 import { universeBases } from "./common"
 
 /**
- * Korean exchanges (MASTER_PLAN §4.1 wave 3, `korea`), tier 1, from their official public APIs
- * (Phase 7.4: Upbit's website disallows crawling, so its notice pages are not read). Korean
+ * Korean exchanges (`korea`), tier 1, from their official public APIs
+ * (Upbit's website disallows crawling, so its notice pages are not read). Korean
  * retail moves fast and both exchanges flag unusual trading per coin; for our pairs that is
  * context, and an investment-warning designation or a delisting is a reason to review a holding.
  *

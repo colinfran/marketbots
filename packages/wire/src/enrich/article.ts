@@ -3,9 +3,9 @@ import type { RequestText } from "../fetch"
 import { unmatchedNumbers } from "./numbers"
 
 /**
- * The two calls behind an article summary (MARKETBOTS_PLAN §3.8–3.9): the scraper sidecar's
+ * The two calls behind an article summary: the scraper sidecar's
  * `POST /extract` for the article text, and Ollama's `POST /api/chat` for the summary, with the
- * stricter prompt from the 10.1 spike (PHASE10_SPIKE "Prompt v2"). Both answers are untrusted:
+ * stricter of the two prompts tried when the model was picked. Both answers are untrusted:
  * they are parsed, cleaned, length-capped and checked before anything is stored.
  */
 

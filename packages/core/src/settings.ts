@@ -50,7 +50,7 @@ const hourRange = z
   .refine((r) => r.split("-")[0] !== r.split("-")[1], "an hour range can't start and end at the same hour")
 
 /**
- * Local article summaries (MARKETBOTS_PLAN §3.9, @mb/wire/enrich): the article behind an important
+ * Local article summaries (@mb/wire/enrich): the article behind an important
  * item, summarized by a small model on the server's GPU, for the Research page. Never on the trigger
  * path, and (until the owner approves 10.5) never in a prompt.
  */

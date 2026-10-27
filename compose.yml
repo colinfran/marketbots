@@ -1,10 +1,10 @@
-# The marketbots stack on the trading server: both engines, one shared scraper and (Phase 10) the
-# local LLM. The dashboards run on Vercel; MongoDB is hosted on Atlas, so there is no database here.
+# The marketbots stack on the trading server: both engines, one shared scraper and the local LLM.
+# The dashboards run on Vercel; MongoDB is hosted on Atlas, so there is no database here.
 #
 #   docker compose up -d --build                         build and start (restarts after reboots)
 #   docker compose up -d --build stock-engine            redeploy one engine; the other is untouched
 #   docker compose logs -f crypto-engine                 follow one engine's structured logs
-#   docker compose --profile llm up -d llm               start the local LLM (MARKETBOTS_PLAN Phase 10)
+#   docker compose --profile llm up -d llm               start the local LLM
 #
 # The two engines share nothing at runtime: separate images, containers, ports, env files,
 # databases and leases. See docs/SERVER.md.
@@ -91,7 +91,7 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # Nightly copy of the paper wallet (MARKETBOTS_PLAN Phase 11) to backups/kraken/ on the host disk,
+  # Nightly copy of the paper wallet to backups/kraken/ on the host disk,
   # which survives a Docker or WSL reset. One at start, then daily at 10:00 UTC; the newest 14 kept.
   # Restore: docs/SERVER.md.
   wallet-backup:
@@ -119,7 +119,7 @@ services:
     mem_limit: 64m
     logging: *logging
 
-  # Local article summaries (MARKETBOTS_PLAN §3.9, Phase 10). Off unless started with --profile llm.
+  # Local article summaries. Off unless started with --profile llm.
   # GPU only: ~3 GB of VRAM while a model is loaded, released after 5 idle minutes.
   llm:
     image: ollama/ollama:0.40.11@sha256:dea72d1e22270fe095b68fdf756d2b489d615643c5a2eaebbc5f569181e322d8

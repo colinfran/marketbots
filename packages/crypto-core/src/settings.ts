@@ -255,7 +255,7 @@ export const DEFAULT_SETTINGS: Settings = {
     emergency_action: "review",
     anomaly: { price_z: 4, volume_multiple: 5, market_z: 4 },
     disabled_sources: [],
-    // 30, not the plan's 90: the Atlas tier may be the free 512 MB one (Phase 0.7). Raise it from Admin.
+    // Short because the Atlas tier may be the free 512 MB one. Raise it from Admin.
     retention_days: 30,
     depeg_pct: 1,
     tvl_drop_pct: 15,
@@ -264,7 +264,7 @@ export const DEFAULT_SETTINGS: Settings = {
     coinbase_premium_pct: 0.3,
     summaries: {
       enabled: true,
-      // The 10.1 spike's pick (docs/plans/PHASE10_SPIKE.md).
+      // Picked over qwen3:4b, phi4-mini and gemma3:4b on 20 real articles.
       model: "llama3.2:3b",
       min_severity: 55,
       max_per_hour: 60,

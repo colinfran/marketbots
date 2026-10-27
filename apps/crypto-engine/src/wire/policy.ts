@@ -7,7 +7,7 @@ import { WirePolicy as WirePolicyOf, type Candidate, type Rules as RulesOf } fro
 export type { Candidate } from "@mb/wire/trigger"
 
 /**
- * The crypto trigger rules (MASTER_PLAN §3.5). They only say what an item could justify; the
+ * The crypto trigger rules. They only say what an item could justify; the
  * shared gates in @mb/wire/trigger decide whether it fires now, waits, or is held back, and record why.
  */
 
@@ -20,7 +20,7 @@ export class WirePolicy extends WirePolicyOf<WireCategory, Settings> {}
 const NO_ENTRY = new Set(["exploit", "depeg", "venue_outage", "venue_status", "price_shock", "volume_shock"])
 
 /**
- * Readings that only go in the dossier (§3.5): crowded funding and open interest, the Coinbase
+ * Readings that only go in the dossier: crowded funding and open interest, the Coinbase
  * premium, attention spikes, liquidation cascades and network stress describe the market; they
  * never start a cycle on their own. (Anomaly items are handled above, before this applies.)
  */

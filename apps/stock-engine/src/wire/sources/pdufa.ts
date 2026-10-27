@@ -5,9 +5,9 @@ import type { RawItem, SourceContext, SourceSpec } from "../types"
 import { dayStart, nextWeekdays, shortDay, tracked, usDate } from "./common"
 
 /**
- * RTTNews FDA calendar (MASTER_PLAN §4.2 wave 3, `pdufa`), tier 2, plain HTML: PDUFA and other FDA
+ * RTTNews FDA calendar (`pdufa`), tier 2, plain HTML: PDUFA and other FDA
  * decision dates with the outcome once known. Its terms say personal use, no redistribution
- * (Phase 7.4, owner-approved 2026-10-26), so only tracked tickers become items, as plain facts.
+ * (owner-approved 2026-10-26), so only tracked tickers become items, as plain facts.
  *
  * The calendar is paged by date, ten rows a page, furthest future first; the default page is the
  * current one and its "Previous" link goes later in time. Each poll reads it and up to three

@@ -12,14 +12,14 @@ import { ODDS_SOURCES } from "./sources/odds"
 import type { RawItem, SourceContext, SourceSpec } from "./types"
 
 /**
- * CryptoMarketBot's news sources (MASTER_PLAN §4.1). Free only; keyed sources stay off until
+ * CryptoMarketBot's news sources. Free only; keyed sources stay off until
  * their key is set. Each entry is a generic kind with a URL and an interval; the few that need
  * more (streams, numeric watchers, our own anomaly detectors) live in sources/ and in the market hub.
  * The entries both bots share (government, macro, Truth Social) come from @mb/wire/catalog.
  *
- * Wave 1 verified from the trading server on 2026-10-26, wave 2 on 2026-10-27 (see the Verified
- * lists in MASTER_PLAN §4.1). Left out of wave 2: the Coinbase blog (Cloudflare 403 from the
- * server), Gemini's blog (no feed) and Robinhood's newsroom feed (404).
+ * Wave 1 verified from the trading server on 2026-10-26, wave 2 on 2026-10-27. Left out of wave 2:
+ * the Coinbase blog (Cloudflare 403 from the server), Gemini's blog (no feed) and Robinhood's
+ * newsroom feed (404).
  */
 
 /** Crypto files the US government feeds as regulatory action, and the Fed's as macro. */
@@ -191,12 +191,12 @@ export const cotItems = (rows: CotRow[], ctx: SourceContext): RawItem[] => {
   return items
 }
 
-/** Social lists approved by the owner (MASTER_PLAN §8.9). All tier 3: they feed the dossier. */
+/** Social lists approved by the owner. All tier 3: they feed the dossier. */
 const TELEGRAM_CHANNELS = ["WatcherGuru", "whale_alert_io", "wublockchainenglish", "cointelegraph"]
 const BLUESKY_ACCOUNTS = ["coindesk.com", "decrypt.co", "protos.com", "web3isgoinggreat.com", "molly.wiki", "bloomberg.com", "reuters.com", "apnews.com", "wsj.com", "cnbc.com", "axios.com", "politico.com"]
 /** The general outlets post about everything: only crypto posts go further (the pipeline's relevance filter still applies). */
 const BLUESKY_KEYWORDS = /\b(bitcoin|ethereum|ether|crypto\w*|solana|xrp|ripple|dogecoin|cardano|chainlink|avalanche|litecoin|polkadot|stablecoins?|tether|usdc|coinbase|binance|kraken|defi|blockchain|web3)\b|\$(BTC|ETH|SOL|XRP|DOGE|ADA|LINK|AVAX|LTC|DOT)\b/i
-/** Research and narrative newsletters (§8.9, verified from the server 2026-10-26): context for the dossier, polled every 15 min. */
+/** Research and narrative newsletters (verified from the server 2026-10-26): context for the dossier, polled every 15 min. */
 const NEWSLETTERS: [string, string][] = [
   ["glassnode", "https://research.glassnode.com/rss/"],
   ["unchained", "https://unchainedcrypto.com/feed/"],
@@ -322,7 +322,7 @@ export const CATALOG: SourceSpec[] = [
     note: "Binance's official announcements channel (t.me/s preview): listings, delistings and notices that name a universe asset",
   },
 
-  // ── Social (tier 3, owner-approved lists, MASTER_PLAN §8.9) ──────────────
+  // ── Social (tier 3, owner-approved lists) ───────────────────────────────
   ...TELEGRAM_CHANNELS.map((channel): SourceSpec => ({ id: `telegram:${channel}`, kind: "telegram", channel, interval_s: 30, tier: 3, default_enabled: true })),
   blueskySpec({ accounts: BLUESKY_ACCOUNTS, keywords: BLUESKY_KEYWORDS }),
   ...NEWSLETTERS.map(([name, url]) => rss(`newsletter:${name}`, url, 900, 3)),
@@ -392,7 +392,7 @@ export const CATALOG: SourceSpec[] = [
   ...CHAIN_SOURCES,
   ...ATTENTION_SOURCES,
 
-  // ════ Wave 3 (MASTER_PLAN §4.1; terms and robots.txt checked in Phase 7.4) ═══
+  // ════ Wave 3 (terms and robots.txt checked) ════════════════════════════
   // Plain JSON and HTML: none of the allowed sites needs the scraper sidecar yet.
   ...KOREA_SOURCES,
   HACKS_SOURCE,

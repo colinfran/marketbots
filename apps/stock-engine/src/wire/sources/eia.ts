@@ -3,7 +3,7 @@ import type { RawItem, SourceContext, SourceSpec } from "../types"
 import { etNow, num, settleAll, shortDay, signed } from "./common"
 
 /**
- * EIA weekly energy reports (MASTER_PLAN §4.2 wave 2, `eia`; EIA API v2 with a free key):
+ * EIA weekly energy reports (`eia`; EIA API v2 with a free key):
  *
  *   crude   US crude inventories excluding the SPR (WCESTUS1), Weekly Petroleum Status Report,
  *           Wednesdays 10:30 ET

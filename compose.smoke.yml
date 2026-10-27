@@ -1,4 +1,4 @@
-# Boot test for new engine images, beside the live stack (MARKETBOTS_PLAN 3.4, 6.7, 7.4).
+# Boot test for new engine images, beside the live stack (docs/SERVER.md §6.3).
 #
 #   docker compose build                                            build the images first
 #   docker compose -f compose.smoke.yml up -d                       boot both engines (MB_TAG=<tag> for other images)

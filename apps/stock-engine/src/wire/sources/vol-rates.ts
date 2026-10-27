@@ -6,8 +6,8 @@ import type { RawItem, SourceContext, SourceSpec } from "../types"
 import { etNow, num, settleAll, signed } from "./common"
 
 /**
- * Volatility and rates (MASTER_PLAN §4.2 wave 2, `vol_rates` and `treasury`): tier 1, market-wide
- * readings that only go in the dossier (§3.5: `market_shock` is SPY/QQQ's own move, and these
+ * Volatility and rates (`vol_rates` and `treasury`): tier 1, market-wide
+ * readings that only go in the dossier (`market_shock` is SPY/QQQ's own move, and these
  * describe the market rather than explain a move).
  *
  *   vol_rates:vix     CBOE's delayed VIX quote, every minute. Risk-off when the VIX is up ≥ 20% on

@@ -102,7 +102,7 @@ export function LiveRefresh() {
 }
 
 /**
- * The news engine reaches the feed only when it matters (MASTER_PLAN §3.12): notable items, and
+ * The news engine reaches the feed only when it matters: notable items, and
  * triggers that fired or queued. Source health and everything else stay on the Research page.
  */
 const newsWorthy = (e: AnyEvent) => {

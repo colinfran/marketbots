@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Conventions for anyone, human or AI agent, changing this repo. Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) first, then the design doc of the bot you touch ([docs/CRYPTO.md](docs/CRYPTO.md), [docs/STOCK.md](docs/STOCK.md)). Running the stack: [docs/SERVER.md](docs/SERVER.md). The merge is executed from [docs/plans/MARKETBOTS_PLAN.md](docs/plans/MARKETBOTS_PLAN.md): tick its boxes and add to its §8 progress log as you go.
+Conventions for anyone, human or AI agent, changing this repo. Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) first, then the design doc of the bot you touch ([docs/CRYPTO.md](docs/CRYPTO.md), [docs/STOCK.md](docs/STOCK.md)). Running the stack: [docs/SERVER.md](docs/SERVER.md).
 
 ## Ground rules
 
@@ -19,7 +19,7 @@ Conventions for anyone, human or AI agent, changing this repo. Read [docs/ARCHIT
 
 ## Package boundaries
 
-Dependency direction (plan §2.6):
+Dependency direction:
 
 ```
 @mb/core ◀── @mb/crypto-core, @mb/stock-core
@@ -42,9 +42,9 @@ Beyond what the rule checks:
 
 ## Adding shared code
 
-Phases 5–8 create the shared packages; today `packages/config`, `packages/core` (Phase 5), `packages/engine-kit` (Phase 6), `packages/wire` (Phase 7), `packages/ui` and `packages/web-kit` (Phase 8) exist ([docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#shared-code-today-and-planned)).
+The shared packages are `packages/config`, `packages/core`, `packages/engine-kit`, `packages/wire`, `packages/ui` and `packages/web-kit` ([docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#shared-code)).
 
-1. **Pick the package** from plan §3.3: `core` (pure, no I/O), `engine-kit` (engine runtime), `wire` (news engine), `ui` (client-safe React), `web-kit` (server-only dashboard helpers).
+1. **Pick the package**: `core` (pure, no I/O), `engine-kit` (engine runtime), `wire` (news engine), `ui` (client-safe React), `web-kit` (server-only dashboard helpers).
 2. **Share only what both bots mean the same thing by.** If sharing would need a flag that switches between two behaviors, keep the code per bot. Pass what genuinely differs (a constant, an HMAC prefix, a time zone, a Discord username) in as a parameter; no `if (bot === "crypto")` in shared code, and no bot-specific constants.
 3. **A new package** `packages/<name>/` (copy `packages/crypto-core` as the template):
    - `package.json`: `"name": "@mb/<name>"`, `"private": true`, `"type": "module"`, `"exports": { "./*": "./src/*.ts" }`, `test` / `typecheck` / `lint` scripts, and `"@mb/config": "workspace:*"` in devDependencies.
@@ -56,16 +56,16 @@ Phases 5–8 create the shared packages; today `packages/config`, `packages/core
    - Packages ship TypeScript source, with no build step and no `dist/`.
    - Engines need nothing more: esbuild bundles the source, and the engine Dockerfiles copy `packages/` whole.
    - Dashboards also list the package in `transpilePackages` in `next.config.ts`, and the package path must be in both Vercel Ignored Build Step commands ([docs/SERVER.md §8.2](docs/SERVER.md#82-ignored-build-step)).
-   - For `@mb/ui` (Phase 8), each app's `globals.css` also needs an `@source` for the package: Tailwind v4 doesn't scan workspace symlinks by itself.
+   - For `@mb/ui`, each app's `globals.css` also needs an `@source` for the package: Tailwind v4 doesn't scan workspace symlinks by itself.
 5. **Update the tables** in docs/ARCHITECTURE.md.
 
-**No mirrored code is left:** the news-engine files that used to be kept in sync by hand now live once in `packages/wire` (Phase 7). If you find yourself making the same change in both bots, it probably belongs in a shared package.
+**No mirrored code is left:** the news-engine files that used to be kept in sync by hand now live once in `packages/wire`. If you find yourself making the same change in both bots, it probably belongs in a shared package.
 
 ## Refactors preserve behavior, and that is proven
 
-- **Move first, refactor second.** Move code as-is into its package, then parameterize, one deployable step at a time. Where the two bots' versions differ, plan §3.5 says which one wins and in which phase.
+- **Move first, refactor second.** Move code as-is into its package, then parameterize, one deployable step at a time.
 - **Contract snapshots** under `contracts/<bot>/` record today's behavior: `DEFAULT_SETTINGS`, the settings and command JSON schemas, `INDEXES`, event type lists, the wire catalog, rendered prompts for fixed contexts, and parsed items for every source fixture. The tests that produce and compare them live with each engine's tests (e.g. `apps/crypto-engine/test/contracts/`) and run in `pnpm test`.
-- **A snapshot diff means a behavior change.** Stop. Revert it, or move the change to Phase 9 with a reason, where it is its own owner-approved commit. Never regenerate snapshots to make a refactor pass.
+- **A snapshot diff means a behavior change.** Stop. Revert it, or make the change its own owner-approved commit with a reason. Never regenerate snapshots to make a refactor pass.
 - **Regenerate only for an approved behavior change**, and commit the snapshot diff with it:
 
   ```bash
@@ -73,14 +73,14 @@ Phases 5–8 create the shared packages; today `packages/config`, `packages/core
   ```
 
   In PowerShell: `$env:UPDATE_CONTRACTS = "1"; pnpm --filter @mb/crypto-engine test; Remove-Item Env:UPDATE_CONTRACTS`.
-- **Test counts** stay at or above the baseline in plan §8 (206 crypto, 615 stock at the move).
-- Behavior changes the plan already lists for Phases 5–8 (e.g. crypto adopting stock's alerts in 6.3) are named in the commit message and the progress log.
+- **Test counts** never go down (1,084 across the repo on 2026-10-27).
+- A commit that changes behavior names the change in its message.
 
 ## Gate, commit, deploy
 
-After each phase (and each Phase 9 item):
+After each change:
 
-1. **Gate**: `pnpm typecheck && pnpm test && pnpm lint && pnpm build`, all green (the baseline had no warnings; keep it that way). (Git Bash or PowerShell 7; Windows PowerShell 5.1 has no `&&`, so run them one by one there.) Refactor phases also need unchanged contract snapshots, and Phases 6–7 a boot test of the new engine images with `compose.smoke.yml` ([docs/SERVER.md §6.3](docs/SERVER.md#63-boot-testing-new-images-against-a-copy)).
+1. **Gate**: `pnpm typecheck && pnpm test && pnpm lint && pnpm build`, all green (the baseline had no warnings; keep it that way). (Git Bash or PowerShell 7; Windows PowerShell 5.1 has no `&&`, so run them one by one there.) Refactors also need unchanged contract snapshots, and a change to engine startup, a Dockerfile or `compose.yml` a boot test of the new engine images with `compose.smoke.yml` ([docs/SERVER.md §6.3](docs/SERVER.md#63-boot-testing-new-images-against-a-copy)).
 2. **One commit.** The owner pushes to GitHub; a push to `main` deploys the dashboards whose paths changed.
 3. **Deploy the engines** whose images changed: `docker compose up -d --build <bot>-engine` (a change in a package both engines use means both). Timing and the after-deploy checks: [docs/SERVER.md §5](docs/SERVER.md#5-everyday-operations). Never deploy an engine during a seed run.
 

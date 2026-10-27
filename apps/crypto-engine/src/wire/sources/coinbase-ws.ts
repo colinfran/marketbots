@@ -8,7 +8,7 @@ import type { Emit, RawItem, SourceSpec, WireSource } from "../types"
 import { signed } from "./common"
 
 /**
- * The Coinbase premium (MASTER_PLAN §3.6, §4.1 `coinbase_ws`): Coinbase Exchange's public
+ * The Coinbase premium (`coinbase_ws`): Coinbase Exchange's public
  * WebSocket ticker for BTC-USD and ETH-USD (no auth), compared every 30 s with Kraken's mid from
  * the market hub. Coinbase at least `coinbase_premium_pct` above (US buyers paying up) or below
  * Kraken for 5 minutes → a `coinbase_premium` item, which the policy only annotates.

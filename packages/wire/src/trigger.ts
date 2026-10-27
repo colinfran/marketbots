@@ -9,7 +9,7 @@ import { isConfirmed } from "./notable"
 import type { WireEventSink } from "./types"
 
 /**
- * When an item is out of the ordinary enough to act on (MASTER_PLAN §3.5). Each bot's rules
+ * When an item is out of the ordinary enough to act on. Each bot's rules
  * (wire/policy.ts in each engine) turn an item into candidate triggers; every candidate then
  * passes the same gates, in order, and is recorded in `wire_triggers` with the reason it fired or
  * didn't:

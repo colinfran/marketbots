@@ -164,7 +164,7 @@ export const wireSettingsSchema = z.object({
   disabled_sources: wireBase.disabled_sources,
   retention_days: wireBase.retention_days,
   odds_swing_pts: wireBase.odds_swing_pts,
-  /** Symbols the breadth scan covers (MASTER_PLAN §3.13). */
+  /** Symbols the breadth scan covers. */
   scan_max_symbols: int(100, 5_000),
   /** 20-day average dollar volume a stock needs to enter the scan universe. */
   scan_min_dollar_volume: z.number().min(0).max(10_000_000_000),
@@ -294,14 +294,14 @@ export const DEFAULT_SETTINGS: Settings = {
     emergency_action: "review",
     anomaly: { price_z: 4, volume_multiple: 5, market_z: 4 },
     disabled_sources: [],
-    // 30, not the plan's 90: the Atlas tier may be the free 512 MB one (Phase 0.7). Raise it from Admin.
+    // Short because the Atlas tier may be the free 512 MB one. Raise it from Admin.
     retention_days: 30,
     odds_swing_pts: 15,
     scan_max_symbols: 1_500,
     scan_min_dollar_volume: 20_000_000,
     summaries: {
       enabled: true,
-      // The 10.1 spike's pick (docs/plans/PHASE10_SPIKE.md).
+      // Picked over qwen3:4b, phi4-mini and gemma3:4b on 20 real articles.
       model: "llama3.2:3b",
       min_severity: 55,
       max_per_hour: 60,

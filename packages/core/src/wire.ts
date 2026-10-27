@@ -66,7 +66,7 @@ export type WireItemDoc<Category extends string> = {
 export type WireArticleStatus = "ok" | "skipped" | "failed" | "rejected"
 
 /**
- * The outcome of summarizing an item's article with the local model (MARKETBOTS_PLAN §3.9). Only
+ * The outcome of summarizing an item's article with the local model. Only
  * the summary is stored, never the article text. A machine summary can still put a number the
  * article does contain on the wrong thing, so it is always shown as one, with the article's link.
  */

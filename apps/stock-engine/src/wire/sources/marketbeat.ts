@@ -5,9 +5,9 @@ import type { RawItem, SourceContext, SourceSpec } from "../types"
 import { etNow, num, tracked } from "./common"
 
 /**
- * MarketBeat (MASTER_PLAN §4.2 wave 3, `ratings`), tier 2, plain HTML. Its robots.txt and llms.txt
+ * MarketBeat (`ratings`), tier 2, plain HTML. Its robots.txt and llms.txt
  * invite crawling; its terms ask that data not be redistributed in bulk, so only the rows for
- * tracked symbols become items (Phase 7.4, owner-approved 2026-10-26).
+ * tracked symbols become items (owner-approved 2026-10-26).
  *
  *   ratings:marketbeat    today's analyst actions: upgrades, downgrades, initiations, target
  *                         changes, reiterations (~460 rows, no timestamps; new rows are new)

@@ -2,7 +2,7 @@ import type { WireSummariesSettings } from "@mb/core/settings"
 import type { WireItemDoc } from "@mb/core/wire"
 
 /**
- * Which items get an article summary (MARKETBOTS_PLAN §3.9, PHASE10_SPIKE "Plan changes" 4): the
+ * Which items get an article summary: the
  * first item of its cluster, at or above the summaries' minimum severity or notable, with a link to
  * a real article in English on a domain we may fetch. Many qualifying items aren't articles at all
  * (trading halts, social posts, odds markets, filing indexes, videos), so only news and central-bank

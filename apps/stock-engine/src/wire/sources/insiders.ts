@@ -5,7 +5,7 @@ import type { RawItem, SourceContext, SourceSpec } from "../types"
 import { BROWSER_HEADERS, num, usd, watched } from "./common"
 
 /**
- * Insider buying (MASTER_PLAN §4.2 wave 2, `insiders` and the insider half of `finviz`), from
+ * Insider buying (`insiders` and the insider half of `finviz`), from
  * Form 4 filings as two aggregators list them (HTML, browser User-Agent), tier 2:
  *
  *   insiders            openinsider.com "latest insider purchases $25K+", every 10 minutes
@@ -14,7 +14,7 @@ import { BROWSER_HEADERS, num, usd, watched } from "./common"
  * A purchase or sale becomes an item only for held and watched stocks. Two or more insiders
  * buying at one issuer within 5 days (openinsider, any issuer priced at $5+ with $100K+ bought
  * between them) is an `insider_cluster`: one item per cluster, also for stocks we don't follow,
- * as an idea for the next cycle. All of it is annotate only (§3.5): items carry `meta.insider`,
+ * as an idea for the next cycle. All of it is annotate only: items carry `meta.insider`,
  * which the policy never acts on. Both sources title a purchase the same way, so one Form 4 seen
  * on both sites is one story.
  */

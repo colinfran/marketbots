@@ -5,7 +5,7 @@ import { upcomingMacro } from "./calendar"
 import { isConfirmed } from "./notable"
 
 /**
- * What our own feeds know about a cycle's subjects, ready for a prompt (MASTER_PLAN §3.8).
+ * What our own feeds know about a cycle's subjects, ready for a prompt.
  *
  * Items for the subject symbols plus market-wide ones in the window, cluster roots only, ranked
  * by severity × recency (half-life 12 h) and capped: 8 per symbol, 10 market-wide, 10 calendar
@@ -16,7 +16,7 @@ import { isConfirmed } from "./notable"
  * aren't confirmed yet.
  *
  * The 8 highest-ranked items with a checked machine summary of their article (@mb/wire/enrich)
- * carry it on a line of its own, once each (MARKETBOTS_PLAN 10.5).
+ * carry it on a line of its own, once each.
  */
 
 const PER_SYMBOL = 8

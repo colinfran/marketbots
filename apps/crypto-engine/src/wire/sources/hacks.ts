@@ -4,9 +4,9 @@ import { baseOf } from "./common"
 import { largestAmountUsd } from "../lexicon"
 
 /**
- * SlowMist Hacked (MASTER_PLAN §4.1 wave 3, `hacks`), tier 2: the hack database's front page, one
+ * SlowMist Hacked (`hacks`), tier 2: the hack database's front page, one
  * row per incident with the date, target, description, loss and attack method (plain HTML; no
- * robots.txt or terms restrict it, Phase 7.4). SlowMist logs incidents hours to days after the
+ * robots.txt or terms restrict it). SlowMist logs incidents hours to days after the
  * first reports, so these items are dossier context: dated by day, they never pass the trigger
  * gates' old-news check. The outlets and Telegram report the big ones first.
  *

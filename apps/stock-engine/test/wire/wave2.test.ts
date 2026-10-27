@@ -423,7 +423,7 @@ describe("macro, energy, positioning and contracts", () => {
 })
 
 describe("wave-2 catalog and plumbing", () => {
-  it("registers every wave-2 source once, with the plan's tiers", () => {
+  it("registers every wave-2 source once, with its tier", () => {
     const ids = CATALOG.map((s) => s.id)
     expect(new Set(ids).size).toBe(ids.length)
     for (const id of ["vol_rates:vix", "vol_rates:yields", "treasury", "odds:kalshi", "odds:polymarket", "fng", "rss:cnbc", "rss:seekingalpha", "persymbol:nasdaq", "rss:benzinga", "fda:approvals", "fda:adcomm", "calendar:earnings", "calendar:dividends", "calendar:ipo", "insiders", "finviz", "finviz:insider", "stocktwits", "macro_actuals", "fedreg:tariff", "fedreg:export", "wsb:apewisdom", "wsb:tradestie", "gdelt", "eia", "cot", "finra_short", "usaspending", "clinicaltrials", "cb:ecb", "cb:boe", "cb:boj", "appstore", "wikipedia"]) {

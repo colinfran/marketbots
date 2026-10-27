@@ -4,7 +4,7 @@ import type { RawItem, SourceContext, SourceSpec } from "../types"
 import { num } from "./common"
 
 /**
- * The exact CPI and jobs numbers at release time (MASTER_PLAN §4.1 and §4.2, wave 2, `macro_actuals`).
+ * The exact CPI and jobs numbers at release time (`macro_actuals`).
  * The item is market-wide; how the market reacted is each bot's `macro_reaction` rule (its market
  * reference's anomaly within 10 minutes of a release).
  *

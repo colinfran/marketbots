@@ -49,7 +49,7 @@ void bootstrap({
         : bus.emit("broker.disconnected", { channel, reason }, { summary: `Alpaca ${channel === "trade_updates" ? "trade updates" : "market data"} disconnected (${reason})`, level: "warn" })
     const tradeStream = new TradeStream(creds, log.child({ component: "trade-stream" }), { onUpdate: (u) => engine?.onTradeUpdate(u), onState: brokerState("trade_updates") })
     // Our own market data as a news source: 1-minute bars for the scan universe and what we hold and
-    // watch, merged from the free price layers (MASTER_PLAN §3.13), judged against SPY.
+    // watch, merged from the free price layers, judged against SPY.
     const marketSignals = new StockMarketSignals(alpaca, () => settings.current, log.child({ component: "anomaly" }), () => engine?.sessionOpenAt() ?? null, (symbol, kind) => wire.recordAnomaly(symbol, kind))
     const marketStream = new MarketStream(creds, log.child({ component: "market-stream" }), {
       onTrade: (s, p, t) => {

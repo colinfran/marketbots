@@ -7,7 +7,7 @@ import type { MinuteBar } from "../../venues/kraken/ws"
 import type { Emit, RawItem, SourceSpec, WireSource } from "../types"
 
 /**
- * Our own market data as news (MASTER_PLAN §3.6, crypto):
+ * Our own market data as news:
  *   - `anomaly`: Kraken 1-minute bars for the universe → idiosyncratic price shocks (residual vs
  *     BTC), volume shocks, and BTC's own 5-minute move as the market-wide shock;
  *   - depeg: USDT/USD and USDC/USD tickers (data only, never tradable) off $1 by `depeg_pct`.

@@ -26,8 +26,8 @@ import { BROWSER_HEADERS, num, settleAll, watched } from "./common"
 export { APP_CHARTS, appRank } from "@mb/wire/sources/attention"
 
 /**
- * Retail attention and sentiment (MASTER_PLAN §4.2 wave 2): all `sentiment_spike`, tier 3, low
- * severity, annotate only (§3.5). Each source reports a change, never a level, and only for held
+ * Retail attention and sentiment: all `sentiment_spike`, tier 3, low
+ * severity, annotate only. Each source reports a change, never a level, and only for held
  * and watched symbols (market-wide for the fear gauge and the broker apps). The building blocks
  * both bots use are in @mb/wire/sources/attention.
  *

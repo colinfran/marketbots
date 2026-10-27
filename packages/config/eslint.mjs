@@ -5,7 +5,7 @@ import tseslint from "typescript-eslint"
 
 /**
  * Shared ESLint presets. Every package and app lints its imports against the dependency direction
- * in MARKETBOTS_PLAN §2.6:
+ * in AGENTS.md:
  *
  *   @mb/core ← @mb/crypto-core / @mb/stock-core
  *   @mb/core ← @mb/engine-kit ← @mb/wire
@@ -35,7 +35,7 @@ export const boundaries = (owner) => {
     patterns.push({ regex: `^@mb/${other}-`, message: `A ${owner} package or app never imports ${other} code.` })
   } else {
     const allowed = [owner, "config", ...(SHARED[owner] ?? [])].join("|")
-    patterns.push({ regex: `^@mb/(?!(${allowed})(/|$))`, message: `@mb/${owner} may import only ${allowed.replaceAll("|", ", ")} (MARKETBOTS_PLAN §2.6).` })
+    patterns.push({ regex: `^@mb/(?!(${allowed})(/|$))`, message: `@mb/${owner} may import only ${allowed.replaceAll("|", ", ")} (AGENTS.md, Package boundaries).` })
   }
   return { "no-restricted-imports": ["error", { patterns }] }
 }

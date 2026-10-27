@@ -10,7 +10,7 @@ import type { ScanUniverseStore } from "./scan-universe"
 import { YahooStream } from "./yahoo-stream"
 
 /**
- * The stock price layers (MASTER_PLAN §3.13) and which symbols each one carries:
+ * The stock price layers and which symbols each one carries:
  *   tracked (bars and anomaly detection): the scan universe plus held stocks, option underlyings,
  *     benchmarks, the watchlist, today's movers and the news engine's focus
  *   Yahoo (C) and the snapshot fallback (E): the tracked set

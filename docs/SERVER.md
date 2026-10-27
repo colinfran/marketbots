@@ -8,13 +8,13 @@ What runs where:
 
 | Where | What | Config |
 | --- | --- | --- |
-| Windows server, Docker stack `marketbots` | `crypto-engine` on 127.0.0.1:8787 (with the Kraken CLI paper wallet), `stock-engine` on 127.0.0.1:8788, `scraper` (no host port), `llm` (Phase 10, off by default) | `compose.yml`, `crypto.env`, `stock.env` at the repo root |
+| Windows server, Docker stack `marketbots` | `crypto-engine` on 127.0.0.1:8787 (with the Kraken CLI paper wallet), `stock-engine` on 127.0.0.1:8788, `scraper` (no host port), `llm` (Ollama on the GPU, no host port, `--profile llm`) | `compose.yml`, `crypto.env`, `stock.env` at the repo root |
 | Caddy on the Windows host | `engine.cryptomarketbot.app` → 127.0.0.1:8787, `engine.stockmarketbot.app` → 127.0.0.1:8788 (WebSocket) | `C:\Caddy\Caddyfile` |
 | Vercel | two projects: `apps/crypto-web` at cryptomarketbot.app, `apps/stock-web` at stockmarketbot.app | each project's environment variables |
 | MongoDB Atlas | one cluster, databases `cryptomarketbot` and `stockmarketbot` | `MONGODB_URI` |
 | Alpaca | the stock bot's paper account | `stock.env` (engine only) |
 
-The two engines are independent: separate images, containers, ports, env files, databases, leases and stream secrets. Deploying, restarting or crashing one never touches the other. At runtime they share only the scraper (from Phase 10 also the LLM) and the server's IP address.
+The two engines are independent: separate images, containers, ports, env files, databases, leases and stream secrets. Deploying, restarting or crashing one never touches the other. At runtime they share only the scraper, the LLM and the server's IP address.
 
 ---
 
@@ -101,7 +101,7 @@ notepad stock.env
 | ENGINE | the engine only |
 | DASHBOARD | the dashboard only (Vercel, local dev) |
 
-- **Engine container**: compose loads the whole file (`env_file`). The engine also receives the DASHBOARD values and ignores them (accepted trade-off, MARKETBOTS_PLAN §3.6).
+- **Engine container**: compose loads the whole file (`env_file`). The engine also receives the DASHBOARD values and ignores them (an accepted trade-off).
 - **Vercel** can't read the file. The SHARED and DASHBOARD values are set in the Vercel project (§3.4).
 - **Local dev**: the `pnpm dev:*` scripts read the file, then `<bot>.local.env` (§3.5).
 
@@ -114,7 +114,7 @@ Don't put these in the env files. `compose.yml` sets them, and its values win ov
 | `STREAM_HOST` | `0.0.0.0` | `0.0.0.0` |
 | `STREAM_PORT` | `8787` | `8788` |
 | `SCRAPER_URL` | `http://scraper:8790` | `http://scraper:8790` |
-| `LLM_URL` | `http://llm:11434` (unused until Phase 10) | `http://llm:11434` (unused until Phase 10) |
+| `LLM_URL` | `http://llm:11434` | `http://llm:11434` |
 
 ### 3.3 Rules
 
@@ -271,14 +271,14 @@ The detailed view (every dependency, data freshness, news source health, AI spen
 
 ### 5.5 Memory caps
 
-The Docker VM has 11.6 GiB and other containers already use ~4.6 GiB of it. Every service here is capped (MARKETBOTS_PLAN §3.10):
+The Docker VM has 11.6 GiB and other containers already use ~4.6 GiB of it. Every service here is capped:
 
 | Service | Limit | Expected |
 | --- | --- | --- |
 | `crypto-engine` | 1 GB | ~0.35 GB |
 | `stock-engine` | 1 GB (was 768 MB: headroom at the open with ~1,500 tracked symbols) | 0.3–0.5 GB |
 | `scraper` | 1 GB | 0.15 GB idle, up to 0.5 GB while rendering |
-| `llm` (Phase 10) | 2 GB RAM, 2 CPUs; ~3 GB GPU memory only while a model is loaded | ~0.1 GB idle, under 1 GB loaded; no GPU memory when idle |
+| `llm` | 2 GB RAM, 2 CPUs; ~3 GB GPU memory only while a model is loaded | ~0.1 GB idle; 1.6–2 GB while a model is loaded (mostly reclaimable cache); ~2.4 GB GPU memory loaded, none when idle |
 
 Check with `docker stats --no-stream` (§5.2).
 
@@ -307,7 +307,7 @@ volumes:
 - **Never let compose create a new one.** Compose prefixes volume names with the project name: without `external`, this stack would create an empty `marketbots_kraken-paper`, and the engine would start a new wallet while the books in MongoDB have history (Discord alert: *Paper wallet was recreated*). With `external`, a missing volume stops compose with `external volume "cryptomarketbot_kraken-paper" not found` instead. Don't "fix" that by creating an empty volume: find out what happened, and restore a backup (§6.2).
 - **Never point it at another database.** On a fresh database the engine resets the wallet to match (log: `paper workspace reset to match a fresh database`). `MONGODB_DB_NAME` stays `cryptomarketbot`; test images get a copy of the volume (§6.3).
 - **Never remove it.** No `docker volume rm`, and no `down -v` in either project: in the old `cryptomarketbot` project it is a regular volume, so `docker compose -p cryptomarketbot down -v` would delete it.
-- Copying it to a `marketbots_` name is optional cleanup for later (Phase 11).
+- Copying it to a `marketbots_` name is optional cleanup for later.
 
 Check that the engine has the right volume:
 
@@ -345,7 +345,7 @@ docker compose up -d crypto-engine
 
 ### 6.3 Boot-testing new images against a copy
 
-`compose.smoke.yml` (project `marketbots-smoke`) boots the new engine images beside the live stack: a throwaway local MongoDB, loopback ports 18787 and 18788, a **copy** of the wallet volume, fake Alpaca keys, and no AI, Discord, email or news keys. It is the boot test of Phase 3.4 and of the gates in Phases 6.7 and 7.4. Its header has the commands:
+`compose.smoke.yml` (project `marketbots-smoke`) boots the new engine images beside the live stack: a throwaway local MongoDB, loopback ports 18787 and 18788, a **copy** of the wallet volume, fake Alpaca keys, and no AI, Discord, email or news keys. Use it before deploying a change to engine startup, a Dockerfile or `compose.yml`. Its header has the commands:
 
 ```powershell
 docker compose build                                   # builds the images; running containers are not touched
@@ -359,12 +359,12 @@ Never `down -v` there: that file also declares the live wallet volume (as `exter
 
 ---
 
-## 7. The swap from the old stacks (Phase 4)
+## 7. The swap from the old stacks
 
 Both engines moved from their old compose projects (`stockmarketbot`, `cryptomarketbot`) to this stack on 2026-10-26, stock first. The procedure stays here for reference, and the rollback for as long as the old containers exist.
 
 **Before:**
-- Phase 3 is done: images built (`docker compose build`) and boot-tested (§6.3).
+- The images are built (`docker compose build`) and boot-tested (§6.3).
 - `crypto.env` / `stock.env` are filled in (the old server `.env` values, same names).
 - No seed run is scheduled or running, and no cycle is running (Admin).
 - **Stock**: a weekend or after 20:00 ET. Stops rest at Alpaca; options exits need the engine.
@@ -397,7 +397,7 @@ Both engines moved from their old compose projects (`stockmarketbot`, `cryptomar
 
 **Afterwards:** remove the old scraper containers (`docker rm stockmarketbot-scraper cryptomarketbot-scraper`, done on 2026-10-26). Keep the old engine containers stopped, not removed, for 14 days (until 2026-11-09). They stay stopped across reboots.
 
-The plan writes the old-project commands as `docker compose -p <old project> stop|start`. Don't run those from the marketbots folder: compose would load this folder's `compose.yml` under the old project name and can miss the old `engine` service. Use the container names as above, or run compose from the old repo's folder.
+Don't run `docker compose -p <old project> stop|start` from the marketbots folder: compose would load this folder's `compose.yml` under the old project name and can miss the old `engine` service. Use the container names as above, or run compose from the old repo's folder.
 
 ### Rollback
 
@@ -427,11 +427,11 @@ docker image rm stockmarketbot-engine:latest stockmarketbot-scraper:latest crypt
 
 ## 8. Vercel
 
-Both dashboards stay on Vercel, in the same two projects, with the same domains, env vars and auth. Only the connected repo and the build settings change.
+Both dashboards are on Vercel, in the same two projects as before the merge, with the same domains, env vars and auth. Both build from `colinfran/marketbots`.
 
-### 8.1 Re-link the projects (Phase 4.2)
+### 8.1 Project settings
 
-Once `colinfran/marketbots` exists on GitHub with this code pushed (Phase 1.6), in each project:
+In each project:
 
 1. *Settings → Build and Deployment*:
    - **Root Directory**: `apps/crypto-web` (stock: `apps/stock-web`).
@@ -439,12 +439,9 @@ Once `colinfran/marketbots` exists on GitHub with this code pushed (Phase 1.6), 
    - **Node.js Version**: 22.x.
    - Framework Next.js; install and build commands default (pnpm is detected from the root lockfile).
 2. *Settings → Git → Ignored Build Step*: Custom, with the bot's command from §8.2.
-3. *Settings → Git*: disconnect the old repo, connect `colinfran/marketbots`, production branch `main`.
-4. Deploy (push to `main`, or redeploy the latest commit). Check: you can sign in, the stream connects, and a *Pause* / *Resume* round trip works.
+3. *Settings → Git*: repo `colinfran/marketbots`, production branch `main`.
 
-Until the re-link, Vercel keeps building from the old repos. Archive those (read-only) only after both projects build from marketbots (Phase 4.4).
-
-Optional, before touching the real projects (Phase 3.5): a temporary Vercel project per dashboard linked to marketbots, to see a green preview build. Delete it afterwards.
+After a deploy, check that you can sign in, the stream connects, and a *Pause* / *Resume* round trip works. The old repos no longer deploy anything and can be archived (read-only).
 
 ### 8.2 Ignored Build Step
 
@@ -464,7 +461,7 @@ Stock:
 
 - Exit 0 skips the build, exit 1 builds. `git diff --quiet` exits 0 when none of the paths changed since the last deployed commit. Without a previous SHA (the first deploy), or with one git can't find, the command builds.
 - The `:/` prefix anchors each path at the repo root. Vercel runs the command from the project's Root Directory, where a plain `apps/crypto-web` would be read as `apps/crypto-web/apps/crypto-web`, match nothing, and skip every build.
-- `packages/core`, `packages/ui` and `packages/web-kit` don't exist yet (Phases 5 and 8); they are listed so the command needn't change. A new shared package that a dashboard imports must be added.
+- A new shared package that a dashboard imports must be added to both commands.
 - A commit that touches only the root `package.json` or `pnpm-workspace.yaml` doesn't trigger a build; redeploy by hand if it matters.
 
 ### 8.3 Bad deploys
@@ -475,7 +472,7 @@ Vercel's instant rollback (*Deployments* → a previous deployment → *Instant 
 
 ## 9. The local LLM (article summaries)
 
-`llm` is Ollama running `llama3.2:3b`. It writes short summaries of the articles behind important news items (MARKETBOTS_PLAN §3.9). Both engines reach it at `LLM_URL=http://llm:11434`.
+`llm` is Ollama running `llama3.2:3b`. It writes short summaries of the articles behind important news items. Both engines reach it at `LLM_URL=http://llm:11434`.
 
 **The `llm` profile:** the service sits behind it, so a plain `docker compose up -d` neither starts nor recreates it. Pass `--profile llm` whenever you bring the whole stack up. Once it is running, `restart: unless-stopped` brings it back after a reboot like everything else.
 
@@ -504,7 +501,7 @@ docker compose --profile llm stop llm
 - GPU: ~2.5–3 GB while a model is loaded. It unloads after 5 idle minutes (`OLLAMA_KEEP_ALIVE=5m`), so idle it uses none.
 - Models live in the `marketbots_ollama-models` volume (`down -v` would delete them).
 
-**GPU only:** if `ollama ps` shows any CPU share, the model didn't fit in free GPU memory (something else is using it). Phase 10's engines check this (`/api/ps`) and pause summaries rather than run slowly on the CPU. The image tag is pinned in `compose.yml`; Phase 10.1 pins the model tag and records its digest.
+**GPU only:** if `ollama ps` shows any CPU share, the model didn't fit in free GPU memory (something else is using it). The engines check this (`/api/ps`) and pause summaries rather than run slowly on the CPU. The image is pinned by digest in `compose.yml`; the model in use is `llama3.2:3b` with manifest digest `a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72` (`ollama list` ID `a80c4f17acd5`).
 
 ---
 
@@ -532,7 +529,7 @@ docker compose --profile llm stop llm
 | AI calls fail with "BYOK is available only with paid credits" | Add credits to the Vercel AI Gateway. |
 | "Owner sign-in is not configured" | `BETTER_AUTH_SECRET` (32+ characters) or `MONGODB_URI` is missing on Vercel. |
 | No sign-in email arrives | `USESEND_API_KEY` is missing or wrong, or the sender domain isn't verified in useSend (Vercel function logs show the error). Only `OWNER_EMAIL` is ever emailed. |
-| Vercel skips every build after the re-link | The Ignored Build Step paths aren't anchored with `:/` (§8.2). |
+| Vercel skips every build | The Ignored Build Step paths aren't anchored with `:/` (§8.2). |
 | Vercel build can't resolve `@mb/...` | *Include files outside the root directory* is off (§8.1). |
 | `llm` won't start: `could not select device driver "nvidia"` | Docker can't see the GPU: update the NVIDIA driver and Docker Desktop, and check the WSL2 backend is on. |
-| `ollama ps` shows a CPU share | Not enough free GPU memory for the model. Summaries pause (Phase 10); free the GPU or use a smaller model. |
+| `ollama ps` shows a CPU share | Not enough free GPU memory for the model. Summaries pause; free the GPU or use a smaller model. |

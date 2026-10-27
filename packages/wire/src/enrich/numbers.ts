@@ -1,5 +1,5 @@
 /**
- * The number check (PHASE10_SPIKE "Plan changes" 3): every number in a machine summary must occur
+ * The number check: every number in a machine summary must occur
  * in the article it summarizes. It catches invented or computed totals ("around $600 million") and
  * corrupted numbers ("2:026"). It can't catch a number the article does have but the summary pins on
  * the wrong thing (C$10M for "serious" instead of "very serious" violations); that is why summaries

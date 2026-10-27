@@ -7,7 +7,7 @@ import { repairCryptoReport } from "../src/ai/repair"
 import { AiRunner } from "../src/ai/runner"
 
 /**
- * MARKETBOTS_PLAN 9.2: crypto's decision call streams now. These run the real AI SDK against a
+ * Crypto's decision call streams. These run the real AI SDK against a
  * scripted model, once through crypto's runner (streamed) and once through the binding crypto used
  * before (`stream: false`), and check that both send the model the same request and parse,
  * validate and repair the same answers the same way. Only progress and per-attempt cost differ.

@@ -3,7 +3,7 @@ import { dirname, join, resolve } from "node:path"
 import { expect } from "vitest"
 
 /**
- * Contract snapshots (MARKETBOTS_PLAN §2 rule 2, task 2.5): today's behavior, committed under
+ * Contract snapshots: today's behavior, committed under
  * contracts/crypto/. A test compares what the code produces now with the committed file and fails
  * on any difference. `UPDATE_CONTRACTS=1 pnpm --filter @mb/crypto-engine test` rewrites them.
  */
@@ -53,7 +53,7 @@ export const matchContract = (file: string, content: string) => {
   if (current === null) throw new Error(`Missing contract snapshot contracts/crypto/${file}. Generate it with UPDATE_CONTRACTS=1 pnpm --filter @mb/crypto-engine test`)
   expect(
     content,
-    `contracts/crypto/${file} changed. A contract diff means a behavior change: revert it, or move it to Phase 9 with a reason and regenerate with UPDATE_CONTRACTS=1 (MARKETBOTS_PLAN §2 rule 2).`,
+    `contracts/crypto/${file} changed. A contract diff means a behavior change: revert it, or make it its own owner-approved commit and regenerate with UPDATE_CONTRACTS=1 (contracts/README.md).`,
   ).toBe(current)
 }
 

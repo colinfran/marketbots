@@ -5,7 +5,7 @@ Two autonomous, AI-driven paper-trading bots in one pnpm monorepo:
 - **CryptoMarketBot** trades Kraken spot pairs 24/7 in a Kraken CLI paper wallet. Dashboard: [cryptomarketbot.app](https://cryptomarketbot.app).
 - **StockMarketBot** trades US stocks and defined-risk options on market days in an Alpaca paper account. Dashboard: [stockmarketbot.app](https://stockmarketbot.app).
 
-In both, Grok (through the Vercel AI Gateway) researches and decides, and deterministic code sizes and checks every order. Each bot has its own always-on engine, its own Next.js dashboard on Vercel with its own owner sign-in, and its own database on MongoDB Atlas. One Docker stack, `marketbots`, runs both engines and a shared headless scraper on the owner's Windows server.
+In both, Grok (through the Vercel AI Gateway) researches and decides, and deterministic code sizes and checks every order. Each bot has its own always-on engine, its own Next.js dashboard on Vercel with its own owner sign-in, and its own database on MongoDB Atlas. One Docker stack, `marketbots`, runs both engines, a shared headless scraper and a local LLM for article summaries on the owner's Windows server.
 
 **Paper trading only.** Neither engine has a live-trading code path.
 
@@ -22,7 +22,7 @@ flowchart LR
     stock[Stock engine]
     atlas[(MongoDB Atlas<br/>separate database per bot)]
     scraper[Shared scraper]
-    llm[Local LLM<br/>Phase 10, currently off]
+    llm[Local LLM<br/>article summaries]
     services[Kraken paper wallet<br/>Alpaca paper account<br/>Vercel AI Gateway and news sources]
 
     browser -->|HTTPS| dashboards
@@ -34,8 +34,8 @@ flowchart LR
     stock -->|Own trading state| atlas
     crypto --> scraper
     stock --> scraper
-    crypto -.->|When enabled| llm
-    stock -.->|When enabled| llm
+    crypto --> llm
+    stock --> llm
     crypto --> services
     stock --> services
 ```
@@ -49,16 +49,19 @@ apps/stock-engine/      stock engine (Docker)
 apps/stock-web/         stock dashboard (Vercel)
 apps/scraper/           headless Chromium sidecar shared by both engines (own npm lockfile)
 packages/config/        tsconfig base, ESLint presets with the import boundaries, Vitest presets
+packages/core/          pure shared schemas and helpers, no I/O
+packages/engine-kit/    engine runtime shared by both engines
+packages/wire/          the news engine, shared by both engines
+packages/ui/            client-safe React shared by both dashboards
+packages/web-kit/       server-only dashboard helpers
 packages/crypto-core/   crypto schemas and types
 packages/stock-core/    stock schemas and types
 contracts/              behavior snapshots per bot
-docs/                   architecture, per-bot design, server runbook, plans
-compose.yml             the marketbots stack: both engines, the scraper, the local LLM (off)
+docs/                   architecture, per-bot design, server runbook
+compose.yml             the marketbots stack: both engines, the scraper, the local LLM
 crypto.env.example      every crypto variable, by where it's used (copy to crypto.env)
 stock.env.example       every stock variable, by where it's used (copy to stock.env)
 ```
-
-The shared packages (`core`, `engine-kit`, `wire`, `ui`, `web-kit`) were added in Phases 5–8 of the [merge plan](docs/plans/MARKETBOTS_PLAN.md).
 
 ## Development
 
@@ -85,6 +88,5 @@ pnpm backtest -- --symbols BTC/USD,ETH/USD,SOL/USD --strategies trend,momentum -
 - [docs/CRYPTO.md](docs/CRYPTO.md), [docs/STOCK.md](docs/STOCK.md): each bot's design.
 - [docs/SERVER.md](docs/SERVER.md): the server, the Docker stack, env files, deploys, Vercel, troubleshooting.
 - [AGENTS.md](AGENTS.md): conventions for changing this repo (package boundaries, shared code, safety rules).
-- [docs/plans/MARKETBOTS_PLAN.md](docs/plans/MARKETBOTS_PLAN.md): the merge plan and its progress; [docs/plans/MASTER_PLAN.md](docs/plans/MASTER_PLAN.md): the news engine plan.
 
 Paper trading with simulated money for research. Not financial advice; nothing here guarantees profits, and options can lose their entire value.

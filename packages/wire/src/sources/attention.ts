@@ -3,10 +3,10 @@ import type { RawItem, SourceContext } from "../types"
 import { num } from "./common"
 
 /**
- * Retail-attention building blocks (MASTER_PLAN §4.1 and §4.2, wave 2) that both bots' attention
+ * Retail-attention building blocks that both bots' attention
  * sources are made of: ApeWisdom mention jumps, StockTwits trending entries, App Store chart
  * ranks and Wikipedia pageview spikes. Every item is `sentiment_spike`, tier 3, low severity and
- * annotate only (§3.5), and reports a change, never a level.
+ * annotate only, and reports a change, never a level.
  *
  * What differs per bot is how it names its subjects on each site (a coin is "BTC.X" on StockTwits,
  * a stock its ticker), which apps it watches and its pageview floor; the bot passes those in.

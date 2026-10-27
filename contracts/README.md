@@ -1,6 +1,6 @@
 # Contract snapshots
 
-These files record what both bots do today. They were generated from the code as it was moved in unchanged (MARKETBOTS_PLAN §2 rule 2, task 2.5). The refactors in Phases 5–8 must leave every file here byte-identical.
+These files record what both bots do today. They were first generated from the code as it was moved in unchanged, and since then change only with an approved behavior change. A refactor must leave every file here byte-identical.
 
 ## The rule
 
@@ -9,7 +9,7 @@ The tests compare what the code produces now with these files, and fail on any d
 **A diff means behavior changed.** Do one of two things:
 
 - Revert the change, or
-- Move it to Phase 9 (one approved change per commit) with a reason, then regenerate.
+- Make it its own owner-approved commit with a reason, then regenerate.
 
 Never regenerate just to make a refactor pass.
 
@@ -96,4 +96,4 @@ So a refactor of those helpers shows up here too.
 
 - **Repair schemas aren't snapshotted.** The lenient schemas in `src/ai/repair.ts` (both bots) are not exported, and they are built from `z.preprocess`. Their behavior is covered by the repair unit tests.
 - **Some outputs are legitimately empty.** For example, a status page with no incidents, or a watcher's first, baseline reading. The intermediate data is kept wherever the parser exposes it.
-- **Stock times depend on Node's ICU data.** Stock prompts format times with `Intl` (`America/New_York`). A Node upgrade that changes ICU output could change those bytes without a code change; that is the one case where regenerating without a Phase 9 entry is fine, after checking that the diff is only date formatting.
+- **Stock times depend on Node's ICU data.** Stock prompts format times with `Intl` (`America/New_York`). A Node upgrade that changes ICU output could change those bytes without a code change; that is the one case where regenerating without an approved behavior change is fine, after checking that the diff is only date formatting.

@@ -4,9 +4,9 @@ import { createExtractor, parseExtractJob, USER_AGENT } from "./extract.mjs"
 import { createRobots } from "./robots.mjs"
 
 /**
- * The headless scraper sidecar (MASTER_PLAN Phase 7): renders pages that need JavaScript for the
+ * The headless scraper sidecar: renders pages that need JavaScript for the
  * engines' `headless` news sources (wire/kinds/headless.ts), and extracts news articles as plain
- * text for the article summaries (MARKETBOTS_PLAN §3.8, extract.mjs). One container serves both
+ * text for the article summaries (extract.mjs). One container serves both
  * engines.
  *
  *   POST /render  { url, wait_for?, timeout_ms?, capture? }    → { status, url, html, captured }

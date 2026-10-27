@@ -1,6 +1,6 @@
 # Architecture
 
-The platform view of marketbots: how the two bots run side by side, what the repo holds, what the bots share today and what they will share, and what stays per bot by design. Each bot's own design (trading loop, risk model, news engine, data model) is in [CRYPTO.md](CRYPTO.md) and [STOCK.md](STOCK.md). Running the stack is in [SERVER.md](SERVER.md). The merge plan and its phases are in [plans/MARKETBOTS_PLAN.md](plans/MARKETBOTS_PLAN.md).
+The platform view of marketbots: how the two bots run side by side, what the repo holds, what the bots share, and what stays per bot by design. Each bot's own design (trading loop, risk model, news engine, data model) is in [CRYPTO.md](CRYPTO.md) and [STOCK.md](STOCK.md). Running the stack is in [SERVER.md](SERVER.md).
 
 ## Two bots, one repo
 
@@ -14,7 +14,7 @@ The platform view of marketbots: how the two bots run side by side, what the rep
 | Config | `crypto.env` | `stock.env` |
 | Design doc | [CRYPTO.md](CRYPTO.md) | [STOCK.md](STOCK.md) |
 
-The rules behind the layout (plan §1–2):
+The rules behind the layout:
 
 - **Two independent engines.** Separate images, containers, processes, ports, databases, leases and env files. They share library code, compiled into each image at build time, and have no runtime link to each other. A crash, deploy or restart of one never touches the other.
 - **Two dashboards with separate auth.** Each has its own auth secret, database, domain and owner check.
@@ -30,7 +30,7 @@ Browser ──https──▶ Vercel: cryptomarketbot.app, stockmarketbot.app ─
                                              ├─▶ 127.0.0.1:8787  crypto-engine ───┤
                                              └─▶ 127.0.0.1:8788  stock-engine  ───┘
                      marketbots stack:  crypto-engine, stock-engine ──▶ scraper (Playwright), no host port
-                                                                    ──▶ llm (Ollama, RTX 3070, Phase 10), no host port
+                                                                    ──▶ llm (Ollama, RTX 3070), no host port
 External: Kraken (CLI wallet in its volume), Alpaca, Vercel AI Gateway (Grok), ~150 news sources
 ```
 
@@ -43,7 +43,7 @@ External: Kraken (CLI wallet in its volume), Alpaca, Vercel AI Gateway (Grok), ~
 | Shared | How |
 | --- | --- |
 | Scraper | One container, `http://scraper:8790` on the compose network. Three renders at a time; each caller (the `X-Client` header, else the engine container's address) may hold at most 8 of the 16 queue places, so one bot can't starve the other. If it dies, only the headless news sources go down. |
-| Local LLM (Phase 10) | One Ollama container on the GPU, `http://llm:11434`. Off until Phase 10. |
+| Local LLM | One Ollama container on the GPU, `http://llm:11434`, that summarizes news articles for both engines. If it is down, only the summaries stop. |
 | Atlas cluster | One cluster, a separate database per bot. |
 | The server's IP | Outbound rate limits (SEC, GDELT, ForexFactory…) apply to both bots together. |
 | Vercel AI Gateway key | Can be the same key; each bot enforces its own daily AI budget. |
@@ -52,8 +52,6 @@ External: Kraken (CLI wallet in its volume), Alpaca, Vercel AI Gateway (Grok), ~
 Not shared: databases, leases, env files, auth secrets, stream token secrets (whose HMAC context prefixes, `cmb-stream.` and `smb-stream.`, also keep tokens from crossing bots), and the Kraken wallet volume (crypto only).
 
 ## Repo layout
-
-Today:
 
 ```
 marketbots/
@@ -65,10 +63,15 @@ marketbots/
 │  └─ scraper/         @mb/scraper         one sidecar; own npm lockfile, outside the pnpm workspace
 ├─ packages/
 │  ├─ config/          @mb/config          tsconfig base, ESLint presets with the import boundaries, Vitest presets
+│  ├─ core/            @mb/core            pure shared schemas and helpers
+│  ├─ engine-kit/      @mb/engine-kit      engine runtime
+│  ├─ wire/            @mb/wire            the news engine
+│  ├─ ui/              @mb/ui              client-safe React
+│  ├─ web-kit/         @mb/web-kit         server-only dashboard helpers
 │  ├─ crypto-core/     @mb/crypto-core     crypto schemas (was cryptomarketbot/packages/core)
 │  └─ stock-core/      @mb/stock-core      stock schemas (was stockmarketbot/packages/core)
 ├─ contracts/          behavior snapshots per bot (contracts/<bot>/)
-├─ docs/               ARCHITECTURE.md (this file), CRYPTO.md, STOCK.md, SERVER.md, plans/
+├─ docs/               ARCHITECTURE.md (this file), CRYPTO.md, STOCK.md, SERVER.md
 ├─ compose.yml         the marketbots stack
 ├─ compose.smoke.yml   boot test of new images beside the live stack
 ├─ crypto.env.example  stock.env.example
@@ -76,26 +79,19 @@ marketbots/
 └─ package.json  pnpm-workspace.yaml  pnpm-lock.yaml
 ```
 
-Phases 5–8 add `packages/core`, `packages/engine-kit`, `packages/wire`, `packages/ui` and `packages/web-kit` (below).
+## Shared code
 
-## Shared code: today and planned
+Both bots were moved in from their old repos unchanged and then refactored onto the shared packages below. No file is mirrored by hand any more. Code that still exists once per bot does so on purpose (see [What stays per bot](#what-stays-per-bot-by-design)).
 
-**Shared packages today:** `config`, `core`, `engine-kit`, `wire`, `ui` and `web-kit` (table below). Both bots were moved in unchanged (Phase 2) and then refactored onto these packages.
+| Package | Holds | Used by |
+| --- | --- | --- |
+| `@mb/core` | Pure shared schemas and helpers, no I/O: `math`, `stream-token` (prefix as a parameter), settings base pieces and helpers, the shared command schemas, the event envelope and the events both bots define identically, base collections, indexes and document types, wire types, `metrics`, `indicators`, generic `time` | every app and package |
+| `@mb/engine-kit` | Engine runtime, generic over each bot's settings, events and commands: log, lease, heartbeat, bus, stream server, command processor, Mongo connect, state stores, alerts, AI budget/repair/runner/prompt parts, `ControlPlane`, `StatusReporter`, `EventCycleQueue`, bootstrap, env base, test helpers | both engines |
+| `@mb/wire` | The news engine: the formerly mirrored files, shared source helpers, `sharedCatalog()`, a `makeLexicon()` skeleton, and `enrich/` for article summaries | both engines |
+| `@mb/ui` | Client-safe React: the shadcn primitives, design tokens (`styles.css`), app-shell components, the live-UI shell driven by a per-bot event catalog, shared page sections, the charts (`@mb/ui/charts`) | both dashboards |
+| `@mb/web-kit` | Server-only dashboard helpers: auth factory, database, command routes, shared queries, formatting, metadata, error reporting | both dashboards |
 
-
-No file is mirrored by hand any more. Code that still exists once per bot does so on purpose (see [What stays per bot](#what-stays-per-bot-by-design)).
-
-**Shared packages** (the Phase column says when each one lands; ✓ = exists):
-
-| Package | Phase | Holds | Used by |
-| --- | --- | --- | --- |
-| `@mb/core` | 5 ✓ | Pure shared schemas and helpers, no I/O: `math`, `stream-token` (prefix as a parameter), settings base pieces and helpers, the shared command schemas, the event envelope and the events both bots define identically, base collections, indexes and document types, wire types, `metrics`, `indicators`, generic `time` | every app and package |
-| `@mb/engine-kit` | 6 ✓ | Engine runtime, generic over each bot's settings, events and commands: log, lease, heartbeat, bus, stream server, command processor, Mongo connect, state stores, alerts, AI budget/repair/runner/prompt parts, `ControlPlane`, `StatusReporter`, `EventCycleQueue`, bootstrap, env base, test helpers | both engines |
-| `@mb/wire` | 7 ✓ | The news engine: the formerly mirrored files, shared source helpers, `sharedCatalog()`, a `makeLexicon()` skeleton, and (Phase 10) `enrich/` for article summaries | both engines |
-| `@mb/ui` | 8 ✓ | Client-safe React: the shadcn primitives, design tokens (`styles.css`), app-shell components, the live-UI shell driven by a per-bot event catalog, shared page sections | both dashboards |
-| `@mb/web-kit` | 8 ✓ | Server-only dashboard helpers: auth factory, database, command routes, shared queries, formatting, metadata, error reporting | both dashboards |
-
-Since Phase 5, `crypto-core` and `stock-core` build on `@mb/core`: the shared logic lives there once, and each bot core binds its own parameters (the stream-token prefix, its wire categories, its owner-only events, its settings sections). Crypto's AI output schema lives in `crypto-core/src/report.ts`. The full module lists are in plan §3.3. Where the two bots' versions of something differ, plan §3.5 says which version wins and in which phase. Behavior changes are kept out of Phases 5–8 and done one by one in Phase 9.
+`crypto-core` and `stock-core` build on `@mb/core`: the shared logic lives there once, and each bot core binds its own parameters (the stream-token prefix, its wire categories, its owner-only events, its settings sections). Crypto's AI output schema lives in `crypto-core/src/report.ts`.
 
 ## Dependency direction
 
@@ -127,7 +123,7 @@ No package or app ever imports an app. ESLint enforces this with `no-restricted-
 | Scraper | The official Playwright image plus `playwright-core` | `docker compose up -d --build scraper` |
 | Dashboards | Vercel, Root Directory `apps/<bot>-web`, files outside the root included | push to `main`; an Ignored Build Step skips a dashboard none of whose paths changed |
 
-Every deploy is gated by `pnpm typecheck && pnpm test && pnpm lint && pnpm build`. The refactor phases (5–8) are also gated by unchanged contract snapshots under `contracts/<bot>/` and test counts at or above the baseline (plan §8).
+Every deploy is gated by `pnpm typecheck && pnpm test && pnpm lint && pnpm build`. The contract snapshots under `contracts/<bot>/` change only with a deliberate, owner-approved behavior change ([AGENTS.md](../AGENTS.md)).
 
 ## Configuration
 
@@ -143,7 +139,7 @@ Live trading settings are not configuration: they live in each bot's database an
 | Prompts and the AI output schema | Prompts and the report schema |
 | Wire catalog, lexicon rules, policy rules, domain sources (chain, DefiLlama, derivatives, Korea, hacks…) | Wire catalog, lexicon rules, policy rules, domain sources (EDGAR, halts, FDA, insiders, congress, MarketBeat…) |
 | Same-name events with different payloads (`market.ticker`, `cycle.*`, `order.*`, `position.*`, `risk.checked`…), the bot section of `engine_status`, the `cycles` / `decisions` / `daily_stats` shapes | Same |
-| Pages: dashboard, holdings, markets/[pair], decisions/[id], strategies and backtests, `/api/candles`, decision card, tables, charts (until Phase 9), `buildTrail` | Pages: dashboard, holdings, markets/[symbol], research/[id] report, options tab, public JSON API, report view, market status, tables, charts (until Phase 9), `buildTrail` |
+| Pages: dashboard, holdings, markets/[pair], decisions/[id], strategies and backtests, `/api/candles`, decision card, tables, chart wrappers (crypto's data and formats), `buildTrail` | Pages: dashboard, holdings, markets/[symbol], research/[id] report, options tab, public JSON API, report view, market status, tables, chart wrappers (stock's data and formats), `buildTrail` |
 
 ## Reading CRYPTO.md and STOCK.md
 
@@ -155,8 +151,7 @@ Both were copied unchanged from the old repos' `docs/ARCHITECTURE.md`, so their 
 | `apps/web` | `apps/crypto-web` / `apps/stock-web` |
 | `packages/core`, `@cmb/core`, `@smb/core` | `packages/crypto-core` / `packages/stock-core`, `@mb/crypto-core` / `@mb/stock-core` |
 | `apps/scraper`, one per bot | `apps/scraper`, one for both |
-| "Mirrored in cryptomarketbot and stockmarketbot" | `packages/wire` (`@mb/wire`), once for both since Phase 7 |
+| "Mirrored in cryptomarketbot and stockmarketbot" | `packages/wire` (`@mb/wire`), once for both |
 | `docker-compose.yml`, `.env` | `compose.yml`, `crypto.env` / `stock.env` |
-| `MASTER_PLAN.md` | `docs/plans/MASTER_PLAN.md` |
 
-When a phase adds or changes a shared package, update the tables in this file; per-bot behavior goes in CRYPTO.md or STOCK.md.
+When a change adds or changes a shared package, update the tables in this file; per-bot behavior goes in CRYPTO.md or STOCK.md.

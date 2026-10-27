@@ -58,7 +58,7 @@ The daily AI budget is checked before each cycle; when it's spent, cycles are sk
 
 ## News engine (the wire)
 
-The engine reads about 80 free news, filing and market-data sources itself, so Grok doesn't have to find everything by searching, and so the bot can react to news between scheduled cycles. Design and decisions: `MASTER_PLAN.md` §3–4.
+The engine reads about 80 free news, filing and market-data sources itself, so Grok doesn't have to find everything by searching, and so the bot can react to news between scheduled cycles.
 
 ```
 sources (each isolated) → normalize → dedupe → tag tickers → classify → relevance filter
@@ -76,7 +76,7 @@ wire_items → dossier → every cycle's research and decision prompts
 | Market-data detectors | `wire/anomaly.ts`, `wire/metrics.ts` | Price, volume and market-wide shocks from closed 1-minute bars (z-scores, judged on the residual against SPY) across the scan universe. `MetricWatcher` turns numeric feeds (VIX, yields, odds, attention, short volume) into items: level, change and spike rules, the first reading only a baseline, one item per excursion |
 | Dossier | `wire/dossier.ts` | What our feeds know about a cycle's subjects: cluster roots ranked by severity × recency, capped per symbol, plus market-wide items, the next 72 h of scheduled releases and earnings (`calendar.ts`), and two gap lists (moves no item explains, high-severity items not yet confirmed) |
 | Policy and gates | `wire/policy.ts`, `wire/trigger.ts` | The bot's rules turn an item into candidate triggers (review a holding, evaluate an entry, review the market, fill the gap behind an unexplained move); the shared gates decide and record why |
-| Scraper sidecar | `apps/scraper` | Headless Chromium for the few pages that need JavaScript (Phase 7). Its own container with no host port; the engine reaches it at `SCRAPER_URL` |
+| Scraper sidecar | `apps/scraper` | Headless Chromium for the few pages that need JavaScript, shared by both engines. Its own container with no host port; the engine reaches it at `SCRAPER_URL` |
 
 Files headed `// Mirrored in cryptomarketbot and stockmarketbot: keep in sync.` are identical in both repos apart from the `@cmb`/`@smb` import prefix. The catalog, lexicon, policy and `sources/` are per bot.
 

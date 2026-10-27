@@ -4,7 +4,7 @@ import type { RawItem, SourceContext, SourceSpec } from "../types"
 import { BROWSER_HEADERS, nextWeekdays, num, settleAll, usd, usDate, watched } from "./common"
 
 /**
- * Scheduled company events from Nasdaq's calendars (MASTER_PLAN §4.2 wave 2, `calendars`;
+ * Scheduled company events from Nasdaq's calendars (`calendars`;
  * unofficial JSON that answers browsers only), as calendar items for the dossier's "next 72 hours":
  *
  *   calendar:earnings   earnings dates of held and watched stocks, today and the next 3 weekdays
@@ -14,7 +14,7 @@ import { BROWSER_HEADERS, nextWeekdays, num, settleAll, usd, usDate, watched } f
  *
  * Only held and watched symbols get earnings and dividend items, never the whole list (a busy day
  * has 300+ reports). Items appear once, a few days ahead, so they are fresh when the dossier looks.
- * Alpaca's corporate-actions feed (also in the plan's row) is not wired: splits and dividends of
+ * Alpaca's corporate-actions feed is not wired: splits and dividends of
  * what we hold are already reflected in the broker's positions.
  */
 

@@ -3,7 +3,7 @@ import { oddsSources, polymarketMarkets as polymarketMarketsOf, type PmEvent } f
 export { kalshiMarkets, swingItems } from "@mb/wire/sources/odds"
 
 /**
- * Prediction-market odds on the macro calendar (MASTER_PLAN §4.2 wave 2), on the shared source
+ * Prediction-market odds on the macro calendar, on the shared source
  * (@mb/wire/sources/odds): a market's probability moving at least `odds_swing_pts` points within
  * an hour → `odds_swing`, market-wide.
  *

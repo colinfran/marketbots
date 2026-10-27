@@ -2,7 +2,7 @@ import { MACRO_ACTUALS } from "./sources/macro-actuals"
 import type { RawItem, SourceSpec } from "./types"
 
 /**
- * The catalog entries both bots define the same way (MASTER_PLAN §4.1 and §4.2): US government
+ * The catalog entries both bots define the same way: US government
  * and regulators (SEC, DOJ, OFAC, the Fed, the White House), Truth Social, the ForexFactory
  * calendar, the ECB, BoE and BoJ rate decisions and the BLS/FRED actuals. Each bot puts them where
  * it wants them in its own catalog (the order is part of its behavior) and passes the category

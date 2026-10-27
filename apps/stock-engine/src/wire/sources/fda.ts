@@ -6,7 +6,7 @@ import { companyDirectoryOrAliases, normalizeName, shortName, type CompanyDirect
 import { BROWSER_HEADERS, dayStart, isoDay, settleAll, watched } from "./common"
 
 /**
- * FDA catalysts (MASTER_PLAN §4.2 wave 2, `fda` and `clinicaltrials`), tier 1. Sponsors are named,
+ * FDA catalysts (`fda` and `clinicaltrials`), tier 1. Sponsors are named,
  * not ticked, so each is mapped to a ticker through the SEC company directory and its aliases
  * (sources/companies.ts); a sponsor that maps to no listed company is skipped.
  *

@@ -137,7 +137,7 @@ const X_READ_FRESH_MINUTES = 120
 export type ResearchPlan = { kind: "full" | "gap" | "none"; reason: string }
 
 /**
- * Which Grok research a cycle runs (MASTER_PLAN §3.9). Full whenever the wire is off or
+ * Which Grok research a cycle runs. Full whenever the wire is off or
  * unhealthy. auto skips Grok only when our feeds leave no gap: no unexplained moves, no
  * unconfirmed high-severity items, and a recent X read of these same subjects.
  */

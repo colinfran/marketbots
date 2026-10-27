@@ -1,5 +1,5 @@
 /**
- * robots.txt for POST /extract (MARKETBOTS_PLAN §3.8). Only the `User-agent: *` group is read: the
+ * robots.txt for POST /extract. Only the `User-agent: *` group is read: the
  * scraper fetches one article per news item, so it follows the rules every crawler gets. Rules are
  * matched the RFC 9309 way: `*` matches any run of characters, a trailing `$` anchors the end, the
  * longest matching pattern wins and Allow wins a tie. A robots.txt that can't be fetched (network

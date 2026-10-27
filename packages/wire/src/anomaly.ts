@@ -1,5 +1,5 @@
 /**
- * Deterministic market-data anomalies from closed 1-minute bars (MASTER_PLAN §3.6).
+ * Deterministic market-data anomalies from closed 1-minute bars.
  *
  * Per symbol: a ring of up to a day of bars; σ is the EWMA standard deviation of 1-minute log
  * returns (the current bar excluded); z₁ = r₁/σ, z₅ = r₅/(σ√5), z₁₅ = r₁₅/(σ√15); the volume

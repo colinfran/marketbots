@@ -18,12 +18,12 @@ import { POSITIONING_SOURCES } from "./sources/positioning"
 import { USASPENDING_SOURCE } from "./sources/usaspending"
 import { VOL_RATES_SOURCES } from "./sources/vol-rates"
 
-/** Social lists approved by the owner (MASTER_PLAN §8.9). All tier 3: they feed the dossier. */
+/** Social lists approved by the owner. All tier 3: they feed the dossier. */
 const TELEGRAM_CHANNELS = ["WalterBloomberg", "FinancialJuice", "marketfeed"]
 const BLUESKY_ACCOUNTS = ["bloomberg.com", "reuters.com", "apnews.com", "wsj.com", "cnbc.com", "nytimes.com", "axios.com", "politico.com", "marketwatch.com", "barrons.com", "businessinsider.com", "economist.com", "semafor.com"]
 /** General outlets post about everything: only market and economy posts go further (the pipeline's relevance filter still applies). */
 const BLUESKY_KEYWORDS = /\b(stocks?|shares|markets?|wall street|nasdaq|s&p|dow|fed|federal reserve|rates?|inflation|cpi|jobs report|payrolls|tariffs?|earnings|ipo|merger|acquisition|bankruptcy|sec|treasury|yields?|recession|economy|oil prices)\b|\$[A-Z]{1,5}\b/i
-/** Research and narrative newsletters (§8.9, verified from the server 2026-10-26): context for the dossier, polled every 15 min. */
+/** Research and narrative newsletters (verified from the server 2026-10-26): context for the dossier, polled every 15 min. */
 const NEWSLETTERS: [string, string][] = [
   ["liberty_street", "https://libertystreeteconomics.newyorkfed.org/feed/"],
   ["employ_america", "https://www.employamerica.org/rss/"],
@@ -37,11 +37,11 @@ const NEWSLETTERS: [string, string][] = [
 ]
 
 /**
- * StockMarketBot's news sources (MASTER_PLAN §4.2). Free only; keyed sources stay off until their
+ * StockMarketBot's news sources. Free only; keyed sources stay off until their
  * key is set. Each entry is a generic kind with a URL and an interval; sources that need the
  * Alpaca client or our own market data (alpaca_news, movers, anomaly) are added in main.ts.
  *
- * Verified from the trading server on 2026-10-26 (see the Verified lists in MASTER_PLAN §4.2).
+ * Verified from the trading server on 2026-10-26.
  * GlobeNewswire (403), ACCESSWIRE (404), Newsfile and Business Wire (empty) failed from the server
  * and are left out until they can be reached. Left out of wave 2: MarketScreener (403), the Motley
  * Fool feed (needs a partner key), CNN Business (its RSS stopped in 2018) and CBOE's put/call
@@ -229,7 +229,7 @@ export const CATALOG: SourceSpec[] = [
   SHARED.truth_social,
   SHARED.macro_ff,
 
-  // ════ Wave 2 (MASTER_PLAN §4.2; verified from the server 2026-10-26) ═══════
+  // ════ Wave 2 (verified from the server 2026-10-26) ══════════════════════
 
   // ── Outlets: major newsrooms tier 2, aggregators and explainers tier 3 ──────
   // The relevance filter keeps only items that name a tracked ticker or the whole market.
@@ -267,7 +267,7 @@ export const CATALOG: SourceSpec[] = [
   ...POSITIONING_SOURCES,
   ...ATTENTION_SOURCES,
 
-  // ════ Wave 3 (MASTER_PLAN §4.2; terms and robots.txt checked in Phase 7.4) ═══
+  // ════ Wave 3 (terms and robots.txt checked) ════════════════════════════
   // Plain HTML: none of the allowed sites needs the scraper sidecar yet.
   ...MARKETBEAT_SOURCES,
   PDUFA_SOURCE,

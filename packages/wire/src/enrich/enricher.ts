@@ -7,7 +7,7 @@ import { articleContext, chat, checkSummary, extractArticle, gpuResidency, loadM
 import { isEnglish, skipReason, type SummaryCandidate } from "./select"
 
 /**
- * Article summaries (MARKETBOTS_PLAN §3.9, Phase 10): a small queue in each engine that takes the
+ * Article summaries: a small queue in each engine that takes the
  * items worth it (select.ts), has the scraper extract the article, has the local model summarize
  * it, checks the summary (article.ts, numbers.ts) and stores the outcome on the wire item as
  * `article`. Never the article text.

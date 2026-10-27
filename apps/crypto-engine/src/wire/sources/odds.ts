@@ -4,9 +4,9 @@ import type { RawItem, SourceContext, SourceSpec } from "../types"
 import { num, settleAll } from "./common"
 
 /**
- * Prediction-market odds (MASTER_PLAN §4.1 wave 2): a market's probability moving at least
+ * Prediction-market odds: a market's probability moving at least
  * `odds_swing_pts` points within an hour → `odds_swing` (annotate; `market_review` only at
- * critical severity while something is held, §3.5).
+ * critical severity while something is held).
  *
  *   odds:polymarket  Gamma API events tagged `fed-rates` and `crypto-legal`. Fed markets (not
  *                    Treasury yields), and crypto-policy markets (laws, regulators, ETFs,

@@ -2,8 +2,8 @@ import { Readability } from "@mozilla/readability"
 import { parseHTML } from "linkedom"
 
 /**
- * POST /extract (MARKETBOTS_PLAN §3.8): one news article as plain text, for the engines' article
- * summaries (§3.9). Nothing is stored.
+ * POST /extract: one news article as plain text, for the engines' article
+ * summaries. Nothing is stored.
  *
  *   POST /extract { url, render?: "auto" | "never" | "always", skip_domains?: string[], max_chars? }
  *     → { status: "ok", url, final_url, title, byline, published, lang, text, words, rendered, truncated }

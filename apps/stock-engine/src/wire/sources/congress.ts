@@ -10,7 +10,7 @@ import type { RawItem, SourceContext, SourceSpec } from "../types"
 import { dayStart, isMissing, tracked, usDate } from "./common"
 
 /**
- * Congressional stock trades (MASTER_PLAN §4.2 wave 3, `congress`), from the House Clerk's
+ * Congressional stock trades (`congress`), from the House Clerk's
  * financial-disclosure files (official, keyless), tier 3:
  *
  *   congress:house   every 6 hours: the year's filing index (a ~64 KB ZIP, updated daily) lists

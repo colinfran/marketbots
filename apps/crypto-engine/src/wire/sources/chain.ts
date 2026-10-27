@@ -3,7 +3,7 @@ import type { RawItem, SourceContext, SourceSpec } from "../types"
 import { num, universeBases } from "./common"
 
 /**
- * Network stress (MASTER_PLAN §4.1 wave 2, `chain`): Bitcoin fees from mempool.space and Ethereum
+ * Network stress (`chain`): Bitcoin fees from mempool.space and Ethereum
  * gas from Etherscan, each spiking to at least 5× its 24-hour median (and above a floor where fees
  * start to bite). Filed as `volume_shock` (on-chain activity far above normal) with a low base:
  * context for the dossier, never a trigger. Solana's status page and the client release feeds are

@@ -6,7 +6,7 @@ export { hasLiveSearch, type ResearchResult } from "@mb/engine-kit/ai/runner"
 
 /**
  * The AI runner (@mb/engine-kit/ai/runner) as crypto runs it: research memos are kept to 12,000
- * characters, and the structured decision streams, as in stock (MARKETBOTS_PLAN 9.2): the partial
+ * characters, and the structured decision streams, as in stock: the partial
  * answer and the reasoning summaries are reported as they arrive, and each attempt is charged the
  * gateway's own cost from its finished steps. The answer is parsed and validated as before.
  */

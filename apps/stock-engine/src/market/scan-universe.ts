@@ -7,7 +7,7 @@ import type { Alpaca } from "../alpaca/client"
 import type { Collections } from "../db/mongo"
 
 /**
- * The scan universe (MASTER_PLAN §3.13): the liquid US stocks and ETFs the news engine watches for
+ * The scan universe: the liquid US stocks and ETFs the news engine watches for
  * unusual moves. Built once a day before premarket:
  *   active, tradable symbols on the main exchanges (Alpaca /v2/assets, ~12.7k)
  *   → the last 20 sessions of consolidated (SIP) daily bars, which the free plan allows for data

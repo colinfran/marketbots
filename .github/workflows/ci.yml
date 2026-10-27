@@ -1,4 +1,4 @@
-# The same gate as a deploy (MARKETBOTS_PLAN §2.7): typecheck, lint, test, build. Plus the
+# The same gate as a deploy (AGENTS.md): typecheck, lint, test, build. Plus the
 # scraper's own tests (it has its own npm lockfile, outside the pnpm workspace).
 name: CI
 

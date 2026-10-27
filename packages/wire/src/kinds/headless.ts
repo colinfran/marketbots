@@ -4,8 +4,8 @@ import type { SourceContext, SourceSpec } from "../types"
 import { parseHtml } from "./html"
 
 /**
- * A page that needs JavaScript, rendered by the scraper sidecar (apps/scraper, MASTER_PLAN
- * Phase 7) and then read like an html source (selectors or mapHtml), or from the JSON responses
+ * A page that needs JavaScript, rendered by the scraper sidecar (apps/scraper)
+ * and then read like an html source (selectors or mapHtml), or from the JSON responses
  * the page loaded itself (`render.capture`, read with `map`). Only for sites whose robots.txt and
  * terms allow it; the catalog notes the check. Off until SCRAPER_URL is set (wire.ts), and a dead
  * sidecar only takes these sources down.

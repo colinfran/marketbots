@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest"
 import { kit } from "../components/kit"
 import { buildTrail } from "../components/live/cycle-trail"
 
-/** MARKETBOTS_PLAN 9.2: the live UI shows the model's reasoning and the decision as it's written. */
+/** The live UI shows the model's reasoning and the decision as it's written. */
 
 /** Events in emission order. Ephemeral ones (reasoning, progress) carry seq 0, so the trail orders them by time. */
 let n = 0

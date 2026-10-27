@@ -3,7 +3,7 @@ import { errorMessage, type Logger } from "@mb/engine-kit/log"
 import { backoffMs } from "@mb/engine-kit/util/async"
 
 /**
- * Layer D of the stock price coverage (MASTER_PLAN §3.13): Finnhub's trade WebSocket (free key).
+ * Layer D of the stock price coverage: Finnhub's trade WebSocket (free key).
  * The free plan takes 50 symbols per connection (checked 2026-10-26: the 51st gets "Subscribing
  * to too many symbols"), so it carries the news engine's focus and the top of the watchlist, in
  * that order. Consolidated trades, tick by tick; a backup when Yahoo throttles.
