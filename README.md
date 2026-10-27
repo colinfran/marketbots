@@ -9,6 +9,37 @@ In both, Grok (through the Vercel AI Gateway) researches and decides, and determ
 
 **Paper trading only.** Neither engine has a live-trading code path.
 
+## Architecture
+
+### Runtime topology
+
+```mermaid
+flowchart LR
+    browser[Browser]
+    dashboards[Vercel dashboards]
+    caddy[Caddy on Windows host]
+    crypto[Crypto engine]
+    stock[Stock engine]
+    atlas[(MongoDB Atlas<br/>separate database per bot)]
+    scraper[Shared scraper]
+    llm[Local LLM<br/>Phase 10, currently off]
+    services[Kraken paper wallet<br/>Alpaca paper account<br/>Vercel AI Gateway and news sources]
+
+    browser -->|HTTPS| dashboards
+    dashboards -->|Read data and write commands| atlas
+    browser -->|Engine WebSocket stream| caddy
+    caddy --> crypto
+    caddy --> stock
+    crypto -->|Own trading state| atlas
+    stock -->|Own trading state| atlas
+    crypto --> scraper
+    stock --> scraper
+    crypto -.->|When enabled| llm
+    stock -.->|When enabled| llm
+    crypto --> services
+    stock --> services
+```
+
 ## Layout
 
 ```
@@ -27,7 +58,7 @@ crypto.env.example      every crypto variable, by where it's used (copy to crypt
 stock.env.example       every stock variable, by where it's used (copy to stock.env)
 ```
 
-More shared packages (`core`, `engine-kit`, `wire`, `ui`, `web-kit`) arrive in Phases 5–8 of the [merge plan](docs/plans/MARKETBOTS_PLAN.md).
+The shared packages (`core`, `engine-kit`, `wire`, `ui`, `web-kit`) were added in Phases 5–8 of the [merge plan](docs/plans/MARKETBOTS_PLAN.md).
 
 ## Development
 
