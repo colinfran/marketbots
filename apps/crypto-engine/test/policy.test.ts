@@ -77,6 +77,7 @@ const setupPolicy = async ({ held = ["BTC/USD"], settings = DEFAULT_SETTINGS, ru
   return { policy, request, markNotable, emergency, alert }
 }
 const triggers = () => db.col.wireTriggers.find({}).sort({ at: 1 }).toArray()
+const unexplainedOn: Settings = { ...DEFAULT_SETTINGS, wire: { ...DEFAULT_SETTINGS.wire, unexplained_move_entries: true } }
 
 describe("wire policy", () => {
   it("reviews a held position on negative news and marks the item notable", async () => {
@@ -157,7 +158,7 @@ describe("wire policy", () => {
   })
 
   it("flags unexplained moves only when no news explains them", async () => {
-    const { policy, request } = await setupPolicy({ held: [] })
+    const { policy, request } = await setupPolicy({ held: [], settings: unexplainedOn })
     const move = withRoot(item({ kind: "anomaly", category: "price_shock", tier: 1, symbols: ["ETH/USD"], polarity: 1, severity: 63, meta: { anomaly: "price" } }))
     await db.col.wireItems.insertOne(withRoot(item({ symbols: ["ETH/USD"], first_seen_at: new Date(NOW.getTime() - 10 * 60_000) })))
     await policy.onItem({ item: move, backfill: false, confirmation: false })
@@ -165,6 +166,14 @@ describe("wire policy", () => {
     await db.col.wireItems.deleteMany({})
     await policy.onItem({ item: { ...move, _id: "move-2", cluster_id: "move-2" }, backfill: false, confirmation: false })
     expect(request).toHaveBeenCalledWith(expect.objectContaining({ rule: "unexplained_move", action: "gap_fill", symbol: "ETH/USD" }))
+  })
+
+  it("with unexplained_move_entries off (the default), an unexplained move only reviews what we hold", async () => {
+    const move = withRoot(item({ kind: "anomaly", category: "price_shock", tier: 1, symbols: ["ETH/USD"], polarity: 1, severity: 63, meta: { anomaly: "price" } }))
+    const { policy: flat } = await setupPolicy({ held: [] })
+    expect(await flat.candidates(move)).toEqual([])
+    const { policy: holding } = await setupPolicy({ held: ["ETH/USD"] })
+    expect(await holding.candidates(move)).toEqual([{ rule: "unexplained_move", action: "gap_fill", symbols: ["ETH/USD"], entry: false }])
   })
 })
 
@@ -209,7 +218,7 @@ describe("wave-2 policy rules", () => {
   })
 
   it("doesn't let our own readings explain a price move", async () => {
-    const { policy, request } = await setupPolicy({ held: [] })
+    const { policy, request } = await setupPolicy({ held: [], settings: unexplainedOn })
     await db.col.wireItems.insertOne(withRoot(item({ symbols: ["ETH/USD"], kind: "derivatives", category: "funding_extreme", first_seen_at: new Date(NOW.getTime() - 10 * 60_000), meta: { metric: "hyperliquid:funding:ETH/USD" } })))
     const move = withRoot(item({ kind: "anomaly", category: "price_shock", tier: 1, symbols: ["ETH/USD"], polarity: 1, severity: 63, meta: { anomaly: "price" } }))
     await policy.onItem({ item: move, backfill: false, confirmation: false })
@@ -314,6 +323,18 @@ describe("research modes", () => {
     expect(await plan()).toMatchObject({ kind: "gap", reason: expect.stringContaining("no X read") })
     await db.col.research.insertOne({ _id: "r1", cycle_id: "c", subjects: ["BTC/USD", "ETH/USD"], memo: "memo", sources: [], queries: [], model: "m", prompt_version: "v", x_search: true, started_at: new Date(NOW.getTime() - 30 * 60_000), duration_ms: 1, usage: { input: 0, output: 0, total: 0 }, cost_usd: 0, error: null })
     expect(await plan()).toMatchObject({ kind: "none", reason: expect.stringContaining("30 min ago") })
+  })
+
+  it("held_gaps runs the gap-fill only for a gap on a held pair", async () => {
+    const moved = withRoot(item({ kind: "anomaly", category: "price_shock", tier: 1, symbols: ["ETH/USD"], url: null, meta: { anomaly: "price" } }))
+    const rumor = withRoot(item({ symbols: ["SOL/USD"], tier: 3, url: "https://rumor.test/sol" }))
+    const gaps = assembleDossier([moved, rumor], { symbols: ["ETH/USD", "SOL/USD"], since: new Date(NOW.getTime() - HOUR), now: NOW, price: () => null, timeLabel: () => "", reviewThreshold: 55 })
+    expect([gaps.unexplained.length, gaps.unconfirmed.length]).toEqual([1, 1])
+    const plan = (held: string[], dossier = gaps) => researchPlan(ctxFor({}), { isEvent: false, wireHealthy: true, dossier, subjects: ["ETH/USD", "SOL/USD"], held, now: NOW })
+    expect(await plan(["ETH/USD"])).toEqual({ kind: "gap", reason: "1 unexplained moves, 0 unconfirmed items on held pairs" })
+    expect(await plan(["SOL/USD"])).toMatchObject({ kind: "gap", reason: expect.stringContaining("1 unconfirmed items") })
+    expect(await plan([])).toMatchObject({ kind: "none" })
+    expect(await plan(["ETH/USD"], empty)).toMatchObject({ kind: "none" })
   })
 })
 

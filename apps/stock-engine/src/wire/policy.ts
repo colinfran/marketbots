@@ -50,7 +50,7 @@ export const stockRules: Rules = async (item, ctx) => {
     if ((a === "price" || a === "mover") && item.symbols.length === 1) {
       const symbol = item.symbols[0]
       if (ctx.held.has(symbol)) return [{ rule: "held_shock", action: "review", symbols: [symbol], entry: false }]
-      if (item.polarity <= 0 || (await ctx.hasRecentNews(symbol))) return []
+      if (!ctx.settings.wire.unexplained_move_entries || item.polarity <= 0 || (await ctx.hasRecentNews(symbol))) return []
       return [{ rule: "unexplained_move", action: "gap_fill", symbols: [symbol], entry: true }]
     }
     return []

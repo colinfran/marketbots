@@ -121,15 +121,18 @@ Files headed `// Mirrored in cryptomarketbot and stockmarketbot: keep in sync.` 
 
 **Trigger gates**, in order: `wire.mode` → fresh (first seen within `trigger_max_age_minutes`, never a source's first poll after a restart, published under 2 h ago) → confirmation for entries (a tier-1 source, two independent outlets, or a matching price move) → shadow mode → engine running and kill switch off → per-symbol cooldown → hourly and daily caps → AI budget. A trigger never trades: it asks for a focused event cycle, where Grok and the risk engine decide as usual. Event cycles are spaced by `event_min_gap_seconds`, and `event_budget_reserve_pct` of the daily AI budget is kept for them. The one exception is `emergency_action` for a holding hit by a critical, confirmed, negative event, and it only ever reduces risk.
 
+An unexplained move (a price shock no news explains) in a held pair asks for a review. In a universe pair we don't hold, it asks for an entry check only when `unexplained_move_entries` is on (off by default: on 2026-10-27, 13 of these checks cost $1.91 and none led to a trade).
+
 **Research modes** (`wire.research_mode`):
 
 | Mode | What Grok research does |
 | --- | --- |
 | `full` | The usual research; the dossier goes into the decision prompt. Also used whenever the wire is off or unhealthy (fewer than half its sources `ok`) |
 | `gap_fill` | A shorter prompt that gets the dossier and only fills its gaps: X sentiment, unexplained moves, unconfirmed items, anything critical it missed |
-| `auto` (default) | `gap_fill`, but skipped when there's no gap: no unexplained moves, no unconfirmed items, and an X read of the same subjects within 2 h. The cycle records why |
+| `auto` | `gap_fill`, but skipped when there's no gap: no unexplained moves, no unconfirmed items, and an X read of the same subjects within 2 h. The cycle records why. In practice it never skipped: on 2026-10-27 every scheduled cycle ran the gap-fill |
+| `held_gaps` (default) | The dossier alone, and `gap_fill` only when a held pair under review has an unexplained move or an unconfirmed high-severity item (no X-freshness rule). The cycle records why it skipped |
 
-**Settings** (the `wire` section, changed live from Admin; defaults): `mode` live, `research_mode` auto, `thresholds` 30/55/70/85, `entry_confirmation` on, `trigger_max_age_minutes` 15, `symbol_cooldown_minutes` 30, `event_min_gap_seconds` 60, `max_event_cycles_per_hour` / `_per_day` 4 / 24, `event_budget_reserve_pct` 30, `event_research` x_verify (45 s; event decisions 90 s), `emergency_action` review, `anomaly` price z 4 / volume ×5 / market z 4, `retention_days` 30, and the crypto detectors: `depeg_pct` 1, `tvl_drop_pct` 15, `odds_swing_pts` 15, `funding_extreme_annual_pct` 100, `coinbase_premium_pct` 0.3.
+**Settings** (the `wire` section, changed live from Admin; defaults): `mode` live, `research_mode` held_gaps, `thresholds` 30/55/70/85, `entry_confirmation` on, `unexplained_move_entries` off, `trigger_max_age_minutes` 15, `symbol_cooldown_minutes` 30, `event_min_gap_seconds` 60, `max_event_cycles_per_hour` / `_per_day` 4 / 24, `event_budget_reserve_pct` 30, `event_research` x_verify (45 s; event decisions 90 s), `emergency_action` review, `anomaly` price z 4 / volume ×5 / market z 4, `retention_days` 30, and the crypto detectors: `depeg_pct` 1, `tvl_drop_pct` 15, `odds_swing_pts` 15, `funding_extreme_annual_pct` 100, `coinbase_premium_pct` 0.3.
 
 **Events and commands**: `wire.item`, `wire.notable`, `wire.dossier`, `wire.trigger` and `wire.source` on the live stream; `wire.replay` (Admin) re-runs an item through the policy as a dry run. Source health is in the heartbeat (`engine_status.wire.sources`: state, last error, items and drops in 24 h, lag).
 

@@ -139,17 +139,26 @@ export type ResearchPlan = { kind: "full" | "gap" | "none"; reason: string }
 /**
  * Which Grok research a cycle runs. Full whenever the wire is off or
  * unhealthy. auto skips Grok only when our feeds leave no gap: no unexplained moves, no
- * unconfirmed high-severity items, and a recent X read of these same subjects.
+ * unconfirmed high-severity items, and a recent X read of these same subjects. held_gaps runs
+ * the gap-fill only for a gap on a held subject.
  */
 export const researchPlan = async (
   ctx: Pick<EngineContext, "settings" | "col">,
-  { isEvent, wireHealthy, dossier, subjects, now = new Date() }: { isEvent: boolean; wireHealthy: boolean; dossier: Dossier | null; subjects: string[]; now?: Date },
+  { isEvent, wireHealthy, dossier, subjects, held = [], now = new Date() }: { isEvent: boolean; wireHealthy: boolean; dossier: Dossier | null; subjects: string[]; held?: string[]; now?: Date },
 ): Promise<ResearchPlan> => {
   const w = ctx.settings.current.wire
   if (isEvent) return w.event_research === "none" ? { kind: "none", reason: "event cycle with event_research none: the dossier is the evidence" } : { kind: "gap", reason: "event check (x_verify)" }
   if (!dossier) return { kind: "full", reason: "news engine off" }
   if (!wireHealthy) return { kind: "full", reason: "news engine unhealthy" }
   if (w.research_mode === "full") return { kind: "full", reason: "research_mode full" }
+  if (w.research_mode === "held_gaps") {
+    const ours = (i: { symbols: string[] }) => i.symbols.some((s) => held.includes(s))
+    const unexplained = dossier.unexplained.filter(ours).length
+    const unconfirmed = dossier.unconfirmed.filter(ours).length
+    return unexplained || unconfirmed
+      ? { kind: "gap", reason: `${unexplained} unexplained moves, ${unconfirmed} unconfirmed items on held pairs` }
+      : { kind: "none", reason: "no unexplained moves or unconfirmed items on held pairs" }
+  }
   if (w.research_mode === "gap_fill") return { kind: "gap", reason: "research_mode gap_fill" }
   if (dossier.unexplained.length || dossier.unconfirmed.length) return { kind: "gap", reason: `${dossier.unexplained.length} unexplained moves, ${dossier.unconfirmed.length} unconfirmed items` }
   const lastX = await ctx.col.research.findOne(
@@ -348,7 +357,7 @@ export const runCryptoCycle = async (ctx: EngineContext, request: CycleRequest):
     ctx.bus.emit("wire.dossier", { cycle_id: cycleId, rows: dossier.rows, total: dossier.items.length }, { summary: `Our research: ${dossier.items.length} items for ${subjects.length} subjects`, cycle_id: cycleId })
   }
   const eventText = isEvent ? eventSection(events) : undefined
-  const plan = await researchPlan(ctx, { isEvent, wireHealthy: !!wire && wire.healthy(), dossier, subjects: subjectSymbols })
+  const plan = await researchPlan(ctx, { isEvent, wireHealthy: !!wire && wire.healthy(), dossier, subjects: subjectSymbols, held: reviews.map((r) => r.position.symbol) })
   const estimate = (plan.kind === "full" ? await ctx.budget.estimate("research") : plan.kind === "gap" ? await ctx.budget.estimate("research_gap") : 0) + (await ctx.budget.estimate("decision"))
   // Scheduled cycles leave the event reserve alone; event cycles may use the whole budget.
   const reservePct = !isEvent && settings.wire.mode === "live" ? settings.wire.event_budget_reserve_pct : 0

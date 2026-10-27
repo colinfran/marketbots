@@ -426,7 +426,8 @@
             "enum": [
               "full",
               "gap_fill",
-              "auto"
+              "auto",
+              "held_gaps"
             ]
           },
           "thresholds": {
@@ -461,6 +462,9 @@
             ]
           },
           "entry_confirmation": {
+            "type": "boolean"
+          },
+          "unexplained_move_entries": {
             "type": "boolean"
           },
           "trigger_max_age_minutes": {
@@ -634,6 +638,7 @@
           "research_mode",
           "thresholds",
           "entry_confirmation",
+          "unexplained_move_entries",
           "trigger_max_age_minutes",
           "symbol_cooldown_minutes",
           "event_min_gap_seconds",
@@ -1108,7 +1113,8 @@
             "enum": [
               "full",
               "gap_fill",
-              "auto"
+              "auto",
+              "held_gaps"
             ]
           },
           "thresholds": {
@@ -1144,6 +1150,9 @@
             "additionalProperties": false
           },
           "entry_confirmation": {
+            "type": "boolean"
+          },
+          "unexplained_move_entries": {
             "type": "boolean"
           },
           "trigger_max_age_minutes": {
@@ -1319,6 +1328,7 @@
           "research_mode",
           "thresholds",
           "entry_confirmation",
+          "unexplained_move_entries",
           "trigger_max_age_minutes",
           "symbol_cooldown_minutes",
           "event_min_gap_seconds",

@@ -199,7 +199,7 @@ export type CycleDocBase<Status extends string> = {
   /** Event cycles: the trigger and the wire items that started it. */
   wire_trigger_id?: string | null
   wire_item_ids?: string[]
-  /** Why Grok research was skipped (research_mode auto), when it was. */
+  /** Why Grok research was skipped (research_mode auto or held_gaps), when it was. */
   research_skip_reason?: string | null
 }
 

@@ -88,15 +88,21 @@ describe("stock policy", () => {
     await b.bus.stop()
   })
 
-  it("evaluates confirmed good news on a stock we don't hold, and checks unexplained movers", async () => {
+  it("evaluates confirmed good news on a stock we don't hold, and checks unexplained movers only when unexplained_move_entries is on", async () => {
     const { policy, request, bus } = await setup({ held: [] })
     await policy.onItem({ item: item({ symbols: ["AAPL"], category: "m_and_a", polarity: 1, severity: 75, tier: 1, title: "AAPL to be acquired" }), backfill: false, confirmation: false })
     expect(request).toHaveBeenCalledWith(expect.objectContaining({ symbol: "AAPL", action: "evaluate" }))
     request.mockClear()
-    const mover = item({ symbols: ["ACME"], kind: "anomaly", category: "price_shock", polarity: 1, severity: 60, meta: { anomaly: "mover" } })
-    await policy.onItem({ item: mover, backfill: false, confirmation: false })
-    expect(request).toHaveBeenCalledWith(expect.objectContaining({ symbol: "ACME", rule: "unexplained_move", action: "gap_fill" }))
+    const mover = () => item({ symbols: ["ACME"], kind: "anomaly", category: "price_shock", polarity: 1, severity: 60, meta: { anomaly: "mover" } })
+    await policy.onItem({ item: mover(), backfill: false, confirmation: false })
+    expect(request).not.toHaveBeenCalled()
+    expect((await triggers()).map((t) => t.rule)).not.toContain("unexplained_move")
     await bus.stop()
+
+    const on = await setup({ held: [], settings: { ...DEFAULT_SETTINGS, wire: { ...DEFAULT_SETTINGS.wire, unexplained_move_entries: true } } })
+    await on.policy.onItem({ item: mover(), backfill: false, confirmation: false })
+    expect(on.request).toHaveBeenCalledWith(expect.objectContaining({ symbol: "ACME", rule: "unexplained_move", action: "gap_fill" }))
+    await on.bus.stop()
   })
 
   it("alerts on a halt of a holding and reviews on the resumption", async () => {
@@ -156,12 +162,28 @@ describe("stock research modes", () => {
   const ctxFor = (wire: Partial<Settings["wire"]>) => ({ col: db.col, settings: { current: { ...DEFAULT_SETTINGS, wire: { ...DEFAULT_SETTINGS.wire, ...wire } }, version: 1 } }) as unknown as Pick<EngineContext, "settings" | "col">
   const empty = assembleDossier([], { symbols: ["NVDA"], since: NOW, now: NOW, price: () => null, timeLabel: () => "", reviewThreshold: 55 })
   it("is full without a healthy wire, gap-fill in premarket, and skipped in auto only with a fresh X read", async () => {
-    expect((await researchPlan(ctxFor({}), { phase: "intraday", isEvent: false, wireHealthy: false, dossier: empty })).kind).toBe("full")
-    expect((await researchPlan(ctxFor({}), { phase: "premarket", isEvent: false, wireHealthy: true, dossier: empty })).kind).toBe("gap")
-    expect((await researchPlan(ctxFor({}), { phase: "intraday", isEvent: false, wireHealthy: true, dossier: empty, now: NOW })).kind).toBe("gap")
+    const auto = ctxFor({ research_mode: "auto" })
+    expect((await researchPlan(auto, { phase: "intraday", isEvent: false, wireHealthy: false, dossier: empty })).kind).toBe("full")
+    expect((await researchPlan(auto, { phase: "premarket", isEvent: false, wireHealthy: true, dossier: empty })).kind).toBe("gap")
+    expect((await researchPlan(auto, { phase: "intraday", isEvent: false, wireHealthy: true, dossier: empty, now: NOW })).kind).toBe("gap")
     await db.col.reports.insertOne({ _id: "r", cycle_id: "c", phase: "intraday", trading_day: DAY, created_at: new Date(NOW.getTime() - 20 * 60_000), research: { memo: "m", sources: [], queries: [], model: "m", x_search: true, duration_ms: 1, error: null, usage: { input: 0, output: 0, total: 0 } } } as never)
-    expect(await researchPlan(ctxFor({}), { phase: "intraday", isEvent: false, wireHealthy: true, dossier: empty, now: NOW })).toMatchObject({ kind: "none" })
+    expect(await researchPlan(auto, { phase: "intraday", isEvent: false, wireHealthy: true, dossier: empty, now: NOW })).toMatchObject({ kind: "none" })
     expect((await researchPlan(ctxFor({ event_research: "none" }), { phase: "intraday", isEvent: true, wireHealthy: true, dossier: empty })).kind).toBe("none")
+  })
+
+  it("held_gaps runs the gap-fill only for a gap on a held or requested symbol, in any phase", async () => {
+    const moved = item({ symbols: ["NVDA"], kind: "anomaly", category: "price_shock", polarity: 1, url: null, meta: { anomaly: "price" } })
+    const rumor = item({ symbols: ["ACME"], source: "rss:blog", tier: 3, kind: "news", url: "https://blog.test/a" })
+    const gaps = assembleDossier([moved, rumor], { symbols: ["NVDA", "ACME"], since: new Date(NOW.getTime() - 3_600_000), now: NOW, price: () => null, timeLabel: () => "", reviewThreshold: 55 })
+    expect([gaps.unexplained.length, gaps.unconfirmed.length]).toEqual([1, 1])
+    const plan = (focus: string[], phase: "premarket" | "intraday" | "postmarket" = "intraday", dossier = gaps) =>
+      researchPlan(ctxFor({}), { phase, isEvent: false, wireHealthy: true, dossier, focus, now: NOW })
+    expect(await plan(["NVDA"])).toEqual({ kind: "gap", reason: "1 unexplained moves, 0 unconfirmed items on held or requested symbols" })
+    expect(await plan(["ACME"])).toMatchObject({ kind: "gap", reason: expect.stringContaining("1 unconfirmed items") })
+    expect(await plan(["AAPL"])).toMatchObject({ kind: "none" })
+    expect(await plan(["NVDA"], "premarket", empty)).toMatchObject({ kind: "none" })
+    expect(await plan([], "postmarket", empty)).toMatchObject({ kind: "none" })
+    expect((await researchPlan(ctxFor({}), { phase: "intraday", isEvent: false, wireHealthy: false, dossier: gaps, focus: [] })).kind).toBe("full")
   })
 
   it("always gives the one-time seed the full research", async () => {

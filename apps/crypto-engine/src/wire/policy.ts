@@ -44,7 +44,7 @@ export const cryptoRules: Rules = async (item, ctx) => {
       const symbol = item.symbols[0]
       if (await ctx.hasRecentNews(symbol)) return []
       const held = ctx.held.has(symbol)
-      if (!held && (item.polarity <= 0 || !ctx.universe.has(symbol))) return []
+      if (!held && (!ctx.settings.wire.unexplained_move_entries || item.polarity <= 0 || !ctx.universe.has(symbol))) return []
       return [{ rule: "unexplained_move", action: "gap_fill", symbols: [symbol], entry: !held }]
     }
     return []

@@ -42,7 +42,7 @@ const list = (items: string[]) => (items.length ? items.join(", ") : "none")
 const WIRE_RULE = `WIRE lists what our own feeds saw, each line stamped with the time we first saw it (ET), the source tier (T1 official or primary: SEC filings, exchanges, regulators, issuers' own releases, our own market data; T2 major outlet; T3 aggregator or social), the category, a severity score computed in code, any independent confirmations and the price move since. It replaces the broker headline list. It is evidence like RESEARCH, not a recommendation: weigh tier and confirmation, and prefer T1. ${WIRE_SUMMARY_RULE}`
 
 /**
- * Gap-fill research (research_mode gap_fill / auto, and event checks): Grok already has the wire
+ * Gap-fill research (research_mode gap_fill / auto / held_gaps, and event checks): Grok already has the wire
  * dossier and must not repeat it. It only does what our feeds can't: read X, explain moves our
  * feeds can't, verify single-source claims, and catch anything critical the dossier missed.
  */
