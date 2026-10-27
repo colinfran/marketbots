@@ -44,7 +44,12 @@ type Handler = (body: Record<string, unknown>, init: RequestInit) => Response | 
 
 /** A fake scraper and Ollama behind global fetch, routed by path. */
 const fakeHttp = (routes: { extract?: Handler; chat?: Handler; ps?: Handler } = {}) => {
-  const handlers: Record<string, Handler> = { "/extract": routes.extract ?? (() => extracted()), "/api/chat": routes.chat ?? (() => replied(GOOD)), "/api/ps": routes.ps ?? (() => onGpu()) }
+  const handlers: Record<string, Handler> = {
+    "/extract": routes.extract ?? (() => extracted()),
+    "/api/chat": routes.chat ?? (() => replied(GOOD)),
+    "/api/ps": routes.ps ?? (() => onGpu()),
+    "/api/generate": () => json({ model: "llama3.2:3b", done: true, done_reason: "load" }),
+  }
   const calls: { path: string; body: Record<string, unknown>; headers: Record<string, string> }[] = []
   vi.stubGlobal(
     "fetch",
@@ -60,7 +65,7 @@ const fakeHttp = (routes: { extract?: Handler; chat?: Handler; ps?: Handler } = 
   return {
     calls,
     count: (path: string) => calls.filter((c) => c.path === path).length,
-    route: (path: "/extract" | "/api/chat" | "/api/ps", handler: Handler) => void (handlers[path] = handler),
+    route: (path: "/extract" | "/api/chat" | "/api/ps" | "/api/generate", handler: Handler) => void (handlers[path] = handler),
   }
 }
 
@@ -197,6 +202,21 @@ describe("the summary queue", () => {
     vi.useRealTimers()
   })
 
+  it("loads a model that isn't loaded on its own, before spending a scrape", async () => {
+    let loaded = false
+    const http = fakeHttp({ ps: () => (loaded ? onGpu() : json({ models: [] })) })
+    http.route("/api/generate", () => {
+      loaded = true
+      return json({ model: "llama3.2:3b", done: true, done_reason: "load" })
+    })
+    const { enricher, stored } = makeEnricher()
+    enricher.offer(item("a"))
+    await enricher.idle()
+    expect(http.calls.map((c) => c.path)).toEqual(["/api/ps", "/api/generate", "/api/ps", "/extract", "/api/chat", "/api/ps"])
+    expect(http.calls[1].body).toEqual({ model: "llama3.2:3b", keep_alive: "5m" })
+    expect(stored.get("a")?.status).toBe("ok")
+  })
+
   it("extracts, summarizes and stores only the summary, once per item", async () => {
     const http = fakeHttp()
     const { enricher, stored } = makeEnricher()
@@ -254,10 +274,27 @@ describe("the summary queue", () => {
     expect(stored.get("costco")).toEqual({ status: "rejected", reason: "numbers not in the article: 600", words: 497, model: "llama3.2:3b", ms: 0, at: NOW })
   })
 
+  it("pauses for 30 minutes when loading put the model partly outside GPU memory, before spending a scrape", async () => {
+    let ps = 0
+    const http = fakeHttp({ ps: () => (ps++ === 0 ? json({ models: [] }) : onGpu(1_200_000_000)) })
+    const { enricher, stored, clock, states } = makeEnricher()
+    enricher.offer(item("a"))
+    await enricher.idle()
+    expect(http.calls.map((c) => c.path)).toEqual(["/api/ps", "/api/generate", "/api/ps"])
+    expect(stored.get("a")).toBeUndefined()
+    expect(enricher.health()).toMatchObject({ state: "degraded", last_error: "llama3.2:3b not fully on the GPU (1,144 of 2,384 MB): paused for 30 min" })
+    http.route("/api/ps", () => onGpu())
+    clock.now = minutes(31)
+    await vi.advanceTimersByTimeAsync(5 * 60_000)
+    await enricher.idle()
+    expect(stored.get("a")?.status).toBe("ok")
+    expect(states).toEqual(["degraded", "ok"])
+  })
+
   it("pauses for 30 minutes when a call left the model partly outside GPU memory, so it doesn't keep running on the CPU", async () => {
     let ps = 0
-    // Not loaded before the first call; the call loads it only partly onto the GPU.
-    const http = fakeHttp({ ps: () => (ps++ === 0 ? json({ models: [] }) : onGpu(1_200_000_000)) })
+    // Fully on the GPU before the first call; afterwards (a reload during the call) only partly.
+    const http = fakeHttp({ ps: () => (ps++ === 0 ? onGpu() : onGpu(1_200_000_000)) })
     const { enricher, stored, clock, states } = makeEnricher()
     enricher.offer(item("a"))
     await enricher.idle()

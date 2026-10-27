@@ -111,6 +111,21 @@ export const chat = async (request: RequestText, base: string, job: { model: str
   return content
 }
 
+/**
+ * Loads the model without generating anything (Ollama's `/api/generate` with no prompt). A cold
+ * load from disk can take minutes, and Ollama abandons a load when its caller hangs up, so the
+ * load gets its own long timeout instead of sharing the chat's.
+ */
+export const loadModel = async (request: RequestText, base: string, job: { model: string; timeoutMs: number }): Promise<void> => {
+  await request(`${base.replace(/\/+$/, "")}/api/generate`, {
+    method: "POST",
+    headers: { "content-type": "application/json", accept: "application/json" },
+    body: JSON.stringify({ model: job.model, keep_alive: "5m" }),
+    timeoutMs: job.timeoutMs,
+    attempts: 1,
+  })
+}
+
 const wordCount = (s: string) => (s.match(/\S+/g) ?? []).length
 
 export type Checked = { status: "ok"; summary: string; key_points: string[] } | { status: "failed" | "rejected"; reason: string }

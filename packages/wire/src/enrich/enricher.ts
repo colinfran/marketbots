@@ -3,7 +3,7 @@ import type { WireArticle, WireArticleStatus, WireItemDoc, WireSourceHealth, Wir
 import { errorMessage, type Logger } from "@mb/engine-kit/log"
 import { HttpError } from "@mb/engine-kit/util/http"
 import type { RequestText } from "../fetch"
-import { articleContext, chat, checkSummary, extractArticle, gpuResidency, MIN_WORDS, type Extracted } from "./article"
+import { articleContext, chat, checkSummary, extractArticle, gpuResidency, loadModel, MIN_WORDS, type Extracted } from "./article"
 import { isEnglish, skipReason, type SummaryCandidate } from "./select"
 
 /**
@@ -40,10 +40,10 @@ const MAX_BACKOFF_MS = 30 * 60_000
 const RECHECK_MS = 5 * 60_000
 const TRIED_MAX = 5_000
 
-export type EnricherTimeouts = { extractMs: number; chatMs: number; psMs: number }
+export type EnricherTimeouts = { extractMs: number; chatMs: number; psMs: number; loadMs: number }
 
-/** The spike's lesson: a generous timeout, because a host stall once held a 4 s call for 27 s. */
-const DEFAULT_TIMEOUTS: EnricherTimeouts = { extractMs: 60_000, chatMs: 60_000, psMs: 10_000 }
+/** The spike's lesson: a generous timeout, because a host stall once held a 4 s call for 27 s. A cold model load from disk took 134 s on this server (2026-10-27). */
+const DEFAULT_TIMEOUTS: EnricherTimeouts = { extractMs: 60_000, chatMs: 60_000, psMs: 10_000, loadMs: 300_000 }
 
 export type EnricherDeps = {
   /** Writes the outcome onto the wire item. */
@@ -237,9 +237,14 @@ export class Enricher {
     }
 
     // Ollama first: if it is out, or the model is already loaded partly on the CPU (both engines
-    // share it), nothing runs and the scraper isn't spent on the article.
+    // share it), nothing runs and the scraper isn't spent on the article. A model that isn't loaded
+    // is loaded on its own first (see loadModel), then checked again.
     try {
-      const residency = await gpuResidency(this.d.request, llm, s.model, this.timeouts.psMs)
+      let residency = await gpuResidency(this.d.request, llm, s.model, this.timeouts.psMs)
+      if (!residency) {
+        await loadModel(this.d.request, llm, { model: s.model, timeoutMs: this.timeouts.loadMs })
+        residency = await gpuResidency(this.d.request, llm, s.model, this.timeouts.psMs)
+      }
       if (residency && residency.vram < residency.size) {
         this.pauseForGpu(s.model, residency)
         return "wait"
