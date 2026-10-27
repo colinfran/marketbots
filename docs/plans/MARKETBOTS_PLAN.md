@@ -410,7 +410,7 @@ Tags: **[C]** crypto, **[S]** stock, **[both]**, **[stack]** Docker/infra, **[ow
 - [ ] 4.2 [owner] Re-link both Vercel projects to the new repo (§3.7), set the Ignored Build Step, deploy. Check both dashboards: signed in, stream connects, a `pause`/`resume` round trip works.
 - [x] 4.3 [both] Remove the old scraper containers. Keep the old compose projects stopped (not removed) for 14 days, then remove them with owner approval.
 - [ ] 4.4 [owner] Archive both old GitHub repos, read-only, once Vercel no longer builds from them.
-- [ ] 4.5 Update memory: the repo, the stack, and where progress lives.
+- [x] 4.5 Update memory: the repo, the stack, and where progress lives.
 
 ### Phase 5: `@mb/core` and per-bot cores (≈ 1 session)
 
@@ -469,9 +469,9 @@ Tags: **[C]** crypto, **[S]** stock, **[both]**, **[stack]** Docker/infra, **[ow
 
 - [ ] A shared outbound fetch cache + cross-engine rate limits for URLs both bots poll (ForexFactory, SEC, Fed, Polymarket…), and one Bluesky Jetstream consumer instead of two.
 - [ ] Change streams instead of the 1-second command poll (check the Atlas tier supports them).
-- [ ] A nightly backup of the Kraken wallet volume (today it has none).
+- [x] A nightly backup of the Kraken wallet volume (today it has none). *(Done 2026-10-26: compose service `wallet-backup`, daily 10:00 UTC to `backups/kraken/`, 14 kept.)*
 - [ ] Copy the wallet volume to a `marketbots_` name and drop the `external` reference.
-- [ ] GitHub Actions CI (typecheck, test, lint, build). Neither repo has CI today.
+- [x] GitHub Actions CI (typecheck, test, lint, build). Neither repo has CI today. *(Done 2026-10-26: `.github/workflows/ci.yml`, plus the scraper's tests; it runs once the repo is on GitHub.)*
 - [ ] Carry over MASTER_PLAN's open work: 8.2 and 8.3 tuning, and its Phase 9.
 
 ---

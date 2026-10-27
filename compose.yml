@@ -91,6 +91,34 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # Nightly copy of the paper wallet (MARKETBOTS_PLAN Phase 11) to backups/kraken/ on the host disk,
+  # which survives a Docker or WSL reset. One at start, then daily at 10:00 UTC; the newest 14 kept.
+  # Restore: docs/SERVER.md.
+  wallet-backup:
+    image: node:22-bookworm-slim@sha256:de170b39439eb0e5a3444ad7d60b015614a381e10fecae2e30ec9e735122f38d
+    container_name: marketbots-wallet-backup
+    restart: unless-stopped
+    user: "1000:1000"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        while true; do
+          f=/backups/kraken-paper-$$(date -u +%Y%m%dT%H%M%SZ).tgz
+          tar -czf "$$f.part" -C /data . && mv "$$f.part" "$$f" && echo "backed up $$f ($$(du -h "$$f" | cut -f1))"
+          ls -1t /backups/kraken-paper-*.tgz | tail -n +15 | xargs -r rm -f
+          sleep $$(( $$(date -u -d 'tomorrow 10:00' +%s) - $$(date -u +%s) ))
+        done
+    volumes:
+      - kraken-paper:/data:ro
+      - ./backups/kraken:/backups
+    mem_limit: 64m
+    logging: *logging
+
   # Local article summaries (MARKETBOTS_PLAN §3.9, Phase 10). Off unless started with --profile llm.
   # GPU only: ~3 GB of VRAM while a model is loaded, released after 5 idle minutes.
   llm:

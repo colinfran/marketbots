@@ -14,6 +14,7 @@
 docs
 contracts
 data
+backups
 *.md
 apps/crypto-web/**
 !apps/crypto-web/package.json

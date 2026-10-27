@@ -21,6 +21,9 @@ coverage/
 !*.env.example
 !.env.example
 
+# wallet backups (compose service wallet-backup)
+/backups/
+
 # local data (backtest CSVs etc.)
 /data/
 
