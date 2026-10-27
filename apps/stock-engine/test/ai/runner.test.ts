@@ -165,6 +165,25 @@ describe("AiRunner.structured", () => {
     expect(stream.mock.calls.map(([o]) => (o as { model: string }).model)).toEqual(["spacexai/grok-4.7", "spacexai/grok-4.7", "xai/grok-4"])
   })
 
+  it("goes straight to the fallback model after a timeout, since the same model would likely time out again", async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-10-27T14:00:00Z") })
+    stream
+      .mockImplementationOnce(() => {
+        vi.setSystemTime(Date.now() + 60_000)
+        return fakeStream([], { output: new DOMException("The operation was aborted due to timeout", "TimeoutError") })
+      })
+      .mockReturnValueOnce(fakeStream([], { output: good }))
+    const b = budget()
+    const r = await new AiRunner(b, silentLogger, true).structured(opts({ fallback: "xai/grok-4" }))
+    vi.useRealTimers()
+    expect(r).toMatchObject({ output: good, attempts: 2, model: "xai/grok-4" })
+    expect(stream.mock.calls.map(([o]) => (o as { model: string }).model)).toEqual(["spacexai/grok-4.7", "xai/grok-4"])
+    expect(b.record.mock.calls.map(([c]) => [c.model, c.ok])).toEqual([
+      ["spacexai/grok-4.7", false],
+      ["xai/grok-4", true],
+    ])
+  })
+
   it("charges a timed-out call by how long it ran, since it reports no usage", async () => {
     stream.mockImplementation(() => fakeStream([{ type: "error", error: new Error("The operation was aborted due to timeout") }]))
     const b = budget()

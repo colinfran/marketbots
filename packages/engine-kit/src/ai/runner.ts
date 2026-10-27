@@ -74,6 +74,9 @@ const queryOf = (input: unknown): string | null => {
   return typeof q === "string" && q.trim() ? cleanLine(q, 200) : null
 }
 
+/** A structured call that failed this close to its time limit timed out (timers can fire a moment early). */
+const TIMEOUT_SLACK_MS = 1_000
+
 /** Throttled reasoning reporter: the last ~240 characters, at most every PROGRESS_MS. */
 const reasoningReporter = (report?: (chars: number, excerpt: string) => void) => {
   let text = ""
@@ -250,8 +253,9 @@ export class AiRunner {
   /**
    * Structured decision with up to three attempts at decreasing temperature. A schema failure is
    * first repaired in code; if the repair lost items and there's another attempt left, the model
-   * is asked again with the exact validation error. The last attempt switches to the fallback
-   * model when the primary keeps failing for non-schema reasons (outage, timeouts).
+   * is asked again with the exact validation error. After a timeout the fallback model takes over
+   * at once (another try on a model that ran out of time would most likely time out too, and be
+   * billed again); after other non-schema failures (outages) it takes the last attempt.
    */
   async structured<T>(opts: {
     task: AiTask
@@ -348,6 +352,9 @@ export class AiRunner {
         totalCost += await this.record(opts.task, model, opts.cycleId, usage, cost, 0, started, message)
         totalUsage = addUsage(totalUsage, usage)
         this.log.warn("structured attempt failed", { task: opts.task, attempt, model, error: message })
+        // The SDK words a timeout several ways (its own, or an abort during its retry back-off), so a
+        // failure at the time limit is what counts.
+        if (opts.fallback && !NoObjectGeneratedError.isInstance(error) && Date.now() - started >= opts.timeoutMs - TIMEOUT_SLACK_MS) model = opts.fallback
         feedback = `\n\nIMPORTANT: your previous answer was rejected: ${message}\nReturn ONLY one JSON object that matches the schema exactly (every field present, correct types, numbers as numbers, enums spelled exactly as listed).`
       }
     }
