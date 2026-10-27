@@ -7,9 +7,9 @@ import { env } from "./env"
 export { sameOrigin, type Viewer } from "@mb/web-kit/auth"
 
 /**
- * Owner sign-in (@mb/web-kit/auth): a Better Auth magic link for OWNER_EMAIL only, with this
- * dashboard's own secret, database and domain. The IP salt "smb-ip." must never change: the
- * login rate-limit records are keyed by it.
+ * Owner sign-in (@mb/web-kit/auth): a Better Auth magic link (or, in the Home Screen app, an
+ * emailed code) for OWNER_EMAIL only, with this dashboard's own secret, database and domain. The
+ * IP salt "smb-ip." must never change: the login rate-limit records are keyed by it.
  */
 export const { auth, authConfigured, getViewer } = createAuth({
   appName: "StockMarketBot",
@@ -17,5 +17,5 @@ export const { auth, authConfigured, getViewer } = createAuth({
   env,
   mongoClient,
   collections,
-  sendMagicLinkEmail: email({ appName: "StockMarketBot", env }).sendMagicLinkEmail,
+  ...email({ appName: "StockMarketBot", env }),
 })

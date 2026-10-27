@@ -63,7 +63,7 @@ Safety: browser `Origin` allowlist, max clients and max connections per IP, 4KB 
 | `wire_triggers` | Every trigger candidate the policy produced, with the gate that passed or stopped it and why | TTL, `wire.retention_days` |
 | `seed_runs` | The owner's one-time seed buys: schedule, status, allocations, orders, error | permanent |
 | `notifications`, `login_attempts` | Alerts for the dashboard; sign-in rate limits (hashed IPs) | TTL |
-| `auth_users` / `auth_sessions` / `auth_accounts` / `auth_verifications` | Owner sign-in (Better Auth magic links, only `OWNER_EMAIL`); written by the dashboard | sessions 12h, links 5 min (TTL) |
+| `auth_users` / `auth_sessions` / `auth_accounts` / `auth_verifications` | Owner sign-in (Better Auth magic links, or emailed codes in the Home Screen app; only `OWNER_EMAIL`); written by the dashboard | sessions 12h, links and codes 5 min (TTL) |
 
 Raw market data is not stored: candles come from Kraken on demand (720 per interval) and only compact feature summaries reach MongoDB. Index definitions live in `packages/core/src/db.ts` and are created by the engine on boot.
 

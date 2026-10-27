@@ -4,7 +4,7 @@ import { mongodbAdapter } from "@better-auth/mongo-adapter"
 import { type AuditDoc, BASE_COLLECTIONS, type LoginAttemptDoc } from "@mb/core/db"
 import { betterAuth } from "better-auth"
 import { toNextJsHandler } from "better-auth/next-js"
-import { magicLink } from "better-auth/plugins"
+import { emailOTP, magicLink } from "better-auth/plugins"
 import type { Collection, MongoClient } from "mongodb"
 import { headers } from "next/headers"
 import { NextResponse } from "next/server"
@@ -17,9 +17,11 @@ import { isOwnerEmail } from "./owner"
  * (it's paper money); every control, the settings page, the audit log and operational details
  * need the owner session.
  *
- * The owner signs in with a Better Auth magic link, emailed through useSend. Only OWNER_EMAIL gets
- * in, checked three times: no link is ever emailed to another address, no account can be created
- * for one, and a session only counts as the owner's while its email matches.
+ * The owner signs in with a Better Auth magic link, emailed through useSend. The dashboard installed
+ * as a Home Screen app keeps its own cookies apart from the browser's, so an emailed link would sign
+ * in the browser instead; there the owner types an emailed code (Better Auth email OTP). Only
+ * OWNER_EMAIL gets in, checked three times: no link or code is ever emailed to another address, no
+ * account can be created for one, and a session only counts as the owner's while its email matches.
  *
  * Each dashboard calls `createAuth` with its own name, secret, database, domain and IP salt.
  */
@@ -27,7 +29,19 @@ import { isOwnerEmail } from "./owner"
 export type Viewer = { owner: boolean }
 
 const SESSION_TTL_SECONDS = 12 * 3_600
-const MAGIC_LINK_TTL_SECONDS = 5 * 60
+/** How long a sign-in link or code works. */
+const SIGN_IN_TTL_SECONDS = 5 * 60
+
+/** The email OTP plugin's routes beyond signing in with a code: no use here, so they 404. */
+export const UNUSED_OTP_PATHS = [
+  "/email-otp/check-verification-otp",
+  "/email-otp/verify-email",
+  "/email-otp/request-password-reset",
+  "/forget-password/email-otp",
+  "/email-otp/reset-password",
+  "/email-otp/request-email-change",
+  "/email-otp/change-email",
+]
 
 /**
  * Client IPs are only stored hashed, with a per-bot salt ("cmb-ip." / "smb-ip."). The salt must
@@ -42,6 +56,7 @@ export const createAuth = ({
   mongoClient,
   collections,
   sendMagicLinkEmail,
+  sendSignInCodeEmail,
 }: {
   appName: string
   ipSalt: string
@@ -49,6 +64,7 @@ export const createAuth = ({
   mongoClient: () => MongoClient
   collections: () => Promise<{ loginAttempts: Collection<LoginAttemptDoc>; audit: Collection<AuditDoc> }>
   sendMagicLinkEmail: (message: { to: string; url: string; minutes: number }) => Promise<void>
+  sendSignInCodeEmail: (message: { to: string; code: string; minutes: number }) => Promise<void>
 }) => {
   /** Sign-in needs BETTER_AUTH_SECRET (32+ chars) and MongoDB; without them everyone is public. */
   const authConfigured = () => (env.betterAuthSecret()?.length ?? 0) >= 32 && !!env.mongoUri()
@@ -68,6 +84,7 @@ export const createAuth = ({
       session: { modelName: BASE_COLLECTIONS.authSessions, expiresIn: SESSION_TTL_SECONDS },
       account: { modelName: BASE_COLLECTIONS.authAccounts },
       verification: { modelName: BASE_COLLECTIONS.authVerifications },
+      disabledPaths: UNUSED_OTP_PATHS,
       // Stored in MongoDB so every serverless instance shares the limits (expires on its own).
       rateLimit: {
         customStorage: {
@@ -107,11 +124,20 @@ export const createAuth = ({
       },
       plugins: [
         magicLink({
-          expiresIn: MAGIC_LINK_TTL_SECONDS,
+          expiresIn: SIGN_IN_TTL_SECONDS,
           storeToken: "hashed",
           sendMagicLink: async ({ email, url }) => {
             // Anyone can ask for a link; only the owner is ever emailed one, and the response is the same either way.
-            if (isOwnerEmail(email, env.ownerEmail())) await sendMagicLinkEmail({ to: email, url, minutes: MAGIC_LINK_TTL_SECONDS / 60 })
+            if (isOwnerEmail(email, env.ownerEmail())) await sendMagicLinkEmail({ to: email, url, minutes: SIGN_IN_TTL_SECONDS / 60 })
+          },
+        }),
+        // 6 digits, single use, locked after 3 wrong tries; requests and tries are rate-limited per client.
+        emailOTP({
+          expiresIn: SIGN_IN_TTL_SECONDS,
+          storeOTP: "hashed",
+          sendVerificationOTP: async ({ email, otp, type }) => {
+            // Same rule as the links. Only sign-in codes exist: the other OTP routes are disabled.
+            if (type === "sign-in" && isOwnerEmail(email, env.ownerEmail())) await sendSignInCodeEmail({ to: email, code: otp, minutes: SIGN_IN_TTL_SECONDS / 60 })
           },
         }),
       ],
@@ -132,7 +158,7 @@ export const createAuth = ({
   return { auth, authConfigured, getViewer }
 }
 
-/** app/api/auth/[...all]: magic-link sign-in, link verification, sign-out (503 until sign-in is configured). */
+/** app/api/auth/[...all]: magic-link and code sign-in, link verification, sign-out (503 until sign-in is configured). */
 export const authRoute = ({ auth, authConfigured }: Pick<ReturnType<typeof createAuth>, "auth" | "authConfigured">) =>
   toNextJsHandler(async (request) =>
     authConfigured() ? auth().handler(request) : NextResponse.json({ message: "Owner sign-in is not configured (BETTER_AUTH_SECRET / MONGODB_URI)." }, { status: 503 }),

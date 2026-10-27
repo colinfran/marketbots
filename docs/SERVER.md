@@ -31,7 +31,7 @@ The two engines are independent: separate images, containers, ports, env files, 
 
 **Vercel AI Gateway**: one `AI_GATEWAY_API_KEY` works for both engines. The gateway needs paid credits.
 
-**useSend** (`USESEND_API_KEY`): sends the owner's sign-in magic links. The link only ever goes to `OWNER_EMAIL`; nobody else can sign in.
+**useSend** (`USESEND_API_KEY`): sends the owner's sign-in magic links, and the sign-in codes the dashboard asks for when it runs as an installed Home Screen app (that app keeps its own cookies, so a link opened in the browser wouldn't sign it in). Links and codes only ever go to `OWNER_EMAIL`; nobody else can sign in.
 
 **Random secrets**: each bot has its own `STREAM_TOKEN_SECRET` and `BETTER_AUTH_SECRET`; never reuse one across bots. Generate each with:
 

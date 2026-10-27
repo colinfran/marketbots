@@ -177,7 +177,7 @@ Events are typed (`packages/core/src/events.ts`) and carry a strictly increasing
 | `wire_triggers` | every trigger candidate the policy produced, with the gate that passed or stopped it and why (TTL `wire.retention_days`) |
 | `seed_runs` | the owner's one-time seed buys: schedule, status, allocations, orders, error |
 | `ai_calls`, `notifications`, `login_attempts` | AI spend (budget; research calls also count their searches), alerts, sign-in rate limits |
-| `auth_*` | owner sign-in (Better Auth magic links, only `OWNER_EMAIL`), written by the dashboard |
+| `auth_*` | owner sign-in (Better Auth magic links, or emailed codes in the Home Screen app; only `OWNER_EMAIL`), written by the dashboard |
 
 ## Testing
 
