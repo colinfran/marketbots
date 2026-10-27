@@ -219,7 +219,7 @@ docker compose up -d --build                   # everything whose image or confi
 ```
 
 - Naming the service is how you deploy one bot without touching the other. Shared code (`packages/*`) is compiled into each image at build time, so a change there reaches an engine only when that engine is rebuilt.
-- **Stock**: prefer outside market hours. Stops rest at Alpaca, but options exits need the engine.
+- **Stock**: any time, market hours included; pick a moment with no cycle or seed run in progress. Stops rest at Alpaca; options exits wait for the engine, which is back in about a minute.
 - **Crypto**: pick a moment with no cycle or seed run in progress. Stops are watched only by the engine; it is back in about a minute.
 - A stop is graceful (30 s grace period): the engine releases its lease, so the new container takes over at once.
 - Dashboards deploy by pushing to `main` (Vercel, §8).
