@@ -1,0 +1,30 @@
+{
+  "name": "@mb/wire",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@mb/core": "workspace:*",
+    "@mb/engine-kit": "workspace:*",
+    "cheerio": "1.2.0",
+    "fast-xml-parser": "5.11.2",
+    "mongodb": "^7.7.0",
+    "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "@mb/config": "workspace:*",
+    "@types/node": "^22",
+    "@types/ws": "^8.18.2",
+    "eslint": "^9",
+    "typescript": "^5",
+    "vitest": "^4.1.12"
+  }
+}

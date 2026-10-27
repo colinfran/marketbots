@@ -1,5 +1,5 @@
 import { marketDay, marketTime } from "@mb/stock-core/time"
-import { PollingSource } from "../poller"
+import { PollingSource } from "@mb/wire/poller"
 import type { RawItem, SourceContext, SourceSpec } from "../types"
 import { BROWSER_HEADERS, nextWeekdays, num, settleAll, usd, usDate, watched } from "./common"
 

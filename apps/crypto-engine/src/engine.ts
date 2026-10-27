@@ -11,6 +11,7 @@ import { StatusReporter } from "@mb/engine-kit/control/status"
 import { errorMessage, type Logger } from "@mb/engine-kit/log"
 import { claimDueSeed, finishSeed } from "@mb/engine-kit/state/seed-runs"
 import { every, withTimeout } from "@mb/engine-kit/util/async"
+import { coverageGaps } from "@mb/wire/calendar"
 import type { AiBudget } from "./ai/budget"
 import type { AiRunner } from "./ai/runner"
 import type { Alerts } from "./alerts"
@@ -36,7 +37,6 @@ import type { KrakenCli } from "./venues/kraken/cli"
 import type { KrakenRest } from "./venues/kraken/rest"
 import { roundPrice } from "./venues/kraken/pairs"
 import { cryptoRules, WirePolicy } from "./wire/policy"
-import { coverageGaps } from "./wire/calendar"
 import type { Wire } from "./wire/wire"
 
 export const ENGINE_VERSION = "0.1.0"
@@ -259,7 +259,7 @@ export class Engine {
   /** The macro calendar file needs regenerating before any kind runs out of dates. */
   private async checkCalendar() {
     const gaps = coverageGaps(new Date())
-    if (gaps.length) await this.d.alerts.send("info", "Macro calendar running out", `Regenerate apps/crypto-engine/src/wire/macro-calendar.json: ${gaps.join("; ")}.`, { key: `calendar|${gaps.join(",")}` })
+    if (gaps.length) await this.d.alerts.send("info", "Macro calendar running out", `Regenerate packages/wire/src/macro-calendar.json: ${gaps.join("; ")}.`, { key: `calendar|${gaps.join(",")}` })
   }
 
   private setCycleState(state: CycleState, detail?: string) {

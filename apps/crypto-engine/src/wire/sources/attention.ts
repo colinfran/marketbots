@@ -1,4 +1,25 @@
-import { crossingId, crossingMeta, metricSource, type MetricRule, type MetricWatcher } from "../metrics"
+import { crossingId, crossingMeta, metricSource, type MetricRule, type MetricWatcher } from "@mb/wire/metrics"
+import {
+  apewisdomItems as apewisdomItemsOf,
+  APP_CHARTS,
+  appChartCrossings,
+  appChartTitle,
+  appRank,
+  attention,
+  ENTRY,
+  pageviewItems,
+  pageviewRatio as pageviewRatioOf,
+  pageviewsUrl,
+  STOCKTWITS_API,
+  stocktwitsTrendingItems as stocktwitsTrendingItemsOf,
+  type ApeResult,
+  type AppChart,
+  type AppleGenre,
+  type AppleTop,
+  type ChartApp,
+  type Pageviews,
+  type StSymbol,
+} from "@mb/wire/sources/attention"
 import type { RawItem, SourceContext, SourceSpec } from "../types"
 import { num, settleAll, universeBases } from "./common"
 
@@ -6,7 +27,8 @@ import { num, settleAll, universeBases } from "./common"
  * Retail attention (MASTER_PLAN §4.1 wave 2): all `sentiment_spike`, tier 3, low severity, and
  * annotate only (§3.5). Each source reports a change, never a level: a coin entering a trending
  * list, mentions or message rates jumping, an app climbing the charts, pageviews far above normal,
- * the Fear & Greed index entering or leaving an extreme.
+ * the Fear & Greed index entering or leaving an extreme. The building blocks both bots use are in
+ * @mb/wire/sources/attention.
  *
  *   apewisdom   Reddit/4chan mentions (24 h) ≥ 3× the day before, with at least 30 mentions
  *   stocktwits  a universe coin entering StockTwits trending; BTC.X/ETH.X message rate ≥ 4× its
@@ -22,45 +44,20 @@ import { num, settleAll, universeBases } from "./common"
  * passed, so a coin hovering at the edge of a list doesn't repeat.
  */
 
-const ENTRY_REARM_MS = 6 * 3_600_000
-const ENTRY: MetricRule = { id: "entry", kind: "level", abs: 1, rearmMs: ENTRY_REARM_MS }
-
-const attention = (symbols: string[], marketWide = false) => ({ symbols, marketWide, category: "sentiment_spike" as const, kind: "sentiment" as const, tier: 3 as const, polarity: 0 as const })
-
 // ── ApeWisdom ───────────────────────────────────────────────────────────────
 
-type ApeResult = { ticker: string; name: string; rank: number; mentions: number | string; mentions_24h_ago: number | string | null }
-
-const APE_MIN_MENTIONS = 30
-const APE_RATIO = 3
-
-export const apewisdomItems = (body: { results?: ApeResult[] }, w: MetricWatcher, ctx: SourceContext): RawItem[] => {
-  const at = ctx.now().getTime()
-  const universe = universeBases(ctx)
-  const rows = new Map((body.results ?? []).map((r) => [String(r.ticker).replace(/\.X$/i, "").toUpperCase(), r]))
-  const items: RawItem[] = []
-  for (const [base, symbol] of universe) {
-    const r = rows.get(base)
-    const mentions = num(r?.mentions) ?? 0
-    const before = num(r?.mentions_24h_ago)
-    // Every coin is observed every poll (0 when quiet), so a jump can end and re-arm.
-    const ratio = mentions >= APE_MIN_MENTIONS && before && before > 0 ? mentions / before : 0
-    for (const c of w.observe(`apewisdom:${base}`, ratio, at, [{ id: "jump", kind: "level", abs: APE_RATIO }])) {
-      items.push({
-        ...attention([symbol]),
-        sourceId: crossingId(c),
-        title: `${symbol}: ${mentions} Reddit/4chan mentions in 24 h, ${c.value.toFixed(1)}× the day before (ApeWisdom)`,
-        url: `https://apewisdom.io/cryptocurrencies/${base}/`,
-        meta: { ...crossingMeta(c), mentions, mentions_24h_ago: before, rank: num(r?.rank) },
-      })
-    }
-  }
-  return items
-}
+export const apewisdomItems = (body: { results?: ApeResult[] }, w: MetricWatcher, ctx: SourceContext): RawItem[] =>
+  apewisdomItemsOf(
+    body,
+    [...universeBases(ctx)].map(([base, symbol]) => ({ key: base, ticker: base, symbol })),
+    w,
+    ctx,
+    // ApeWisdom lists coins as BTC or BTC.X.
+    { rowTicker: (ticker) => ticker.replace(/\.X$/i, "").toUpperCase(), url: (t) => `https://apewisdom.io/cryptocurrencies/${t.key}/` },
+  )
 
 // ── StockTwits ──────────────────────────────────────────────────────────────
 
-type StSymbol = { symbol: string; title?: string }
 type StMessage = { id: number; created_at: string }
 
 /** The universe coins StockTwits streams are read for (more need the owner's approval, Phase 6.5). */
@@ -75,18 +72,14 @@ export const messageRate = (messages: StMessage[]) => {
   return spanH > 0 ? (times.length - 1) / spanH : null
 }
 
-export const stocktwitsTrendingItems = (body: { symbols?: StSymbol[] }, w: MetricWatcher, ctx: SourceContext): RawItem[] => {
-  const at = ctx.now().getTime()
-  const list = (body.symbols ?? []).map((s) => s.symbol.toUpperCase())
-  const items: RawItem[] = []
-  for (const [base, symbol] of universeBases(ctx)) {
-    const rank = list.indexOf(`${base}.X`) + 1
-    for (const c of w.observe(`stocktwits:trending:${base}`, rank ? 1 : 0, at, [ENTRY])) {
-      items.push({ ...attention([symbol]), sourceId: crossingId(c), title: `${symbol} enters StockTwits trending (#${rank} of ${list.length})`, url: `https://stocktwits.com/symbol/${base}.X`, meta: { ...crossingMeta(c), rank } })
-    }
-  }
-  return items
-}
+/** StockTwits lists a coin as BTC.X. */
+export const stocktwitsTrendingItems = (body: { symbols?: StSymbol[] }, w: MetricWatcher, ctx: SourceContext): RawItem[] =>
+  stocktwitsTrendingItemsOf(
+    body,
+    [...universeBases(ctx)].map(([base, symbol]) => ({ key: base, ticker: `${base}.X`, symbol })),
+    w,
+    ctx,
+  )
 
 export const stocktwitsRateItems = (base: string, body: { messages?: StMessage[] }, w: MetricWatcher, ctx: SourceContext): RawItem[] => {
   const symbol = universeBases(ctx).get(base)
@@ -135,53 +128,14 @@ export const coingeckoItems = (body: CgTrending, w: MetricWatcher, ctx: SourceCo
 
 // ── App Store ───────────────────────────────────────────────────────────────
 
-type AppleTop = { feed?: { results?: { id: string; name: string }[] } }
-type AppleGenre = { feed?: { entry?: { id?: { attributes?: { "im:id"?: string } }; "im:name"?: { label?: string } }[] } }
-
-const COINBASE_APP_ID = "886427730"
-const isCoinbase = (id: string | undefined, name: string | undefined) => id === COINBASE_APP_ID || /^coinbase\b(?!\s*wallet)/i.test(name ?? "")
+const COINBASE: ChartApp = { id: "886427730", name: "Coinbase", match: /^coinbase\b(?!\s*wallet)/i, url: "https://apps.apple.com/us/app/coinbase-buy-bitcoin-ether/id886427730" }
 
 /** Coinbase's rank in a chart (1 = top), or null when it isn't on it. */
-export const coinbaseRank = (body: AppleTop | AppleGenre): number | null => {
-  const top = (body as AppleTop).feed?.results
-  if (top) {
-    const i = top.findIndex((a) => isCoinbase(a.id, a.name))
-    return i >= 0 ? i + 1 : null
-  }
-  const entries = (body as AppleGenre).feed?.entry ?? []
-  const i = entries.findIndex((e) => isCoinbase(e.id?.attributes?.["im:id"], e["im:name"]?.label))
-  return i >= 0 ? i + 1 : null
-}
+export const coinbaseRank = (body: AppleTop | AppleGenre): number | null => appRank(body, COINBASE)
 
-const CHARTS = [
-  {
-    id: "top",
-    label: "top 100 free apps",
-    url: "https://rss.marketingtools.apple.com/api/v2/us/apps/top-free/100/apps.json",
-    // Scored as places from the bottom (101 − rank, 0 when off the chart).
-    rules: [{ id: "entry", kind: "level", abs: 1, rearmMs: 24 * 3_600_000 }, { id: "climb", kind: "change", windowMin: 24 * 60, points: 25, direction: "up" }] as MetricRule[],
-  },
-  {
-    id: "finance",
-    label: "Finance top 100",
-    url: "https://itunes.apple.com/us/rss/topfreeapplications/limit=100/genre=6015/json",
-    rules: [{ id: "climb", kind: "change", windowMin: 24 * 60, points: 15, direction: "up", min: 81 }] as MetricRule[],
-  },
-]
-
-export const appstoreItems = (chart: (typeof CHARTS)[number], body: AppleTop | AppleGenre, w: MetricWatcher, ctx: SourceContext): RawItem[] => {
-  const rank = coinbaseRank(body)
-  const score = rank ? 101 - rank : 0
-  const crossings = w.observe(`appstore:${chart.id}:coinbase`, score, ctx.now().getTime(), chart.rules)
-  // Entering the chart is also a climb from nothing: one item, not two.
-  const entered = crossings.some((c) => c.rule === "entry")
-  return crossings.filter((c) => !entered || c.rule === "entry").map((c) => ({
-    ...attention([], true),
-    sourceId: crossingId(c),
-    title: c.rule === "entry" ? `Coinbase app enters the US App Store ${chart.label} (#${rank})` : `Coinbase app up ${Math.round(c.delta!)} places in 24 h to #${rank} in the US App Store ${chart.label}`,
-    url: "https://apps.apple.com/us/app/coinbase-buy-bitcoin-ether/id886427730",
-    meta: { ...crossingMeta(c), chart: chart.id, rank },
-  }))
+export const appstoreItems = (chart: AppChart, body: AppleTop | AppleGenre, w: MetricWatcher, ctx: SourceContext): RawItem[] => {
+  const { rank, crossings } = appChartCrossings(chart, body, COINBASE, w, ctx)
+  return crossings.map((c) => ({ ...attention([], true), sourceId: crossingId(c), title: appChartTitle(COINBASE, chart, c, rank), url: COINBASE.url, meta: { ...crossingMeta(c), chart: chart.id, rank } }))
 }
 
 // ── Wikipedia ───────────────────────────────────────────────────────────────
@@ -199,36 +153,22 @@ export const WIKIPEDIA_ARTICLES: Record<string, string> = {
   LTC: "Litecoin",
   DOT: "Polkadot_(blockchain_platform)",
 }
-const WIKI_RATIO = 3
 /** Below this many daily views (Chainlink, Avalanche, Polkadot get under 40) a 3× day is a few clicks. */
 const WIKI_MIN_MEDIAN = 50
 
-type Pageviews = { items?: { timestamp: string; views: number }[] }
-
-const ymd = (d: Date) => d.toISOString().slice(0, 10).replace(/-/g, "")
-
 /** The latest day's views over the median of the 28 days before it, with that day's time. */
-export const pageviewRatio = (body: Pageviews): { at: number; views: number; median: number; ratio: number } | null => {
-  const days = (body.items ?? []).map((i) => ({ at: Date.UTC(+i.timestamp.slice(0, 4), +i.timestamp.slice(4, 6) - 1, +i.timestamp.slice(6, 8)), views: num(i.views) ?? 0 }))
-  if (days.length < 8) return null
-  const last = days[days.length - 1]
-  const prior = days.slice(-29, -1).map((d) => d.views).sort((a, b) => a - b)
-  const median = prior.length % 2 ? prior[(prior.length - 1) / 2] : (prior[prior.length / 2 - 1] + prior[prior.length / 2]) / 2
-  return median >= WIKI_MIN_MEDIAN ? { at: last.at, views: last.views, median, ratio: last.views / median } : null
-}
+export const pageviewRatio = (body: Pageviews) => pageviewRatioOf(body, WIKI_MIN_MEDIAN)
 
 const wikipediaPoll = (ctx: SourceContext, w: MetricWatcher) => {
   const warned = new Set<string>()
   return async (): Promise<RawItem[]> => {
     const now = ctx.now()
-    const start = ymd(new Date(now.getTime() - 35 * 86_400_000))
-    const end = ymd(now)
     const coins = [...universeBases(ctx)].filter(([base]) => WIKIPEDIA_ARTICLES[base])
     const results = await settleAll(
       coins.map(([base, symbol]) => async () => {
         const article = WIKIPEDIA_ARTICLES[base]
         try {
-          const body = await ctx.fetch.json<Pageviews>(`https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/user/${encodeURIComponent(article)}/daily/${start}/${end}`, { conditional: false })
+          const body = await ctx.fetch.json<Pageviews>(pageviewsUrl(article, now), { conditional: false })
           return { base, symbol, article, r: body ? pageviewRatio(body) : null }
         } catch (error) {
           // One renamed article shouldn't hide the rest; say so once.
@@ -238,21 +178,7 @@ const wikipediaPoll = (ctx: SourceContext, w: MetricWatcher) => {
         }
       }),
     )
-    const items: RawItem[] = []
-    for (const x of results) {
-      if (!x?.r) continue
-      // The day's own time, so the next polls of the same day are ignored.
-      for (const c of w.observe(`wikipedia:${x.base}`, x.r.ratio, x.r.at, [{ id: "spike", kind: "level", abs: WIKI_RATIO }])) {
-        items.push({
-          ...attention([x.symbol]),
-          sourceId: crossingId(c),
-          title: `${x.symbol}: Wikipedia "${x.article.replace(/_/g, " ")}" had ${x.r.views.toLocaleString("en-US")} views on ${new Date(x.r.at).toISOString().slice(0, 10)}, ${c.value.toFixed(1)}× its 4-week median`,
-          url: `https://en.wikipedia.org/wiki/${x.article}`,
-          meta: { ...crossingMeta(c), views: x.r.views, median: x.r.median },
-        })
-      }
-    }
-    return items
+    return results.flatMap((x) => (x?.r ? pageviewItems({ key: x.base, symbol: x.symbol }, x.article, x.r, w, `https://en.wikipedia.org/wiki/${x.article}`) : []))
   }
 }
 
@@ -278,8 +204,6 @@ export const fngItems = (body: Fng, w: MetricWatcher, ctx: SourceContext): RawIt
 }
 
 // ── Catalog entries ─────────────────────────────────────────────────────────
-
-const STOCKTWITS_API = "https://api.stocktwits.com/api/2"
 
 export const ATTENTION_SOURCES: SourceSpec[] = [
   {
@@ -341,7 +265,7 @@ export const ATTENTION_SOURCES: SourceSpec[] = [
   {
     id: "appstore",
     kind: "custom",
-    url: CHARTS[0].url,
+    url: APP_CHARTS[0].url,
     interval_s: 3_600,
     tier: 3,
     wire_kind: "sentiment",
@@ -349,7 +273,7 @@ export const ATTENTION_SOURCES: SourceSpec[] = [
     note: "Apple App Store charts (keyless): Coinbase's rank in the US top free apps and in Finance",
     create: (spec, ctx) =>
       metricSource(spec, ctx, (w) => async () => {
-        const results = await settleAll(CHARTS.map((chart) => async () => appstoreItems(chart, (await ctx.fetch.json<AppleTop | AppleGenre>(chart.url, { conditional: false })) ?? {}, w, ctx)))
+        const results = await settleAll(APP_CHARTS.map((chart) => async () => appstoreItems(chart, (await ctx.fetch.json<AppleTop | AppleGenre>(chart.url, { conditional: false })) ?? {}, w, ctx)))
         return results.flatMap((r) => r ?? [])
       }),
   },
@@ -381,4 +305,3 @@ export const ATTENTION_SOURCES: SourceSpec[] = [
       }),
   },
 ]
-

@@ -14,6 +14,7 @@ import { STRATEGY_LABEL } from "@mb/stock-core/options"
 import type { Phase } from "@mb/stock-core/settings"
 import type { EventFocus, WireItemDoc } from "@mb/stock-core/wire"
 import { marketDay, minutesBetween } from "@mb/stock-core/time"
+import { coverageGaps } from "@mb/wire/calendar"
 import type { AiBudget } from "./ai/budget"
 import type { Alerts } from "./alerts"
 import type { Alpaca, RestHealth } from "./alpaca/client"
@@ -38,7 +39,6 @@ import type { LivePrices } from "./market/prices"
 import type { EngineStateStore, SettingsStore } from "./state/stores"
 import type { PriceCoverage } from "./market/price-layers"
 import type { StreamServer } from "./stream/server"
-import { coverageGaps } from "./wire/calendar"
 import { stockRules, WirePolicy } from "./wire/policy"
 import type { Wire } from "./wire/wire"
 
@@ -286,7 +286,7 @@ export class Engine {
   /** The macro calendar file needs regenerating before any kind runs out of dates. */
   private async checkCalendar() {
     const gaps = coverageGaps(new Date())
-    if (gaps.length) await this.d.alerts.send("info", "Macro calendar running out", `Regenerate apps/stock-engine/src/wire/macro-calendar.json: ${gaps.join("; ")}.`, { key: `calendar|${gaps.join(",")}` })
+    if (gaps.length) await this.d.alerts.send("info", "Macro calendar running out", `Regenerate packages/wire/src/macro-calendar.json: ${gaps.join("; ")}.`, { key: `calendar|${gaps.join(",")}` })
   }
 
   /** Called by the Alpaca REST client after every request. */

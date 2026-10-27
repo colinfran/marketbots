@@ -1,13 +1,20 @@
-import { recentMacro } from "./calendar"
-import { isConfirmed } from "./notable"
-import type { Candidate, Rules } from "./trigger"
+import type { Settings } from "@mb/crypto-core/settings"
+import type { WireCategory } from "@mb/crypto-core/wire"
+import { recentMacro } from "@mb/wire/calendar"
+import { isConfirmed } from "@mb/wire/notable"
+import { WirePolicy as WirePolicyOf, type Candidate, type Rules as RulesOf } from "@mb/wire/trigger"
 
-export { WirePolicy, type Candidate } from "./trigger"
+export type { Candidate } from "@mb/wire/trigger"
 
 /**
  * The crypto trigger rules (MASTER_PLAN §3.5). They only say what an item could justify; the
- * shared gates in wire/trigger.ts decide whether it fires now, waits, or is held back, and record why.
+ * shared gates in @mb/wire/trigger decide whether it fires now, waits, or is held back, and record why.
  */
+
+type Rules = RulesOf<WireCategory, Settings>
+
+/** The trigger policy (@mb/wire/trigger) for crypto's items and settings. */
+export class WirePolicy extends WirePolicyOf<WireCategory, Settings> {}
 
 /** Categories that never justify a long: you don't buy into a hack, a depeg or an outage. */
 const NO_ENTRY = new Set(["exploit", "depeg", "venue_outage", "venue_status", "price_shock", "volume_shock"])

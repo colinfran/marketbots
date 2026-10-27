@@ -1,10 +1,12 @@
 import type { WireCategory } from "@mb/crypto-core/wire"
+import { escapeRegExp as escape, makeLexicon } from "@mb/wire/lexicon"
 import type { Lexicon } from "./types"
 
 /**
  * Crypto language rules for the news engine: which pair a headline is about, what kind of event
  * it describes, and which way it probably cuts. Deterministic and deliberately simple; the AI
- * judges what an item means, these rules only route and rank it.
+ * judges what an item means, these rules only route and rank it. The shared skeleton
+ * (@mb/wire/lexicon) caches the matchers and takes the polarity vote.
  *
  * Ambiguous tickers (SOL, ADA, LINK, DOT…) are ordinary words, so they match only as a cashtag
  * ($SOL) or by the project's name ("Solana"). Pairs the owner adds to the universe without an
@@ -34,22 +36,14 @@ const ASSETS: Record<string, Alias> = {
   USDC: { names: ["usdc", "usd coin"], ticker: "plain" },
 }
 
-const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-
-const matcherCache = new Map<string, (text: string) => boolean>()
-
-const matcherFor = (symbol: string) => {
-  const cached = matcherCache.get(symbol)
-  if (cached) return cached
+const matcher = (symbol: string) => {
   const base = symbol.split("/")[0].toUpperCase()
   const alias = ASSETS[base]
   const cashtag = new RegExp(`(^|[^\\w$])\\$${escape(base)}\\b`, "i")
   const names = alias ? new RegExp(`\\b(${alias.names.map(escape).join("|")})\\b`, "i") : null
   // Unknown assets: the ticker in capitals (case-sensitive), if it isn't too short to be a word.
   const plain = !alias && base.length >= 3 ? new RegExp(`\\b${escape(base)}\\b`) : null
-  const fn = (text: string) => cashtag.test(text) || (!!names && names.test(alias?.not ? text.replace(alias.not, " ") : text)) || (!!plain && plain.test(text))
-  matcherCache.set(symbol, fn)
-  return fn
+  return (text: string) => cashtag.test(text) || (!!names && names.test(alias?.not ? text.replace(alias.not, " ") : text)) || (!!plain && plain.test(text))
 }
 
 /** First match wins, so the most specific categories come first. */
@@ -93,14 +87,11 @@ export const largestAmountUsd = (text: string): number | null => {
   return max
 }
 
-export const cryptoLexicon: Lexicon = {
-  tag: (text, symbols) => symbols.filter((s) => matcherFor(s)(text)),
-  classify: (text, hint) => RULES.find(([, re]) => re.test(text))?.[0] ?? hint ?? "general",
-  polarity: (text) => {
-    const neg = NEGATIVE.test(text)
-    const pos = POSITIVE.test(text)
-    return neg === pos ? 0 : neg ? -1 : 1
-  },
+export const cryptoLexicon: Lexicon = makeLexicon<WireCategory>({
+  matcher,
+  categories: RULES,
+  negative: NEGATIVE,
+  positive: POSITIVE,
   marketWide: (text, category) => category === "depeg" || MACRO_POLICY.test(text) || (MARKET_CATEGORIES.has(category) && CRYPTO_CONTEXT.test(text)),
   // Kraken volume is real exchange volume, so a volume anomaly counts as much as a price one.
   volumeAnomalyPoints: 15,
@@ -113,4 +104,4 @@ export const cryptoLexicon: Lexicon = {
     if (usd === null) return SECURITY_RESEARCH.test(text) ? 30 : 60
     return usd >= 100e6 ? 90 : usd >= 10e6 ? 70 : 40
   },
-}
+})

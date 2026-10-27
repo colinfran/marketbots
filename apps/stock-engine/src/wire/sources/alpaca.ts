@@ -1,7 +1,7 @@
 import type { Settings } from "@mb/stock-core/settings"
 import { marketDay } from "@mb/stock-core/time"
+import { PollingSource } from "@mb/wire/poller"
 import type { Alpaca } from "../../alpaca/client"
-import { PollingSource } from "../poller"
 import type { RawItem, SourceSpec } from "../types"
 
 /**

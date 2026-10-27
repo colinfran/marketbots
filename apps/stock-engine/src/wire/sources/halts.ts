@@ -1,6 +1,6 @@
 import { XMLParser } from "fast-xml-parser"
 import { marketTime } from "@mb/stock-core/time"
-import { PollingSource } from "../poller"
+import { PollingSource } from "@mb/wire/poller"
 import type { RawItem, SourceSpec } from "../types"
 
 /**

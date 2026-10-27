@@ -1,6 +1,8 @@
+import type { WireCategory } from "@mb/stock-core/wire"
+import { sharedCatalog, unixDate } from "@mb/wire/catalog"
+import { blueskySpec } from "@mb/wire/sources/bluesky"
 import type { RawItem, SourceSpec } from "./types"
 import { ATTENTION_SOURCES } from "./sources/attention"
-import { blueskySpec } from "./sources/bluesky"
 import { CALENDAR_SOURCES } from "./sources/calendars"
 import { CONGRESS_SOURCE } from "./sources/congress"
 import { EDGAR_SPECS } from "./sources/edgar"
@@ -8,7 +10,6 @@ import { EIA_SOURCE } from "./sources/eia"
 import { FDA_SOURCES } from "./sources/fda"
 import { haltsSpec } from "./sources/halts"
 import { INSIDER_SOURCES } from "./sources/insiders"
-import { MACRO_ACTUALS } from "./sources/macro-actuals"
 import { MARKETBEAT_SOURCES } from "./sources/marketbeat"
 import { ODDS_SOURCES } from "./sources/odds"
 import { OUTLET_SOURCES } from "./sources/outlets"
@@ -44,29 +45,27 @@ const NEWSLETTERS: [string, string][] = [
  * GlobeNewswire (403), ACCESSWIRE (404), Newsfile and Business Wire (empty) failed from the server
  * and are left out until they can be reached. Left out of wave 2: MarketScreener (403), the Motley
  * Fool feed (needs a partner key), CNN Business (its RSS stopped in 2018) and CBOE's put/call
- * ratio (no simple endpoint; the Fear & Greed item carries the 5-day average instead).
+ * ratio (no simple endpoint; the Fear & Greed item carries the 5-day average instead). The
+ * entries both bots share (government, macro, Truth Social) come from @mb/wire/catalog.
  */
 
-const unixDate = (v: unknown) => {
-  const n = Number(v)
-  return Number.isFinite(n) && n > 0 ? new Date(n * 1000) : null
-}
+/**
+ * Stock files SEC press and litigation releases and DOJ releases as regulatory action, and SEC
+ * trading suspensions as halts; the other government feeds are left to the lexicon.
+ */
+const SHARED = sharedCatalog<WireCategory>({
+  "gov:sec_press": "regulatory_action",
+  "gov:sec_litigation": "regulatory_action",
+  "gov:sec_suspensions": "halt",
+  "gov:doj": "regulatory_action",
+})
 
 const rss = (id: string, url: string, interval_s: number, tier: SourceSpec["tier"], extra: Partial<SourceSpec> = {}): SourceSpec => ({ id, kind: "rss", url, interval_s, tier, default_enabled: true, ...extra })
 
 type FinnhubNews = { id: number; datetime: number; headline: string; summary: string; url: string; source: string; related?: string }
-type DojRelease = { uuid: string; title: string; url: string; date: string; teaser?: string }
-type FfEvent = { title: string; country: string; date: string; impact: string; forecast?: string; previous?: string }
 type MassiveNews = { id: string; title: string; article_url: string; published_utc: string; tickers?: string[]; description?: string; publisher?: { name?: string } }
 
 const day = (d: Date) => d.toISOString().slice(0, 10)
-
-/** Rate decisions and the policy statements around them; the feeds' statistics and speeches stay out. */
-const CB_DECISION = /monetary policy (decisions?|statement|summary|report)|statement on monetary policy|key ecb interest rates|\bbank rate\b|guideline for (money )?market operations|outlook for economic activity and prices/i
-
-/** ECB, BoE and BoJ feeds (mirrored with the crypto bot): decisions only, market-wide. */
-export const centralBankDecisions = (items: RawItem[]): RawItem[] =>
-  items.filter((i) => CB_DECISION.test(i.title)).map((i) => ({ ...i, symbols: [], marketWide: true, category: "macro_release" as const, kind: "macro" as const }))
 
 type FedRegDoc = { document_number: string; title: string; type?: string; abstract?: string | null; html_url: string; publication_date: string; agencies?: { name?: string }[] }
 
@@ -198,25 +197,16 @@ export const CATALOG: SourceSpec[] = [
   },
 
   // ── Government, regulators and policy (tier 1) ───────────────────────────
-  rss("gov:sec_press", "https://www.sec.gov/news/pressreleases.rss", 120, 1, { category_hint: "regulatory_action", key_env: "SEC_USER_AGENT" }),
-  rss("gov:sec_litigation", "https://www.sec.gov/enforcement-litigation/litigation-releases/rss", 300, 1, { category_hint: "regulatory_action", key_env: "SEC_USER_AGENT" }),
-  rss("gov:sec_suspensions", "https://www.sec.gov/enforcement-litigation/trading-suspensions/rss", 300, 1, { category_hint: "halt", key_env: "SEC_USER_AGENT" }),
+  SHARED["gov:sec_press"],
+  SHARED["gov:sec_litigation"],
+  SHARED["gov:sec_suspensions"],
   rss("gov:ftc", "https://www.ftc.gov/feeds/press-release.xml", 300, 1, { category_hint: "antitrust" }),
-  {
-    id: "gov:doj",
-    kind: "json",
-    url: "https://www.justice.gov/api/v1/press_releases.json?pagesize=25&sort=date&direction=DESC",
-    interval_s: 300,
-    tier: 1,
-    category_hint: "regulatory_action",
-    default_enabled: true,
-    map: (body) => ((body as { results?: DojRelease[] }).results ?? []).map((r) => ({ sourceId: r.uuid, title: r.title, summary: r.teaser ?? null, url: r.url, publishedAt: unixDate(r.date) })),
-  },
-  rss("gov:whitehouse", "https://www.whitehouse.gov/presidential-actions/feed/", 300, 1),
+  SHARED["gov:doj"],
+  SHARED["gov:whitehouse"],
   rss("gov:ustr", "https://ustr.gov/rss.xml", 300, 1),
   rss("gov:bis", "https://www.bis.doc.gov/index.php/news-updates?format=feed&type=rss", 300, 1),
-  rss("gov:ofac", "https://ofac.treasury.gov/rss.xml", 300, 1),
-  rss("gov:fed", "https://www.federalreserve.gov/feeds/press_all.xml", 120, 1),
+  SHARED["gov:ofac"],
+  SHARED["gov:fed"],
   rss("gov:fed_speeches", "https://www.federalreserve.gov/feeds/speeches.xml", 600, 1),
   rss("gov:fda", "https://www.fda.gov/about-fda/contact-fda/stay-informed/rss-feeds/press-releases/rss.xml", 300, 1, { category_hint: "fda" }),
 
@@ -236,34 +226,8 @@ export const CATALOG: SourceSpec[] = [
   ...NEWSLETTERS.map(([name, url]) => rss(`newsletter:${name}`, url, 900, 3)),
 
   // ── Primary statements and calendars ─────────────────────────────────────
-  rss("truth_social", "https://www.trumpstruth.org/feed", 60, 1, { note: "trumpstruth.org mirror of Truth Social; the posts are primary statements" }),
-  {
-    id: "macro_ff",
-    kind: "json",
-    url: "https://nfs.faireconomy.media/ff_calendar_thisweek.json",
-    interval_s: 300,
-    tier: 3,
-    wire_kind: "calendar",
-    category_hint: "macro_release",
-    default_enabled: true,
-    note: "ForexFactory weekly calendar (unofficial): times and forecasts for high-impact USD events",
-    map: (body) =>
-      (Array.isArray(body) ? (body as FfEvent[]) : [])
-        .filter((e) => e.country === "USD" && e.impact === "High")
-        .map(
-          (e): RawItem => ({
-            sourceId: `${e.title}|${e.date}`,
-            title: `Scheduled: ${e.title} at ${e.date}${e.forecast ? ` (forecast ${e.forecast}, previous ${e.previous || "n/a"})` : ""}`,
-            url: "https://www.forexfactory.com/calendar",
-            publishedAt: null,
-            category: "macro_release",
-            kind: "calendar",
-            marketWide: true,
-            baseSeverity: 15,
-            meta: { event_at: new Date(e.date).toISOString(), forecast: e.forecast || null, previous: e.previous || null },
-          }),
-        ),
-  },
+  SHARED.truth_social,
+  SHARED.macro_ff,
 
   // ════ Wave 2 (MASTER_PLAN §4.2; verified from the server 2026-10-26) ═══════
 
@@ -283,12 +247,12 @@ export const CATALOG: SourceSpec[] = [
   ...OUTLET_SOURCES,
 
   // ── Central banks, rules and macro numbers (tier 1) ──────────────────────
-  rss("cb:ecb", "https://www.ecb.europa.eu/rss/press.html", 300, 1, { wire_kind: "macro", category_hint: "macro_release", refine: centralBankDecisions }),
-  rss("cb:boe", "https://www.bankofengland.co.uk/rss/news", 300, 1, { wire_kind: "macro", category_hint: "macro_release", refine: centralBankDecisions }),
-  rss("cb:boj", "https://www.boj.or.jp/en/rss/whatsnew.xml", 300, 1, { wire_kind: "macro", category_hint: "macro_release", refine: centralBankDecisions }),
+  SHARED["cb:ecb"],
+  SHARED["cb:boe"],
+  SHARED["cb:boj"],
   fedreg("fedreg:tariff", "tariff"),
   fedreg("fedreg:export", '"entity list"'),
-  MACRO_ACTUALS,
+  SHARED.macro_actuals,
   EIA_SOURCE,
   ...VOL_RATES_SOURCES,
   ...ODDS_SOURCES,

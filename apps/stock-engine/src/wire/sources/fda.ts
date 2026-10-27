@@ -1,6 +1,6 @@
 import { load } from "cheerio"
 import { marketTime } from "@mb/stock-core/time"
-import { PollingSource } from "../poller"
+import { PollingSource } from "@mb/wire/poller"
 import type { RawItem, SourceContext, SourceSpec } from "../types"
 import { companyDirectoryOrAliases, normalizeName, shortName, type CompanyDirectory } from "./companies"
 import { BROWSER_HEADERS, dayStart, isoDay, settleAll, watched } from "./common"

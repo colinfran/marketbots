@@ -1,4 +1,4 @@
-import { PollingSource } from "../poller"
+import { PollingSource } from "@mb/wire/poller"
 import type { RawItem, SourceContext, SourceSpec } from "../types"
 import { companyDirectoryOrAliases, type CompanyDirectory } from "./companies"
 import { dayStart, isoDay, num, usd } from "./common"

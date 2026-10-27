@@ -1,12 +1,13 @@
+import type { WireCategory } from "@mb/crypto-core/wire"
+import { sharedCatalog, unixDate } from "@mb/wire/catalog"
+import { blueskySpec } from "@mb/wire/sources/bluesky"
 import { ATTENTION_SOURCES } from "./sources/attention"
-import { blueskySpec } from "./sources/bluesky"
 import { CHAIN_SOURCES } from "./sources/chain"
 import { universeBases } from "./sources/common"
 import { DEFILLAMA_SOURCES } from "./sources/defillama"
 import { DERIVATIVES_SOURCES } from "./sources/derivatives"
 import { HACKS_SOURCE } from "./sources/hacks"
 import { KOREA_SOURCES } from "./sources/korea"
-import { MACRO_ACTUALS } from "./sources/macro-actuals"
 import { ODDS_SOURCES } from "./sources/odds"
 import type { RawItem, SourceContext, SourceSpec } from "./types"
 
@@ -14,16 +15,23 @@ import type { RawItem, SourceContext, SourceSpec } from "./types"
  * CryptoMarketBot's news sources (MASTER_PLAN §4.1). Free only; keyed sources stay off until
  * their key is set. Each entry is a generic kind with a URL and an interval; the few that need
  * more (streams, numeric watchers, our own anomaly detectors) live in sources/ and in the market hub.
+ * The entries both bots share (government, macro, Truth Social) come from @mb/wire/catalog.
  *
  * Wave 1 verified from the trading server on 2026-10-26, wave 2 on 2026-10-27 (see the Verified
  * lists in MASTER_PLAN §4.1). Left out of wave 2: the Coinbase blog (Cloudflare 403 from the
  * server), Gemini's blog (no feed) and Robinhood's newsroom feed (404).
  */
 
-const unixDate = (v: unknown) => {
-  const n = Number(v)
-  return Number.isFinite(n) && n > 0 ? new Date(n * 1000) : null
-}
+/** Crypto files the US government feeds as regulatory action, and the Fed's as macro. */
+const SHARED = sharedCatalog<WireCategory>({
+  "gov:sec_press": "regulatory_action",
+  "gov:sec_litigation": "regulatory_action",
+  "gov:sec_suspensions": "regulatory_action",
+  "gov:doj": "regulatory_action",
+  "gov:ofac": "regulatory_action",
+  "gov:fed": "macro_release",
+  "gov:whitehouse": "regulatory_action",
+})
 
 /** What to search Google News for, per base asset (bare tickers like SOL or LINK are too ambiguous). */
 const SEARCH_NAMES: Record<string, string> = {
@@ -42,8 +50,6 @@ const SEARCH_NAMES: Record<string, string> = {
 const rss = (id: string, url: string, interval_s: number, tier: SourceSpec["tier"], extra: Partial<SourceSpec> = {}): SourceSpec => ({ id, kind: "rss", url, interval_s, tier, default_enabled: true, ...extra })
 
 type FinnhubNews = { id: number; datetime: number; headline: string; summary: string; url: string; source: string; related?: string }
-type DojRelease = { uuid: string; title: string; url: string; date: string; teaser?: string; body?: string }
-type FfEvent = { title: string; country: string; date: string; impact: string; forecast?: string; previous?: string }
 type KrakenPairs = { error: string[]; result: Record<string, { wsname?: string; altname: string; quote: string; status?: string }> }
 
 /** Kraken's websocket names use XBT and XDG; the bot uses BTC and DOGE. */
@@ -86,13 +92,6 @@ export const githubReleases =
         }
       })
   }
-
-/** Rate decisions and the policy statements around them; the feeds' statistics and speeches stay out. */
-const CB_DECISION = /monetary policy (decisions?|statement|summary|report)|statement on monetary policy|key ecb interest rates|\bbank rate\b|guideline for (money )?market operations|outlook for economic activity and prices/i
-
-/** ECB, BoE and BoJ feeds: decisions only, market-wide (they're macro, not about one coin). */
-export const centralBankDecisions = (items: RawItem[]): RawItem[] =>
-  items.filter((i) => CB_DECISION.test(i.title)).map((i) => ({ ...i, symbols: [], marketWide: true, category: "macro_release" as const, kind: "macro" as const }))
 
 const BINANCE_LISTING = /^binance will list\b/i
 /**
@@ -259,24 +258,14 @@ export const CATALOG: SourceSpec[] = [
   },
 
   // ── Government and regulators (tier 1) ────────────────────────────────────
-  rss("gov:sec_press", "https://www.sec.gov/news/pressreleases.rss", 120, 1, { category_hint: "regulatory_action", key_env: "SEC_USER_AGENT" }),
-  rss("gov:sec_litigation", "https://www.sec.gov/enforcement-litigation/litigation-releases/rss", 300, 1, { category_hint: "regulatory_action", key_env: "SEC_USER_AGENT" }),
-  rss("gov:sec_suspensions", "https://www.sec.gov/enforcement-litigation/trading-suspensions/rss", 300, 1, { category_hint: "regulatory_action", key_env: "SEC_USER_AGENT" }),
+  SHARED["gov:sec_press"],
+  SHARED["gov:sec_litigation"],
+  SHARED["gov:sec_suspensions"],
   rss("gov:cftc", "https://www.cftc.gov/RSS/RSSGP/rssgp.xml", 180, 1, { category_hint: "regulatory_action" }),
-  {
-    id: "gov:doj",
-    kind: "json",
-    url: "https://www.justice.gov/api/v1/press_releases.json?pagesize=25&sort=date&direction=DESC",
-    interval_s: 300,
-    tier: 1,
-    category_hint: "regulatory_action",
-    default_enabled: true,
-    map: (body) =>
-      ((body as { results?: DojRelease[] }).results ?? []).map((r) => ({ sourceId: r.uuid, title: r.title, summary: r.teaser ?? null, url: r.url, publishedAt: unixDate(r.date) })),
-  },
-  rss("gov:ofac", "https://ofac.treasury.gov/rss.xml", 300, 1, { category_hint: "regulatory_action" }),
-  rss("gov:fed", "https://www.federalreserve.gov/feeds/press_all.xml", 120, 1, { category_hint: "macro_release" }),
-  rss("gov:whitehouse", "https://www.whitehouse.gov/presidential-actions/feed/", 300, 1, { category_hint: "regulatory_action" }),
+  SHARED["gov:doj"],
+  SHARED["gov:ofac"],
+  SHARED["gov:fed"],
+  SHARED["gov:whitehouse"],
 
   // ── Broad coverage and primary statements ────────────────────────────────
   rss("gnews", "https://news.google.com/rss", 30, 3, {
@@ -287,35 +276,10 @@ export const CATALOG: SourceSpec[] = [
       return `https://news.google.com/rss/search?q=${encodeURIComponent(q)}+when:1h&hl=en-US&gl=US&ceid=US:en`
     },
   }),
-  rss("truth_social", "https://www.trumpstruth.org/feed", 60, 1, { note: "trumpstruth.org mirror of Truth Social; the posts are primary statements" }),
+  SHARED.truth_social,
 
   // ── Calendars ─────────────────────────────────────────────────────────────
-  {
-    id: "macro_ff",
-    kind: "json",
-    url: "https://nfs.faireconomy.media/ff_calendar_thisweek.json",
-    interval_s: 300,
-    tier: 3,
-    wire_kind: "calendar",
-    category_hint: "macro_release",
-    default_enabled: true,
-    note: "ForexFactory weekly calendar (unofficial): times and forecasts for high-impact USD events",
-    map: (body) =>
-      (Array.isArray(body) ? (body as FfEvent[]) : [])
-        .filter((e) => e.country === "USD" && e.impact === "High")
-        .map((e) => ({
-          sourceId: `${e.title}|${e.date}`,
-          title: `Scheduled: ${e.title} at ${e.date}${e.forecast ? ` (forecast ${e.forecast}, previous ${e.previous || "n/a"})` : ""}`,
-          url: "https://www.forexfactory.com/calendar",
-          publishedAt: null,
-          category: "macro_release",
-          kind: "calendar",
-          marketWide: true,
-          // Schedule information, not news: stored for the dossier, never loud.
-          baseSeverity: 15,
-          meta: { event_at: new Date(e.date).toISOString(), forecast: e.forecast || null, previous: e.previous || null },
-        })),
-  },
+  SHARED.macro_ff,
 
   // ════ Wave 2 ═══════════════════════════════════════════════════════════════
 
@@ -371,12 +335,12 @@ export const CATALOG: SourceSpec[] = [
   rss("gh:cardano", "https://github.com/IntersectMBO/cardano-node/releases.atom", 900, 1, { category_hint: "upgrade", refine: githubReleases("ADA", "cardano-node") }),
 
   // ── Central banks and rules (tier 1) ──────────────────────────────────────
-  rss("cb:ecb", "https://www.ecb.europa.eu/rss/press.html", 300, 1, { wire_kind: "macro", category_hint: "macro_release", refine: centralBankDecisions }),
-  rss("cb:boe", "https://www.bankofengland.co.uk/rss/news", 300, 1, { wire_kind: "macro", category_hint: "macro_release", refine: centralBankDecisions }),
-  rss("cb:boj", "https://www.boj.or.jp/en/rss/whatsnew.xml", 300, 1, { wire_kind: "macro", category_hint: "macro_release", refine: centralBankDecisions }),
+  SHARED["cb:ecb"],
+  SHARED["cb:boe"],
+  SHARED["cb:boj"],
   fedreg("fedreg", '"digital asset"'),
   fedreg("fedreg:stablecoin", "stablecoin"),
-  MACRO_ACTUALS,
+  SHARED.macro_actuals,
 
   // ── More outlets: Bitcoin Magazine, CryptoSlate, DL News, Protos, Unchained (tier 2), the rest tier 3 ──
   rss("rss:bitcoinmagazine", "https://bitcoinmagazine.com/.rss/full/", 90, 2),

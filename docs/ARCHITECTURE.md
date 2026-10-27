@@ -80,12 +80,10 @@ Phases 5–8 add `packages/core`, `packages/engine-kit`, `packages/wire`, `packa
 
 ## Shared code: today and planned
 
-**Shared packages today:** `config`, `core`, `engine-kit`, `ui` and `web-kit` (table below); `wire` comes in Phase 7. Both bots were moved in unchanged (Phase 2) and then refactored onto these packages, and what still exists twice is:
+**Shared packages today:** `config`, `core`, `engine-kit`, `wire`, `ui` and `web-kit` (table below). Both bots were moved in unchanged (Phase 2) and then refactored onto these packages.
 
-- The 23 news-engine files headed `// Mirrored in cryptomarketbot and stockmarketbot: keep in sync.` in `apps/crypto-engine/src/wire/` and `apps/stock-engine/src/wire/`.
-- More generally, the plan's comparison (§0) found 33 engine and core files identical apart from the package scope, and 11 more that differ only in a constant.
 
-Until those move into shared packages, a change to one copy is made to the other as well (AGENTS.md).
+No file is mirrored by hand any more. Code that still exists once per bot does so on purpose (see [What stays per bot](#what-stays-per-bot-by-design)).
 
 **Shared packages** (the Phase column says when each one lands; ✓ = exists):
 
@@ -93,7 +91,7 @@ Until those move into shared packages, a change to one copy is made to the other
 | --- | --- | --- | --- |
 | `@mb/core` | 5 ✓ | Pure shared schemas and helpers, no I/O: `math`, `stream-token` (prefix as a parameter), settings base pieces and helpers, the shared command schemas, the event envelope and the events both bots define identically, base collections, indexes and document types, wire types, `metrics`, `indicators`, generic `time` | every app and package |
 | `@mb/engine-kit` | 6 ✓ | Engine runtime, generic over each bot's settings, events and commands: log, lease, heartbeat, bus, stream server, command processor, Mongo connect, state stores, alerts, AI budget/repair/runner/prompt parts, `ControlPlane`, `StatusReporter`, `EventCycleQueue`, bootstrap, env base, test helpers | both engines |
-| `@mb/wire` | 7 | The news engine: the mirrored files, shared source helpers, `sharedCatalog()`, a `makeLexicon()` skeleton, and (Phase 10) `enrich/` for article summaries | both engines |
+| `@mb/wire` | 7 ✓ | The news engine: the formerly mirrored files, shared source helpers, `sharedCatalog()`, a `makeLexicon()` skeleton, and (Phase 10) `enrich/` for article summaries | both engines |
 | `@mb/ui` | 8 ✓ | Client-safe React: the shadcn primitives, design tokens (`styles.css`), app-shell components, the live-UI shell driven by a per-bot event catalog, shared page sections | both dashboards |
 | `@mb/web-kit` | 8 ✓ | Server-only dashboard helpers: auth factory, database, command routes, shared queries, formatting, metadata, error reporting | both dashboards |
 
@@ -157,7 +155,7 @@ Both were copied unchanged from the old repos' `docs/ARCHITECTURE.md`, so their 
 | `apps/web` | `apps/crypto-web` / `apps/stock-web` |
 | `packages/core`, `@cmb/core`, `@smb/core` | `packages/crypto-core` / `packages/stock-core`, `@mb/crypto-core` / `@mb/stock-core` |
 | `apps/scraper`, one per bot | `apps/scraper`, one for both |
-| "Mirrored in cryptomarketbot and stockmarketbot" | mirrored between `apps/crypto-engine` and `apps/stock-engine` until Phase 7 |
+| "Mirrored in cryptomarketbot and stockmarketbot" | `packages/wire` (`@mb/wire`), once for both since Phase 7 |
 | `docker-compose.yml`, `.env` | `compose.yml`, `crypto.env` / `stock.env` |
 | `MASTER_PLAN.md` | `docs/plans/MASTER_PLAN.md` |
 

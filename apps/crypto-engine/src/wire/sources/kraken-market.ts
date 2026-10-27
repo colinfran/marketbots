@@ -1,9 +1,9 @@
 import type { Settings } from "@mb/crypto-core/settings"
 import type { WireSourceHealth } from "@mb/crypto-core/wire"
 import { errorMessage, type Logger } from "@mb/engine-kit/log"
+import { AnomalyDetector, type AnomalySignal } from "@mb/wire/anomaly"
 import type { MarketHub } from "../../market/hub"
 import type { MinuteBar } from "../../venues/kraken/ws"
-import { AnomalyDetector, type AnomalySignal } from "../anomaly"
 import type { Emit, RawItem, SourceSpec, WireSource } from "../types"
 
 /**

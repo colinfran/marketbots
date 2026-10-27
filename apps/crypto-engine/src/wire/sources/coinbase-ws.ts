@@ -3,7 +3,7 @@ import type { WireSourceHealth } from "@mb/crypto-core/wire"
 import WebSocket from "ws"
 import { errorMessage, type Logger } from "@mb/engine-kit/log"
 import { backoffMs } from "@mb/engine-kit/util/async"
-import { crossingId, crossingMeta, MetricWatcher } from "../metrics"
+import { crossingId, crossingMeta, MetricWatcher } from "@mb/wire/metrics"
 import type { Emit, RawItem, SourceSpec, WireSource } from "../types"
 import { signed } from "./common"
 

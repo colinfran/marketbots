@@ -1,7 +1,7 @@
 import { XMLParser } from "fast-xml-parser"
 import { marketDay } from "@mb/stock-core/time"
-import { crossingId, crossingMeta, metricSource, type Crossing, type MetricRule, type MetricWatcher } from "../metrics"
-import { PollingSource } from "../poller"
+import { crossingId, crossingMeta, metricSource, type Crossing, type MetricRule, type MetricWatcher } from "@mb/wire/metrics"
+import { PollingSource } from "@mb/wire/poller"
 import type { RawItem, SourceContext, SourceSpec } from "../types"
 import { etNow, num, settleAll, signed } from "./common"
 
@@ -12,7 +12,7 @@ import { etNow, num, settleAll, signed } from "./common"
  *
  *   vol_rates:vix     CBOE's delayed VIX quote, every minute. Risk-off when the VIX is up ≥ 20% on
  *                     the day, up ≥ 15% within an hour (from at least 12), or reaches 30. Each
- *                     fires once per excursion (wire/metrics.ts), and one poll is one item.
+ *                     fires once per excursion (@mb/wire/metrics), and one poll is one item.
  *   vol_rates:yields  Treasury's daily par yield curve (an ~18 s XML answer, polled every two
  *                     hours): the 2-year or 10-year moving ≥ 15 bp from the previous day.
  *   treasury          TreasuryDirect auction results for nominal notes and bonds (bills, TIPS and

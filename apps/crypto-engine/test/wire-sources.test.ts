@@ -1,18 +1,19 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { DEFAULT_SETTINGS, settingsSchema } from "@mb/crypto-core/settings"
+import { centralBankDecisions } from "@mb/wire/catalog"
+import { WireFetch } from "@mb/wire/fetch"
+import { diffEntries, diffPoller } from "@mb/wire/kinds/diff"
+import { parseFeed } from "@mb/wire/kinds/rss"
+import { parseStatuspage } from "@mb/wire/kinds/statuspage"
+import { parseTelegram } from "@mb/wire/kinds/telegram"
+import { rateFor } from "@mb/wire/limiter"
+import { MetricWatcher, type MetricRule } from "@mb/wire/metrics"
+import { blsFigures, fredValues, macroActualsPoll, referenceMonth } from "@mb/wire/sources/macro-actuals"
 import { describe, expect, it, vi } from "vitest"
 import { silentLogger } from "@mb/engine-kit/log"
-import { binanceAnnouncements, CATALOG, centralBankDecisions, cotItems, githubReleases } from "../src/wire/catalog"
-import { WireFetch } from "../src/wire/fetch"
-import { diffEntries, diffPoller } from "../src/wire/kinds/diff"
-import { headlessPoller, type Rendered } from "../src/wire/kinds/headless"
-import { parseFeed } from "../src/wire/kinds/rss"
-import { parseStatuspage } from "../src/wire/kinds/statuspage"
-import { parseTelegram } from "../src/wire/kinds/telegram"
+import { binanceAnnouncements, CATALOG, cotItems, githubReleases } from "../src/wire/catalog"
 import { cryptoLexicon } from "../src/wire/lexicon"
-import { rateFor } from "../src/wire/limiter"
-import { crossingMeta, MetricWatcher, type MetricRule } from "../src/wire/metrics"
 import { apewisdomItems, appstoreItems, coinbaseRank, coingeckoItems, fngItems, messageRate, pageviewRatio, stocktwitsRateItems, stocktwitsTrendingItems } from "../src/wire/sources/attention"
 import { btcFeeItems, ethGasItems } from "../src/wire/sources/chain"
 import { CoinbasePremium } from "../src/wire/sources/coinbase-ws"
@@ -20,10 +21,8 @@ import { chainReadings, stableItems, tvlItems } from "../src/wire/sources/defill
 import { slowmistItems } from "../src/wire/sources/hacks"
 import { bithumbAlertItems, bithumbNoticeItems, upbitDescribe, upbitEntries } from "../src/wire/sources/korea"
 import { coinalyzeFunding, coinalyzeLiquidations, coinalyzeSymbols, deribitFundingAnnualPct, hyperliquidReadings, krakenFuturesReadings, latestDvol, perpItems } from "../src/wire/sources/derivatives"
-import { blsFigures, fredValues, macroActualsPoll, referenceMonth } from "../src/wire/sources/macro-actuals"
 import { kalshiFedEvents, kalshiMarkets, polymarketMarkets, swingBase, swingItems, yesProbability } from "../src/wire/sources/odds"
 import type { RawItem, SourceContext, SourceSpec } from "../src/wire/types"
-import { Wire } from "../src/wire/wire"
 
 const fixture = (name: string) => readFileSync(join(__dirname, "fixtures", "wire", name), "utf8")
 const json = (name: string) => JSON.parse(fixture(name))
@@ -41,82 +40,6 @@ const makeCtx = ({ clock = { now: NOW }, fetch = {}, env = {}, wire = {} }: { cl
     now: () => clock.now,
     settings: () => ({ ...DEFAULT_SETTINGS.wire, ...wire }),
   }) satisfies SourceContext
-
-describe("metric watcher", () => {
-  const level: MetricRule = { id: "lvl", kind: "level", abs: 100 }
-
-  it("treats the first reading as a baseline and fires once per excursion", () => {
-    const w = new MetricWatcher()
-    // Already extreme at boot: nothing fires, and this excursion never does.
-    expect(w.observe("k", 150, 0, [level])).toEqual([])
-    expect(w.observe("k", 160, MIN, [level])).toEqual([])
-    // Back below half the threshold, but too soon to re-arm.
-    expect(w.observe("k", 20, 2 * MIN, [level])).toEqual([])
-    expect(w.observe("k", 120, 3 * MIN, [level])).toEqual([])
-    expect(w.observe("k", 20, 20 * MIN, [level])).toEqual([])
-    const [c] = w.observe("k", -130, 21 * MIN, [level])
-    expect(c).toMatchObject({ key: "k", rule: "lvl", kind: "level", value: -130, exit: false })
-    expect(w.observe("k", -140, 22 * MIN, [level])).toEqual([])
-    // A reading that isn't newer than the last is ignored.
-    expect(w.observe("k", 500, 22 * MIN, [level])).toEqual([])
-  })
-
-  it("measures changes within the window from its low or high, one way if asked", () => {
-    const w = new MetricWatcher()
-    const drop: MetricRule = { id: "drop", kind: "change", windowMin: 60, pct: 15, direction: "down" }
-    w.observe("tvl", 100, 0, [drop])
-    expect(w.observe("tvl", 110, 10 * MIN, [drop])).toEqual([])
-    expect(w.observe("tvl", 130, 20 * MIN, [drop])).toEqual([])
-    const [c] = w.observe("tvl", 105, 30 * MIN, [drop])
-    expect(c).toMatchObject({ ref: 130, delta: -25, windowMin: 60 })
-    expect(c.pct).toBeCloseTo(-19.23, 2)
-    // Outside the window the old high no longer counts.
-    const w2 = new MetricWatcher()
-    w2.observe("tvl", 130, 0, [drop])
-    expect(w2.observe("tvl", 100, 61 * MIN, [drop])).toEqual([])
-    const pts: MetricRule = { id: "swing", kind: "change", windowMin: 60, points: 15 }
-    w2.observe("odds", 40, 0, [pts])
-    expect(w2.observe("odds", 56, 30 * MIN, [pts])[0]).toMatchObject({ ref: 40, delta: 16 })
-  })
-
-  it("compares spikes with the trailing median, needs enough samples, and skips tiny values", () => {
-    const w = new MetricWatcher()
-    const spike: MetricRule = { id: "s", kind: "spike", windowMin: 24 * 60, ratio: 5, minSamples: 5, min: 20 }
-    for (let i = 0; i < 4; i++) w.observe("fee", 4, i * MIN, [spike])
-    expect(w.observe("fee", 40, 4 * MIN, [spike])).toEqual([])
-    for (let i = 5; i < 10; i++) w.observe("fee", 4, i * MIN, [spike])
-    expect(w.observe("fee", 15, 10 * MIN, [spike])).toEqual([]) // 3.75× and below the floor
-    expect(w.observe("fee", 30, 11 * MIN, [spike])[0]).toMatchObject({ ref: 4, ratio: 7.5 })
-  })
-
-  it("holds a level for a while, reports exits, and backfills silently", () => {
-    const w = new MetricWatcher()
-    const held: MetricRule = { id: "p", kind: "level", abs: 0.3, forMin: 5 }
-    w.observe("prem", 0.5, 0, [held])
-    expect(w.observe("prem", 0.5, 4 * MIN, [held])).toEqual([])
-    expect(w.observe("prem", -0.5, 5 * MIN, [held])).toEqual([]) // flipped side: not held
-    expect(w.observe("prem", -0.6, 11 * MIN, [held])[0]).toMatchObject({ value: -0.6, windowMin: 5 })
-    const extreme: MetricRule = { id: "x", kind: "level", abs: 1, rearmAt: 1, rearmMs: 0, exits: true }
-    w.backfill("fng", [{ at: 0, value: 0 }, { at: 1, value: -1 }], [extreme])
-    expect(w.observe("fng", -1, 2, [extreme])).toEqual([])
-    expect(w.observe("fng", 0, 3, [extreme])).toEqual([expect.objectContaining({ exit: true })])
-    expect(w.observe("fng", 1, 4, [extreme])).toEqual([expect.objectContaining({ exit: false, value: 1 })])
-  })
-
-  it("keeps memory bounded and marks items as readings", () => {
-    const w = new MetricWatcher({ maxPoints: 10, maxKeys: 3 })
-    for (let i = 0; i < 50; i++) w.observe("a", i, i, [])
-    for (const k of ["b", "c", "d"]) w.observe(k, 1, 1, [])
-    expect(w.size).toBe(3)
-    expect(w.last("a")).toBeNull()
-    const [c] = (() => {
-      const x = new MetricWatcher()
-      x.observe("m", 0, 0, [{ id: "l", kind: "level", abs: 1 }])
-      return x.observe("m", 2, MIN, [{ id: "l", kind: "level", abs: 1 }])
-    })()
-    expect(crossingMeta(c)).toMatchObject({ metric: "m", rule: "l", value: 2 })
-  })
-})
 
 describe("wave-2 feeds and catalog parsers", () => {
   it("parses the new outlets' feeds", () => {
@@ -515,42 +438,6 @@ describe("wave-2 plumbing", () => {
     expect(cryptoLexicon.tag("Department of Government Efficiency (DOGE) cuts more contracts", UNIVERSE)).toEqual([])
     expect(cryptoLexicon.tag("DOGE jumps 12% as Musk teases X payments", UNIVERSE)).toEqual(["DOGE/USD"])
     expect(cryptoLexicon.tag("Dogecoin rallies while DOGE staffers testify", UNIVERSE)).toEqual(["DOGE/USD"])
-  })
-})
-
-describe("headless sources (scraper sidecar)", () => {
-  const page = (over: Partial<SourceSpec> = {}): SourceSpec => ({ id: "headless:test", kind: "headless", url: "https://js.test/list", interval_s: 600, tier: 3, default_enabled: true, ...over })
-  const rendered = (over: Partial<Rendered> = {}): Rendered => ({ status: 200, url: "https://js.test/list", html: "", captured: [], ...over })
-  const env = { SCRAPER_URL: "http://scraper:8790/" }
-
-  it("sends the render job to the sidecar and reads the rendered HTML with selectors", async () => {
-    const postJson = vi.fn(async () => rendered({ html: '<ul><li class="row"><a href="/n/1">Upbit lists XRP</a><time datetime="2026-10-27T11:00:00Z"></time></li></ul>' }))
-    const items = await headlessPoller(page({ selectors: { item: "li.row", title: "a", time: "time" }, render: { wait_for: "li.row", timeout_ms: 20_000 } }), makeCtx({ fetch: { postJson }, env }))()
-    expect(postJson).toHaveBeenCalledWith("http://scraper:8790/render", { url: "https://js.test/list", wait_for: "li.row", timeout_ms: 20_000, capture: [] }, { timeoutMs: 50_000 })
-    expect(items).toEqual([{ title: "Upbit lists XRP", url: "https://js.test/n/1", summary: null, publishedAt: new Date("2026-10-27T11:00:00Z") }])
-  })
-
-  it("hands the page's captured JSON responses to map", async () => {
-    const captured = [{ url: "https://js.test/api/notices?page=1", status: 200, body: JSON.stringify({ notices: [{ id: 7, title: "Investment warning: XYZ" }] }) }]
-    const postJson = vi.fn(async () => rendered({ captured }))
-    const map = vi.fn((body: unknown) => (body as typeof captured).flatMap((c) => (JSON.parse(c.body) as { notices: { id: number; title: string }[] }).notices.map((n): RawItem => ({ sourceId: String(n.id), title: n.title }))))
-    const items = await headlessPoller(page({ render: { capture: ["/api/notices"] }, map }), makeCtx({ fetch: { postJson }, env }))()
-    expect(postJson).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ capture: ["/api/notices"], wait_for: null, timeout_ms: 30_000 }), expect.anything())
-    expect(items).toEqual([{ sourceId: "7", title: "Investment warning: XYZ" }])
-  })
-
-  it("treats the site's own 403 as a block, so the source degrades like a plain fetch", async () => {
-    const postJson = vi.fn(async () => rendered({ status: 403, html: "<title>Access denied</title>" }))
-    await expect(headlessPoller(page({ mapHtml: () => [] }), makeCtx({ fetch: { postJson }, env }))()).rejects.toMatchObject({ status: 403 })
-  })
-
-  it("needs a way to read the page, and stays off without a sidecar", () => {
-    expect(() => headlessPoller(page(), makeCtx({ env }))).toThrow(/needs map/)
-    expect(() => headlessPoller(page({ render: { capture: ["/api"] }, mapHtml: () => [] }), makeCtx({ env }))).toThrow(/needs map/)
-    const spec = page({ mapHtml: () => [] })
-    const wireWith = (e: Record<string, string>) => new Wire({ col: {} as never, bus: {} as never, log: silentLogger, settings: () => DEFAULT_SETTINGS.wire, catalog: [spec], lexicon: cryptoLexicon, env: e, symbols: () => ({ universe: UNIVERSE, held: [], focus: [] }), price: () => null, userAgent: "test" })
-    expect(wireWith({}).disabledReason(spec)).toMatch(/SCRAPER_URL not set/)
-    expect(wireWith(env).disabledReason(spec)).toBeNull()
   })
 })
 

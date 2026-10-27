@@ -1,4 +1,4 @@
-import { crossingId, crossingMeta, metricSource, type Crossing, type MetricRule, type MetricWatcher } from "../metrics"
+import { crossingId, crossingMeta, metricSource, type Crossing, type MetricRule, type MetricWatcher } from "@mb/wire/metrics"
 import type { RawItem, SourceContext, SourceSpec } from "../types"
 import { num, universeBases } from "./common"
 

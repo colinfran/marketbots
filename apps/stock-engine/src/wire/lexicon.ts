@@ -1,10 +1,12 @@
 import type { WireCategory } from "@mb/stock-core/wire"
+import { escapeRegExp as escape, makeLexicon } from "@mb/wire/lexicon"
 import type { Lexicon } from "./types"
 
 /**
  * Stock language rules for the news engine: which tickers a headline is about, what kind of
  * event it describes, and which way it probably cuts. Deterministic and deliberately simple; the
- * AI judges what an item means, these rules only route and rank it.
+ * AI judges what an item means, these rules only route and rank it. The shared skeleton
+ * (@mb/wire/lexicon) caches the matchers and takes the polarity vote.
  *
  * Tickers match as a cashtag ($NVDA), an exchange tag ("(NASDAQ: NVDA)"), or the ticker in
  * capitals as its own word, except tickers that are everyday words in capitals (A, IT, ALL, NOW…),
@@ -16,20 +18,12 @@ const AMBIGUOUS = new Set(
   "A AN AM ARE AS AT BE BIG BY CAN CEO CFO CEOS CPI DD DO EV EPS ETF FDA FOR GDP GO HAS HE IPO IT ITS KEY LOW MAN NEW NOW OK ON ONE OR OUT PM POST REAL RUN SAFE SEE SO SEC THE TV TWO UK UP US USA WELL ALL ANY CASH FAST FUN GOOD HOPE LIFE LOVE MAIN MORE NEXT OPEN PLAY RIDE SAVE SHOP SKY STAY TRUE WORK YOU".split(" "),
 )
 
-const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-
-const tickerMatcher = new Map<string, (text: string) => boolean>()
-
-const matcherFor = (symbol: string) => {
-  const cached = tickerMatcher.get(symbol)
-  if (cached) return cached
+const matcher = (symbol: string) => {
   const t = escape(symbol.toUpperCase())
   const cashtag = new RegExp(`(^|[^\\w$])\\$${t}\\b`, "i")
   const exchange = new RegExp(`\\((?:NASDAQ|NYSE|NYSE American|NYSE Arca|AMEX|OTC|OTCQX|OTCQB|Cboe)\\s*:\\s*${t}\\)`, "i")
   const plain = AMBIGUOUS.has(symbol.toUpperCase()) || symbol.length < 2 ? null : new RegExp(`(^|[^A-Za-z0-9$])${t}(?![A-Za-z0-9])`)
-  const fn = (text: string) => cashtag.test(text) || exchange.test(text) || (!!plain && plain.test(text))
-  tickerMatcher.set(symbol, fn)
-  return fn
+  return (text: string) => cashtag.test(text) || exchange.test(text) || (!!plain && plain.test(text))
 }
 
 /** First match wins, so the most specific categories come first. */
@@ -84,15 +78,12 @@ const POSITIVE =
 const MARKET_WIDE = /\b(federal reserve|fomc|powell|interest rates?|rate (cut|hike)s?|inflation|cpi|jobs report|payrolls|recession|tariffs?|trade war|export controls?|treasury yields?|government shutdown|debt ceiling|stock market|wall street|s&p 500 (falls|rises|drops|jumps))\b/i
 const MARKET_CATEGORIES = new Set<WireCategory>(["macro_release", "policy_shock"])
 
-export const stockLexicon: Lexicon = {
-  tag: (text, symbols) => symbols.filter((s) => matcherFor(s)(text)),
-  classify: (text, hint) => RULES.find(([, re]) => re.test(text))?.[0] ?? hint ?? "general",
-  polarity: (text) => {
-    const neg = NEGATIVE.test(text)
-    const pos = POSITIVE.test(text)
-    return neg === pos ? 0 : neg ? -1 : 1
-  },
+export const stockLexicon: Lexicon = makeLexicon<WireCategory>({
+  matcher,
+  categories: RULES,
+  negative: NEGATIVE,
+  positive: POSITIVE,
   marketWide: (text, category) => MARKET_CATEGORIES.has(category) || MARKET_WIDE.test(text),
   // IEX volume is a small slice of real volume, so a volume-only anomaly counts for little.
   volumeAnomalyPoints: 5,
-}
+})

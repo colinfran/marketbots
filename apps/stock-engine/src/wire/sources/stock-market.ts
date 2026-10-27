@@ -2,9 +2,9 @@ import { errorMessage, type Logger } from "@mb/engine-kit/log"
 import { sleep } from "@mb/engine-kit/util/async"
 import type { Settings } from "@mb/stock-core/settings"
 import type { WireSourceHealth } from "@mb/stock-core/wire"
+import { AnomalyDetector, type AnomalySignal } from "@mb/wire/anomaly"
 import type { Alpaca } from "../../alpaca/client"
 import type { BoardBar } from "../../market/price-board"
-import { AnomalyDetector, type AnomalySignal } from "../anomaly"
 import type { Emit, RawItem, SourceSpec, WireSource } from "../types"
 
 /**

@@ -1,12 +1,35 @@
-import { crossingId, crossingMeta, metricSource, type MetricRule, type MetricWatcher } from "../metrics"
+import { crossingId, crossingMeta, metricSource, type MetricRule, type MetricWatcher } from "@mb/wire/metrics"
+import {
+  apewisdomItems as apewisdomItemsOf,
+  APP_CHARTS,
+  appChartCrossings,
+  appChartTitle,
+  attention,
+  ENTRY,
+  pageviewItems,
+  pageviewRatio as pageviewRatioOf,
+  pageviewsUrl,
+  STOCKTWITS_API,
+  stocktwitsTrendingItems as stocktwitsTrendingItemsOf,
+  type ApeResult,
+  type AppChart,
+  type AppleGenre,
+  type AppleTop,
+  type ChartApp,
+  type Pageviews,
+  type StSymbol,
+} from "@mb/wire/sources/attention"
 import type { RawItem, SourceContext, SourceSpec } from "../types"
 import { companyDirectoryOrAliases, shortName } from "./companies"
 import { BROWSER_HEADERS, num, settleAll, watched } from "./common"
 
+export { APP_CHARTS, appRank } from "@mb/wire/sources/attention"
+
 /**
  * Retail attention and sentiment (MASTER_PLAN §4.2 wave 2): all `sentiment_spike`, tier 3, low
  * severity, annotate only (§3.5). Each source reports a change, never a level, and only for held
- * and watched symbols (market-wide for the fear gauge and the broker apps):
+ * and watched symbols (market-wide for the fear gauge and the broker apps). The building blocks
+ * both bots use are in @mb/wire/sources/attention.
  *
  *   fng                CNN Fear & Greed entering (≤ 25 / ≥ 75) or leaving (past 30 / 70, at least
  *                      an hour later) extreme fear or greed; the 5-day put/call average rides along
@@ -22,10 +45,8 @@ import { BROWSER_HEADERS, num, settleAll, watched } from "./common"
  * passed, so a stock hovering at the edge of a list doesn't repeat.
  */
 
-const ENTRY_REARM_MS = 6 * 3_600_000
-const ENTRY: MetricRule = { id: "entry", kind: "level", abs: 1, rearmMs: ENTRY_REARM_MS }
-
-const attention = (symbols: string[], marketWide = false) => ({ symbols, marketWide, category: "sentiment_spike" as const, kind: "sentiment" as const, tier: 3 as const, polarity: 0 as const })
+/** Held and watched stocks, each listed by its own ticker. */
+const watchedTargets = (ctx: SourceContext) => [...watched(ctx)].map((symbol) => ({ key: symbol, ticker: symbol, symbol }))
 
 // ── CNN Fear & Greed ────────────────────────────────────────────────────────
 
@@ -69,50 +90,12 @@ export const cnnFngItems = (body: CnnFng, w: MetricWatcher, ctx: SourceContext):
 
 // ── StockTwits ──────────────────────────────────────────────────────────────
 
-type StSymbol = { symbol: string; title?: string }
-
-export const stocktwitsTrendingItems = (body: { symbols?: StSymbol[] }, w: MetricWatcher, ctx: SourceContext): RawItem[] => {
-  const at = ctx.now().getTime()
-  const list = (body.symbols ?? []).map((s) => s.symbol.toUpperCase())
-  const items: RawItem[] = []
-  // Every watched stock is observed every poll (0 when absent), so an entry can end and re-arm.
-  for (const symbol of watched(ctx)) {
-    const rank = list.indexOf(symbol) + 1
-    for (const c of w.observe(`stocktwits:trending:${symbol}`, rank ? 1 : 0, at, [ENTRY])) {
-      items.push({ ...attention([symbol]), sourceId: crossingId(c), title: `${symbol} enters StockTwits trending (#${rank} of ${list.length})`, url: `https://stocktwits.com/symbol/${symbol}`, meta: { ...crossingMeta(c), rank } })
-    }
-  }
-  return items
-}
+export const stocktwitsTrendingItems = (body: { symbols?: StSymbol[] }, w: MetricWatcher, ctx: SourceContext): RawItem[] => stocktwitsTrendingItemsOf(body, watchedTargets(ctx), w, ctx)
 
 // ── r/wallstreetbets: ApeWisdom and Tradestie ───────────────────────────────
 
-type ApeResult = { ticker: string; name: string; rank: number; mentions: number | string; mentions_24h_ago: number | string | null }
-
-const APE_MIN_MENTIONS = 30
-const APE_RATIO = 3
-
-export const apewisdomItems = (body: { results?: ApeResult[] }, w: MetricWatcher, ctx: SourceContext): RawItem[] => {
-  const at = ctx.now().getTime()
-  const rows = new Map((body.results ?? []).map((r) => [String(r.ticker).toUpperCase(), r]))
-  const items: RawItem[] = []
-  for (const symbol of watched(ctx)) {
-    const r = rows.get(symbol)
-    const mentions = num(r?.mentions) ?? 0
-    const before = num(r?.mentions_24h_ago)
-    const ratio = mentions >= APE_MIN_MENTIONS && before && before > 0 ? mentions / before : 0
-    for (const c of w.observe(`apewisdom:${symbol}`, ratio, at, [{ id: "jump", kind: "level", abs: APE_RATIO }])) {
-      items.push({
-        ...attention([symbol]),
-        sourceId: crossingId(c),
-        title: `${symbol}: ${mentions} Reddit/4chan mentions in 24 h, ${c.value.toFixed(1)}× the day before (ApeWisdom)`,
-        url: `https://apewisdom.io/stocks/${encodeURIComponent(symbol)}/`,
-        meta: { ...crossingMeta(c), mentions, mentions_24h_ago: before, rank: num(r?.rank) },
-      })
-    }
-  }
-  return items
-}
+export const apewisdomItems = (body: { results?: ApeResult[] }, w: MetricWatcher, ctx: SourceContext): RawItem[] =>
+  apewisdomItemsOf(body, watchedTargets(ctx), w, ctx, { rowTicker: (ticker) => ticker.toUpperCase(), url: (t) => `https://apewisdom.io/stocks/${encodeURIComponent(t.key)}/` })
 
 type TradestieRow = { ticker: string; sentiment?: string; sentiment_score?: number; no_of_comments?: number }
 
@@ -144,83 +127,28 @@ export const tradestieItems = (body: TradestieRow[], w: MetricWatcher, ctx: Sour
 
 // ── App Store ───────────────────────────────────────────────────────────────
 
-type AppleTop = { feed?: { results?: { id: string; name: string }[] } }
-type AppleGenre = { feed?: { entry?: { id?: { attributes?: { "im:id"?: string } }; "im:name"?: { label?: string } }[] } }
-
 /** Retail brokers whose chart rank says how many new traders are arriving. */
-export const BROKER_APPS = [
+export const BROKER_APPS: ChartApp[] = [
   { id: "938003185", name: "Robinhood", match: /^robinhood\b(?!\s*banking)/i, url: "https://apps.apple.com/us/app/robinhood-trading-investing/id938003185" },
   { id: "1179213067", name: "Webull", match: /^webull\b/i, url: "https://apps.apple.com/us/app/webull-investing-trading/id1179213067" },
 ]
-type App = (typeof BROKER_APPS)[number]
 
-/** An app's rank in a chart (1 = top), or null when it isn't on it. */
-export const appRank = (body: AppleTop | AppleGenre, app: App): number | null => {
-  const top = (body as AppleTop).feed?.results
-  if (top) {
-    const i = top.findIndex((a) => a.id === app.id || app.match.test(a.name ?? ""))
-    return i >= 0 ? i + 1 : null
-  }
-  const entries = (body as AppleGenre).feed?.entry ?? []
-  const i = entries.findIndex((e) => e.id?.attributes?.["im:id"] === app.id || app.match.test(e["im:name"]?.label ?? ""))
-  return i >= 0 ? i + 1 : null
-}
-
-export const APP_CHARTS = [
-  {
-    id: "top",
-    label: "top 100 free apps",
-    url: "https://rss.marketingtools.apple.com/api/v2/us/apps/top-free/100/apps.json",
-    // Scored as places from the bottom (101 − rank, 0 when off the chart).
-    rules: [{ id: "entry", kind: "level", abs: 1, rearmMs: 24 * 3_600_000 }, { id: "climb", kind: "change", windowMin: 24 * 60, points: 25, direction: "up" }] as MetricRule[],
-  },
-  {
-    id: "finance",
-    label: "Finance top 100",
-    url: "https://itunes.apple.com/us/rss/topfreeapplications/limit=100/genre=6015/json",
-    rules: [{ id: "climb", kind: "change", windowMin: 24 * 60, points: 15, direction: "up", min: 81 }] as MetricRule[],
-  },
-]
-type Chart = (typeof APP_CHARTS)[number]
-
-export const appstoreItems = (chart: Chart, body: AppleTop | AppleGenre, w: MetricWatcher, ctx: SourceContext): RawItem[] =>
+export const appstoreItems = (chart: AppChart, body: AppleTop | AppleGenre, w: MetricWatcher, ctx: SourceContext): RawItem[] =>
   BROKER_APPS.flatMap((app) => {
-    const rank = appRank(body, app)
-    const crossings = w.observe(`appstore:${chart.id}:${app.name.toLowerCase()}`, rank ? 101 - rank : 0, ctx.now().getTime(), chart.rules)
-    // Entering the chart is also a climb from nothing: one item, not two.
-    const entered = crossings.some((c) => c.rule === "entry")
-    return crossings
-      .filter((c) => !entered || c.rule === "entry")
-      .map((c) => ({
-        ...attention([], true),
-        sourceId: crossingId(c),
-        title: c.rule === "entry" ? `${app.name} app enters the US App Store ${chart.label} (#${rank})` : `${app.name} app up ${Math.round(c.delta!)} places in 24 h to #${rank} in the US App Store ${chart.label}`,
-        url: app.url,
-        meta: { ...crossingMeta(c), chart: chart.id, app: app.name, rank },
-      }))
+    const { rank, crossings } = appChartCrossings(chart, body, app, w, ctx)
+    return crossings.map((c) => ({ ...attention([], true), sourceId: crossingId(c), title: appChartTitle(app, chart, c, rank), url: app.url, meta: { ...crossingMeta(c), chart: chart.id, app: app.name, rank } }))
   })
 
 // ── Wikipedia ───────────────────────────────────────────────────────────────
 
-const WIKI_RATIO = 3
 /** Below this many daily views a 3× day is a few clicks. */
 const WIKI_MIN_MEDIAN = 100
 const WIKI_MAX_COMPANIES = 40
 
-type Pageviews = { items?: { timestamp: string; views: number }[] }
 type WikiSearch = { query?: { search?: { title: string }[] } }
 
-const ymd = (d: Date) => d.toISOString().slice(0, 10).replace(/-/g, "")
-
 /** The latest day's views over the median of the 28 days before it, with that day's time. */
-export const pageviewRatio = (body: Pageviews): { at: number; views: number; median: number; ratio: number } | null => {
-  const days = (body.items ?? []).map((i) => ({ at: Date.UTC(+i.timestamp.slice(0, 4), +i.timestamp.slice(4, 6) - 1, +i.timestamp.slice(6, 8)), views: num(i.views) ?? 0 }))
-  if (days.length < 8) return null
-  const last = days[days.length - 1]
-  const prior = days.slice(-29, -1).map((d) => d.views).sort((a, b) => a - b)
-  const median = prior.length % 2 ? prior[(prior.length - 1) / 2] : (prior[prior.length / 2 - 1] + prior[prior.length / 2]) / 2
-  return median >= WIKI_MIN_MEDIAN ? { at: last.at, views: last.views, median, ratio: last.views / median } : null
-}
+export const pageviewRatio = (body: Pageviews) => pageviewRatioOf(body, WIKI_MIN_MEDIAN)
 
 const key = (s: string) => s.toLowerCase().replace(/^the\s+/, "").replace(/[^a-z0-9]/g, "")
 
@@ -251,8 +179,6 @@ const wikipediaPoll = (ctx: SourceContext, w: MetricWatcher) => {
   return async (): Promise<RawItem[]> => {
     const now = ctx.now()
     const dir = await companyDirectoryOrAliases(ctx)
-    const start = ymd(new Date(now.getTime() - 35 * 86_400_000))
-    const end = ymd(now)
     const companies = [...watched(ctx)].flatMap((symbol) => {
       const title = dir.names.get(symbol)
       return title ? [{ symbol, name: shortName(title) }] : []
@@ -261,25 +187,11 @@ const wikipediaPoll = (ctx: SourceContext, w: MetricWatcher) => {
       companies.slice(0, WIKI_MAX_COMPANIES).map(({ symbol, name }) => async () => {
         const title = await article(symbol, name)
         if (!title) return null
-        const body = await ctx.fetch.json<Pageviews>(`https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/user/${encodeURIComponent(title)}/daily/${start}/${end}`, { conditional: false })
+        const body = await ctx.fetch.json<Pageviews>(pageviewsUrl(title, now), { conditional: false })
         return { symbol, title, r: body ? pageviewRatio(body) : null }
       }),
     )
-    const items: RawItem[] = []
-    for (const x of results) {
-      if (!x?.r) continue
-      // The day's own time, so the next polls of the same day are ignored.
-      for (const c of w.observe(`wikipedia:${x.symbol}`, x.r.ratio, x.r.at, [{ id: "spike", kind: "level", abs: WIKI_RATIO }])) {
-        items.push({
-          ...attention([x.symbol]),
-          sourceId: crossingId(c),
-          title: `${x.symbol}: Wikipedia "${x.title.replace(/_/g, " ")}" had ${x.r.views.toLocaleString("en-US")} views on ${new Date(x.r.at).toISOString().slice(0, 10)}, ${c.value.toFixed(1)}× its 4-week median`,
-          url: `https://en.wikipedia.org/wiki/${encodeURIComponent(x.title)}`,
-          meta: { ...crossingMeta(c), views: x.r.views, median: x.r.median },
-        })
-      }
-    }
-    return items
+    return results.flatMap((x) => (x?.r ? pageviewItems({ key: x.symbol, symbol: x.symbol }, x.title, x.r, w, `https://en.wikipedia.org/wiki/${encodeURIComponent(x.title)}`) : []))
   }
 }
 
@@ -304,7 +216,7 @@ export const ATTENTION_SOURCES: SourceSpec[] = [
   {
     id: "stocktwits",
     kind: "custom",
-    url: "https://api.stocktwits.com/api/2/trending/symbols.json",
+    url: `${STOCKTWITS_API}/trending/symbols.json`,
     // 20 requests an hour; the crypto bot uses ~60 of the ~200/hour this server's IP gets.
     interval_s: 180,
     tier: 3,

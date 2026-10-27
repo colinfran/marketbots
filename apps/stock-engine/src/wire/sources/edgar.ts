@@ -1,7 +1,7 @@
 import type { WireCategory } from "@mb/stock-core/wire"
-import { parseFeed } from "../kinds/rss"
+import { parseFeed } from "@mb/wire/kinds/rss"
+import { PollingSource } from "@mb/wire/poller"
 import { EIGHT_K_ITEMS, ITEM_PRIORITY } from "../lexicon"
-import { PollingSource } from "../poller"
 import type { RawItem, SourceContext, SourceSpec } from "../types"
 import { companyDirectory } from "./companies"
 

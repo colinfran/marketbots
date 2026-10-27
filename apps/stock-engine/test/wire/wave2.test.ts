@@ -1,13 +1,13 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { DEFAULT_SETTINGS } from "@mb/stock-core/settings"
+import type { WireFetch } from "@mb/wire/fetch"
+import { parseFeed } from "@mb/wire/kinds/rss"
+import { MetricWatcher } from "@mb/wire/metrics"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { silentLogger } from "@mb/engine-kit/log"
-import { benzingaNews, CATALOG, centralBankDecisions, fedregItems } from "../../src/wire/catalog"
-import { WireFetch } from "../../src/wire/fetch"
-import { parseFeed } from "../../src/wire/kinds/rss"
+import { benzingaNews, CATALOG, fedregItems } from "../../src/wire/catalog"
 import { stockLexicon } from "../../src/wire/lexicon"
-import { MetricWatcher } from "../../src/wire/metrics"
 import { stockRules } from "../../src/wire/policy"
 import { appRank, appstoreItems, APP_CHARTS, apewisdomItems, BROKER_APPS, cnnFngItems, companyArticle, pageviewRatio, stocktwitsTrendingItems, tradestieItems } from "../../src/wire/sources/attention"
 import { dividendItems, earningsItems, ipoItems } from "../../src/wire/sources/calendars"
@@ -355,12 +355,6 @@ describe("macro, energy, positioning and contracts", () => {
     expect(stockLexicon.classify(items[2].title)).toBe("policy_shock")
   })
 
-  it("central banks: rate decisions only, market-wide", () => {
-    const kept = centralBankDecisions([{ title: "Bank Rate reduced to 3.75% - November 2026" }, { title: "Monetary policy decisions" }, { title: "Speech by the Governor" }])
-    expect(kept.map((i) => i.title)).toEqual(["Bank Rate reduced to 3.75% - November 2026", "Monetary policy decisions"])
-    expect(kept[0]).toMatchObject({ symbols: [], marketWide: true, category: "macro_release", kind: "macro" })
-  })
-
   it("EIA: the week's change with the forecast and surprise", () => {
     const crude = EIA_REPORTS[0]
     const values = eiaValues(json("eia-petroleum.json"), crude)
@@ -441,15 +435,6 @@ describe("wave-2 catalog and plumbing", () => {
     expect(["vol_rates:vix", "treasury", "eia", "fda:approvals", "macro_actuals", "cb:ecb"].map(tier)).toEqual([1, 1, 1, 1, 1, 1])
     expect(CATALOG.find((s) => s.id === "vol_rates:yields")!.interval_s).toBeGreaterThanOrEqual(3_600)
     expect(CATALOG.filter((s) => ["eia", "fda:approvals"].includes(s.id)).map((s) => s.key_env)).toEqual(["EIA_API_KEY", "OPENFDA_API_KEY"])
-  })
-
-  it("a spec's browser User-Agent replaces the wire's own", async () => {
-    const request = vi.fn(async () => ({ status: 200, text: "{}", headers: new Headers() }))
-    const f = new WireFetch({ take: async () => undefined }, "StockMarketBot/1 a@b.c", request)
-    await f.get("https://api.nasdaq.com/api/calendar/earnings?date=2026-10-27", { headers: { ...BROWSER_HEADERS, accept: "application/json" } })
-    const headers = (request.mock.calls[0] as unknown as [string, { headers: Record<string, string> }])[1].headers
-    expect(headers["user-agent"]).toBe(BROWSER_HEADERS["user-agent"])
-    expect(Object.keys(headers).filter((k) => k.toLowerCase() === "user-agent")).toHaveLength(1)
   })
 
   it("a polled reading source stays quiet on its first poll", async () => {

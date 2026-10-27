@@ -1,5 +1,5 @@
-import { MACRO_EVENTS } from "../calendar"
-import { crossingId, crossingMeta, metricSource, type Crossing, type MetricWatcher } from "../metrics"
+import { MACRO_EVENTS } from "@mb/wire/calendar"
+import { crossingId, crossingMeta, metricSource, type Crossing, type MetricWatcher } from "@mb/wire/metrics"
 import type { RawItem, SourceContext, SourceSpec } from "../types"
 import { num, settleAll } from "./common"
 

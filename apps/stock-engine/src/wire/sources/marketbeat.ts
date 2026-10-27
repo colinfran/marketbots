@@ -1,6 +1,6 @@
 import { load } from "cheerio"
 import { marketDay } from "@mb/stock-core/time"
-import { PollingSource } from "../poller"
+import { PollingSource } from "@mb/wire/poller"
 import type { RawItem, SourceContext, SourceSpec } from "../types"
 import { etNow, num, tracked } from "./common"
 

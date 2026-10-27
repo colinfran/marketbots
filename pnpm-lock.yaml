@@ -22,6 +22,9 @@ importers:
       '@mb/engine-kit':
         specifier: workspace:*
         version: link:../../packages/engine-kit
+      '@mb/wire':
+        specifier: workspace:*
+        version: link:../../packages/wire
       ai:
         specifier: ^7.0.153
         version: 7.0.153(zod@4.6.7)
@@ -177,6 +180,9 @@ importers:
       '@mb/stock-core':
         specifier: workspace:*
         version: link:../../packages/stock-core
+      '@mb/wire':
+        specifier: workspace:*
+        version: link:../../packages/wire
       ai:
         specifier: ^7.0.153
         version: 7.0.153(zod@4.6.7)
@@ -558,6 +564,46 @@ importers:
       '@types/react-dom':
         specifier: ^19
         version: 19.3.0(@types/react@19.3.0)
+      eslint:
+        specifier: ^9
+        version: 9.39.5(jiti@2.7.0)
+      typescript:
+        specifier: ^5
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.12
+        version: 4.1.12(@types/node@22.20.5)(vite@8.3.5(@types/node@22.20.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
+
+  packages/wire:
+    dependencies:
+      '@mb/core':
+        specifier: workspace:*
+        version: link:../core
+      '@mb/engine-kit':
+        specifier: workspace:*
+        version: link:../engine-kit
+      cheerio:
+        specifier: 1.2.0
+        version: 1.2.0
+      fast-xml-parser:
+        specifier: 5.11.2
+        version: 5.11.2
+      mongodb:
+        specifier: ^7.7.0
+        version: 7.7.0(socks@2.8.10)
+      ws:
+        specifier: ^8.22.0
+        version: 8.22.0
+    devDependencies:
+      '@mb/config':
+        specifier: workspace:*
+        version: link:../config
+      '@types/node':
+        specifier: ^22
+        version: 22.20.5
+      '@types/ws':
+        specifier: ^8.18.2
+        version: 8.18.2
       eslint:
         specifier: ^9
         version: 9.39.5(jiti@2.7.0)

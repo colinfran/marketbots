@@ -1,16 +1,23 @@
-import { recentMacro } from "./calendar"
-import { isConfirmed } from "./notable"
-import type { Candidate, Rules } from "./trigger"
+import type { Settings } from "@mb/stock-core/settings"
+import type { WireCategory } from "@mb/stock-core/wire"
+import { recentMacro } from "@mb/wire/calendar"
+import { isConfirmed } from "@mb/wire/notable"
+import { WirePolicy as WirePolicyOf, type Candidate, type Rules as RulesOf } from "@mb/wire/trigger"
 
-export { WirePolicy, type Candidate } from "./trigger"
+export type { Candidate } from "@mb/wire/trigger"
 
 /**
  * The stock trigger rules (MASTER_PLAN §3.5). They only say what an item could justify; the
- * shared gates in wire/trigger.ts decide whether it fires now, waits, or is held back, and record
+ * shared gates in @mb/wire/trigger decide whether it fires now, waits, or is held back, and record
  * why. Event cycles run only in the regular session (the engine's session gate): outside it,
  * bad news about a holding still sends an alert at once, and everything lands in the next phase's
  * dossier anyway.
  */
+
+type Rules = RulesOf<WireCategory, Settings>
+
+/** The trigger policy (@mb/wire/trigger) for stock's items and settings. */
+export class WirePolicy extends WirePolicyOf<WireCategory, Settings> {}
 
 /** Categories that are bad news for a holder whatever the wording. */
 const NEGATIVE = new Set(["bankruptcy", "restatement", "delisting_notice", "late_filing", "short_report", "offering", "antitrust", "lawsuit", "cyber_incident", "exec_departure"])

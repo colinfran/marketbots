@@ -1,24 +1,17 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { DEFAULT_SETTINGS, type Settings } from "@mb/crypto-core/settings"
-import { HttpError } from "@mb/engine-kit/util/http"
+import type { WireFetch } from "@mb/wire/fetch"
+import { diffEntries, diffPoller } from "@mb/wire/kinds/diff"
+import { parseFeed } from "@mb/wire/kinds/rss"
+import { parseStatuspage } from "@mb/wire/kinds/statuspage"
+import { parseTelegram } from "@mb/wire/kinds/telegram"
 import { describe, expect, it, vi } from "vitest"
 import { silentLogger } from "@mb/engine-kit/log"
 import { loadSettings } from "../src/state/stores"
 import { CATALOG } from "../src/wire/catalog"
-import { ClusterIndex, jaccard, titleTokens } from "../src/wire/cluster"
-import { WireFetch } from "../src/wire/fetch"
-import { diffEntries, diffPoller } from "../src/wire/kinds/diff"
-import { parseFeed } from "../src/wire/kinds/rss"
-import { parseStatuspage } from "../src/wire/kinds/statuspage"
-import { parseTelegram } from "../src/wire/kinds/telegram"
 import { cryptoLexicon, largestAmountUsd } from "../src/wire/lexicon"
-import { rateFor } from "../src/wire/limiter"
-import { canonicalUrl, itemId, normalizeRaw, stripHtml } from "../src/wire/normalize"
-import { isConfirmed, notableReasons } from "../src/wire/notable"
-import { PollingSource } from "../src/wire/poller"
-import { scoreSeverity } from "../src/wire/severity"
-import type { RawItem, SourceContext, SourceSpec } from "../src/wire/types"
+import type { SourceContext } from "../src/wire/types"
 import { Wire } from "../src/wire/wire"
 import { useTestDb } from "./helpers/db"
 import { makeBus } from "./helpers/fakes"
@@ -27,48 +20,6 @@ const fixture = (name: string) => readFileSync(join(__dirname, "fixtures", "wire
 const spec = (id: string) => CATALOG.find((s) => s.id === id)!
 const NOW = new Date("2026-10-27T12:00:00Z")
 const UNIVERSE = ["BTC/USD", "ETH/USD", "SOL/USD", "XRP/USD", "DOGE/USD", "ADA/USD", "LINK/USD", "AVAX/USD", "LTC/USD", "DOT/USD"]
-
-describe("normalize", () => {
-  it("strips HTML and tracking, decodes entities, and keeps ids stable", () => {
-    expect(stripHtml("<p>Bitcoin&nbsp;tops &#36;80K &amp; more</p><script>alert(1)</script>").replace(/\s+/g, " ").trim()).toBe("Bitcoin tops $80K & more")
-    expect(canonicalUrl("https://www.coindesk.com/markets/2026/10/27/btc/?utm_source=x&id=7#top")).toBe("https://www.coindesk.com/markets/2026/10/27/btc?id=7")
-    expect(canonicalUrl("javascript:alert(1)")).toBeNull()
-    const a = normalizeRaw("rss:x", { title: "Hello", url: "https://a.com/x?utm_medium=y" }, NOW)!
-    const b = normalizeRaw("rss:x", { title: "Hello again", url: "https://a.com/x" }, NOW)!
-    expect(a.id).toBe(b.id)
-    expect(itemId("rss:x", { sourceId: "g1", title: "t" }, null)).not.toBe(itemId("rss:y", { sourceId: "g1", title: "t" }, null))
-  })
-
-  it("never lets a source claim the future, and drops empty titles", () => {
-    expect(normalizeRaw("s", { title: "x", publishedAt: new Date("2030-01-01") }, NOW)!.published_at).toEqual(NOW)
-    expect(normalizeRaw("s", { title: "  <b></b> " }, NOW)).toBeNull()
-  })
-})
-
-describe("cluster", () => {
-  it("groups near-duplicates with overlapping symbols inside the window", () => {
-    expect(jaccard(titleTokens("SEC approves spot Solana ETF"), titleTokens("SEC approves spot Solana ETFs, a first"))).toBeGreaterThanOrEqual(0.6)
-    const c = new ClusterIndex()
-    c.add("a", "SEC approves spot Solana ETF", ["SOL/USD"], NOW.getTime(), "coindesk.com")
-    const root = c.match("SEC approves spot Solana ETF today", ["SOL/USD"], NOW.getTime() + 60_000)
-    expect(root?.id).toBe("a")
-    expect(c.match("SEC approves spot Solana ETF today", ["ETH/USD"], NOW.getTime())).toBeNull()
-    expect(c.match("SEC approves spot Solana ETF today", ["SOL/USD"], NOW.getTime() + 7 * 3_600_000)).toBeNull()
-    expect(c.confirm(root!, "SEC approves spot Solana ETF today", "theblock.co")).toBe(true)
-    // A syndicated copy of a title already seen counts once, whatever domain carries it.
-    expect(c.confirm(root!, "SEC approves spot Solana ETF today", "yahoo.com")).toBe(false)
-    expect(c.confirm(root!, "SEC approves spot Solana ETF, says agency", "coindesk.com")).toBe(false)
-  })
-})
-
-describe("severity", () => {
-  it("adds base × tier, relevance, confirmations (capped) and anomaly points", () => {
-    const s = scoreSeverity({ category: "exploit", tier: 2, held: true, candidate: true, marketWide: false, confirmations: 3, anomalyPoints: 15 })
-    expect(s.parts).toEqual({ base: 72.3, relevance: 20, confirmation: 16, anomaly: 15 })
-    expect(s.severity).toBe(100)
-    expect(scoreSeverity({ category: "general", tier: 3, held: false, candidate: false, marketWide: true, confirmations: 0, anomalyPoints: 0 }).severity).toBe(11)
-  })
-})
 
 describe("crypto lexicon", () => {
   const tag = (t: string) => cryptoLexicon.tag(t, UNIVERSE)
@@ -157,40 +108,6 @@ describe("source kinds (real payloads)", () => {
     const items = (await poll())!
     expect(items).toEqual([expect.objectContaining({ symbols: ["BTC/USD"], category: "venue_status", polarity: -1 })])
     expect(diffEntries(new Map([["a", "1"]]), new Map([["b", "1"]])).map((c) => c.type).sort()).toEqual(["added", "removed"])
-  })
-
-  it("sends conditional GETs and treats 304 as no change", async () => {
-    const request = vi.fn()
-    request.mockResolvedValueOnce({ status: 200, text: "{}", headers: new Headers({ etag: '"v1"' }) })
-    request.mockResolvedValueOnce({ status: 304, text: "", headers: new Headers() })
-    const f = new WireFetch({ take: async () => undefined }, "Test/1 a@b.c", request)
-    expect(await f.json("https://x.test/a")).toEqual({})
-    expect(await f.json("https://x.test/a")).toBeNull()
-    expect(request.mock.calls[1][1].headers["if-none-match"]).toBe('"v1"')
-    expect(request.mock.calls[0][1].headers["user-agent"]).toBe("Test/1 a@b.c")
-    expect(rateFor("www.sec.gov").key).toBe("sec.gov")
-    expect(rateFor("efts.sec.gov").rate.perSecond).toBe(4)
-  })
-})
-
-describe("polling sources", () => {
-  const ctx = { log: silentLogger, now: () => NOW } as SourceContext
-  const s: SourceSpec = { id: "t", kind: "rss", interval_s: 60, tier: 2, default_enabled: true }
-
-  it("marks the first poll as backfill, skips 304s, and degrades after repeated 403/429", async () => {
-    const poll = vi.fn<() => Promise<RawItem[] | null>>()
-    poll.mockResolvedValueOnce([{ title: "a" }]).mockResolvedValueOnce(null).mockResolvedValueOnce([{ title: "b" }])
-    const states: string[] = []
-    const src = new PollingSource(s, ctx, poll, (_id, st) => states.push(st))
-    const emit = vi.fn(async (_items: RawItem[], _opts?: { backfill?: boolean }) => undefined)
-    await src.tick(emit)
-    await src.tick(emit)
-    await src.tick(emit)
-    expect(emit.mock.calls.map((c) => c[1])).toEqual([{ backfill: true }, { backfill: false }])
-    poll.mockRejectedValue(new HttpError(429, "slow down", ""))
-    for (let i = 0; i < 3; i++) await src.tick(emit)
-    expect(src.health()).toMatchObject({ state: "degraded", last_error: expect.stringContaining("slow down") })
-    expect(states).toEqual(["ok", "degraded"])
   })
 })
 
@@ -295,21 +212,6 @@ describe("wire pipeline", () => {
     const { wire } = await makeWire([], { ...DEFAULT_SETTINGS.wire, mode: "off" })
     expect((await wire.ingest("rss:a", [{ title: "Bitcoin hits a record", url: "https://a.test/r" }])).stored).toEqual([])
     expect(wire.health().sources.every((s) => s.state === "disabled" && s.last_error === "wire is off")).toBe(true)
-  })
-})
-
-describe("notable rules", () => {
-  const base = { _id: "x", cluster_id: "x", tier: 1 as const, kind: "news" as const, confirmations: [], severity_parts: {}, first_seen_at: NOW, severity: 60, symbols: ["BTC/USD"] }
-  const ctx = { now: NOW, held: new Set(["BTC/USD"]), focus: new Set<string>(), thresholds: DEFAULT_SETTINGS.wire.thresholds }
-  it("needs a valid item and an applicable reason", () => {
-    expect(notableReasons(base, ctx)).toEqual(["held"])
-    expect(notableReasons({ ...base, severity: 40 }, ctx)).toEqual([])
-    expect(notableReasons({ ...base, cluster_id: "y" }, ctx)).toEqual([])
-    expect(notableReasons(base, { ...ctx, now: new Date(NOW.getTime() + 7 * 3_600_000) })).toEqual([])
-    expect(notableReasons({ ...base, symbols: [] }, ctx)).toEqual(["market"])
-    expect(notableReasons({ ...base, severity: 72 }, { ...ctx, held: new Set(), focus: new Set(["BTC/USD"]) })).toEqual(["focus"])
-    expect(isConfirmed({ tier: 2, confirmations: [], severity_parts: { anomaly: 15 }, kind: "news" })).toBe(true)
-    expect(isConfirmed({ tier: 3, confirmations: [{ domain: "a", url: null, at: NOW }], severity_parts: {}, kind: "news" })).toBe(false)
   })
 })
 

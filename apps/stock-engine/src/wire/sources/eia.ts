@@ -1,4 +1,4 @@
-import { PollingSource } from "../poller"
+import { PollingSource } from "@mb/wire/poller"
 import type { RawItem, SourceContext, SourceSpec } from "../types"
 import { etNow, num, settleAll, shortDay, signed } from "./common"
 
