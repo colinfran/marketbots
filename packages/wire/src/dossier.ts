@@ -1,5 +1,5 @@
 import type { DossierRow, WireItemDoc } from "@mb/core/wire"
-import { fenceUntrusted } from "@mb/engine-kit/util/text"
+import { cleanLine, fenceUntrusted } from "@mb/engine-kit/util/text"
 import type { Collection } from "mongodb"
 import { upcomingMacro } from "./calendar"
 import { isConfirmed } from "./notable"
@@ -14,12 +14,17 @@ import { isConfirmed } from "./notable"
  *
  * Two lists drive gap-fill research: anomalies no item explains, and high-severity items that
  * aren't confirmed yet.
+ *
+ * The 8 highest-ranked items with a checked machine summary of their article (@mb/wire/enrich)
+ * carry it on a line of its own, once each (MARKETBOTS_PLAN 10.5).
  */
 
 const PER_SYMBOL = 8
 const MARKET = 10
 const CALENDAR = 10
 const SENTIMENT = 5
+const SUMMARIES = 8
+const SUMMARY_CHARS = 600
 const HALF_LIFE_H = 12
 /** An anomaly counts as explained by any news on its symbol within this window. */
 const EXPLAIN_MS = 2 * 3_600_000
@@ -74,6 +79,11 @@ export const renderLine = (i: WireItemDoc<string>, o: Pick<DossierOptions, "pric
   return `[${o.timeLabel(i.first_seen_at)} | T${i.tier} ${i.domain ?? i.source} | ${i.category.replace(/_/g, " ")} | sev ${i.severity}${confirmed}${since}] ${i.title}${i.url ? ` (${i.url})` : ""}`
 }
 
+const hasSummary = (i: WireItemDoc<string>) => i.article?.status === "ok" && !!i.article.summary
+
+/** The line under an item that carries its article's machine summary (quoted: the fence collapses indentation). */
+export const summaryLine = (i: WireItemDoc<string>) => `> machine summary of the article: ${cleanLine(i.article?.summary, SUMMARY_CHARS)}`
+
 /** Picks and renders the dossier from items already loaded (pure; buildDossier loads them). */
 export const assembleDossier = <C extends string>(all: WireItemDoc<C>[], o: DossierOptions): Dossier<C> => {
   const roots = all.filter((i) => i.cluster_id === i._id).sort((a, b) => score(b, o.now) - score(a, o.now))
@@ -126,14 +136,27 @@ export const assembleDossier = <C extends string>(all: WireItemDoc<C>[], o: Doss
     .filter((v, idx, arr) => arr.indexOf(v) === idx)
     .slice(0, CALENDAR)
 
+  // Roots are in rank order, so these are the best-ranked chosen items with a summary.
+  const summarized = new Set(
+    roots
+      .filter((i) => chosen.has(i._id) && hasSummary(i))
+      .slice(0, SUMMARIES)
+      .map((i) => i._id),
+  )
+  const withSummary = (i: WireItemDoc<C>) => {
+    const line = renderLine(i, o)
+    if (!summarized.delete(i._id)) return line
+    return `${line}\n${summaryLine(i)}`
+  }
+
   const sections: string[] = []
   for (const s of o.symbols) {
     const list = bySymbol.get(s)
-    if (list?.length) sections.push(`## ${s}\n${list.map((i) => renderLine(i, o)).join("\n")}`)
+    if (list?.length) sections.push(`## ${s}\n${list.map(withSummary).join("\n")}`)
   }
-  if (market.length) sections.push(`## Market-wide\n${market.map((i) => renderLine(i, o)).join("\n")}`)
+  if (market.length) sections.push(`## Market-wide\n${market.map(withSummary).join("\n")}`)
   if (calendar.length) sections.push(`## Scheduled (next 72 h)\n${calendar.join("\n")}`)
-  if (sentiment.length) sections.push(`## Sentiment and odds\n${sentiment.map((i) => renderLine(i, o)).join("\n")}`)
+  if (sentiment.length) sections.push(`## Sentiment and odds\n${sentiment.map(withSummary).join("\n")}`)
   if (unexplained.length) sections.push(`## Unexplained moves (no news found yet)\n${unexplained.map((i) => renderLine(i, o)).join("\n")}`)
   if (unconfirmed.length) sections.push(`## Unconfirmed high-severity items (one source so far)\n${unconfirmed.map((i) => renderLine(i, o)).join("\n")}`)
 

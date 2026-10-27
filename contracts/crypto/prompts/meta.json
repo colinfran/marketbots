@@ -1,5 +1,5 @@
 {
-  "prompt_version": "crypto-v4",
+  "prompt_version": "crypto-v5",
   "seed_prompt_version": "crypto-seed-v1",
   "seed_owner_lean": "55% BTC/USD, 35% ETH/USD, 10% SOL/USD",
   "regime": {

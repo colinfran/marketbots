@@ -298,6 +298,15 @@ const WIRE_ITEMS: WireItemDoc[] = [
     severity: 58,
     confirmations: [{ domain: "coindesk.com", url: "https://www.coindesk.com/markets/2026/10/27/btc-etf-inflows", at: at("2026-10-27T08:40:00Z") }],
     price_at_seen: { "BTC/USD": 110_950 },
+    article: {
+      status: "ok",
+      summary: "US spot bitcoin ETFs took in $412 million on Monday, their fourth straight day of inflows, according to Farside data cited by The Block. BlackRock's IBIT led with $291 million. Analysts quoted said the flows could continue if bitcoin holds above $110,000.",
+      key_points: ["$412 million of inflows on Monday", "IBIT led with $291 million"],
+      words: 640,
+      model: "llama3.2:3b",
+      ms: 4_100,
+      at: at("2026-10-27T08:13:00Z"),
+    },
   }),
   wireItem({
     _id: "w-eth-treasury",
@@ -313,6 +322,8 @@ const WIRE_ITEMS: WireItemDoc[] = [
     polarity: 1,
     severity: 62,
     price_at_seen: { "ETH/USD": 3_921.4 },
+    // Rejected by the number check: never reaches a prompt.
+    article: { status: "rejected", reason: "numbers not in the article: 45,000", summary: "The firm added 45,000 ETH.", model: "llama3.2:3b", ms: 3_800, at: at("2026-10-27T07:59:00Z") },
   }),
   wireItem({
     _id: "w-sol-outage",

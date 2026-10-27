@@ -473,9 +473,19 @@ Vercel's instant rollback (*Deployments* → a previous deployment → *Instant 
 
 ---
 
-## 9. The local LLM (Phase 10, off by default)
+## 9. The local LLM (article summaries)
 
-`llm` is Ollama, for local summaries of the articles behind important news items (MARKETBOTS_PLAN §3.9). It sits behind the compose profile `llm`, so `docker compose up -d` doesn't start it. No engine calls it before Phase 10.3; compose already sets `LLM_URL=http://llm:11434` for both.
+`llm` is Ollama running `llama3.2:3b`. It writes short summaries of the articles behind important news items (MARKETBOTS_PLAN §3.9). Both engines reach it at `LLM_URL=http://llm:11434`.
+
+**The `llm` profile:** the service sits behind it, so a plain `docker compose up -d` neither starts nor recreates it. Pass `--profile llm` whenever you bring the whole stack up. Once it is running, `restart: unless-stopped` brings it back after a reboot like everything else.
+
+**When it's down:** the engines keep trading. Only the summaries stop, and the source `enrich:summaries` turns degraded on the dashboard.
+
+**How summaries are used:**
+- **Which items:** news cluster roots at severity ≥ `wire.summaries.min_severity` (Admin), and never on the trigger path.
+- **Where they show:** under the item on the Research page.
+- **In prompts:** the AI's wire dossier carries the summaries of its 8 best-ranked items. Each is labelled as a machine summary, and the AI is told to cite the item's URL, never the summary.
+- **Turning them off:** set `wire.summaries.enabled` to off in Admin.
 
 **Requirements:** an NVIDIA GPU (the RTX 3070), the Windows NVIDIA driver, and Docker Desktop's WSL2 backend, which passes the GPU to containers (Jellyfin already uses it that way). No host port.
 

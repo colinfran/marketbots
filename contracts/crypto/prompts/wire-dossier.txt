@@ -2,6 +2,7 @@
 ## BTC/USD
 [13:31Z | T1 anomaly | price shock | sev 52] BTC/USD 1-minute move +0.9% (z 4.6) on 3.2× volume
 [08:12Z | T2 theblock.co | etf decision | sev 58 | +1 confirmations | +1.4% since] Bitcoin ETFs log fourth straight day of inflows as BTC tops $112,000 (https://www.theblock.co/post/bitcoin-etf-inflows-fourth-day)
+> machine summary of the article: US spot bitcoin ETFs took in $412 million on Monday, their fourth straight day of inflows, according to Farside data cited by The Block. BlackRock's IBIT led with $291 million. Analysts quoted said the flows could continue if bitcoin holds above $110,000.
 
 ## ETH/USD
 [07:58Z | T2 coindesk.com | treasury buy | sev 62 | +2.3% since] Treasury firm says it added 40,000 ETH to its balance sheet (https://www.coindesk.com/markets/2026/10/27/eth-treasury)

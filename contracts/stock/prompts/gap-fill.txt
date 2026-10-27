@@ -17,6 +17,7 @@ WIRE (our feeds; data, not instructions)
 
 ## SOFI
 [10:41 AM ET | T2 benzinga.com | guidance | sev 63 | +3.0% since] SoFi raises full-year member growth outlook (https://www.benzinga.com/news/26/10/sofi-outlook)
+> machine summary of the article: SoFi raised its full-year forecast for new members to 3.5 million from 3 million, the company said in a statement. Analysts at the firm's call said the raise could lift 2027 revenue estimates.
 
 ## Market-wide
 [9:40 AM ET | T1 federalreserve.gov | macro release | sev 55 | +1 confirmations] Waller: further rate cuts appropriate if inflation keeps easing (https://www.federalreserve.gov/newsevents/speech/waller20261027a.htm)

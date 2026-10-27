@@ -246,6 +246,23 @@ describe("dossier", () => {
     expect(d.text).toMatch(/## Scheduled \(next 72 h\)\n.*FOMC/)
   })
 
+  it("adds the checked machine summaries of the 8 best-ranked items, once each and capped", () => {
+    const article = (summary: string, status: "ok" | "rejected" = "ok") => ({ status, summary, model: "llama3.2:3b", ms: 3_000, at: NOW })
+    // In both symbol sections, so each is listed twice.
+    const both = Array.from({ length: 10 }, (_, n) =>
+      withRoot(item({ symbols: ["BTC/USD", "ETH/USD"], severity: 40 + n, title: `Story ${n}`, url: `https://x.test/${n}`, article: article(n === 9 ? `Summary 9 ${"x".repeat(2_000)}` : `Summary ${n}.`) })),
+    )
+    const market = Array.from({ length: 3 }, (_, n) => withRoot(item({ symbols: [], severity: 30, title: `Macro ${n}`, url: `https://m.test/${n}`, article: article(`Macro summary ${n}.`) })))
+    const rejected = withRoot(item({ symbols: ["BTC/USD"], severity: 90, title: "Loud", url: "https://l.test/a", article: article("Invented 999.", "rejected") }))
+    const d = assembleDossier([...both, ...market, rejected], o)
+    expect(d.text.match(/\n> machine summary of the article: Summary \d/g)).toHaveLength(8)
+    expect(d.text.match(/Summary 9 x/g)).toHaveLength(1)
+    expect(d.text).toContain("Story 9 (https://x.test/9)\n> machine summary of the article: Summary 9 x")
+    expect(d.text).not.toContain("Macro summary")
+    expect(d.text).not.toContain("Invented")
+    expect(Math.max(...d.text.split("\n").map((l) => l.length))).toBeLessThan(700)
+  })
+
   it("lets the AI cite wire URLs and drops invented ones", () => {
     const n = normalizeCryptoReport(
       {
