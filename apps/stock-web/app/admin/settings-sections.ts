@@ -37,6 +37,26 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     ],
   },
   {
+    title: "Core book (long-term holdings, reviewed weekly)",
+    fields: [
+      { path: "core.enabled", label: "Core book enabled", kind: "boolean" },
+      { path: "core.target_pct", label: "Target share of equity (%)", kind: "number" },
+      { path: "core.band_pct", label: "Rebalance only when off target by more than (pts)", kind: "number" },
+      { path: "core.min_holdings", label: "Min holdings", kind: "number" },
+      { path: "core.max_holdings", label: "Max holdings", kind: "number" },
+      { path: "core.max_holding_pct", label: "Max per single stock (% of equity)", kind: "number" },
+      { path: "core.max_index_etf_pct", label: "Max per index ETF: SPY, QQQ, DIA, IWM, VTI, VOO (% of equity)", kind: "number" },
+      { path: "core.max_theme_pct", label: "Max in one theme (% of the core book)", kind: "number" },
+      { path: "core.stop_pct", label: "Initial stop below entry (%)", kind: "number" },
+      { path: "core.min_conviction", label: "Min AI conviction for a core buy (1-10)", kind: "number" },
+      { path: "core.max_trades_per_review", label: "Max trades per review", kind: "number" },
+      { path: "core.review_weekday", label: "Weekly review day", kind: "select", options: ["mon", "tue", "wed", "thu", "fri"] },
+      { path: "core.review_time_et", label: "Weekly review time (ET, HH:MM)", kind: "text" },
+      { path: "core.universe_size", label: "Candidates: top names in the scan universe by dollar volume", kind: "number" },
+      { path: "core.themes", label: "Long-term themes, one per line (e.g. AI buildout: NVDA, AVGO, TSM)", kind: "lines" },
+    ],
+  },
+  {
     title: "Options",
     fields: [
       { path: "options.enabled", label: "Options trading enabled", kind: "boolean" },

@@ -177,8 +177,8 @@ export type AiCallDoc = {
   error: string | null
 }
 
-/** What started a cycle (absent on cycles from before it was recorded). */
-export type CycleKind = "scheduled" | "price_move" | "manual" | "event" | "seed"
+/** What started a cycle (absent on cycles from before it was recorded). core = a review of the long-term core book. */
+export type CycleKind = "scheduled" | "price_move" | "manual" | "event" | "seed" | "core"
 
 export type CycleStep = { name: string; at: Date; ok: boolean; detail: string | null }
 

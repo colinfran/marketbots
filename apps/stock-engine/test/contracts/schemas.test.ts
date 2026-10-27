@@ -44,6 +44,10 @@ const settingsValidation = () => {
     "options.min_delta >= max_delta": { ...S, options: { ...S.options, min_delta: 0.7 } },
     "options.max_premium_per_trade_pct > max_total_premium_pct": { ...S, options: { ...S.options, max_premium_per_trade_pct: 16 } },
     "duplicate benchmarks": { ...S, universe: { ...S.universe, benchmarks: ["SPY", "SPY"] } },
+    "core.min_holdings > max_holdings": { ...S, core: { ...S.core, min_holdings: 9 } },
+    "core.target_pct + risk.cash_reserve_pct > 100": { ...S, core: { ...S.core, target_pct: 90 }, risk: { ...S.risk, cash_reserve_pct: 15 } },
+    "core.review_time_et outside the session": { ...S, core: { ...S.core, review_time_et: "15:45" } },
+    "core.themes malformed": { ...S, core: { ...S.core, themes: ["AI buildout: NVDA, AVGO", "Chips: 2330"] } },
     "unknown keys are dropped": { ...S, extra: 1, risk: { ...S.risk, extra: 2 } },
   }
   return Object.fromEntries(

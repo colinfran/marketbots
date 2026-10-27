@@ -15,7 +15,8 @@ import { Switch } from "./components/switch"
  * two tabs can't overwrite each other).
  */
 
-export type SettingsField = { path: string; label: string; kind: "number" | "boolean" | "text" | "list" | "idlist" | "select"; options?: string[]; step?: number }
+/** list: comma-separated tickers (uppercased). idlist: comma-separated ids. lines: one entry per line, for entries that contain commas. */
+export type SettingsField = { path: string; label: string; kind: "number" | "boolean" | "text" | "list" | "idlist" | "lines" | "select"; options?: string[]; step?: number }
 
 export type SettingsSection = { title: string; fields: SettingsField[] }
 
@@ -28,7 +29,7 @@ const setIn = (obj: Record<string, unknown>, path: string, value: unknown) => {
   cur[keys.at(-1)!] = value
 }
 
-const toInput = (v: unknown) => (Array.isArray(v) ? v.join(", ") : v === null || v === undefined ? "" : String(v))
+const toInput = (v: unknown, separator = ", ") => (Array.isArray(v) ? v.join(separator) : v === null || v === undefined ? "" : String(v))
 
 export function SettingsForm({ sections, settings, version }: { sections: SettingsSection[]; settings: object; version: number }) {
   const initial = useMemo(() => Object.fromEntries(sections.flatMap((g) => g.fields).map((f) => [f.path, get(settings, f.path)])), [sections, settings])
@@ -39,6 +40,7 @@ export function SettingsForm({ sections, settings, version }: { sections: Settin
     if (f.kind === "number") return Number(raw)
     if (f.kind === "list") return String(raw).split(",").map((s) => s.trim().toUpperCase()).filter(Boolean)
     if (f.kind === "idlist") return String(raw).split(",").map((s) => s.trim()).filter(Boolean)
+    if (f.kind === "lines") return (Array.isArray(raw) ? raw.map(String) : String(raw).split("\n")).map((s) => s.trim()).filter(Boolean)
     if (f.kind === "text" && f.path === "ai.models.fallback") return toInput(raw).trim() || null
     return raw
   }
@@ -61,6 +63,23 @@ export function SettingsForm({ sections, settings, version }: { sections: Settin
             {g.fields.map((f) => {
               const id = `s-${f.path}`
               const dirty = changed.includes(f)
+              if (f.kind === "lines") {
+                return (
+                  <div key={f.path} className="space-y-1.5 md:col-span-2">
+                    <Label htmlFor={id} className={dirty ? "text-foreground font-medium" : "text-muted-foreground font-normal"}>
+                      {f.label}
+                      {dirty && " •"}
+                    </Label>
+                    <textarea
+                      id={id}
+                      rows={4}
+                      className="border-input focus-visible:border-ring focus-visible:ring-ring/50 dark:bg-input/30 w-full rounded-lg border bg-transparent px-2.5 py-1.5 font-mono text-xs outline-none focus-visible:ring-3"
+                      value={toInput(values[f.path], "\n")}
+                      onChange={(e) => setValues({ ...values, [f.path]: e.target.value })}
+                    />
+                  </div>
+                )
+              }
               return (
                 <div key={f.path} className="flex items-center justify-between gap-3">
                   <Label htmlFor={id} className={dirty ? "text-foreground font-medium" : "text-muted-foreground font-normal"}>

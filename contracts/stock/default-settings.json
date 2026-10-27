@@ -139,5 +139,22 @@
       ],
       "pause_hours": []
     }
+  },
+  "core": {
+    "enabled": false,
+    "target_pct": 50,
+    "band_pct": 5,
+    "min_holdings": 4,
+    "max_holdings": 8,
+    "max_holding_pct": 15,
+    "max_index_etf_pct": 25,
+    "max_theme_pct": 50,
+    "stop_pct": 15,
+    "min_conviction": 7,
+    "max_trades_per_review": 6,
+    "review_weekday": "mon",
+    "review_time_et": "10:15",
+    "universe_size": 100,
+    "themes": []
   }
 }

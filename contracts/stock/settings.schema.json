@@ -636,6 +636,108 @@
           "scan_min_dollar_volume",
           "summaries"
         ]
+      },
+      "core": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "target_pct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 90
+          },
+          "band_pct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 50
+          },
+          "min_holdings": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20
+          },
+          "max_holdings": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20
+          },
+          "max_holding_pct": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 50
+          },
+          "max_index_etf_pct": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "max_theme_pct": {
+            "type": "number",
+            "minimum": 10,
+            "maximum": 100
+          },
+          "stop_pct": {
+            "type": "number",
+            "minimum": 3,
+            "maximum": 50
+          },
+          "min_conviction": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10
+          },
+          "max_trades_per_review": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20
+          },
+          "review_weekday": {
+            "type": "string",
+            "enum": [
+              "mon",
+              "tue",
+              "wed",
+              "thu",
+              "fri"
+            ]
+          },
+          "review_time_et": {
+            "type": "string",
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+          },
+          "universe_size": {
+            "type": "integer",
+            "minimum": 20,
+            "maximum": 500
+          },
+          "themes": {
+            "maxItems": 12,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 200
+            }
+          }
+        },
+        "required": [
+          "enabled",
+          "target_pct",
+          "band_pct",
+          "min_holdings",
+          "max_holdings",
+          "max_holding_pct",
+          "max_index_etf_pct",
+          "max_theme_pct",
+          "stop_pct",
+          "min_conviction",
+          "max_trades_per_review",
+          "review_weekday",
+          "review_time_et",
+          "universe_size",
+          "themes"
+        ]
       }
     },
     "required": [
@@ -645,7 +747,8 @@
       "ai",
       "schedule",
       "universe",
-      "wire"
+      "wire",
+      "core"
     ]
   },
   "output": {
@@ -1296,6 +1399,109 @@
           "summaries"
         ],
         "additionalProperties": false
+      },
+      "core": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "target_pct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 90
+          },
+          "band_pct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 50
+          },
+          "min_holdings": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20
+          },
+          "max_holdings": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20
+          },
+          "max_holding_pct": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 50
+          },
+          "max_index_etf_pct": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "max_theme_pct": {
+            "type": "number",
+            "minimum": 10,
+            "maximum": 100
+          },
+          "stop_pct": {
+            "type": "number",
+            "minimum": 3,
+            "maximum": 50
+          },
+          "min_conviction": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10
+          },
+          "max_trades_per_review": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20
+          },
+          "review_weekday": {
+            "type": "string",
+            "enum": [
+              "mon",
+              "tue",
+              "wed",
+              "thu",
+              "fri"
+            ]
+          },
+          "review_time_et": {
+            "type": "string",
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+          },
+          "universe_size": {
+            "type": "integer",
+            "minimum": 20,
+            "maximum": 500
+          },
+          "themes": {
+            "maxItems": 12,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 200
+            }
+          }
+        },
+        "required": [
+          "enabled",
+          "target_pct",
+          "band_pct",
+          "min_holdings",
+          "max_holdings",
+          "max_holding_pct",
+          "max_index_etf_pct",
+          "max_theme_pct",
+          "stop_pct",
+          "min_conviction",
+          "max_trades_per_review",
+          "review_weekday",
+          "review_time_et",
+          "universe_size",
+          "themes"
+        ],
+        "additionalProperties": false
       }
     },
     "required": [
@@ -1305,7 +1511,8 @@
       "ai",
       "schedule",
       "universe",
-      "wire"
+      "wire",
+      "core"
     ],
     "additionalProperties": false
   }

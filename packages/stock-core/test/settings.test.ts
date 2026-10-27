@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { commandSchema } from "../src/commands"
-import { applySettingsPatch, DEFAULT_SETTINGS, diffSettings, settingsSchema } from "../src/settings"
+import { applySettingsPatch, DEFAULT_SETTINGS, diffSettings, parseTheme, settingsSchema } from "../src/settings"
 
 describe("settings", () => {
   it("ships valid defaults matching the old risk rules", () => {
@@ -49,6 +49,46 @@ describe("settings", () => {
   it("drops unknown keys rather than storing them", () => {
     const r = applySettingsPatch(DEFAULT_SETTINGS, { risk: { yolo: true } } as never)
     expect(r.ok && "yolo" in r.settings.risk).toBe(false)
+  })
+
+  it("ships the core book switched off", () => {
+    expect(DEFAULT_SETTINGS.core).toMatchObject({ enabled: false, target_pct: 50, max_holding_pct: 15, max_index_etf_pct: 25, stop_pct: 15, review_weekday: "mon", review_time_et: "10:15", themes: [] })
+  })
+
+  it("migrates stored settings from before the core book by filling it from the defaults", () => {
+    const { core: _core, ...stored } = { ...DEFAULT_SETTINGS, risk: { ...DEFAULT_SETTINGS.risk, max_open_positions: 4 } }
+    expect(settingsSchema.safeParse(stored).success).toBe(false)
+    const r = applySettingsPatch(DEFAULT_SETTINGS, stored)
+    expect(r.ok && r.settings.core).toEqual(DEFAULT_SETTINGS.core)
+    expect(r.ok && r.settings.risk.max_open_positions).toBe(4)
+  })
+
+  it.each([
+    [{ core: { min_holdings: 9 } }, "core.min_holdings: min_holdings can't exceed max_holdings"],
+    [{ core: { target_pct: 90 }, risk: { cash_reserve_pct: 15 } }, "core.target_pct: target_pct plus risk.cash_reserve_pct can't exceed 100"],
+    [{ core: { review_time_et: "09:00" } }, "core.review_time_et: review_time_et must be between 09:30 and 15:00 (the regular session)"],
+    [{ core: { review_time_et: "15:30" } }, "core.review_time_et: review_time_et must be between 09:30 and 15:00 (the regular session)"],
+  ])("rejects an inconsistent core book: %j", (patch, error) => {
+    const r = applySettingsPatch(DEFAULT_SETTINGS, patch)
+    expect(r.ok).toBe(false)
+    expect(!r.ok && r.errors).toContain(error)
+  })
+
+  it("validates core themes and review times", () => {
+    expect(applySettingsPatch(DEFAULT_SETTINGS, { core: { themes: ["AI buildout: NVDA, AVGO, TSM", "Nuclear power"] } }).ok).toBe(true)
+    expect(applySettingsPatch(DEFAULT_SETTINGS, { core: { themes: ["AI buildout: NVDA, $AVGO"] } })).toEqual({ ok: false, errors: ['core.themes.0: Expected a theme like "AI buildout: NVDA, AVGO, TSM"'] })
+    expect(applySettingsPatch(DEFAULT_SETTINGS, { core: { review_time_et: "9:45" } }).ok).toBe(false)
+    expect(applySettingsPatch(DEFAULT_SETTINGS, { core: { review_weekday: "sat" as never } }).ok).toBe(false)
+  })
+
+  it("parses theme lines", () => {
+    expect(parseTheme("AI buildout: NVDA, AVGO, TSM")).toEqual({ name: "AI buildout", tickers: ["NVDA", "AVGO", "TSM"] })
+    expect(parseTheme("  Nuclear power  ")).toEqual({ name: "Nuclear power", tickers: [] })
+    expect(parseTheme("Banks: jpm bac  JPM,brk.b")).toEqual({ name: "Banks", tickers: ["JPM", "BAC", "BRK.B"] })
+    expect(parseTheme("Space:")).toEqual({ name: "Space", tickers: [] })
+    expect(parseTheme(": NVDA")).toBeNull()
+    expect(parseTheme("Chips: NVDA, 2330")).toBeNull()
+    expect(parseTheme(`${"x".repeat(61)}: NVDA`)).toBeNull()
   })
 
   it("diffs leaf paths for the audit log", () => {

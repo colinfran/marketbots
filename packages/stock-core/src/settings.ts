@@ -34,6 +34,67 @@ const ticker = z.string().regex(TICKER_PATTERN, "Expected an uppercase ticker li
 export const PHASES = ["premarket", "intraday", "close", "postmarket"] as const
 export type Phase = (typeof PHASES)[number]
 
+/** The weekdays a weekly job can be scheduled on. */
+export const WEEKDAYS = ["mon", "tue", "wed", "thu", "fri"] as const
+export type Weekday = (typeof WEEKDAYS)[number]
+
+/** A wall-clock time in New York, "HH:MM" on a 24-hour clock. */
+export const TIME_ET_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/
+
+/** Broad-index ETFs: a core holding of one is capped at core.max_index_etf_pct, a single stock at core.max_holding_pct. */
+export const CORE_INDEX_ETFS = ["SPY", "QQQ", "DIA", "IWM", "VTI", "VOO"] as const
+
+export type CoreTheme = { name: string; tickers: string[] }
+
+/**
+ * One of the owner's long-term themes, written as "AI buildout: NVDA, AVGO, TSM". The tickers are
+ * optional ("Nuclear power" alone is a theme), separated by commas or spaces, any case. null when
+ * the line isn't a theme: no name, a name over 60 characters, or a malformed or 16th ticker.
+ */
+export const parseTheme = (line: string): CoreTheme | null => {
+  const colon = line.indexOf(":")
+  const name = (colon < 0 ? line : line.slice(0, colon)).trim()
+  if (!name || name.length > 60) return null
+  const tickers = colon < 0 ? [] : line.slice(colon + 1).split(/[\s,]+/).filter(Boolean).map((t) => t.toUpperCase())
+  if (tickers.length > 15 || !tickers.every((t) => TICKER_PATTERN.test(t))) return null
+  return { name, tickers: [...new Set(tickers)] }
+}
+
+const themeLine = z.string().max(200).refine((s) => parseTheme(s) !== null, 'Expected a theme like "AI buildout: NVDA, AVGO, TSM"')
+
+/**
+ * The long-term core book: a share of equity in a handful of holdings, each with a written thesis,
+ * reviewed weekly instead of every cycle. Off until the owner turns it on.
+ */
+export const coreSettingsSchema = z.object({
+  enabled: z.boolean(),
+  /** Share of equity the core book aims for. */
+  target_pct: pct(0, 90),
+  /** The book is rebalanced toward the target only when it is off by more than this many points. */
+  band_pct: pct(0, 50),
+  min_holdings: int(1, 20),
+  max_holdings: int(1, 20),
+  /** Cap per single stock, as % of equity. */
+  max_holding_pct: pct(1, 50),
+  /** Cap per broad-index ETF (CORE_INDEX_ETFS), as % of equity. */
+  max_index_etf_pct: pct(1, 100),
+  /** Most of the core book any one theme may hold, as % of the book. */
+  max_theme_pct: pct(10, 100),
+  /** Initial stop below entry. Reviews may raise a holding's stop, never lower it. */
+  stop_pct: pct(3, 50),
+  /** 1-10 AI conviction required for a core buy. */
+  min_conviction: int(1, 10),
+  /** Buys + trims + sells in one review. */
+  max_trades_per_review: int(1, 20),
+  review_weekday: z.enum(WEEKDAYS),
+  /** When the weekly review runs, New York time; in the regular session. */
+  review_time_et: z.string().regex(TIME_ET_PATTERN, "Expected a time like 10:15"),
+  /** Candidates taken from the scan universe: the top names by dollar volume. */
+  universe_size: int(20, 500),
+  /** The owner's long-term themes, one per line (parseTheme). */
+  themes: z.array(themeLine).max(12),
+})
+
 export const riskSettingsSchema = z.object({
   /** Max % of equity in any single stock position. */
   max_position_pct: pct(1, 100),
@@ -189,6 +250,7 @@ export const settingsSchema = z
       stream_max_symbols: int(1, 1_000),
     }),
     wire: wireSettingsSchema,
+    core: coreSettingsSchema,
   })
   .superRefine((s, ctx) => {
     const issue = (path: string[], message: string) => ctx.addIssue({ code: "custom", path, message })
@@ -205,6 +267,9 @@ export const settingsSchema = z
       issue(["options", "max_premium_per_trade_pct"], "max_premium_per_trade_pct can't exceed max_total_premium_pct")
     }
     if (new Set(s.universe.benchmarks).size !== s.universe.benchmarks.length) issue(["universe", "benchmarks"], "duplicate symbols")
+    if (s.core.min_holdings > s.core.max_holdings) issue(["core", "min_holdings"], "min_holdings can't exceed max_holdings")
+    if (s.core.target_pct + s.risk.cash_reserve_pct > 100) issue(["core", "target_pct"], "target_pct plus risk.cash_reserve_pct can't exceed 100")
+    if (s.core.review_time_et < "09:30" || s.core.review_time_et > "15:00") issue(["core", "review_time_et"], "review_time_et must be between 09:30 and 15:00 (the regular session)")
   })
 
 export type Settings = z.infer<typeof settingsSchema>
@@ -310,6 +375,23 @@ export const DEFAULT_SETTINGS: Settings = {
       skip_domains: ["wsj.com", "ft.com", "bloomberg.com", "nytimes.com", "economist.com", "barrons.com", "seekingalpha.com"],
       pause_hours: [],
     },
+  },
+  core: {
+    enabled: false,
+    target_pct: 50,
+    band_pct: 5,
+    min_holdings: 4,
+    max_holdings: 8,
+    max_holding_pct: 15,
+    max_index_etf_pct: 25,
+    max_theme_pct: 50,
+    stop_pct: 15,
+    min_conviction: 7,
+    max_trades_per_review: 6,
+    review_weekday: "mon",
+    review_time_et: "10:15",
+    universe_size: 100,
+    themes: [],
   },
 }
 

@@ -1,6 +1,6 @@
 # Plan: a long-term core book
 
-Status: **draft for the owner's review**. Nothing here is built yet. Stock bot first, crypto second (phase 2).
+Status: **approved on 2026-10-27**, with every recommendation in §12 taken. Being built in the steps of §11. Stock bot first, crypto second (phase 2).
 
 ## 1. Goal
 
