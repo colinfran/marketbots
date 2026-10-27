@@ -1,0 +1,27 @@
+{
+  "fixture": "coindesk.xml",
+  "parser": "parseFeed (rss:coindesk)",
+  "output": [
+    {
+      "sourceId": "ab48f700-3ebb-46de-910e-20ac938718c5",
+      "title": "Tom Lee's Bitmine favors share buybacks to ether purchases as crypto declines",
+      "summary": "The Ethereum treasury firm spent $46 million buying back shares as Chairman Tom Lee said crypto has held up better than AI stocks during the recent market pullback.",
+      "url": "https://www.coindesk.com/business/2026/10/26/tom-lee-s-bitmine-favors-share-buybacks-to-ether-purchases-as-crypto-declines",
+      "publishedAt": "2026-10-26T16:05:12.000Z"
+    },
+    {
+      "sourceId": "3ee3ec04-031d-41ce-bb81-249e93ec02fb",
+      "title": "NBA joins pro sports leagues on CFTC prediction markets bandwagon while NFL balks",
+      "summary": "The U.S. derivatives regulator, which has championed the arrival of prediction market firms such as Kalshi, has been gathering allied sports leagues.",
+      "url": "https://www.coindesk.com/policy/2026/10/26/nba-joins-pro-sports-leagues-on-cftc-prediction-markets-bandwagon-while-nfl-balks",
+      "publishedAt": "2026-10-26T15:59:55.000Z"
+    },
+    {
+      "sourceId": "f5f0953a-9754-4d4a-8407-129a767c17c7",
+      "title": "OCC calls on community banks to enter the stablecoin payments market",
+      "summary": "The U.S. banking regulator is encouraging smaller lenders to develop stablecoin services as new federal licensing requirements approach.",
+      "url": "https://www.coindesk.com/policy/2026/10/26/occ-calls-on-community-banks-to-enter-the-stablecoin-payments-market",
+      "publishedAt": "2026-10-26T15:45:51.000Z"
+    }
+  ]
+}

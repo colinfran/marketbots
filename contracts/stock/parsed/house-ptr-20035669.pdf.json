@@ -1,0 +1,140 @@
+{
+  "fixture": "house-ptr-20035669.pdf",
+  "parser": "pdfText + parsePtr, then congressItems (every ticker tracked)",
+  "filing": {
+    "docId": "20035669",
+    "type": "P",
+    "year": "2026",
+    "filed": "2026-10-22",
+    "first": "Cleo",
+    "last": "Fields",
+    "suffix": "",
+    "district": "LA06"
+  },
+  "ptr": {
+    "name": "Cleo Fields",
+    "district": "LA06",
+    "rows": [
+      {
+        "owner": "self",
+        "asset": "NVIDIA Corporation - Common Stock (NVDA)",
+        "assetType": "ST",
+        "ticker": "NVDA",
+        "type": "purchase",
+        "tradeDate": "2026-10-01",
+        "notifiedDate": "2026-10-01",
+        "amount": "$1,001 - $15,000",
+        "low": 1001,
+        "high": 15000,
+        "status": "New",
+        "description": null
+      },
+      {
+        "owner": "self",
+        "asset": "NVIDIA Corporation - Common Stock (NVDA)",
+        "assetType": "ST",
+        "ticker": "NVDA",
+        "type": "purchase",
+        "tradeDate": "2026-10-01",
+        "notifiedDate": "2026-10-01",
+        "amount": "$1,001 - $15,000",
+        "low": 1001,
+        "high": 15000,
+        "status": "New",
+        "description": null
+      },
+      {
+        "owner": "self",
+        "asset": "NVIDIA Corporation - Common Stock (NVDA)",
+        "assetType": "ST",
+        "ticker": "NVDA",
+        "type": "purchase",
+        "tradeDate": "2026-10-01",
+        "notifiedDate": "2026-10-01",
+        "amount": "$1,001 - $15,000",
+        "low": 1001,
+        "high": 15000,
+        "status": "New",
+        "description": null
+      },
+      {
+        "owner": "self",
+        "asset": "Taiwan Semiconductor Manufacturing Company Ltd. (TSM)",
+        "assetType": "ST",
+        "ticker": "TSM",
+        "type": "purchase",
+        "tradeDate": "2026-10-09",
+        "notifiedDate": "2026-10-09",
+        "amount": "$1,001 - $15,000",
+        "low": 1001,
+        "high": 15000,
+        "status": "New",
+        "description": null
+      }
+    ]
+  },
+  "output": [
+    {
+      "sourceId": "20035669:NVDA:self:purchase:2026-10-01:ST",
+      "title": "NVDA: Rep. Cleo Fields (LA-06) bought $3K–$45K in 3 transactions on 2026-10-01 (disclosed 2026-10-22)",
+      "summary": "NVIDIA Corporation - Common Stock (NVDA)",
+      "url": "https://disclosures-clerk.house.gov/public_disc/ptr-pdfs/2026/20035669.pdf",
+      "publishedAt": "2026-10-22T00:00:00.000Z",
+      "symbols": [
+        "NVDA"
+      ],
+      "category": "general",
+      "kind": "filing",
+      "tier": 3,
+      "polarity": 1,
+      "baseSeverity": 25,
+      "meta": {
+        "congress": true,
+        "member": "Cleo Fields",
+        "district": "LA-06",
+        "owner": "self",
+        "transaction": "purchase",
+        "asset_type": "ST",
+        "option": null,
+        "amount_range": "$1,001 - $15,000",
+        "amount_low": 3003,
+        "amount_high": 45000,
+        "transactions": 3,
+        "trade_date": "2026-10-01",
+        "filed": "2026-10-22",
+        "doc_id": "20035669"
+      }
+    },
+    {
+      "sourceId": "20035669:TSM:self:purchase:2026-10-09:ST",
+      "title": "TSM: Rep. Cleo Fields (LA-06) bought $1K–$15K on 2026-10-09 (disclosed 2026-10-22)",
+      "summary": "Taiwan Semiconductor Manufacturing Company Ltd. (TSM)",
+      "url": "https://disclosures-clerk.house.gov/public_disc/ptr-pdfs/2026/20035669.pdf",
+      "publishedAt": "2026-10-22T00:00:00.000Z",
+      "symbols": [
+        "TSM"
+      ],
+      "category": "general",
+      "kind": "filing",
+      "tier": 3,
+      "polarity": 1,
+      "baseSeverity": 25,
+      "meta": {
+        "congress": true,
+        "member": "Cleo Fields",
+        "district": "LA-06",
+        "owner": "self",
+        "transaction": "purchase",
+        "asset_type": "ST",
+        "option": null,
+        "amount_range": "$1,001 - $15,000",
+        "amount_low": 1001,
+        "amount_high": 15000,
+        "transactions": 1,
+        "trade_date": "2026-10-09",
+        "filed": "2026-10-22",
+        "doc_id": "20035669"
+      }
+    }
+  ]
+}

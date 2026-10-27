@@ -1,0 +1,759 @@
+{
+  "enums": {
+    "sentiments": [
+      "very_bullish",
+      "bullish",
+      "neutral",
+      "bearish",
+      "very_bearish"
+    ],
+    "regimes": [
+      "trending_up",
+      "trending_down",
+      "range_bound",
+      "high_volatility",
+      "risk_off",
+      "event_driven"
+    ],
+    "stances": [
+      "aggressive",
+      "normal",
+      "defensive",
+      "flat"
+    ],
+    "stock_actions": [
+      "buy",
+      "sell",
+      "adjust_exits",
+      "hold"
+    ],
+    "option_actions": [
+      "buy_option",
+      "close_option",
+      "hold_option"
+    ],
+    "actions": [
+      "buy",
+      "sell",
+      "adjust_exits",
+      "hold",
+      "buy_option",
+      "close_option",
+      "hold_option"
+    ],
+    "horizons": [
+      "intraday",
+      "overnight",
+      "multi_day"
+    ],
+    "setups": [
+      "momentum",
+      "breakout",
+      "pullback",
+      "vwap_reclaim",
+      "mean_reversion",
+      "catalyst",
+      "gap_and_go",
+      "hedge",
+      "other"
+    ],
+    "impacts": [
+      "bullish",
+      "bearish",
+      "mixed",
+      "unknown"
+    ],
+    "severities": [
+      "low",
+      "medium",
+      "high"
+    ]
+  },
+  "bot_report": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "headline": {
+        "type": "string",
+        "description": "The single most important takeaway, max ~100 characters."
+      },
+      "summary": {
+        "type": "string",
+        "description": "3-5 sentences in plain English: what is happening in the market and what the bot is doing about it."
+      },
+      "market": {
+        "type": "object",
+        "properties": {
+          "sentiment": {
+            "type": "string",
+            "enum": [
+              "very_bullish",
+              "bullish",
+              "neutral",
+              "bearish",
+              "very_bearish"
+            ]
+          },
+          "regime": {
+            "type": "string",
+            "enum": [
+              "trending_up",
+              "trending_down",
+              "range_bound",
+              "high_volatility",
+              "risk_off",
+              "event_driven"
+            ]
+          },
+          "stance": {
+            "type": "string",
+            "enum": [
+              "aggressive",
+              "normal",
+              "defensive",
+              "flat"
+            ],
+            "description": "How much risk the bot should take right now. flat = stay in cash."
+          },
+          "confidence": {
+            "type": "number",
+            "description": "0-100 confidence in this read of the market."
+          },
+          "key_drivers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "3-6 short bullet drivers with numbers."
+          }
+        },
+        "required": [
+          "sentiment",
+          "regime",
+          "stance",
+          "confidence",
+          "key_drivers"
+        ]
+      },
+      "catalysts": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "detail": {
+              "type": "string",
+              "description": "One sentence with the specific numbers/expectations."
+            },
+            "impact": {
+              "type": "string",
+              "enum": [
+                "bullish",
+                "bearish",
+                "mixed",
+                "unknown"
+              ]
+            },
+            "symbols": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "description": "US-listed ticker in uppercase, e.g. NVDA. No exchange prefix, no $."
+              }
+            },
+            "time_et": {
+              "description": "Scheduled time today as HH:MM ET, or null if not scheduled.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "source_url": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "title",
+            "detail",
+            "impact",
+            "symbols",
+            "time_et",
+            "source_url"
+          ]
+        },
+        "description": "0-8 market-moving catalysts relevant today."
+      },
+      "watchlist": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "symbol": {
+              "type": "string",
+              "description": "US-listed ticker in uppercase, e.g. NVDA. No exchange prefix, no $."
+            },
+            "setup": {
+              "type": "string",
+              "enum": [
+                "momentum",
+                "breakout",
+                "pullback",
+                "vwap_reclaim",
+                "mean_reversion",
+                "catalyst",
+                "gap_and_go",
+                "hedge",
+                "other"
+              ]
+            },
+            "thesis": {
+              "type": "string",
+              "description": "One sentence: why this name is in play today."
+            },
+            "trigger": {
+              "type": "string",
+              "description": "Concrete entry condition, e.g. 'holds above VWAP 412.50 after first pullback with SPY green'."
+            },
+            "entry_low": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "entry_high": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "stop_loss": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "take_profit": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "conviction": {
+              "type": "number",
+              "description": "1-10"
+            }
+          },
+          "required": [
+            "symbol",
+            "setup",
+            "thesis",
+            "trigger",
+            "entry_low",
+            "entry_high",
+            "stop_loss",
+            "take_profit",
+            "conviction"
+          ]
+        },
+        "description": "4-12 candidates for the rest of the session (not currently held)."
+      },
+      "decisions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "symbol": {
+              "type": "string",
+              "description": "The stock, or the option's UNDERLYING stock for option actions."
+            },
+            "action": {
+              "type": "string",
+              "enum": [
+                "buy",
+                "sell",
+                "adjust_exits",
+                "hold",
+                "buy_option",
+                "close_option",
+                "hold_option"
+              ],
+              "description": "STOCKS: buy = open a NEW position (never add to one). sell = sell some or all of a held position. adjust_exits = replace a held position's stop-loss/take-profit. hold = keep a held position unchanged. OPTIONS: buy_option = open a new options position (needs `option`). close_option = close an open options position (needs structure_id). hold_option = keep it (needs structure_id; may tighten stop_loss/take_profit)."
+            },
+            "allocation_pct": {
+              "description": "Stock buy only: % of total account equity to commit (e.g. 8 means 8%). null otherwise.",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "sell_pct": {
+              "description": "Stock sell only: % of the currently held shares to sell, 1-100 (100 = close the position). null otherwise.",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "stop_loss": {
+              "description": "Stocks (buy, adjust_exits): stop-loss trigger in dollars, BELOW the current price. Options: the UNDERLYING price that proves the trade wrong (below the current price for calls and call spreads, above it for puts and put spreads); the position is closed when the stock crosses it. null = none.",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "take_profit": {
+              "description": "Stocks (buy, adjust_exits): take-profit limit in dollars, ABOVE the current price. Options: the UNDERLYING price at which to take profit (above for calls, below for puts). null = none.",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "horizon": {
+              "type": "string",
+              "enum": [
+                "intraday",
+                "overnight",
+                "multi_day"
+              ],
+              "description": "intraday = flat by the close. overnight = may carry to tomorrow. multi_day = swing position (every options position is multi_day)."
+            },
+            "setup": {
+              "type": "string",
+              "enum": [
+                "momentum",
+                "breakout",
+                "pullback",
+                "vwap_reclaim",
+                "mean_reversion",
+                "catalyst",
+                "gap_and_go",
+                "hedge",
+                "other"
+              ]
+            },
+            "conviction": {
+              "type": "number",
+              "description": "1-10. Below the minimum in CONTEXT means do not open a trade."
+            },
+            "rationale": {
+              "type": "string",
+              "description": "1-3 sentences: why this, why now. Cite specific numbers from CONTEXT or RESEARCH."
+            },
+            "evidence": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "2-5 concrete facts with numbers/times that support the decision."
+            },
+            "invalidation": {
+              "type": "string",
+              "description": "The specific price/event that proves the idea wrong."
+            },
+            "structure_id": {
+              "description": "close_option / hold_option: the id of the position from OPEN OPTIONS POSITIONS. null otherwise.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "option": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "strategy": {
+                      "type": "string",
+                      "enum": [
+                        "long_call",
+                        "long_put",
+                        "call_debit_spread",
+                        "put_debit_spread"
+                      ],
+                      "description": "long_call / long_put = buy one contract type. call_debit_spread = buy a call and sell a higher-strike call, same expiration. put_debit_spread = buy a put and sell a lower-strike put, same expiration."
+                    },
+                    "long_leg": {
+                      "type": "string",
+                      "description": "Contract to BUY, copied exactly from OPTION CHAINS, e.g. NVDA261120C00140000."
+                    },
+                    "short_leg": {
+                      "description": "Spreads only: the contract to SELL, copied exactly from OPTION CHAINS, same expiration as long_leg. null for long_call / long_put.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "premium_pct": {
+                      "description": "% of account equity to spend on premium (at most OPTIONS.max_premium_per_trade_pct).",
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "stop_loss_pct": {
+                      "description": "Exit when the position is worth this % less than was paid, e.g. 50. null = the default.",
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "take_profit_pct": {
+                      "description": "Take profit when the position is worth this % more than was paid, e.g. 100. null = the default.",
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "strategy",
+                    "long_leg",
+                    "short_leg",
+                    "premium_pct",
+                    "stop_loss_pct",
+                    "take_profit_pct"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "buy_option only: what to buy, chosen from OPTION CHAINS. null for every other action."
+            }
+          },
+          "required": [
+            "symbol",
+            "action",
+            "allocation_pct",
+            "sell_pct",
+            "stop_loss",
+            "take_profit",
+            "horizon",
+            "setup",
+            "conviction",
+            "rationale",
+            "evidence",
+            "invalidation",
+            "structure_id",
+            "option"
+          ]
+        },
+        "description": "Concrete orders for THIS cycle. Must include exactly one decision for every open stock position (hold / adjust_exits / sell) and every open options position (hold_option / close_option). Empty in premarket and postmarket."
+      },
+      "risks": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "risk": {
+              "type": "string"
+            },
+            "severity": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high"
+              ]
+            },
+            "mitigation": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "risk",
+            "severity",
+            "mitigation"
+          ]
+        },
+        "description": "2-5 risks to the portfolio right now."
+      },
+      "lessons": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Postmarket: 2-5 concrete, reusable lessons from today. Other phases: lessons being applied (may be empty)."
+      },
+      "next_focus": {
+        "type": "string",
+        "description": "What to watch before the next cycle, with levels/times."
+      },
+      "notification": {
+        "type": "string",
+        "description": "Push-notification style summary, max 180 characters."
+      },
+      "sources": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "title",
+            "url"
+          ]
+        },
+        "description": "URLs actually used, max 10."
+      }
+    },
+    "required": [
+      "headline",
+      "summary",
+      "market",
+      "catalysts",
+      "watchlist",
+      "decisions",
+      "risks",
+      "lessons",
+      "next_focus",
+      "notification",
+      "sources"
+    ]
+  },
+  "decision": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "symbol": {
+        "type": "string",
+        "description": "The stock, or the option's UNDERLYING stock for option actions."
+      },
+      "action": {
+        "type": "string",
+        "enum": [
+          "buy",
+          "sell",
+          "adjust_exits",
+          "hold",
+          "buy_option",
+          "close_option",
+          "hold_option"
+        ],
+        "description": "STOCKS: buy = open a NEW position (never add to one). sell = sell some or all of a held position. adjust_exits = replace a held position's stop-loss/take-profit. hold = keep a held position unchanged. OPTIONS: buy_option = open a new options position (needs `option`). close_option = close an open options position (needs structure_id). hold_option = keep it (needs structure_id; may tighten stop_loss/take_profit)."
+      },
+      "allocation_pct": {
+        "description": "Stock buy only: % of total account equity to commit (e.g. 8 means 8%). null otherwise.",
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "sell_pct": {
+        "description": "Stock sell only: % of the currently held shares to sell, 1-100 (100 = close the position). null otherwise.",
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "stop_loss": {
+        "description": "Stocks (buy, adjust_exits): stop-loss trigger in dollars, BELOW the current price. Options: the UNDERLYING price that proves the trade wrong (below the current price for calls and call spreads, above it for puts and put spreads); the position is closed when the stock crosses it. null = none.",
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "take_profit": {
+        "description": "Stocks (buy, adjust_exits): take-profit limit in dollars, ABOVE the current price. Options: the UNDERLYING price at which to take profit (above for calls, below for puts). null = none.",
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "horizon": {
+        "type": "string",
+        "enum": [
+          "intraday",
+          "overnight",
+          "multi_day"
+        ],
+        "description": "intraday = flat by the close. overnight = may carry to tomorrow. multi_day = swing position (every options position is multi_day)."
+      },
+      "setup": {
+        "type": "string",
+        "enum": [
+          "momentum",
+          "breakout",
+          "pullback",
+          "vwap_reclaim",
+          "mean_reversion",
+          "catalyst",
+          "gap_and_go",
+          "hedge",
+          "other"
+        ]
+      },
+      "conviction": {
+        "type": "number",
+        "description": "1-10. Below the minimum in CONTEXT means do not open a trade."
+      },
+      "rationale": {
+        "type": "string",
+        "description": "1-3 sentences: why this, why now. Cite specific numbers from CONTEXT or RESEARCH."
+      },
+      "evidence": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "2-5 concrete facts with numbers/times that support the decision."
+      },
+      "invalidation": {
+        "type": "string",
+        "description": "The specific price/event that proves the idea wrong."
+      },
+      "structure_id": {
+        "description": "close_option / hold_option: the id of the position from OPEN OPTIONS POSITIONS. null otherwise.",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "option": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "strategy": {
+                "type": "string",
+                "enum": [
+                  "long_call",
+                  "long_put",
+                  "call_debit_spread",
+                  "put_debit_spread"
+                ],
+                "description": "long_call / long_put = buy one contract type. call_debit_spread = buy a call and sell a higher-strike call, same expiration. put_debit_spread = buy a put and sell a lower-strike put, same expiration."
+              },
+              "long_leg": {
+                "type": "string",
+                "description": "Contract to BUY, copied exactly from OPTION CHAINS, e.g. NVDA261120C00140000."
+              },
+              "short_leg": {
+                "description": "Spreads only: the contract to SELL, copied exactly from OPTION CHAINS, same expiration as long_leg. null for long_call / long_put.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "premium_pct": {
+                "description": "% of account equity to spend on premium (at most OPTIONS.max_premium_per_trade_pct).",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "stop_loss_pct": {
+                "description": "Exit when the position is worth this % less than was paid, e.g. 50. null = the default.",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "take_profit_pct": {
+                "description": "Take profit when the position is worth this % more than was paid, e.g. 100. null = the default.",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "strategy",
+              "long_leg",
+              "short_leg",
+              "premium_pct",
+              "stop_loss_pct",
+              "take_profit_pct"
+            ]
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "buy_option only: what to buy, chosen from OPTION CHAINS. null for every other action."
+      }
+    },
+    "required": [
+      "symbol",
+      "action",
+      "allocation_pct",
+      "sell_pct",
+      "stop_loss",
+      "take_profit",
+      "horizon",
+      "setup",
+      "conviction",
+      "rationale",
+      "evidence",
+      "invalidation",
+      "structure_id",
+      "option"
+    ]
+  },
+  "option_order": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "strategy": {
+        "type": "string",
+        "enum": [
+          "long_call",
+          "long_put",
+          "call_debit_spread",
+          "put_debit_spread"
+        ],
+        "description": "long_call / long_put = buy one contract type. call_debit_spread = buy a call and sell a higher-strike call, same expiration. put_debit_spread = buy a put and sell a lower-strike put, same expiration."
+      },
+      "long_leg": {
+        "type": "string",
+        "description": "Contract to BUY, copied exactly from OPTION CHAINS, e.g. NVDA261120C00140000."
+      },
+      "short_leg": {
+        "description": "Spreads only: the contract to SELL, copied exactly from OPTION CHAINS, same expiration as long_leg. null for long_call / long_put.",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "premium_pct": {
+        "description": "% of account equity to spend on premium (at most OPTIONS.max_premium_per_trade_pct).",
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "stop_loss_pct": {
+        "description": "Exit when the position is worth this % less than was paid, e.g. 50. null = the default.",
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "take_profit_pct": {
+        "description": "Take profit when the position is worth this % more than was paid, e.g. 100. null = the default.",
+        "type": [
+          "number",
+          "null"
+        ]
+      }
+    },
+    "required": [
+      "strategy",
+      "long_leg",
+      "short_leg",
+      "premium_pct",
+      "stop_loss_pct",
+      "take_profit_pct"
+    ]
+  }
+}

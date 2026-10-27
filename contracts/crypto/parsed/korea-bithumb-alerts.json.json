@@ -1,0 +1,158 @@
+{
+  "fixture": "korea-bithumb-alerts.json",
+  "parser": "korea:bithumb_alerts.map",
+  "output": [
+    {
+      "sourceId": "KRW-XEC|DEPOSIT_AMOUNT_SUDDEN_FLUCTUATION|DANGER|2026-10-28 01:59:59",
+      "title": "Bithumb alert on XEC: deposit amount sudden fluctuation (danger, until 2026-10-28 01:59:59 KST)",
+      "url": "https://www.bithumb.com/",
+      "publishedAt": "2026-10-27T12:00:00.000Z",
+      "symbols": [
+        "XEC/USD"
+      ],
+      "kind": "venue",
+      "category": "general",
+      "polarity": 0,
+      "baseSeverity": 35,
+      "meta": {
+        "exchange": "bithumb",
+        "market": "KRW-XEC",
+        "alert": "DEPOSIT_AMOUNT_SUDDEN_FLUCTUATION",
+        "step": "DANGER"
+      }
+    },
+    {
+      "sourceId": "KRW-CSPR|SPECIFIC_ACCOUNT_HIGH_TRANSACTION|WARNING|2026-10-28 01:59:59",
+      "title": "Bithumb alert on CSPR: specific account high transaction (warning, until 2026-10-28 01:59:59 KST)",
+      "url": "https://www.bithumb.com/",
+      "publishedAt": "2026-10-27T12:00:00.000Z",
+      "symbols": [
+        "CSPR/USD"
+      ],
+      "kind": "venue",
+      "category": "general",
+      "polarity": 0,
+      "baseSeverity": 30,
+      "meta": {
+        "exchange": "bithumb",
+        "market": "KRW-CSPR",
+        "alert": "SPECIFIC_ACCOUNT_HIGH_TRANSACTION",
+        "step": "WARNING"
+      }
+    },
+    {
+      "sourceId": "KRW-CSPR|TRADING_VOLUME_SUDDEN_FLUCTUATION|DANGER|2026-10-28 01:59:59",
+      "title": "Bithumb alert on CSPR: trading volume sudden fluctuation (danger, until 2026-10-28 01:59:59 KST)",
+      "url": "https://www.bithumb.com/",
+      "publishedAt": "2026-10-27T12:00:00.000Z",
+      "symbols": [
+        "CSPR/USD"
+      ],
+      "kind": "venue",
+      "category": "general",
+      "polarity": 0,
+      "baseSeverity": 35,
+      "meta": {
+        "exchange": "bithumb",
+        "market": "KRW-CSPR",
+        "alert": "TRADING_VOLUME_SUDDEN_FLUCTUATION",
+        "step": "DANGER"
+      }
+    },
+    {
+      "sourceId": "KRW-ZK|TRADING_VOLUME_SUDDEN_FLUCTUATION|DANGER|2026-10-28 01:59:59",
+      "title": "Bithumb alert on ZK: trading volume sudden fluctuation (danger, until 2026-10-28 01:59:59 KST)",
+      "url": "https://www.bithumb.com/",
+      "publishedAt": "2026-10-27T12:00:00.000Z",
+      "symbols": [
+        "ZK/USD"
+      ],
+      "kind": "venue",
+      "category": "general",
+      "polarity": 0,
+      "baseSeverity": 35,
+      "meta": {
+        "exchange": "bithumb",
+        "market": "KRW-ZK",
+        "alert": "TRADING_VOLUME_SUDDEN_FLUCTUATION",
+        "step": "DANGER"
+      }
+    },
+    {
+      "sourceId": "KRW-INIT|SPECIFIC_ACCOUNT_HIGH_TRANSACTION|CAUTION|2026-10-28 01:59:59",
+      "title": "Bithumb alert on INIT: specific account high transaction (caution, until 2026-10-28 01:59:59 KST)",
+      "url": "https://www.bithumb.com/",
+      "publishedAt": "2026-10-27T12:00:00.000Z",
+      "symbols": [
+        "INIT/USD"
+      ],
+      "kind": "venue",
+      "category": "general",
+      "polarity": 0,
+      "baseSeverity": 25,
+      "meta": {
+        "exchange": "bithumb",
+        "market": "KRW-INIT",
+        "alert": "SPECIFIC_ACCOUNT_HIGH_TRANSACTION",
+        "step": "CAUTION"
+      }
+    },
+    {
+      "sourceId": "KRW-INIT|PRICE_DIFFERENCE_HIGH|CAUTION|2026-10-27 14:49:59",
+      "title": "Bithumb alert on INIT: price difference high (caution, until 2026-10-27 14:49:59 KST)",
+      "url": "https://www.bithumb.com/",
+      "publishedAt": "2026-10-27T12:00:00.000Z",
+      "symbols": [
+        "INIT/USD"
+      ],
+      "kind": "venue",
+      "category": "general",
+      "polarity": 0,
+      "baseSeverity": 25,
+      "meta": {
+        "exchange": "bithumb",
+        "market": "KRW-INIT",
+        "alert": "PRICE_DIFFERENCE_HIGH",
+        "step": "CAUTION"
+      }
+    },
+    {
+      "sourceId": "KRW-CTR|SPECIFIC_ACCOUNT_HIGH_TRANSACTION|DANGER|2026-10-28 01:59:59",
+      "title": "Bithumb alert on CTR: specific account high transaction (danger, until 2026-10-28 01:59:59 KST)",
+      "url": "https://www.bithumb.com/",
+      "publishedAt": "2026-10-27T12:00:00.000Z",
+      "symbols": [
+        "CTR/USD"
+      ],
+      "kind": "venue",
+      "category": "general",
+      "polarity": 0,
+      "baseSeverity": 35,
+      "meta": {
+        "exchange": "bithumb",
+        "market": "KRW-CTR",
+        "alert": "SPECIFIC_ACCOUNT_HIGH_TRANSACTION",
+        "step": "DANGER"
+      }
+    },
+    {
+      "sourceId": "KRW-CTR|TRADING_VOLUME_SUDDEN_FLUCTUATION|DANGER|2026-10-28 01:59:59",
+      "title": "Bithumb alert on CTR: trading volume sudden fluctuation (danger, until 2026-10-28 01:59:59 KST)",
+      "url": "https://www.bithumb.com/",
+      "publishedAt": "2026-10-27T12:00:00.000Z",
+      "symbols": [
+        "CTR/USD"
+      ],
+      "kind": "venue",
+      "category": "general",
+      "polarity": 0,
+      "baseSeverity": 35,
+      "meta": {
+        "exchange": "bithumb",
+        "market": "KRW-CTR",
+        "alert": "TRADING_VOLUME_SUDDEN_FLUCTUATION",
+        "step": "DANGER"
+      }
+    }
+  ]
+}

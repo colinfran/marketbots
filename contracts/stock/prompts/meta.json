@@ -1,0 +1,130 @@
+{
+  "prompt_version": "2026-10-27.wire-1",
+  "seed_owner_lean": "a broad index ETF such as SPY or QQQ",
+  "seed_stop_pct_default": 7.5,
+  "dossier": {
+    "items": [
+      "w-nvda-8k",
+      "w-sofi-outlook",
+      "w-amd-anomaly",
+      "w-fed-waller",
+      "w-nvda-cnbc",
+      "w-sofi-st"
+    ],
+    "unexplained": [
+      "w-amd-anomaly"
+    ],
+    "unconfirmed": [
+      "w-sofi-outlook"
+    ],
+    "calendar": [
+      "2:00 PM ET FOMC rate decision (federalreserve.gov)",
+      "8:30 AM ET GDP (Advance Estimate), 3rd Quarter 2026 (bea.gov)",
+      "8:30 AM ET PCE (September 2026) (bea.gov)",
+      "4:05 PM ET AMD reports earnings 2026-10-28 after the close"
+    ],
+    "urls": [
+      "https://www.sec.gov/Archives/edgar/data/1045810/0001045810-26-000101-index.htm",
+      "https://www.benzinga.com/news/26/10/sofi-outlook",
+      "https://www.federalreserve.gov/newsevents/speech/waller20261027a.htm",
+      "https://www.cnbc.com/2026/10/27/nvidia-supplier-checks.html"
+    ],
+    "id_by_url": {
+      "https://www.sec.gov/Archives/edgar/data/1045810/0001045810-26-000101-index.htm": "w-nvda-8k",
+      "https://www.benzinga.com/news/26/10/sofi-outlook": "w-sofi-outlook",
+      "https://www.federalreserve.gov/newsevents/speech/waller20261027a.htm": "w-fed-waller",
+      "https://www.cnbc.com/2026/10/27/nvidia-supplier-checks.html": "w-nvda-cnbc"
+    },
+    "rows": [
+      {
+        "id": "w-nvda-8k",
+        "at": "2026-10-27T13:05:00.000Z",
+        "source": "edgar:8k",
+        "tier": 1,
+        "category": "guidance",
+        "title": "NVDA 8-K: 7.01 Regulation FD Disclosure (updated data-center outlook)",
+        "url": "https://www.sec.gov/Archives/edgar/data/1045810/0001045810-26-000101-index.htm",
+        "severity": 72,
+        "symbols": [
+          "NVDA"
+        ]
+      },
+      {
+        "id": "w-sofi-outlook",
+        "at": "2026-10-27T14:41:00.000Z",
+        "source": "finnhub",
+        "tier": 2,
+        "category": "guidance",
+        "title": "SoFi raises full-year member growth outlook",
+        "url": "https://www.benzinga.com/news/26/10/sofi-outlook",
+        "severity": 63,
+        "symbols": [
+          "SOFI"
+        ]
+      },
+      {
+        "id": "w-amd-anomaly",
+        "at": "2026-10-27T14:48:00.000Z",
+        "source": "anomaly",
+        "tier": 1,
+        "category": "price_shock",
+        "title": "AMD -1.4% in 5 min (z 4.6 after removing SPY's move)",
+        "url": null,
+        "severity": 58,
+        "symbols": [
+          "AMD"
+        ]
+      },
+      {
+        "id": "w-fed-waller",
+        "at": "2026-10-27T13:40:00.000Z",
+        "source": "gov:fed_speeches",
+        "tier": 1,
+        "category": "macro_release",
+        "title": "Waller: further rate cuts appropriate if inflation keeps easing",
+        "url": "https://www.federalreserve.gov/newsevents/speech/waller20261027a.htm",
+        "severity": 55,
+        "symbols": []
+      },
+      {
+        "id": "w-nvda-cnbc",
+        "at": "2026-10-27T14:20:00.000Z",
+        "source": "rss:cnbc",
+        "tier": 2,
+        "category": "general",
+        "title": "Nvidia supplier checks point to stronger December quarter",
+        "url": "https://www.cnbc.com/2026/10/27/nvidia-supplier-checks.html",
+        "severity": 36,
+        "symbols": [
+          "NVDA"
+        ]
+      },
+      {
+        "id": "w-sofi-st",
+        "at": "2026-10-27T14:50:00.000Z",
+        "source": "stocktwits",
+        "tier": 3,
+        "category": "sentiment_spike",
+        "title": "SOFI enters StockTwits trending (#2 of 30)",
+        "url": null,
+        "severity": 25,
+        "symbols": [
+          "SOFI"
+        ]
+      }
+    ],
+    "to_row": {
+      "id": "w-nvda-8k",
+      "at": "2026-10-27T13:05:00.000Z",
+      "source": "edgar:8k",
+      "tier": 1,
+      "category": "guidance",
+      "title": "NVDA 8-K: 7.01 Regulation FD Disclosure (updated data-center outlook)",
+      "url": "https://www.sec.gov/Archives/edgar/data/1045810/0001045810-26-000101-index.htm",
+      "severity": 72,
+      "symbols": [
+        "NVDA"
+      ]
+    }
+  }
+}

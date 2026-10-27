@@ -1,0 +1,27 @@
+{
+  "fixture": "doj.json",
+  "parser": "gov:doj.map",
+  "output": [
+    {
+      "sourceId": "cbf8079c-fda7-4482-8570-520045b3eb99",
+      "title": "Illegal aliens face immediate deportation for immigration violations",
+      "summary": "<p>Multiple defendants illegally inside the United States were sentenced in federal court and transferred to immigration authorities for immediate deportation.</p>",
+      "url": "https://www.justice.gov/usao-sdga/pr/illegal-aliens-face-immediate-deportation-immigration-violations-2",
+      "publishedAt": "2026-10-23T12:00:00.000Z"
+    },
+    {
+      "sourceId": "2a085ef5-ec28-46d1-ac43-a65ca39bdb08",
+      "title": "DEA National Prescription Drug Take Back Day",
+      "summary": "",
+      "url": "https://www.justice.gov/usao-edtn/pr/dea-national-prescription-drug-take-back-day-7",
+      "publishedAt": "2026-10-23T12:00:00.000Z"
+    },
+    {
+      "sourceId": "b0734a4a-423e-46b7-a976-55a4d57b0041",
+      "title": "Two Former FBI Officials Charged in Lying to Congress about Hunter Biden Investigations ",
+      "summary": "<p>Two former senior FBI officials, Nikki Cole Floris, 46, of Alexandria, Virginia, and Bradley Benavides, 56, of Aiken, South Carolina, surrendered today on arrest warrants issued after a criminal complaint charged them with lying to Congress about their involvement in the FBI’s investigations into Hunter Biden, announced U.S. Attorney Jeanine Ferris Pirro.</p>",
+      "url": "https://www.justice.gov/usao-dc/pr/two-former-fbi-officials-charged-lying-congress-about-hunter-biden-investigations",
+      "publishedAt": "2026-10-23T12:00:00.000Z"
+    }
+  ]
+}

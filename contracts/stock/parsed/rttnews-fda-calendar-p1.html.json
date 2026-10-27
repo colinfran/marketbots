@@ -1,0 +1,130 @@
+{
+  "fixture": "rttnews-fda-calendar-p1.html",
+  "parser": "parseFdaCalendar + fdaCalendarItems (every ticker tracked, 2026-10-27T14:00Z)",
+  "page": {
+    "rows": [
+      {
+        "id": "2689",
+        "company": "Insmed Inc",
+        "tickers": [
+          "INSM"
+        ],
+        "drug": "ARIKAYCE (sNDA)",
+        "due": "2027-01-28",
+        "event": "FDA decision on ARIKAYCE SNDA for treatment of MAC Lung Disease",
+        "outcome": null,
+        "outcomeDay": null
+      },
+      {
+        "id": "2583",
+        "company": "Praxis Precision Medicines, Inc",
+        "tickers": [
+          "PRAX"
+        ],
+        "drug": "Ulixacaltamide HCl (NDA)",
+        "due": "2027-01-29",
+        "event": "FDA decision on ulixacaltamide HCl for the treatment of essential tremor in adults",
+        "outcome": null,
+        "outcomeDay": null
+      },
+      {
+        "id": "2692",
+        "company": "Pharming Group N.V.",
+        "tickers": [
+          "PHAR"
+        ],
+        "drug": "Joenja (sNDA)",
+        "due": "2027-01-30",
+        "event": "FDA decision on lower doses of Joenja for children aged 4 years and older who weigh between 13 kg and 27 kg with activated phosphoinositide 3-kinase delta syndrome (APDS)",
+        "outcome": null,
+        "outcomeDay": null
+      },
+      {
+        "id": "2677",
+        "company": "GSK plc",
+        "tickers": [
+          "GSK"
+        ],
+        "drug": "Jemperli (sBLA)",
+        "due": null,
+        "event": "FDA decision on Jemperli For patients with DMMR/MSI-H Locally Advanced Rectal Cancer",
+        "outcome": "FDA granted accelerated approval to Jemperli for patients with DMMR/MSI-H locally advanced Rectal Cancer on 19th Oct. 2026.",
+        "outcomeDay": "2026-10-19"
+      },
+      {
+        "id": "2637",
+        "company": "Gilead Sciences Inc.",
+        "tickers": [
+          "GILD"
+        ],
+        "drug": "Yeztugo (sNDA)",
+        "due": "2027-02-02",
+        "event": "FDA decision on Once-Weekly Oral Yeztugo (lenacapavir) 300-mg tablet for the prevention of HIV as pre-exposure prophylaxis",
+        "outcome": null,
+        "outcomeDay": null
+      },
+      {
+        "id": "2693",
+        "company": "BridgeBio Pharma, Inc.",
+        "tickers": [
+          "BBIO"
+        ],
+        "drug": "Oral infigratinib (NDA)",
+        "due": "2027-02-04",
+        "event": "FDA decision on oral infigratinib for children with achondroplasia",
+        "outcome": null,
+        "outcomeDay": null
+      },
+      {
+        "id": "2639",
+        "company": "Roche Holding AG",
+        "tickers": [
+          "RHHBY"
+        ],
+        "drug": "Lunsumio VELO (sBLA)",
+        "due": "2027-02-09",
+        "event": "FDA decision on Lunsumio VELO in combination with Polivy for the treatment of adult patients with relapsed or refractory large B-cell lymphoma (LBCL)",
+        "outcome": null,
+        "outcomeDay": null
+      },
+      {
+        "id": "2669",
+        "company": "Belite Bio, Inc",
+        "tickers": [
+          "BLTE"
+        ],
+        "drug": "Tinlarebant (NDA)",
+        "due": "2027-02-12",
+        "event": "FDA decision on tinlarebant for the treatment of Stargardt Disease Type 1",
+        "outcome": null,
+        "outcomeDay": null
+      },
+      {
+        "id": "2682",
+        "company": "Belite Bio, Inc",
+        "tickers": [
+          "BLTE"
+        ],
+        "drug": "Tinlarebant (NDA)",
+        "due": "2027-02-12",
+        "event": "FDA decision on Tinlarebant for the treatment of Stargardt Disease Type 1",
+        "outcome": null,
+        "outcomeDay": null
+      },
+      {
+        "id": "2648",
+        "company": "Arcutis Biotherapeutics Inc.",
+        "tickers": [
+          "ARQT"
+        ],
+        "drug": "ZORYVE cream 0.05% (sNDA)",
+        "due": "2027-02-23",
+        "event": "FDA decision on ZORYVE cream 0.05% to expand the indication for the topical treatment of mild to moderate atopic dermatitis to include infants aged 3 to 24 months",
+        "outcome": null,
+        "outcomeDay": null
+      }
+    ],
+    "laterPage": null
+  },
+  "output": []
+}

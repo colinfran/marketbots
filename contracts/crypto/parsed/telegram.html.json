@@ -1,0 +1,26 @@
+{
+  "fixture": "telegram.html",
+  "parser": "parseTelegram (telegram:whale_alert_io)",
+  "output": [
+    {
+      "sourceId": "whale_alert_io/104194",
+      "title": "🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 🚨 85,887 $ETH (200,585,192 USD) transferred from unknown wallet to unknown wallet Details",
+      "summary": null,
+      "url": "https://t.me/whale_alert_io/104194",
+      "publishedAt": "2026-10-26T15:53:28.000Z",
+      "meta": {
+        "channel": "whale_alert_io"
+      }
+    },
+    {
+      "sourceId": "whale_alert_io/104195",
+      "title": "🚨 4,649,999,000,000 $PEPE (20,316,527 USD) transferred from #Poloniex to unknown wallet Details",
+      "summary": null,
+      "url": "https://t.me/whale_alert_io/104195",
+      "publishedAt": "2026-10-26T15:56:09.000Z",
+      "meta": {
+        "channel": "whale_alert_io"
+      }
+    }
+  ]
+}

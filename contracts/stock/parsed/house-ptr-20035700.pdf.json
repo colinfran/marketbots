@@ -1,0 +1,49 @@
+{
+  "fixture": "house-ptr-20035700.pdf",
+  "parser": "pdfText + parsePtr, then congressItems (every ticker tracked)",
+  "filing": {
+    "docId": "20035700",
+    "type": "P",
+    "year": "2026",
+    "filed": "2026-10-22",
+    "first": "Darrell E.",
+    "last": "Issa",
+    "suffix": "",
+    "district": "CA48"
+  },
+  "ptr": {
+    "name": "Darrell E. Issa",
+    "district": "CA48",
+    "rows": [
+      {
+        "owner": "self",
+        "asset": "US Treasury Note 3.375% due 09/15/28 CUSIP 91282CNY3",
+        "assetType": "GS",
+        "ticker": null,
+        "type": "purchase",
+        "tradeDate": "2026-10-08",
+        "notifiedDate": "2026-10-09",
+        "amount": "$5,000,001 - $25,000,000",
+        "low": 5000001,
+        "high": 25000000,
+        "status": "New",
+        "description": "Purchase of US Treasury Bond with $10 million face value"
+      },
+      {
+        "owner": "self",
+        "asset": "US Treasury Note 3.375% due 09/15/28 CUSIP 91282CNY3",
+        "assetType": "GS",
+        "ticker": null,
+        "type": "sale",
+        "tradeDate": "2026-10-14",
+        "notifiedDate": "2026-10-15",
+        "amount": "$5,000,001 - $25,000,000",
+        "low": 5000001,
+        "high": 25000000,
+        "status": "New",
+        "description": "Sale of US Treasury Note before Maturity. Face Value $10 million"
+      }
+    ]
+  },
+  "output": []
+}

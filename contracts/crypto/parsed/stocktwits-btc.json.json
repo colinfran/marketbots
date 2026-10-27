@@ -1,0 +1,28 @@
+{
+  "fixture": "stocktwits-btc.json",
+  "parser": "messageRate + stocktwitsRateItems BTC (stocktwits), fresh watcher",
+  "message_rate": 16.783216783216783,
+  "output": [],
+  "observations": {
+    "readings": [
+      {
+        "key": "stocktwits:rate:BTC",
+        "value": 16.783216783216783,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "rate"
+        ]
+      }
+    ],
+    "rules": {
+      "rate": {
+        "id": "rate",
+        "kind": "spike",
+        "windowMin": 1440,
+        "ratio": 4,
+        "minSamples": 30,
+        "min": 30
+      }
+    }
+  }
+}

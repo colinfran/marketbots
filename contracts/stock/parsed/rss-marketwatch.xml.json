@@ -1,0 +1,27 @@
+{
+  "fixture": "rss-marketwatch.xml",
+  "parser": "parseFeed (rss:marketwatch)",
+  "output": [
+    {
+      "sourceId": "WP-MKTW-0005307700",
+      "title": "‘You need only watch episodes of Judge Judy’: I’m in my 70s. Why do people keep making the same avoidable financial mistakes?",
+      "summary": "“Consider some familiar examples of poor decisions: accumulating credit-card debt or failing to plan for retirement.”",
+      "url": "https://www.marketwatch.com/story/you-need-only-watch-episodes-of-judge-judy-im-in-my-70s-why-do-people-keep-making-the-same-avoidable-financial-mistakes-bbf60fe4?mod=mw_rss_topstories",
+      "publishedAt": "2026-10-26T22:30:00.000Z"
+    },
+    {
+      "sourceId": "WP-MKTW-0005308685",
+      "title": "Dividend stocks are having an excellent October as tech sector struggles",
+      "summary": "ETFs focused on dividend stocks are seeing a powerful rally in October, adding to huge gains in 2026.",
+      "url": "https://www.marketwatch.com/story/dividend-stocks-are-having-an-excellent-october-as-tech-sector-struggles-5ae40b02?mod=mw_rss_topstories",
+      "publishedAt": "2026-10-26T22:10:00.000Z"
+    },
+    {
+      "sourceId": "WP-MKTW-0005307376",
+      "title": "Options traders are seizing control of the S&P 500",
+      "summary": "There’s a reason the index hasn’t moved much since June, according to a team at UBS.",
+      "url": "https://www.marketwatch.com/story/options-traders-are-seizing-control-of-the-s-p-500-1add94ca?mod=mw_rss_topstories",
+      "publishedAt": "2026-10-26T22:03:00.000Z"
+    }
+  ]
+}

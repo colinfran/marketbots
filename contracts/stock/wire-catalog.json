@@ -1,0 +1,1093 @@
+{
+  "count": 96,
+  "sources": [
+    {
+      "id": "edgar:8k",
+      "kind": "custom",
+      "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type=8-K&company=&dateb=&owner=include&start=0&count=40&output=atom",
+      "interval_s": 30,
+      "tier": 1,
+      "wire_kind": "filing",
+      "key_env": "SEC_USER_AGENT",
+      "default_enabled": true,
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "edgar:6k",
+      "kind": "custom",
+      "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type=6-K&company=&dateb=&owner=include&start=0&count=40&output=atom",
+      "interval_s": 300,
+      "tier": 1,
+      "wire_kind": "filing",
+      "key_env": "SEC_USER_AGENT",
+      "default_enabled": true,
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "edgar:nt",
+      "kind": "custom",
+      "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type=NT%2010&company=&dateb=&owner=include&start=0&count=40&output=atom",
+      "interval_s": 300,
+      "tier": 1,
+      "wire_kind": "filing",
+      "key_env": "SEC_USER_AGENT",
+      "default_enabled": true,
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "edgar:424b",
+      "kind": "custom",
+      "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type=424B&company=&dateb=&owner=include&start=0&count=40&output=atom",
+      "interval_s": 120,
+      "tier": 1,
+      "wire_kind": "filing",
+      "key_env": "SEC_USER_AGENT",
+      "default_enabled": true,
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "edgar:13d",
+      "kind": "custom",
+      "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type=SC%2013D&company=&dateb=&owner=include&start=0&count=40&output=atom",
+      "interval_s": 300,
+      "tier": 1,
+      "wire_kind": "filing",
+      "key_env": "SEC_USER_AGENT",
+      "default_enabled": true,
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "edgar:25",
+      "kind": "custom",
+      "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type=25-NSE&company=&dateb=&owner=include&start=0&count=40&output=atom",
+      "interval_s": 600,
+      "tier": 1,
+      "wire_kind": "filing",
+      "key_env": "SEC_USER_AGENT",
+      "default_enabled": true,
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "halts",
+      "kind": "custom",
+      "url": "https://www.nasdaqtrader.com/rss.aspx?feed=tradehalts",
+      "interval_s": 30,
+      "tier": 1,
+      "wire_kind": "venue",
+      "default_enabled": true,
+      "note": "Nasdaq Trader halts and resumptions",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "pr:prnewswire",
+      "kind": "rss",
+      "url": "https://www.prnewswire.com/rss/news-releases-list.rss",
+      "interval_s": 45,
+      "tier": 1,
+      "default_enabled": true
+    },
+    {
+      "id": "finnhub",
+      "kind": "json",
+      "url": "https://finnhub.io/api/v1/news?category=general",
+      "interval_s": 60,
+      "tier": 2,
+      "key_env": "FINNHUB_API_KEY",
+      "default_enabled": true,
+      "headers": {
+        "X-Finnhub-Token": "<FINNHUB_API_KEY>"
+      },
+      "functions": [
+        "map"
+      ]
+    },
+    {
+      "id": "finnhub_merger",
+      "kind": "json",
+      "url": "https://finnhub.io/api/v1/news?category=merger",
+      "interval_s": 120,
+      "tier": 2,
+      "category_hint": "m_and_a",
+      "key_env": "FINNHUB_API_KEY",
+      "default_enabled": true,
+      "headers": {
+        "X-Finnhub-Token": "<FINNHUB_API_KEY>"
+      },
+      "functions": [
+        "map"
+      ]
+    },
+    {
+      "id": "finnhub_company",
+      "kind": "json",
+      "url": "https://finnhub.io/api/v1/company-news",
+      "symbols": "held+focus",
+      "interval_s": 20,
+      "tier": 2,
+      "key_env": "FINNHUB_API_KEY",
+      "default_enabled": true,
+      "url_for": {
+        "AAPL": "https://finnhub.io/api/v1/company-news?symbol=AAPL&from=2026-10-26&to=2026-10-27",
+        "NVDA": "https://finnhub.io/api/v1/company-news?symbol=NVDA&from=2026-10-26&to=2026-10-27"
+      },
+      "headers": {
+        "X-Finnhub-Token": "<FINNHUB_API_KEY>"
+      },
+      "functions": [
+        "map"
+      ]
+    },
+    {
+      "id": "massive_news",
+      "kind": "json",
+      "url": "https://api.massive.com/v2/reference/news?limit=50&order=desc&sort=published_utc",
+      "interval_s": 75,
+      "tier": 2,
+      "key_env": "MASSIVE_API_KEY",
+      "default_enabled": true,
+      "note": "Massive (formerly Polygon.io) free plan: 5 calls/min",
+      "headers": {
+        "Authorization": "Bearer <MASSIVE_API_KEY>"
+      },
+      "functions": [
+        "map"
+      ]
+    },
+    {
+      "id": "gov:sec_press",
+      "kind": "rss",
+      "url": "https://www.sec.gov/news/pressreleases.rss",
+      "interval_s": 120,
+      "tier": 1,
+      "category_hint": "regulatory_action",
+      "key_env": "SEC_USER_AGENT",
+      "default_enabled": true
+    },
+    {
+      "id": "gov:sec_litigation",
+      "kind": "rss",
+      "url": "https://www.sec.gov/enforcement-litigation/litigation-releases/rss",
+      "interval_s": 300,
+      "tier": 1,
+      "category_hint": "regulatory_action",
+      "key_env": "SEC_USER_AGENT",
+      "default_enabled": true
+    },
+    {
+      "id": "gov:sec_suspensions",
+      "kind": "rss",
+      "url": "https://www.sec.gov/enforcement-litigation/trading-suspensions/rss",
+      "interval_s": 300,
+      "tier": 1,
+      "category_hint": "halt",
+      "key_env": "SEC_USER_AGENT",
+      "default_enabled": true
+    },
+    {
+      "id": "gov:ftc",
+      "kind": "rss",
+      "url": "https://www.ftc.gov/feeds/press-release.xml",
+      "interval_s": 300,
+      "tier": 1,
+      "category_hint": "antitrust",
+      "default_enabled": true
+    },
+    {
+      "id": "gov:doj",
+      "kind": "json",
+      "url": "https://www.justice.gov/api/v1/press_releases.json?pagesize=25&sort=date&direction=DESC",
+      "interval_s": 300,
+      "tier": 1,
+      "category_hint": "regulatory_action",
+      "default_enabled": true,
+      "functions": [
+        "map"
+      ]
+    },
+    {
+      "id": "gov:whitehouse",
+      "kind": "rss",
+      "url": "https://www.whitehouse.gov/presidential-actions/feed/",
+      "interval_s": 300,
+      "tier": 1,
+      "default_enabled": true
+    },
+    {
+      "id": "gov:ustr",
+      "kind": "rss",
+      "url": "https://ustr.gov/rss.xml",
+      "interval_s": 300,
+      "tier": 1,
+      "default_enabled": true
+    },
+    {
+      "id": "gov:bis",
+      "kind": "rss",
+      "url": "https://www.bis.doc.gov/index.php/news-updates?format=feed&type=rss",
+      "interval_s": 300,
+      "tier": 1,
+      "default_enabled": true
+    },
+    {
+      "id": "gov:ofac",
+      "kind": "rss",
+      "url": "https://ofac.treasury.gov/rss.xml",
+      "interval_s": 300,
+      "tier": 1,
+      "default_enabled": true
+    },
+    {
+      "id": "gov:fed",
+      "kind": "rss",
+      "url": "https://www.federalreserve.gov/feeds/press_all.xml",
+      "interval_s": 120,
+      "tier": 1,
+      "default_enabled": true
+    },
+    {
+      "id": "gov:fed_speeches",
+      "kind": "rss",
+      "url": "https://www.federalreserve.gov/feeds/speeches.xml",
+      "interval_s": 600,
+      "tier": 1,
+      "default_enabled": true
+    },
+    {
+      "id": "gov:fda",
+      "kind": "rss",
+      "url": "https://www.fda.gov/about-fda/contact-fda/stay-informed/rss-feeds/press-releases/rss.xml",
+      "interval_s": 300,
+      "tier": 1,
+      "category_hint": "fda",
+      "default_enabled": true
+    },
+    {
+      "id": "persymbol:gnews",
+      "kind": "rss",
+      "url": "https://news.google.com/rss",
+      "symbols": "held+focus",
+      "interval_s": 20,
+      "tier": 3,
+      "default_enabled": true,
+      "url_for": {
+        "AAPL": "https://news.google.com/rss/search?q=%22AAPL%22%20stock+when:1h&hl=en-US&gl=US&ceid=US:en",
+        "NVDA": "https://news.google.com/rss/search?q=%22NVDA%22%20stock+when:1h&hl=en-US&gl=US&ceid=US:en"
+      }
+    },
+    {
+      "id": "persymbol:yahoo",
+      "kind": "rss",
+      "url": "https://feeds.finance.yahoo.com/rss/2.0/headline",
+      "symbols": "held+focus",
+      "interval_s": 20,
+      "tier": 2,
+      "default_enabled": true,
+      "url_for": {
+        "AAPL": "https://feeds.finance.yahoo.com/rss/2.0/headline?s=AAPL&region=US&lang=en-US",
+        "NVDA": "https://feeds.finance.yahoo.com/rss/2.0/headline?s=NVDA&region=US&lang=en-US"
+      }
+    },
+    {
+      "id": "telegram:WalterBloomberg",
+      "kind": "telegram",
+      "interval_s": 30,
+      "tier": 3,
+      "default_enabled": true,
+      "channel": "WalterBloomberg"
+    },
+    {
+      "id": "telegram:FinancialJuice",
+      "kind": "telegram",
+      "interval_s": 30,
+      "tier": 3,
+      "default_enabled": true,
+      "channel": "FinancialJuice"
+    },
+    {
+      "id": "telegram:marketfeed",
+      "kind": "telegram",
+      "interval_s": 30,
+      "tier": 3,
+      "default_enabled": true,
+      "channel": "marketfeed"
+    },
+    {
+      "id": "bluesky",
+      "kind": "custom",
+      "interval_s": 60,
+      "tier": 3,
+      "wire_kind": "news",
+      "default_enabled": true,
+      "note": "Bluesky Jetstream, 13 curated accounts",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "newsletter:liberty_street",
+      "kind": "rss",
+      "url": "https://libertystreeteconomics.newyorkfed.org/feed/",
+      "interval_s": 900,
+      "tier": 3,
+      "default_enabled": true
+    },
+    {
+      "id": "newsletter:employ_america",
+      "kind": "rss",
+      "url": "https://www.employamerica.org/rss/",
+      "interval_s": 900,
+      "tier": 3,
+      "default_enabled": true
+    },
+    {
+      "id": "newsletter:abnormal_returns",
+      "kind": "rss",
+      "url": "https://abnormalreturns.com/feed/",
+      "interval_s": 900,
+      "tier": 3,
+      "default_enabled": true
+    },
+    {
+      "id": "newsletter:noahpinion",
+      "kind": "rss",
+      "url": "https://www.noahpinion.blog/feed",
+      "interval_s": 900,
+      "tier": 3,
+      "default_enabled": true
+    },
+    {
+      "id": "newsletter:overshoot",
+      "kind": "rss",
+      "url": "https://theovershoot.co/feed",
+      "interval_s": 900,
+      "tier": 3,
+      "default_enabled": true
+    },
+    {
+      "id": "newsletter:apricitas",
+      "kind": "rss",
+      "url": "https://www.apricitas.io/feed",
+      "interval_s": 900,
+      "tier": 3,
+      "default_enabled": true
+    },
+    {
+      "id": "newsletter:net_interest",
+      "kind": "rss",
+      "url": "https://www.netinterest.co/feed",
+      "interval_s": 900,
+      "tier": 3,
+      "default_enabled": true
+    },
+    {
+      "id": "newsletter:doomberg",
+      "kind": "rss",
+      "url": "https://newsletter.doomberg.com/feed",
+      "interval_s": 900,
+      "tier": 3,
+      "default_enabled": true
+    },
+    {
+      "id": "newsletter:kyla_scanlon",
+      "kind": "rss",
+      "url": "https://kyla.substack.com/feed",
+      "interval_s": 900,
+      "tier": 3,
+      "default_enabled": true
+    },
+    {
+      "id": "truth_social",
+      "kind": "rss",
+      "url": "https://www.trumpstruth.org/feed",
+      "interval_s": 60,
+      "tier": 1,
+      "default_enabled": true,
+      "note": "trumpstruth.org mirror of Truth Social; the posts are primary statements"
+    },
+    {
+      "id": "macro_ff",
+      "kind": "json",
+      "url": "https://nfs.faireconomy.media/ff_calendar_thisweek.json",
+      "interval_s": 300,
+      "tier": 3,
+      "wire_kind": "calendar",
+      "category_hint": "macro_release",
+      "default_enabled": true,
+      "note": "ForexFactory weekly calendar (unofficial): times and forecasts for high-impact USD events",
+      "functions": [
+        "map"
+      ]
+    },
+    {
+      "id": "rss:cnbc",
+      "kind": "rss",
+      "url": "https://www.cnbc.com/id/100003114/device/rss/rss.html",
+      "interval_s": 60,
+      "tier": 2,
+      "default_enabled": true
+    },
+    {
+      "id": "rss:marketwatch",
+      "kind": "rss",
+      "url": "https://feeds.content.dowjones.io/public/rss/mw_topstories",
+      "interval_s": 60,
+      "tier": 2,
+      "default_enabled": true
+    },
+    {
+      "id": "rss:wsj_markets",
+      "kind": "rss",
+      "url": "https://feeds.content.dowjones.io/public/rss/RSSMarketsMain",
+      "interval_s": 90,
+      "tier": 2,
+      "default_enabled": true
+    },
+    {
+      "id": "rss:foxbusiness",
+      "kind": "rss",
+      "url": "https://moxie.foxbusiness.com/google-publisher/markets.xml",
+      "interval_s": 120,
+      "tier": 2,
+      "default_enabled": true
+    },
+    {
+      "id": "rss:nyt_business",
+      "kind": "rss",
+      "url": "https://rss.nytimes.com/services/xml/rss/nyt/Business.xml",
+      "interval_s": 180,
+      "tier": 2,
+      "default_enabled": true
+    },
+    {
+      "id": "rss:ft_markets",
+      "kind": "rss",
+      "url": "https://www.ft.com/markets?format=rss",
+      "interval_s": 180,
+      "tier": 2,
+      "default_enabled": true
+    },
+    {
+      "id": "rss:politico",
+      "kind": "rss",
+      "url": "https://rss.politico.com/economy.xml",
+      "interval_s": 300,
+      "tier": 2,
+      "default_enabled": true
+    },
+    {
+      "id": "rss:economist",
+      "kind": "rss",
+      "url": "https://www.economist.com/finance-and-economics/rss.xml",
+      "interval_s": 900,
+      "tier": 2,
+      "default_enabled": true
+    },
+    {
+      "id": "rss:investing",
+      "kind": "rss",
+      "url": "https://www.investing.com/rss/news.rss",
+      "interval_s": 90,
+      "tier": 3,
+      "default_enabled": true
+    },
+    {
+      "id": "rss:rttnews",
+      "kind": "rss",
+      "url": "https://www.rttnews.com/RSS/BreakingNews.xml",
+      "interval_s": 120,
+      "tier": 3,
+      "default_enabled": true
+    },
+    {
+      "id": "rss:benzinga",
+      "kind": "rss",
+      "url": "https://www.benzinga.com/feed",
+      "interval_s": 300,
+      "tier": 3,
+      "default_enabled": true,
+      "note": "Benzinga's public feed; evergreen explainers dropped",
+      "functions": [
+        "refine"
+      ]
+    },
+    {
+      "id": "rss:seekingalpha",
+      "kind": "custom",
+      "url": "https://seekingalpha.com/market_currents.xml",
+      "interval_s": 60,
+      "tier": 2,
+      "default_enabled": true,
+      "note": "Seeking Alpha market currents; each item's ticker comes from its symbol category",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "persymbol:nasdaq",
+      "kind": "custom",
+      "url": "https://www.nasdaq.com/feed/rssoutbound",
+      "symbols": "held+focus",
+      "interval_s": 45,
+      "tier": 2,
+      "default_enabled": true,
+      "note": "Nasdaq.com per-symbol RSS (browser User-Agent), round-robin over held and watched stocks",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "finviz",
+      "kind": "custom",
+      "url": "https://finviz.com/news.ashx",
+      "interval_s": 120,
+      "tier": 2,
+      "default_enabled": true,
+      "note": "Finviz news page (HTML; browser User-Agent): news column tier 2, blogs tier 3",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "gdelt",
+      "kind": "custom",
+      "url": "https://api.gdeltproject.org/api/v2/doc/doc",
+      "interval_s": 300,
+      "tier": 3,
+      "default_enabled": true,
+      "note": "GDELT DOC 2.0 (keyless; one request per 5 s, enforced by the limiter; often answers 429 or times out, so it degrades and backs off): held and watched companies by name, 8 per query in rotation",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "cb:ecb",
+      "kind": "rss",
+      "url": "https://www.ecb.europa.eu/rss/press.html",
+      "interval_s": 300,
+      "tier": 1,
+      "wire_kind": "macro",
+      "category_hint": "macro_release",
+      "default_enabled": true,
+      "functions": [
+        "refine"
+      ]
+    },
+    {
+      "id": "cb:boe",
+      "kind": "rss",
+      "url": "https://www.bankofengland.co.uk/rss/news",
+      "interval_s": 300,
+      "tier": 1,
+      "wire_kind": "macro",
+      "category_hint": "macro_release",
+      "default_enabled": true,
+      "functions": [
+        "refine"
+      ]
+    },
+    {
+      "id": "cb:boj",
+      "kind": "rss",
+      "url": "https://www.boj.or.jp/en/rss/whatsnew.xml",
+      "interval_s": 300,
+      "tier": 1,
+      "wire_kind": "macro",
+      "category_hint": "macro_release",
+      "default_enabled": true,
+      "functions": [
+        "refine"
+      ]
+    },
+    {
+      "id": "fedreg:tariff",
+      "kind": "json",
+      "url": "https://www.federalregister.gov/api/v1/documents.json?conditions%5Bterm%5D=tariff&order=newest&per_page=20",
+      "interval_s": 600,
+      "tier": 1,
+      "category_hint": "policy_shock",
+      "default_enabled": true,
+      "note": "Federal Register API (keyless): documents matching tariff; paperwork and trade-remedy case notices dropped, weighted by document type",
+      "functions": [
+        "map"
+      ]
+    },
+    {
+      "id": "fedreg:export",
+      "kind": "json",
+      "url": "https://www.federalregister.gov/api/v1/documents.json?conditions%5Bterm%5D=%22entity%20list%22&order=newest&per_page=20",
+      "interval_s": 600,
+      "tier": 1,
+      "category_hint": "policy_shock",
+      "default_enabled": true,
+      "note": "Federal Register API (keyless): documents matching \"entity list\"; paperwork and trade-remedy case notices dropped, weighted by document type",
+      "functions": [
+        "map"
+      ]
+    },
+    {
+      "id": "macro_actuals",
+      "kind": "custom",
+      "url": "https://api.bls.gov/publicAPI/v2/timeseries/data/",
+      "interval_s": 30,
+      "tier": 1,
+      "wire_kind": "macro",
+      "category_hint": "macro_release",
+      "key_env": "BLS_API_KEY",
+      "default_enabled": true,
+      "note": "BLS API v2 (key) and FRED (key) polled only in CPI and jobs release windows",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "eia",
+      "kind": "custom",
+      "url": "https://api.eia.gov/v2",
+      "interval_s": 60,
+      "tier": 1,
+      "wire_kind": "macro",
+      "key_env": "EIA_API_KEY",
+      "default_enabled": true,
+      "note": "EIA API v2 (key): weekly crude inventories (Wed 10:30 ET) and natural gas storage (Thu 10:30 ET), polled only around the releases",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "vol_rates:vix",
+      "kind": "custom",
+      "url": "https://cdn.cboe.com/api/global/delayed_quotes/quotes/_VIX.json",
+      "interval_s": 60,
+      "tier": 1,
+      "wire_kind": "derivatives",
+      "default_enabled": true,
+      "note": "CBOE delayed VIX quote (keyless): up ≥ 20% on the day, ≥ 15% within an hour, or at 30",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "vol_rates:yields",
+      "kind": "custom",
+      "url": "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/pages/xml?data=daily_treasury_yield_curve",
+      "interval_s": 7200,
+      "tier": 1,
+      "wire_kind": "macro",
+      "default_enabled": true,
+      "note": "Treasury daily par yield curve (XML, keyless, slow): the 2-year or 10-year moving ≥ 15 bp in a day",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "treasury",
+      "kind": "custom",
+      "url": "https://www.treasurydirect.gov/TA_WS/securities/auctioned?format=json",
+      "interval_s": 60,
+      "tier": 1,
+      "wire_kind": "macro",
+      "default_enabled": true,
+      "note": "TreasuryDirect auction results (keyless): weak note and bond auctions; every minute 13:00-13:30 ET, else every 30 min",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "odds:polymarket",
+      "kind": "custom",
+      "url": "https://gamma-api.polymarket.com/events?closed=false&order=volume24hr&ascending=false",
+      "interval_s": 300,
+      "tier": 2,
+      "wire_kind": "sentiment",
+      "default_enabled": true,
+      "note": "Polymarket Gamma: Fed, inflation, recession, tariff and shutdown markets (no price bets), liquidity ≥ $25K and ≥ $5K traded in 24 h",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "odds:kalshi",
+      "kind": "custom",
+      "url": "https://api.elections.kalshi.com/trade-api/v2/markets",
+      "interval_s": 120,
+      "tier": 2,
+      "wire_kind": "sentiment",
+      "default_enabled": true,
+      "note": "Kalshi KXFED (next two FOMC meetings), KXCPI and KXRECSSNBER; spread ≤ 10¢ and enough open interest",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "fda:approvals",
+      "kind": "custom",
+      "url": "https://api.fda.gov/drug/drugsfda.json",
+      "interval_s": 21600,
+      "tier": 1,
+      "wire_kind": "filing",
+      "key_env": "OPENFDA_API_KEY",
+      "default_enabled": true,
+      "note": "openFDA drugsfda (key): new NDA/BLA approvals and new indications in the last 7 days, sponsor mapped to a ticker",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "fda:adcomm",
+      "kind": "custom",
+      "url": "https://www.fda.gov/datatables-json/advisory-committee-calendar-json",
+      "interval_s": 21600,
+      "tier": 1,
+      "wire_kind": "calendar",
+      "default_enabled": true,
+      "note": "FDA advisory-committee calendar (the JSON behind the calendar page; browser User-Agent): meetings in the next 7 days whose applicant is a listed company",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "clinicaltrials",
+      "kind": "custom",
+      "url": "https://clinicaltrials.gov/api/v2/studies",
+      "interval_s": 21600,
+      "tier": 1,
+      "default_enabled": true,
+      "note": "ClinicalTrials.gov API v2 (keyless): status changes on trials led by held or watched drug developers",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "calendar:earnings",
+      "kind": "custom",
+      "url": "https://api.nasdaq.com/api/calendar/earnings",
+      "interval_s": 21600,
+      "tier": 2,
+      "wire_kind": "calendar",
+      "default_enabled": true,
+      "note": "Nasdaq earnings calendar (unofficial JSON; browser User-Agent): held and watched stocks, the next 4 weekdays",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "calendar:dividends",
+      "kind": "custom",
+      "url": "https://api.nasdaq.com/api/calendar/dividends",
+      "interval_s": 21600,
+      "tier": 2,
+      "wire_kind": "calendar",
+      "default_enabled": true,
+      "note": "Nasdaq dividend calendar: ex-dividend dates of held and watched stocks, the next 4 weekdays",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "calendar:ipo",
+      "kind": "custom",
+      "url": "https://api.nasdaq.com/api/ipo/calendar",
+      "interval_s": 21600,
+      "tier": 2,
+      "wire_kind": "calendar",
+      "default_enabled": true,
+      "note": "Nasdaq IPO calendar: deals of $1B or more expected within 7 days (market-wide)",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "insiders",
+      "kind": "custom",
+      "url": "http://openinsider.com/latest-insider-purchases-25k",
+      "interval_s": 600,
+      "tier": 2,
+      "wire_kind": "filing",
+      "default_enabled": true,
+      "note": "openinsider.com latest purchases $25K+ (HTML; browser User-Agent): held and watched stocks' buys, and insider clusters for any issuer",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "finviz:insider",
+      "kind": "custom",
+      "url": "https://finviz.com/insidertrading.ashx",
+      "interval_s": 600,
+      "tier": 2,
+      "wire_kind": "filing",
+      "default_enabled": true,
+      "note": "Finviz insider trading page (HTML; browser User-Agent): buys and sales of $100K+ in held and watched stocks",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "usaspending",
+      "kind": "custom",
+      "url": "https://api.usaspending.gov/api/v2/search/spending_by_award/",
+      "interval_s": 3600,
+      "tier": 1,
+      "wire_kind": "filing",
+      "default_enabled": true,
+      "note": "USAspending.gov award search (POST, keyless): new contracts ≥ $100M signed in the last 30 days, recipient mapped to a ticker",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "cot",
+      "kind": "json",
+      "url": "https://publicreporting.cftc.gov/resource/gpe5-46if.json?$where=market_and_exchange_names%20like%20'%25E-MINI%20S%26P%20500%25'%20OR%20market_and_exchange_names%20like%20'%25NASDAQ-100%20Consolidated%25'%20OR%20market_and_exchange_names%20like%20'%25VIX%20FUTURES%25'&$order=report_date_as_yyyy_mm_dd%20DESC&$limit=12",
+      "interval_s": 3600,
+      "tier": 1,
+      "wire_kind": "derivatives",
+      "default_enabled": true,
+      "note": "CFTC Traders in Financial Futures (Socrata, keyless): E-mini S&P 500, Nasdaq-100 and VIX futures; one item per report and market",
+      "functions": [
+        "map"
+      ]
+    },
+    {
+      "id": "finra_short",
+      "kind": "custom",
+      "url": "https://cdn.finra.org/equity/regsho/daily/",
+      "interval_s": 1800,
+      "tier": 1,
+      "wire_kind": "derivatives",
+      "default_enabled": true,
+      "note": "FINRA daily short-sale volume (keyless CDN, ~18:00 ET): held and watched stocks' short ratio far above their 10-day median",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "fng",
+      "kind": "custom",
+      "url": "https://production.dataviz.cnn.io/index/fearandgreed/graphdata",
+      "interval_s": 1800,
+      "tier": 3,
+      "wire_kind": "sentiment",
+      "default_enabled": true,
+      "note": "CNN Fear & Greed (unofficial JSON; browser User-Agent): entering or leaving extreme fear or greed",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "stocktwits",
+      "kind": "custom",
+      "url": "https://api.stocktwits.com/api/2/trending/symbols.json",
+      "interval_s": 180,
+      "tier": 3,
+      "wire_kind": "sentiment",
+      "default_enabled": true,
+      "note": "StockTwits public API: held and watched stocks entering trending",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "wsb:apewisdom",
+      "kind": "custom",
+      "url": "https://apewisdom.io/api/v1.0/filter/all-stocks/page/1",
+      "interval_s": 900,
+      "tier": 3,
+      "wire_kind": "sentiment",
+      "default_enabled": true,
+      "note": "ApeWisdom (keyless): Reddit/4chan mention jumps for held and watched stocks",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "wsb:tradestie",
+      "kind": "custom",
+      "url": "https://tradestie.com/api/v1/apps/reddit",
+      "interval_s": 900,
+      "tier": 3,
+      "wire_kind": "sentiment",
+      "default_enabled": true,
+      "note": "Tradestie (keyless): r/wallstreetbets top 50 by comments, with sentiment",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "appstore",
+      "kind": "custom",
+      "url": "https://rss.marketingtools.apple.com/api/v2/us/apps/top-free/100/apps.json",
+      "interval_s": 3600,
+      "tier": 3,
+      "wire_kind": "sentiment",
+      "default_enabled": true,
+      "note": "Apple App Store charts (keyless): Robinhood's and Webull's ranks in the US top free apps and in Finance",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "wikipedia",
+      "kind": "custom",
+      "url": "https://wikimedia.org/api/rest_v1/metrics/pageviews",
+      "interval_s": 21600,
+      "tier": 3,
+      "wire_kind": "sentiment",
+      "default_enabled": true,
+      "note": "Wikimedia pageviews API (keyless): daily views of held and watched companies' articles (found once by Wikipedia search)",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "ratings:marketbeat",
+      "kind": "custom",
+      "url": "https://www.marketbeat.com/ratings/",
+      "interval_s": 900,
+      "tier": 2,
+      "wire_kind": "news",
+      "default_enabled": true,
+      "note": "MarketBeat analyst ratings (HTML, weekdays 06:00–19:00 ET): actions on tracked stocks",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "earnings:marketbeat",
+      "kind": "custom",
+      "url": "https://www.marketbeat.com/earnings/latest/",
+      "interval_s": 900,
+      "tier": 2,
+      "wire_kind": "news",
+      "default_enabled": true,
+      "note": "MarketBeat latest earnings (HTML, weekdays 06:00–19:00 ET): reported EPS and revenue vs estimates for tracked stocks",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "pdufa:rttnews",
+      "kind": "custom",
+      "url": "https://www.rttnews.com/corpinfo/fdacalendar.aspx",
+      "interval_s": 21600,
+      "tier": 2,
+      "wire_kind": "calendar",
+      "default_enabled": true,
+      "note": "RTTNews FDA calendar (HTML): decisions due within 3 weekdays and recent outcomes, tracked tickers only",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "congress:house",
+      "kind": "custom",
+      "url": "https://disclosures-clerk.house.gov/FinancialDisclosure",
+      "interval_s": 21600,
+      "tier": 3,
+      "wire_kind": "filing",
+      "default_enabled": true,
+      "note": "House Clerk periodic transaction reports (official, keyless; daily ZIP index + PDFs, ≤10 a poll): members' trades in held, watched and tracked stocks, weeks late; context only (meta.congress). Personal use: 5 U.S.C. §13107(c) bars commercial use",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "alpaca_news",
+      "kind": "custom",
+      "interval_s": 20,
+      "tier": 2,
+      "default_enabled": true,
+      "note": "Alpaca news (Benzinga), REST every 20 s",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "movers",
+      "kind": "custom",
+      "interval_s": 60,
+      "tier": 1,
+      "wire_kind": "anomaly",
+      "default_enabled": true,
+      "note": "Alpaca screener top movers, regular session only",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "anomaly",
+      "kind": "custom",
+      "interval_s": 60,
+      "tier": 1,
+      "wire_kind": "anomaly",
+      "default_enabled": true,
+      "note": "1-minute bars for the scan universe, held and watched symbols",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "price:alpaca_bars",
+      "kind": "custom",
+      "interval_s": 60,
+      "tier": 1,
+      "wire_kind": "anomaly",
+      "default_enabled": true,
+      "note": "Alpaca IEX minute bars for every symbol (layer B)",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "price:yahoo",
+      "kind": "custom",
+      "interval_s": 60,
+      "tier": 1,
+      "wire_kind": "anomaly",
+      "default_enabled": true,
+      "note": "Yahoo Finance streamer, unofficial (layer C)",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "price:finnhub",
+      "kind": "custom",
+      "interval_s": 60,
+      "tier": 1,
+      "wire_kind": "anomaly",
+      "key_env": "FINNHUB_API_KEY",
+      "default_enabled": true,
+      "note": "Finnhub trades for focus and watchlist, ≤ 50 symbols (layer D)",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "price:snapshots",
+      "kind": "custom",
+      "interval_s": 60,
+      "tier": 1,
+      "wire_kind": "anomaly",
+      "default_enabled": true,
+      "note": "Alpaca snapshots, polled only while layers B and C are down (layer E)",
+      "functions": [
+        "create"
+      ]
+    }
+  ]
+}

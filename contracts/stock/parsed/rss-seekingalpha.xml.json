@@ -1,0 +1,36 @@
+{
+  "fixture": "rss-seekingalpha.xml",
+  "parser": "taggedFeed (rss:seekingalpha, every ticker tracked)",
+  "output": [
+    {
+      "sourceId": "https://seekingalpha.com/news/4657647-cadence-raises-2026-outlook-to-21-percent-revenue-growth-and-8_40-non-gaap-eps-as-it-launches?utm_source=feed_news_all&utm_medium=referral&feed_item_type=news",
+      "title": "Cadence raises 2026 outlook to 21% revenue growth and $8.40 non-GAAP EPS as it launches Maestro models",
+      "summary": null,
+      "url": "https://seekingalpha.com/news/4657647-cadence-raises-2026-outlook-to-21-percent-revenue-growth-and-8_40-non-gaap-eps-as-it-launches?utm_source=feed_news_all&utm_medium=referral&feed_item_type=news",
+      "publishedAt": "2026-10-27T02:31:26.000Z",
+      "symbols": [
+        "CDNS"
+      ]
+    },
+    {
+      "sourceId": "https://seekingalpha.com/news/4657646-greenbrier-anticipates-2_8b-3_2b-revenue-and-2_75-3_75-eps-in-fiscal-2027-as-leasing-expands?utm_source=feed_news_all&utm_medium=referral&feed_item_type=news",
+      "title": "Greenbrier anticipates $2.8B-$3.2B revenue and $2.75-$3.75 EPS in fiscal 2027 as leasing expands",
+      "summary": null,
+      "url": "https://seekingalpha.com/news/4657646-greenbrier-anticipates-2_8b-3_2b-revenue-and-2_75-3_75-eps-in-fiscal-2027-as-leasing-expands?utm_source=feed_news_all&utm_medium=referral&feed_item_type=news",
+      "publishedAt": "2026-10-27T01:40:52.000Z",
+      "symbols": [
+        "GBX"
+      ]
+    },
+    {
+      "sourceId": "https://seekingalpha.com/news/4657645-agilysys-raises-fy2027-revenue-outlook-to-374m-378m-with-at-least-34-percent-subscription?utm_source=feed_news_all&utm_medium=referral&feed_item_type=news",
+      "title": "Agilysys raises FY2027 revenue outlook to $374M-$378M with at least 34% subscription growth",
+      "summary": null,
+      "url": "https://seekingalpha.com/news/4657645-agilysys-raises-fy2027-revenue-outlook-to-374m-378m-with-at-least-34-percent-subscription?utm_source=feed_news_all&utm_medium=referral&feed_item_type=news",
+      "publishedAt": "2026-10-27T01:00:55.000Z",
+      "symbols": [
+        "AGYS"
+      ]
+    }
+  ]
+}

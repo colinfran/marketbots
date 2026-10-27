@@ -1,0 +1,27 @@
+{
+  "fixture": "rss-ft-markets.xml",
+  "parser": "parseFeed (rss:ft_markets)",
+  "output": [
+    {
+      "sourceId": "bffe028e-838d-4e74-b05e-62f6db4978db",
+      "title": "Brazil’s currency plunges most since 1999 after Lula’s election victory",
+      "summary": "São Paulo stocks tumble after leftwing politician’s win against Flávio Bolsonaro",
+      "url": "https://www.ft.com/content/bffe028e-838d-4e74-b05e-62f6db4978db?syn-25a6b1a6=1",
+      "publishedAt": "2026-10-26T21:08:50.000Z"
+    },
+    {
+      "sourceId": "8868926c-3ee2-45e8-9705-0cb195fcc493",
+      "title": "DWS to honour just 10% of redemption requests at flagship property fund",
+      "summary": "Cap imposed by Deutsche Bank’s asset manager aims to preserve liquidity and avoid gating fund altogether",
+      "url": "https://www.ft.com/content/8868926c-3ee2-45e8-9705-0cb195fcc493?syn-25a6b1a6=1",
+      "publishedAt": "2026-10-26T18:16:52.000Z"
+    },
+    {
+      "sourceId": "a6c43402-719e-4295-ae5f-541edb0aeb29",
+      "title": "‘Bold but sane’: what we learnt from Anthropic’s 240,000-word IPO filing",
+      "summary": "Prospectus details AI lab’s ‘mission’, $800bn data centre commitments and extraordinary governance structure",
+      "url": "https://www.ft.com/content/a6c43402-719e-4295-ae5f-541edb0aeb29?syn-25a6b1a6=1",
+      "publishedAt": "2026-10-26T17:45:49.000Z"
+    }
+  ]
+}

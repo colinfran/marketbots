@@ -1,0 +1,30 @@
+{
+  "fixture": "bls.json",
+  "parser": "blsFigures (macro_actuals) for cpi and jobs, 2026-08 to 2026-10",
+  "output": [
+    {
+      "ref": {
+        "year": 2026,
+        "month": 8
+      },
+      "cpi": null,
+      "jobs": null
+    },
+    {
+      "ref": {
+        "year": 2026,
+        "month": 9
+      },
+      "cpi": null,
+      "jobs": null
+    },
+    {
+      "ref": {
+        "year": 2026,
+        "month": 10
+      },
+      "cpi": null,
+      "jobs": null
+    }
+  ]
+}

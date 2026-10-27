@@ -1,0 +1,27 @@
+{
+  "fixture": "clinicaltrials.json",
+  "parser": "trialItems for VRTX at 2026-10-15T12:00Z",
+  "output": [
+    {
+      "sourceId": "NCT05668741:COMPLETED",
+      "title": "VRTX: phase 1/2 trial NCT05668741 completed: A Phase 1/2 Study of VX-522 in Participants With Cystic Fibrosis (CF)",
+      "url": "https://clinicaltrials.gov/study/NCT05668741",
+      "publishedAt": "2026-10-09T00:00:00.000Z",
+      "symbols": [
+        "VRTX"
+      ],
+      "category": "fda",
+      "kind": "news",
+      "tier": 1,
+      "polarity": 0,
+      "baseSeverity": 20,
+      "meta": {
+        "nct": "NCT05668741",
+        "status": "COMPLETED",
+        "phases": "PHASE1,PHASE2",
+        "sponsor": "Vertex Pharmaceuticals Incorporated",
+        "why_stopped": null
+      }
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "fixture": "eia-petroleum.json",
+  "parser": "eiaValues + eiaItem (crude, with a ForexFactory forecast)",
+  "values": [
+    {
+      "period": "2026-10-16",
+      "value": 412.517
+    },
+    {
+      "period": "2026-10-09",
+      "value": 415.577
+    },
+    {
+      "period": "2026-10-02",
+      "value": 424.134
+    }
+  ],
+  "output": {
+    "sourceId": "crude:2026-10-16",
+    "title": "EIA crude inventories -3.1M barrels to 412.5M in the week to Oct 16 (prior week -8.6M barrels; forecast +1.5M barrels, surprise -4.6M barrels)",
+    "url": "https://www.eia.gov/petroleum/supply/weekly/",
+    "publishedAt": "2026-10-27T15:00:00.000Z",
+    "symbols": [],
+    "marketWide": true,
+    "category": "macro_release",
+    "kind": "macro",
+    "tier": 1,
+    "polarity": 0,
+    "baseSeverity": 30,
+    "meta": {
+      "metric": "eia:crude",
+      "period": "2026-10-16",
+      "level": 412.5,
+      "change": -3.06,
+      "prior_change": -8.56,
+      "forecast": 1.5,
+      "surprise": -4.56
+    }
+  }
+}

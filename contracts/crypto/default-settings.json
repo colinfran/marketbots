@@ -1,0 +1,125 @@
+{
+  "kraken": {
+    "max_position_pct": 20,
+    "max_asset_exposure_pct": 30,
+    "max_total_exposure_pct": 90,
+    "max_correlated_exposure_pct": 70,
+    "correlation_threshold": 0.75,
+    "max_concurrent_positions": 7,
+    "risk_per_trade_pct": 1.5,
+    "min_reward_risk": 1.3,
+    "min_stop_pct": 1,
+    "max_stop_pct": 12,
+    "min_edge_bps": 25,
+    "max_spread_bps": 20,
+    "max_slippage_bps": 25,
+    "max_quote_age_seconds": 20,
+    "reentry_cooldown_minutes": 90,
+    "min_hold_minutes": 60,
+    "min_conviction": 55,
+    "max_trades_per_day": 20,
+    "taker_fee_bps": 40,
+    "paper_slippage_bps": 5
+  },
+  "portfolio": {
+    "max_daily_loss_pct": 5,
+    "max_drawdown_pct": 25,
+    "drawdown_action": "halt"
+  },
+  "ai": {
+    "daily_budget_usd": 5,
+    "models": {
+      "research": "spacexai/grok-4.5",
+      "decision": "spacexai/grok-4.7",
+      "fallback": null
+    },
+    "x_search": true,
+    "max_candidates_per_cycle": 4,
+    "probability_shrink": 0.6,
+    "research_timeout_seconds": 180,
+    "decision_timeout_seconds": 240
+  },
+  "schedule": {
+    "crypto_scan_minutes": 15,
+    "position_review_minutes": 240,
+    "trigger_move_atr": 1.5,
+    "trigger_cooldown_minutes": 30,
+    "min_ai_interval_minutes": 10
+  },
+  "strategies": {
+    "trend": {
+      "enabled": true,
+      "max_exposure_pct": 65
+    },
+    "daily_trend": {
+      "enabled": true,
+      "max_exposure_pct": 50
+    },
+    "mean_reversion": {
+      "enabled": true,
+      "max_exposure_pct": 40
+    },
+    "momentum": {
+      "enabled": true,
+      "max_exposure_pct": 55
+    },
+    "event_driven": {
+      "enabled": true,
+      "max_exposure_pct": 40
+    },
+    "discretionary": {
+      "enabled": true,
+      "max_exposure_pct": 30
+    }
+  },
+  "universe": {
+    "kraken_symbols": [
+      "BTC/USD",
+      "ETH/USD",
+      "SOL/USD",
+      "XRP/USD",
+      "DOGE/USD",
+      "ADA/USD",
+      "LINK/USD",
+      "AVAX/USD",
+      "LTC/USD",
+      "DOT/USD"
+    ]
+  },
+  "paper": {
+    "starting_usd": 10000
+  },
+  "wire": {
+    "mode": "live",
+    "research_mode": "auto",
+    "thresholds": {
+      "annotate": 30,
+      "review": 55,
+      "evaluate": 70,
+      "critical": 85
+    },
+    "entry_confirmation": true,
+    "trigger_max_age_minutes": 15,
+    "symbol_cooldown_minutes": 30,
+    "event_min_gap_seconds": 60,
+    "max_event_cycles_per_hour": 4,
+    "max_event_cycles_per_day": 24,
+    "event_budget_reserve_pct": 30,
+    "event_research": "x_verify",
+    "event_research_timeout_seconds": 45,
+    "event_decision_timeout_seconds": 90,
+    "emergency_action": "review",
+    "anomaly": {
+      "price_z": 4,
+      "volume_multiple": 5,
+      "market_z": 4
+    },
+    "disabled_sources": [],
+    "retention_days": 30,
+    "depeg_pct": 1,
+    "tvl_drop_pct": 15,
+    "odds_swing_pts": 15,
+    "funding_extreme_annual_pct": 100,
+    "coinbase_premium_pct": 0.3
+  }
+}

@@ -1,0 +1,247 @@
+{
+  "command": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "oneOf": [
+      {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "pause"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "resume"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "kill_switch.engage"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "liquidate": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "type",
+          "reason",
+          "liquidate"
+        ]
+      },
+      {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "kill_switch.release"
+          },
+          "confirm": {
+            "type": "string",
+            "const": "RELEASE"
+          }
+        },
+        "required": [
+          "type",
+          "confirm"
+        ]
+      },
+      {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "settings.update"
+          },
+          "patch": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "expected_version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "type",
+          "patch",
+          "expected_version"
+        ]
+      },
+      {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "cycle.run_now"
+          },
+          "phase": {
+            "type": "string",
+            "enum": [
+              "premarket",
+              "intraday",
+              "close",
+              "postmarket"
+            ]
+          },
+          "symbols": {
+            "maxItems": 5,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z.]{0,9}$"
+            }
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "position.close"
+          },
+          "symbol": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z.]{0,9}$"
+          }
+        },
+        "required": [
+          "type",
+          "symbol"
+        ]
+      },
+      {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "option.close"
+          },
+          "structure_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "type",
+          "structure_id"
+        ]
+      },
+      {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "broker.sync"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "seed.schedule"
+          },
+          "amount_usd": {
+            "type": "number",
+            "minimum": 100,
+            "maximum": 10000
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "force": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "type",
+          "amount_usd",
+          "at"
+        ]
+      },
+      {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "seed.cancel"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "wire.replay"
+          },
+          "item_id": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "type",
+          "item_id"
+        ]
+      }
+    ]
+  },
+  "labels": {
+    "pause": "Pause trading",
+    "resume": "Resume trading",
+    "kill_switch.engage": "Engage kill switch",
+    "kill_switch.release": "Release kill switch",
+    "settings.update": "Update settings",
+    "cycle.run_now": "Run cycle now",
+    "position.close": "Close stock position",
+    "option.close": "Close options position",
+    "broker.sync": "Sync with Alpaca",
+    "seed.schedule": "Schedule seed buy",
+    "seed.cancel": "Cancel seed buy",
+    "wire.replay": "Replay news item"
+  }
+}

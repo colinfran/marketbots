@@ -374,7 +374,7 @@ Tags: **[C]** crypto, **[S]** stock, **[both]**, **[stack]** Docker/infra, **[ow
 - [x] 2.2 [both] Rename scopes: `@cmb/core` → `@mb/crypto-core`, `@cmb/engine` → `@mb/crypto-engine`, `@cmb/web` → `@mb/crypto-web` (stock likewise), and `@cmb/scraper` → `@mb/scraper` (in `package.json` and `package-lock.json`). Fix relative paths: `tsconfig` extends, vitest configs, `build.mjs`, and the `macro-calendar.json` path in the alert text.
 - [x] 2.3 [both] Dev scripts load `../../<bot>.env` + `../../<bot>.local.env` (§3.6).
 - [x] 2.4 [both] One `pnpm install` and one lockfile (versions already match; drop stock's stale `@vitest/coverage-v8` peer).
-- [ ] 2.5 [both] **Contract snapshots**, generated from the unchanged code and committed under `contracts/<bot>/`:
+- [x] 2.5 [both] **Contract snapshots**, generated from the unchanged code and committed under `contracts/<bot>/`:
   - `DEFAULT_SETTINGS` (JSON).
   - Settings and command schemas (`z.toJSONSchema`).
   - `INDEXES`.

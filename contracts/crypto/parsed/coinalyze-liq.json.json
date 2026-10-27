@@ -1,0 +1,15 @@
+{
+  "fixture": "coinalyze-liq.json",
+  "parser": "coinalyzeLiquidations (coinalyze) since 1793067000 s, symbols from coinalyze-markets.json",
+  "by_symbol": {
+    "BTCUSDT.6": "BTC",
+    "BTCUSDT_PERP.A": "BTC",
+    "ETHUSDT_PERP.A": "ETH"
+  },
+  "output": {
+    "BTC": {
+      "longs": 210529.8676,
+      "shorts": 80.0539
+    }
+  }
+}

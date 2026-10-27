@@ -1,0 +1,5 @@
+{
+  "fixture": "solana-status.json",
+  "parser": "parseStatuspage (status_solana)",
+  "output": []
+}

@@ -1,0 +1,1262 @@
+{
+  "input": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "kraken": {
+        "type": "object",
+        "properties": {
+          "max_position_pct": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 50
+          },
+          "max_asset_exposure_pct": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "max_total_exposure_pct": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "max_correlated_exposure_pct": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "correlation_threshold": {
+            "type": "number",
+            "minimum": 0.3,
+            "maximum": 0.99
+          },
+          "max_concurrent_positions": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30
+          },
+          "risk_per_trade_pct": {
+            "type": "number",
+            "minimum": 0.05,
+            "maximum": 5
+          },
+          "min_reward_risk": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 10
+          },
+          "min_stop_pct": {
+            "type": "number",
+            "minimum": 0.2,
+            "maximum": 20
+          },
+          "max_stop_pct": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 40
+          },
+          "min_edge_bps": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 2000
+          },
+          "max_spread_bps": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "max_slippage_bps": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "max_quote_age_seconds": {
+            "type": "number",
+            "minimum": 2,
+            "maximum": 600
+          },
+          "reentry_cooldown_minutes": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10080
+          },
+          "min_hold_minutes": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10080
+          },
+          "min_conviction": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "max_trades_per_day": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 500
+          },
+          "taker_fee_bps": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 200
+          },
+          "paper_slippage_bps": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 200
+          }
+        },
+        "required": [
+          "max_position_pct",
+          "max_asset_exposure_pct",
+          "max_total_exposure_pct",
+          "max_correlated_exposure_pct",
+          "correlation_threshold",
+          "max_concurrent_positions",
+          "risk_per_trade_pct",
+          "min_reward_risk",
+          "min_stop_pct",
+          "max_stop_pct",
+          "min_edge_bps",
+          "max_spread_bps",
+          "max_slippage_bps",
+          "max_quote_age_seconds",
+          "reentry_cooldown_minutes",
+          "min_hold_minutes",
+          "min_conviction",
+          "max_trades_per_day",
+          "taker_fee_bps",
+          "paper_slippage_bps"
+        ]
+      },
+      "portfolio": {
+        "type": "object",
+        "properties": {
+          "max_daily_loss_pct": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 50
+          },
+          "max_drawdown_pct": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 90
+          },
+          "drawdown_action": {
+            "type": "string",
+            "enum": [
+              "halt",
+              "halt_and_liquidate"
+            ]
+          }
+        },
+        "required": [
+          "max_daily_loss_pct",
+          "max_drawdown_pct",
+          "drawdown_action"
+        ]
+      },
+      "ai": {
+        "type": "object",
+        "properties": {
+          "daily_budget_usd": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "models": {
+            "type": "object",
+            "properties": {
+              "research": {
+                "type": "string",
+                "pattern": "^[a-z0-9-]+\\/[a-z0-9][a-z0-9.\\-]*$"
+              },
+              "decision": {
+                "type": "string",
+                "pattern": "^[a-z0-9-]+\\/[a-z0-9][a-z0-9.\\-]*$"
+              },
+              "fallback": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[a-z0-9-]+\\/[a-z0-9][a-z0-9.\\-]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "research",
+              "decision",
+              "fallback"
+            ]
+          },
+          "x_search": {
+            "type": "boolean"
+          },
+          "max_candidates_per_cycle": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 12
+          },
+          "probability_shrink": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "research_timeout_seconds": {
+            "type": "number",
+            "minimum": 30,
+            "maximum": 600
+          },
+          "decision_timeout_seconds": {
+            "type": "number",
+            "minimum": 20,
+            "maximum": 300
+          }
+        },
+        "required": [
+          "daily_budget_usd",
+          "models",
+          "x_search",
+          "max_candidates_per_cycle",
+          "probability_shrink",
+          "research_timeout_seconds",
+          "decision_timeout_seconds"
+        ]
+      },
+      "schedule": {
+        "type": "object",
+        "properties": {
+          "crypto_scan_minutes": {
+            "type": "number",
+            "minimum": 5,
+            "maximum": 240
+          },
+          "position_review_minutes": {
+            "type": "number",
+            "minimum": 15,
+            "maximum": 1440
+          },
+          "trigger_move_atr": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 10
+          },
+          "trigger_cooldown_minutes": {
+            "type": "number",
+            "minimum": 5,
+            "maximum": 720
+          },
+          "min_ai_interval_minutes": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 240
+          }
+        },
+        "required": [
+          "crypto_scan_minutes",
+          "position_review_minutes",
+          "trigger_move_atr",
+          "trigger_cooldown_minutes",
+          "min_ai_interval_minutes"
+        ]
+      },
+      "strategies": {
+        "type": "object",
+        "properties": {
+          "trend": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "max_exposure_pct": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              }
+            },
+            "required": [
+              "enabled",
+              "max_exposure_pct"
+            ]
+          },
+          "daily_trend": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "max_exposure_pct": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              }
+            },
+            "required": [
+              "enabled",
+              "max_exposure_pct"
+            ]
+          },
+          "mean_reversion": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "max_exposure_pct": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              }
+            },
+            "required": [
+              "enabled",
+              "max_exposure_pct"
+            ]
+          },
+          "momentum": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "max_exposure_pct": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              }
+            },
+            "required": [
+              "enabled",
+              "max_exposure_pct"
+            ]
+          },
+          "event_driven": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "max_exposure_pct": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              }
+            },
+            "required": [
+              "enabled",
+              "max_exposure_pct"
+            ]
+          },
+          "discretionary": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "max_exposure_pct": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              }
+            },
+            "required": [
+              "enabled",
+              "max_exposure_pct"
+            ]
+          }
+        },
+        "required": [
+          "trend",
+          "daily_trend",
+          "mean_reversion",
+          "momentum",
+          "event_driven",
+          "discretionary"
+        ]
+      },
+      "universe": {
+        "type": "object",
+        "properties": {
+          "kraken_symbols": {
+            "minItems": 1,
+            "maxItems": 30,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Z0-9]{2,12}\\/(USD|USDC|USDT)$"
+            }
+          }
+        },
+        "required": [
+          "kraken_symbols"
+        ]
+      },
+      "paper": {
+        "type": "object",
+        "properties": {
+          "starting_usd": {
+            "type": "number",
+            "minimum": 100,
+            "maximum": 10000000
+          }
+        },
+        "required": [
+          "starting_usd"
+        ]
+      },
+      "wire": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "off",
+              "shadow",
+              "live"
+            ]
+          },
+          "research_mode": {
+            "type": "string",
+            "enum": [
+              "full",
+              "gap_fill",
+              "auto"
+            ]
+          },
+          "thresholds": {
+            "type": "object",
+            "properties": {
+              "annotate": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "review": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "evaluate": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "critical": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              }
+            },
+            "required": [
+              "annotate",
+              "review",
+              "evaluate",
+              "critical"
+            ]
+          },
+          "entry_confirmation": {
+            "type": "boolean"
+          },
+          "trigger_max_age_minutes": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 240
+          },
+          "symbol_cooldown_minutes": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 720
+          },
+          "event_min_gap_seconds": {
+            "type": "number",
+            "minimum": 15,
+            "maximum": 3600
+          },
+          "max_event_cycles_per_hour": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 30
+          },
+          "max_event_cycles_per_day": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 200
+          },
+          "event_budget_reserve_pct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 90
+          },
+          "event_research": {
+            "type": "string",
+            "enum": [
+              "none",
+              "x_verify"
+            ]
+          },
+          "event_research_timeout_seconds": {
+            "type": "number",
+            "minimum": 15,
+            "maximum": 300
+          },
+          "event_decision_timeout_seconds": {
+            "type": "number",
+            "minimum": 20,
+            "maximum": 300
+          },
+          "emergency_action": {
+            "type": "string",
+            "enum": [
+              "review",
+              "tighten_stop",
+              "exit"
+            ]
+          },
+          "anomaly": {
+            "type": "object",
+            "properties": {
+              "price_z": {
+                "type": "number",
+                "minimum": 2,
+                "maximum": 20
+              },
+              "volume_multiple": {
+                "type": "number",
+                "minimum": 1.5,
+                "maximum": 50
+              },
+              "market_z": {
+                "type": "number",
+                "minimum": 2,
+                "maximum": 20
+              }
+            },
+            "required": [
+              "price_z",
+              "volume_multiple",
+              "market_z"
+            ]
+          },
+          "disabled_sources": {
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          },
+          "retention_days": {
+            "type": "integer",
+            "minimum": 7,
+            "maximum": 730
+          },
+          "depeg_pct": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 20
+          },
+          "tvl_drop_pct": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 90
+          },
+          "odds_swing_pts": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "funding_extreme_annual_pct": {
+            "type": "number",
+            "minimum": 5,
+            "maximum": 2000
+          },
+          "coinbase_premium_pct": {
+            "type": "number",
+            "minimum": 0.05,
+            "maximum": 5
+          }
+        },
+        "required": [
+          "mode",
+          "research_mode",
+          "thresholds",
+          "entry_confirmation",
+          "trigger_max_age_minutes",
+          "symbol_cooldown_minutes",
+          "event_min_gap_seconds",
+          "max_event_cycles_per_hour",
+          "max_event_cycles_per_day",
+          "event_budget_reserve_pct",
+          "event_research",
+          "event_research_timeout_seconds",
+          "event_decision_timeout_seconds",
+          "emergency_action",
+          "anomaly",
+          "disabled_sources",
+          "retention_days",
+          "depeg_pct",
+          "tvl_drop_pct",
+          "odds_swing_pts",
+          "funding_extreme_annual_pct",
+          "coinbase_premium_pct"
+        ]
+      }
+    },
+    "required": [
+      "kraken",
+      "portfolio",
+      "ai",
+      "schedule",
+      "strategies",
+      "universe",
+      "paper",
+      "wire"
+    ]
+  },
+  "output": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "kraken": {
+        "type": "object",
+        "properties": {
+          "max_position_pct": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 50
+          },
+          "max_asset_exposure_pct": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "max_total_exposure_pct": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "max_correlated_exposure_pct": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "correlation_threshold": {
+            "type": "number",
+            "minimum": 0.3,
+            "maximum": 0.99
+          },
+          "max_concurrent_positions": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30
+          },
+          "risk_per_trade_pct": {
+            "type": "number",
+            "minimum": 0.05,
+            "maximum": 5
+          },
+          "min_reward_risk": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 10
+          },
+          "min_stop_pct": {
+            "type": "number",
+            "minimum": 0.2,
+            "maximum": 20
+          },
+          "max_stop_pct": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 40
+          },
+          "min_edge_bps": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 2000
+          },
+          "max_spread_bps": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "max_slippage_bps": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "max_quote_age_seconds": {
+            "type": "number",
+            "minimum": 2,
+            "maximum": 600
+          },
+          "reentry_cooldown_minutes": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10080
+          },
+          "min_hold_minutes": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10080
+          },
+          "min_conviction": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "max_trades_per_day": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 500
+          },
+          "taker_fee_bps": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 200
+          },
+          "paper_slippage_bps": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 200
+          }
+        },
+        "required": [
+          "max_position_pct",
+          "max_asset_exposure_pct",
+          "max_total_exposure_pct",
+          "max_correlated_exposure_pct",
+          "correlation_threshold",
+          "max_concurrent_positions",
+          "risk_per_trade_pct",
+          "min_reward_risk",
+          "min_stop_pct",
+          "max_stop_pct",
+          "min_edge_bps",
+          "max_spread_bps",
+          "max_slippage_bps",
+          "max_quote_age_seconds",
+          "reentry_cooldown_minutes",
+          "min_hold_minutes",
+          "min_conviction",
+          "max_trades_per_day",
+          "taker_fee_bps",
+          "paper_slippage_bps"
+        ],
+        "additionalProperties": false
+      },
+      "portfolio": {
+        "type": "object",
+        "properties": {
+          "max_daily_loss_pct": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 50
+          },
+          "max_drawdown_pct": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 90
+          },
+          "drawdown_action": {
+            "type": "string",
+            "enum": [
+              "halt",
+              "halt_and_liquidate"
+            ]
+          }
+        },
+        "required": [
+          "max_daily_loss_pct",
+          "max_drawdown_pct",
+          "drawdown_action"
+        ],
+        "additionalProperties": false
+      },
+      "ai": {
+        "type": "object",
+        "properties": {
+          "daily_budget_usd": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "models": {
+            "type": "object",
+            "properties": {
+              "research": {
+                "type": "string",
+                "pattern": "^[a-z0-9-]+\\/[a-z0-9][a-z0-9.\\-]*$"
+              },
+              "decision": {
+                "type": "string",
+                "pattern": "^[a-z0-9-]+\\/[a-z0-9][a-z0-9.\\-]*$"
+              },
+              "fallback": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[a-z0-9-]+\\/[a-z0-9][a-z0-9.\\-]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "research",
+              "decision",
+              "fallback"
+            ],
+            "additionalProperties": false
+          },
+          "x_search": {
+            "type": "boolean"
+          },
+          "max_candidates_per_cycle": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 12
+          },
+          "probability_shrink": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "research_timeout_seconds": {
+            "type": "number",
+            "minimum": 30,
+            "maximum": 600
+          },
+          "decision_timeout_seconds": {
+            "type": "number",
+            "minimum": 20,
+            "maximum": 300
+          }
+        },
+        "required": [
+          "daily_budget_usd",
+          "models",
+          "x_search",
+          "max_candidates_per_cycle",
+          "probability_shrink",
+          "research_timeout_seconds",
+          "decision_timeout_seconds"
+        ],
+        "additionalProperties": false
+      },
+      "schedule": {
+        "type": "object",
+        "properties": {
+          "crypto_scan_minutes": {
+            "type": "number",
+            "minimum": 5,
+            "maximum": 240
+          },
+          "position_review_minutes": {
+            "type": "number",
+            "minimum": 15,
+            "maximum": 1440
+          },
+          "trigger_move_atr": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 10
+          },
+          "trigger_cooldown_minutes": {
+            "type": "number",
+            "minimum": 5,
+            "maximum": 720
+          },
+          "min_ai_interval_minutes": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 240
+          }
+        },
+        "required": [
+          "crypto_scan_minutes",
+          "position_review_minutes",
+          "trigger_move_atr",
+          "trigger_cooldown_minutes",
+          "min_ai_interval_minutes"
+        ],
+        "additionalProperties": false
+      },
+      "strategies": {
+        "type": "object",
+        "properties": {
+          "trend": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "max_exposure_pct": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              }
+            },
+            "required": [
+              "enabled",
+              "max_exposure_pct"
+            ],
+            "additionalProperties": false
+          },
+          "daily_trend": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "max_exposure_pct": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              }
+            },
+            "required": [
+              "enabled",
+              "max_exposure_pct"
+            ],
+            "additionalProperties": false
+          },
+          "mean_reversion": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "max_exposure_pct": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              }
+            },
+            "required": [
+              "enabled",
+              "max_exposure_pct"
+            ],
+            "additionalProperties": false
+          },
+          "momentum": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "max_exposure_pct": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              }
+            },
+            "required": [
+              "enabled",
+              "max_exposure_pct"
+            ],
+            "additionalProperties": false
+          },
+          "event_driven": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "max_exposure_pct": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              }
+            },
+            "required": [
+              "enabled",
+              "max_exposure_pct"
+            ],
+            "additionalProperties": false
+          },
+          "discretionary": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "max_exposure_pct": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              }
+            },
+            "required": [
+              "enabled",
+              "max_exposure_pct"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "trend",
+          "daily_trend",
+          "mean_reversion",
+          "momentum",
+          "event_driven",
+          "discretionary"
+        ],
+        "additionalProperties": false
+      },
+      "universe": {
+        "type": "object",
+        "properties": {
+          "kraken_symbols": {
+            "minItems": 1,
+            "maxItems": 30,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Z0-9]{2,12}\\/(USD|USDC|USDT)$"
+            }
+          }
+        },
+        "required": [
+          "kraken_symbols"
+        ],
+        "additionalProperties": false
+      },
+      "paper": {
+        "type": "object",
+        "properties": {
+          "starting_usd": {
+            "type": "number",
+            "minimum": 100,
+            "maximum": 10000000
+          }
+        },
+        "required": [
+          "starting_usd"
+        ],
+        "additionalProperties": false
+      },
+      "wire": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "off",
+              "shadow",
+              "live"
+            ]
+          },
+          "research_mode": {
+            "type": "string",
+            "enum": [
+              "full",
+              "gap_fill",
+              "auto"
+            ]
+          },
+          "thresholds": {
+            "type": "object",
+            "properties": {
+              "annotate": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "review": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "evaluate": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "critical": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              }
+            },
+            "required": [
+              "annotate",
+              "review",
+              "evaluate",
+              "critical"
+            ],
+            "additionalProperties": false
+          },
+          "entry_confirmation": {
+            "type": "boolean"
+          },
+          "trigger_max_age_minutes": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 240
+          },
+          "symbol_cooldown_minutes": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 720
+          },
+          "event_min_gap_seconds": {
+            "type": "number",
+            "minimum": 15,
+            "maximum": 3600
+          },
+          "max_event_cycles_per_hour": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 30
+          },
+          "max_event_cycles_per_day": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 200
+          },
+          "event_budget_reserve_pct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 90
+          },
+          "event_research": {
+            "type": "string",
+            "enum": [
+              "none",
+              "x_verify"
+            ]
+          },
+          "event_research_timeout_seconds": {
+            "type": "number",
+            "minimum": 15,
+            "maximum": 300
+          },
+          "event_decision_timeout_seconds": {
+            "type": "number",
+            "minimum": 20,
+            "maximum": 300
+          },
+          "emergency_action": {
+            "type": "string",
+            "enum": [
+              "review",
+              "tighten_stop",
+              "exit"
+            ]
+          },
+          "anomaly": {
+            "type": "object",
+            "properties": {
+              "price_z": {
+                "type": "number",
+                "minimum": 2,
+                "maximum": 20
+              },
+              "volume_multiple": {
+                "type": "number",
+                "minimum": 1.5,
+                "maximum": 50
+              },
+              "market_z": {
+                "type": "number",
+                "minimum": 2,
+                "maximum": 20
+              }
+            },
+            "required": [
+              "price_z",
+              "volume_multiple",
+              "market_z"
+            ],
+            "additionalProperties": false
+          },
+          "disabled_sources": {
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          },
+          "retention_days": {
+            "type": "integer",
+            "minimum": 7,
+            "maximum": 730
+          },
+          "depeg_pct": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 20
+          },
+          "tvl_drop_pct": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 90
+          },
+          "odds_swing_pts": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "funding_extreme_annual_pct": {
+            "type": "number",
+            "minimum": 5,
+            "maximum": 2000
+          },
+          "coinbase_premium_pct": {
+            "type": "number",
+            "minimum": 0.05,
+            "maximum": 5
+          }
+        },
+        "required": [
+          "mode",
+          "research_mode",
+          "thresholds",
+          "entry_confirmation",
+          "trigger_max_age_minutes",
+          "symbol_cooldown_minutes",
+          "event_min_gap_seconds",
+          "max_event_cycles_per_hour",
+          "max_event_cycles_per_day",
+          "event_budget_reserve_pct",
+          "event_research",
+          "event_research_timeout_seconds",
+          "event_decision_timeout_seconds",
+          "emergency_action",
+          "anomaly",
+          "disabled_sources",
+          "retention_days",
+          "depeg_pct",
+          "tvl_drop_pct",
+          "odds_swing_pts",
+          "funding_extreme_annual_pct",
+          "coinbase_premium_pct"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "kraken",
+      "portfolio",
+      "ai",
+      "schedule",
+      "strategies",
+      "universe",
+      "paper",
+      "wire"
+    ],
+    "additionalProperties": false
+  }
+}

@@ -1,0 +1,160 @@
+{
+  "fixture": "korea-bithumb-notices.json",
+  "parser": "korea:bithumb.map",
+  "output": [
+    {
+      "sourceId": "https://feed.bithumb.com/notice/1655397",
+      "title": "Bithumb (notice): 10월 4주차 가스(GAS) 에어드랍 지급 안내",
+      "url": "https://feed.bithumb.com/notice/1655397",
+      "publishedAt": "2026-10-26T07:25:37.000Z",
+      "symbols": [
+        "GAS/USD"
+      ],
+      "kind": "venue",
+      "category": "general",
+      "polarity": 0,
+      "baseSeverity": 15,
+      "meta": {
+        "exchange": "bithumb",
+        "categories": "안내"
+      }
+    },
+    {
+      "sourceId": "https://feed.bithumb.com/notice/1655395",
+      "title": "Bithumb (deposits/withdrawals): 지케이싱크(ZK) 입출금 일시 중지 안내 (10/27 재개)",
+      "url": "https://feed.bithumb.com/notice/1655395",
+      "publishedAt": "2026-10-26T07:10:00.000Z",
+      "symbols": [
+        "ZK/USD"
+      ],
+      "kind": "venue",
+      "category": "general",
+      "polarity": 0,
+      "baseSeverity": 20,
+      "meta": {
+        "exchange": "bithumb",
+        "categories": "입출금"
+      }
+    },
+    {
+      "sourceId": "https://feed.bithumb.com/notice/1655392",
+      "title": "Bithumb (trading caution): 이니시아(INIT) 거래유의종목 지정",
+      "url": "https://feed.bithumb.com/notice/1655392",
+      "publishedAt": "2026-10-26T05:00:03.000Z",
+      "symbols": [
+        "INIT/USD"
+      ],
+      "kind": "venue",
+      "category": "venue_status",
+      "polarity": -1,
+      "baseSeverity": 60,
+      "meta": {
+        "exchange": "bithumb",
+        "categories": "거래유의"
+      }
+    },
+    {
+      "sourceId": "https://feed.bithumb.com/notice/1655384",
+      "title": "Bithumb (market added): 액시스로보틱스(AXIS) 원화 마켓 추가",
+      "url": "https://feed.bithumb.com/notice/1655384",
+      "publishedAt": "2026-10-24T00:32:06.000Z",
+      "symbols": [
+        "AXIS/USD"
+      ],
+      "kind": "venue",
+      "category": "general",
+      "polarity": 0,
+      "baseSeverity": 20,
+      "meta": {
+        "exchange": "bithumb",
+        "categories": "마켓 추가"
+      }
+    },
+    {
+      "sourceId": "https://feed.bithumb.com/notice/1655383",
+      "title": "Bithumb (notice): 이니시아(INIT) 유의 촉구 안내",
+      "url": "https://feed.bithumb.com/notice/1655383",
+      "publishedAt": "2026-10-23T16:15:00.000Z",
+      "symbols": [
+        "INIT/USD"
+      ],
+      "kind": "venue",
+      "category": "general",
+      "polarity": -1,
+      "baseSeverity": 35,
+      "meta": {
+        "exchange": "bithumb",
+        "categories": "안내"
+      }
+    },
+    {
+      "sourceId": "https://feed.bithumb.com/notice/1655382",
+      "title": "Bithumb (deposits/withdrawals): 이니시아(INIT) 입출금 일시 중지 안내",
+      "url": "https://feed.bithumb.com/notice/1655382",
+      "publishedAt": "2026-10-23T16:01:30.000Z",
+      "symbols": [
+        "INIT/USD"
+      ],
+      "kind": "venue",
+      "category": "general",
+      "polarity": 0,
+      "baseSeverity": 20,
+      "meta": {
+        "exchange": "bithumb",
+        "categories": "입출금"
+      }
+    },
+    {
+      "sourceId": "https://feed.bithumb.com/notice/1655381",
+      "title": "Bithumb (delisting): 캠프 네트워크(CAMP) 거래지원 종료",
+      "url": "https://feed.bithumb.com/notice/1655381",
+      "publishedAt": "2026-10-23T07:00:00.000Z",
+      "symbols": [
+        "CAMP/USD"
+      ],
+      "kind": "venue",
+      "category": "venue_status",
+      "polarity": -1,
+      "baseSeverity": 75,
+      "meta": {
+        "exchange": "bithumb",
+        "categories": "거래지원종료"
+      }
+    },
+    {
+      "sourceId": "https://feed.bithumb.com/notice/1655380",
+      "title": "Bithumb (trading caution): 멀티버스엑스(EGLD), 페치(FET) 거래유의종목 지정 연장",
+      "url": "https://feed.bithumb.com/notice/1655380",
+      "publishedAt": "2026-10-23T06:00:00.000Z",
+      "symbols": [
+        "EGLD/USD",
+        "FET/USD"
+      ],
+      "kind": "venue",
+      "category": "venue_status",
+      "polarity": -1,
+      "baseSeverity": 60,
+      "meta": {
+        "exchange": "bithumb",
+        "categories": "거래유의"
+      }
+    },
+    {
+      "sourceId": "https://feed.bithumb.com/notice/1655319",
+      "title": "Bithumb (trading caution): 자이(XAI) 거래유의종목 지정 해제",
+      "url": "https://feed.bithumb.com/notice/1655319",
+      "publishedAt": "2026-10-22T07:30:00.000Z",
+      "symbols": [
+        "XAI/USD"
+      ],
+      "kind": "venue",
+      "category": "general",
+      "polarity": 1,
+      "baseSeverity": 30,
+      "meta": {
+        "exchange": "bithumb",
+        "categories": "거래유의"
+      }
+    }
+  ]
+}

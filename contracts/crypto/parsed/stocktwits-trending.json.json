@@ -1,0 +1,185 @@
+{
+  "fixture": "stocktwits-trending.json",
+  "parser": "stocktwitsTrendingItems (stocktwits), fresh watcher",
+  "output": [],
+  "observations": {
+    "readings": [
+      {
+        "key": "stocktwits:trending:BTC",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "stocktwits:trending:ETH",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "stocktwits:trending:SOL",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "stocktwits:trending:XRP",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "stocktwits:trending:DOGE",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "stocktwits:trending:ADA",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "stocktwits:trending:LINK",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "stocktwits:trending:AVAX",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "stocktwits:trending:LTC",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "stocktwits:trending:DOT",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "stocktwits:trending:INIT",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "stocktwits:trending:EGLD",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "stocktwits:trending:FET",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "stocktwits:trending:XAI",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "stocktwits:trending:CAMP",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "stocktwits:trending:ZK",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "stocktwits:trending:AXIS",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "stocktwits:trending:CTR",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "stocktwits:trending:GAS",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "stocktwits:trending:CSPR",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "stocktwits:trending:XEC",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      }
+    ],
+    "rules": {
+      "entry": {
+        "id": "entry",
+        "kind": "level",
+        "abs": 1,
+        "rearmMs": 21600000
+      }
+    }
+  }
+}

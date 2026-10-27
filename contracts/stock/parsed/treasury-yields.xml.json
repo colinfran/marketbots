@@ -1,0 +1,22 @@
+{
+  "fixture": "treasury-yields.xml",
+  "parser": "parseYieldCurve + yieldItems",
+  "days": [
+    {
+      "date": "2026-10-01",
+      "y2": 4.78,
+      "y10": 5.24
+    },
+    {
+      "date": "2026-10-02",
+      "y2": 4.83,
+      "y10": 5.28
+    },
+    {
+      "date": "2026-10-05",
+      "y2": 4.84,
+      "y10": 5.31
+    }
+  ],
+  "output": []
+}

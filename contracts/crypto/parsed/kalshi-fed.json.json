@@ -1,0 +1,15 @@
+{
+  "fixture": "kalshi-fed.json",
+  "parser": "kalshiMarkets (odds:kalshi)",
+  "output": [
+    {
+      "key": "kalshi:KXFED-27DEC-T5.50",
+      "group": "kalshi:KXFED-27DEC",
+      "question": "Will the upper bound of the federal funds rate be above 5.50% following the Fed's Dec 8, 2027 meeting?",
+      "prob": 22,
+      "url": "https://kalshi.com/markets/kxfed",
+      "fed": true,
+      "venue": "Kalshi"
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+{
+  "fixture": "appstore-finance.json",
+  "parser": "coinbaseRank (appstore)",
+  "output": null
+}

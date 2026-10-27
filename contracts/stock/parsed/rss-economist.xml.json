@@ -1,0 +1,27 @@
+{
+  "fixture": "rss-economist.xml",
+  "parser": "parseFeed (rss:economist)",
+  "output": [
+    {
+      "sourceId": "ddb39558-b501-428a-b2a2-860b1727b410",
+      "title": "Sam Bankman-Fried says he has paid his debts",
+      "summary": "The crypto tycoon speaks with The Economist from prison in California",
+      "url": "https://www.economist.com/finance-and-economics/2026/10/22/sam-bankman-fried-says-he-has-paid-his-debts",
+      "publishedAt": "2026-10-22T15:51:39.000Z"
+    },
+    {
+      "sourceId": "cac404a5-019c-4dcf-ad4c-1ab8e03cdbec",
+      "title": "New research tries to defuse the “China shock”",
+      "summary": "An almighty fight over an influential finding",
+      "url": "https://www.economist.com/finance-and-economics/2026/10/22/new-research-tries-to-defuse-the-china-shock",
+      "publishedAt": "2026-10-22T09:12:40.000Z"
+    },
+    {
+      "sourceId": "eaeb9233-73a4-4825-9a3a-73b707196a18",
+      "title": "Brazil’s weird economy needs serious reform",
+      "summary": "Neither Lula nor Flávio Bolsonaro have the stomach for it",
+      "url": "https://www.economist.com/finance-and-economics/2026/10/22/brazils-weird-economy-needs-serious-reform",
+      "publishedAt": "2026-10-22T09:11:38.000Z"
+    }
+  ]
+}

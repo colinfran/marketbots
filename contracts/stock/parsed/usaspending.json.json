@@ -1,0 +1,28 @@
+{
+  "fixture": "usaspending.json",
+  "parser": "awardItems",
+  "output": [
+    {
+      "sourceId": "CONT_AWD_36C10G26K0298_3600_36C79119D0006_3600",
+      "title": "UNH: Department of Veterans Affairs contract to Optum Public Sector Solutions, Inc. worth $1.1B (36C10G26K0298, signed 2026-09-30)",
+      "summary": "Express Report: R3 Fy26 4th Qtr July",
+      "url": "https://www.usaspending.gov/award/CONT_AWD_36C10G26K0298_3600_36C79119D0006_3600",
+      "publishedAt": "2026-09-30T00:00:00.000Z",
+      "symbols": [
+        "UNH"
+      ],
+      "category": "general",
+      "kind": "filing",
+      "tier": 1,
+      "polarity": 1,
+      "baseSeverity": 45,
+      "meta": {
+        "award_id": "36C10G26K0298",
+        "amount_usd": 1085804853,
+        "agency": "Department of Veterans Affairs",
+        "recipient": "OPTUM PUBLIC SECTOR SOLUTIONS, INC.",
+        "signed": "2026-09-30"
+      }
+    }
+  ]
+}

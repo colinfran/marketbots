@@ -1,0 +1,33 @@
+{
+  "fixture": "rss-nasdaq-aapl.xml",
+  "parser": "taggedFeed for AAPL (persymbol:nasdaq, every ticker tracked)",
+  "output": [
+    {
+      "sourceId": "https://www.nasdaq.com/articles/prediction-3-stocks-will-be-worth-more-apple-5-years-now?time=1793064000",
+      "title": "Prediction: 3 Stocks That Will Be Worth More Than Apple 5 Years From Now",
+      "summary": "Key PointsSpaceX has the potential to see its shares skyrocket on the back of its AI infrastructure growth.",
+      "url": "https://www.nasdaq.com/articles/prediction-3-stocks-will-be-worth-more-apple-5-years-now",
+      "publishedAt": "2026-10-27T01:20:00.000Z"
+    },
+    {
+      "sourceId": "https://www.nasdaq.com/articles/apple-aapl-stock-falls-amid-market-uptick-what-investors-need-know?time=1793047503",
+      "title": "Apple (AAPL) Stock Falls Amid Market Uptick: What Investors Need to Know",
+      "summary": "Apple (AAPL) closed the most recent trading day at $344.02, moving 1.07% from the previous trading session.",
+      "url": "https://www.nasdaq.com/articles/apple-aapl-stock-falls-amid-market-uptick-what-investors-need-know",
+      "publishedAt": "2026-10-26T20:45:03.000Z",
+      "symbols": [
+        "AAPL"
+      ]
+    },
+    {
+      "sourceId": "https://www.nasdaq.com/articles/dow-movers-aapl-honiv-2?time=1793029735",
+      "title": "Dow Movers: AAPL, HONIV",
+      "summary": "In early trading on Monday, shares of Honeywell International topped the list of the day's best performing Dow Jones Industrial Average components, trading up 7.5%.  Year to date, Honeywell International registers a 42.2% gain.\n\nAnd the worst performing Dow component thus far on",
+      "url": "https://www.nasdaq.com/articles/dow-movers-aapl-honiv-2",
+      "publishedAt": "2026-10-26T15:48:55.000Z",
+      "symbols": [
+        "AAPL"
+      ]
+    }
+  ]
+}

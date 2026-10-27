@@ -1,0 +1,98 @@
+{
+  "fixture": "kraken-pairs.json",
+  "parser": "kraken_pairs.entries, then kraken_pairs.describe for each entry as added and as removed",
+  "entries": {
+    "BTC/USD": "online",
+    "ETH/USD": "online",
+    "SOL/USD": "online",
+    "USDT/USD": "online"
+  },
+  "added": [
+    {
+      "sourceId": "added:BTC/USD:online",
+      "title": "Kraken adds BTC/USD trading (status online)",
+      "symbols": [
+        "BTC/USD"
+      ],
+      "category": "listing_major",
+      "polarity": 1,
+      "baseSeverity": 40,
+      "url": "https://status.kraken.com"
+    },
+    {
+      "sourceId": "added:ETH/USD:online",
+      "title": "Kraken adds ETH/USD trading (status online)",
+      "symbols": [
+        "ETH/USD"
+      ],
+      "category": "listing_major",
+      "polarity": 1,
+      "baseSeverity": 40,
+      "url": "https://status.kraken.com"
+    },
+    {
+      "sourceId": "added:SOL/USD:online",
+      "title": "Kraken adds SOL/USD trading (status online)",
+      "symbols": [
+        "SOL/USD"
+      ],
+      "category": "listing_major",
+      "polarity": 1,
+      "baseSeverity": 40,
+      "url": "https://status.kraken.com"
+    },
+    {
+      "sourceId": "added:USDT/USD:online",
+      "title": "Kraken adds USDT/USD trading (status online)",
+      "symbols": [
+        "USDT/USD"
+      ],
+      "category": "listing_major",
+      "polarity": 1,
+      "baseSeverity": 40,
+      "url": "https://status.kraken.com"
+    }
+  ],
+  "removed": [
+    {
+      "sourceId": "removed:BTC/USD",
+      "title": "Kraken no longer lists BTC/USD",
+      "symbols": [
+        "BTC/USD"
+      ],
+      "category": "venue_status",
+      "polarity": -1,
+      "url": "https://status.kraken.com"
+    },
+    {
+      "sourceId": "removed:ETH/USD",
+      "title": "Kraken no longer lists ETH/USD",
+      "symbols": [
+        "ETH/USD"
+      ],
+      "category": "venue_status",
+      "polarity": -1,
+      "url": "https://status.kraken.com"
+    },
+    {
+      "sourceId": "removed:SOL/USD",
+      "title": "Kraken no longer lists SOL/USD",
+      "symbols": [
+        "SOL/USD"
+      ],
+      "category": "venue_status",
+      "polarity": -1,
+      "url": "https://status.kraken.com"
+    },
+    {
+      "sourceId": "removed:USDT/USD",
+      "title": "Kraken no longer lists USDT/USD",
+      "symbols": [
+        "USDT/USD"
+      ],
+      "category": "venue_status",
+      "polarity": -1,
+      "url": "https://status.kraken.com"
+    }
+  ]
+}

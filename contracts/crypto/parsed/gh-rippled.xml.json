@@ -1,0 +1,46 @@
+{
+  "fixture": "gh-rippled.xml",
+  "parser": "parseFeed + gh:rippled.refine",
+  "parsed": [
+    {
+      "sourceId": "tag:github.com,2008:Repository/2724167/3.5.0-rc1",
+      "title": "3.5.0-rc1",
+      "summary": "<p>Body trimmed for the fixture.</p>",
+      "url": "https://github.com/XRPLF/rippled/releases/tag/3.5.0-rc1",
+      "publishedAt": "2026-10-20T12:49:40.000Z"
+    },
+    {
+      "sourceId": "tag:github.com,2008:Repository/2724167/3.4.1",
+      "title": "3.4.1",
+      "summary": "<p>Body trimmed for the fixture.</p>",
+      "url": "https://github.com/XRPLF/rippled/releases/tag/3.4.1",
+      "publishedAt": "2026-10-10T00:04:48.000Z"
+    },
+    {
+      "sourceId": "tag:github.com,2008:Repository/2724167/3.5.0-custom-2",
+      "title": "3.5.0-custom-2",
+      "summary": "<p>Body trimmed for the fixture.</p>",
+      "url": "https://github.com/XRPLF/rippled/releases/tag/3.5.0-custom-2",
+      "publishedAt": "2026-09-29T20:44:49.000Z"
+    }
+  ],
+  "output": [
+    {
+      "sourceId": "tag:github.com,2008:Repository/2724167/3.4.1",
+      "title": "rippled (XRP Ledger) release 3.4.1",
+      "summary": null,
+      "url": "https://github.com/XRPLF/rippled/releases/tag/3.4.1",
+      "publishedAt": "2026-10-10T00:04:48.000Z",
+      "symbols": [
+        "XRP/USD"
+      ],
+      "category": "upgrade",
+      "polarity": 0,
+      "baseSeverity": 20,
+      "meta": {
+        "release": true,
+        "new_line": false
+      }
+    }
+  ]
+}

@@ -1,0 +1,73 @@
+{
+  "fixture": "stocktwits-trending-stocks.json",
+  "parser": "stocktwitsTrendingItems (stocktwits), fresh watcher",
+  "output": [],
+  "observations": {
+    "readings": [
+      {
+        "key": "stocktwits:trending:NVDA",
+        "value": 0,
+        "at": "2026-10-27T15:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "stocktwits:trending:SOFI",
+        "value": 1,
+        "at": "2026-10-27T15:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "stocktwits:trending:GPI",
+        "value": 0,
+        "at": "2026-10-27T15:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "stocktwits:trending:AAPL",
+        "value": 0,
+        "at": "2026-10-27T15:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "stocktwits:trending:TSLA",
+        "value": 0,
+        "at": "2026-10-27T15:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "stocktwits:trending:META",
+        "value": 0,
+        "at": "2026-10-27T15:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "stocktwits:trending:RVI",
+        "value": 0,
+        "at": "2026-10-27T15:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      }
+    ],
+    "rules": {
+      "entry": {
+        "id": "entry",
+        "kind": "level",
+        "abs": 1,
+        "rearmMs": 21600000
+      }
+    }
+  }
+}

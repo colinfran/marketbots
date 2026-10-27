@@ -1,0 +1,30 @@
+{
+  "fixture": "kraken-futures.json",
+  "parser": "krakenFuturesReadings (kraken_futures)",
+  "output": [
+    {
+      "symbol": "BTC/USD",
+      "fundingAnnualPct": 11.936536599999707,
+      "openInterest": 2651.4359,
+      "openInterestUsd": 211502199.24322298
+    },
+    {
+      "symbol": "SOL/USD",
+      "fundingAnnualPct": 29.931372399999706,
+      "openInterest": 230871.27,
+      "openInterestUsd": 23119585.347318012
+    },
+    {
+      "symbol": "DOT/USD",
+      "fundingAnnualPct": -10.930961600000293,
+      "openInterest": 3493472.6,
+      "openInterestUsd": 3481270.1179912817
+    },
+    {
+      "symbol": "ETH/USD",
+      "fundingAnnualPct": 17.36722925000029,
+      "openInterest": 32181.221,
+      "openInterestUsd": 74428920.50370798
+    }
+  ]
+}

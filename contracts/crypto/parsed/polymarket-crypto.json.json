@@ -1,0 +1,5 @@
+{
+  "fixture": "polymarket-crypto.json",
+  "parser": "polymarketMarkets crypto (odds:polymarket)",
+  "output": []
+}

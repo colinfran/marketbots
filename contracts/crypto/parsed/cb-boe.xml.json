@@ -1,0 +1,28 @@
+{
+  "fixture": "cb-boe.xml",
+  "parser": "parseFeed + cb:boe.refine",
+  "parsed": [
+    {
+      "sourceId": "{0186346F-7A47-467D-AC6F-A1590EC12748}",
+      "title": "Regulators unveil plans to simplify Senior Manager and Certification Regime",
+      "summary": "<p>Body trimmed for the fixture.</p>",
+      "url": "https://www.bankofengland.co.uk/news/2026/october/regulators-unveil-plans-to-simplify-senior-manager-and-certification-regime",
+      "publishedAt": "2026-10-22T20:00:00.000Z"
+    },
+    {
+      "sourceId": "{CB8AD149-12AA-4141-8EE0-D4322A4F35CA}",
+      "title": "Minutes of the Securities Lending Committee meeting – September 2026",
+      "summary": "<p>Body trimmed for the fixture.</p>",
+      "url": "https://www.bankofengland.co.uk/minutes/2026/september/securities-lending-committee-meeting-september-2026",
+      "publishedAt": "2026-10-22T15:35:53.000Z"
+    },
+    {
+      "sourceId": "{D75ECC94-7371-4801-A55B-19F9CEF62C13}",
+      "title": "Banknote imagery advisory group minutes – 15 July 2026",
+      "summary": "<p>Body trimmed for the fixture.</p>",
+      "url": "https://www.bankofengland.co.uk/minutes/2026/july/banknote-advisory-minutes-15-july",
+      "publishedAt": "2026-10-16T11:00:00.000Z"
+    }
+  ],
+  "output": []
+}

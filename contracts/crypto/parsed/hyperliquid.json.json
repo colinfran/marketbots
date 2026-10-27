@@ -1,0 +1,90 @@
+{
+  "fixture": "hyperliquid.json",
+  "parser": "hyperliquidReadings + perpItems (hyperliquid), fresh watcher",
+  "readings": [
+    {
+      "symbol": "BTC/USD",
+      "fundingAnnualPct": 6.5706132,
+      "openInterest": 42261.73336,
+      "openInterestUsd": 3374992442.916248
+    },
+    {
+      "symbol": "ETH/USD",
+      "fundingAnnualPct": 2.3265683999999998,
+      "openInterest": 1117165.2422000002,
+      "openInterestUsd": 2586516827.0035505
+    },
+    {
+      "symbol": "SOL/USD",
+      "fundingAnnualPct": 10.95,
+      "openInterest": 5540357.4399999995,
+      "openInterestUsd": 555506154.864576
+    }
+  ],
+  "output": [],
+  "observations": {
+    "readings": [
+      {
+        "key": "hyperliquid:funding:BTC/USD",
+        "value": 6.5706132,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "funding"
+        ]
+      },
+      {
+        "key": "hyperliquid:oi:BTC/USD",
+        "value": 42261.73336,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "oi"
+        ]
+      },
+      {
+        "key": "hyperliquid:funding:ETH/USD",
+        "value": 2.3265683999999998,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "funding"
+        ]
+      },
+      {
+        "key": "hyperliquid:oi:ETH/USD",
+        "value": 1117165.2422000002,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "oi"
+        ]
+      },
+      {
+        "key": "hyperliquid:funding:SOL/USD",
+        "value": 10.95,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "funding"
+        ]
+      },
+      {
+        "key": "hyperliquid:oi:SOL/USD",
+        "value": 5540357.4399999995,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "oi"
+        ]
+      }
+    ],
+    "rules": {
+      "funding": {
+        "id": "funding",
+        "kind": "level",
+        "abs": 100
+      },
+      "oi": {
+        "id": "oi",
+        "kind": "change",
+        "windowMin": 60,
+        "pct": 20
+      }
+    }
+  }
+}

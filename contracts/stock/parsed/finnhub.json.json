@@ -1,0 +1,71 @@
+{
+  "fixture": "finnhub.json",
+  "parser": "finnhub.map",
+  "output": [
+    {
+      "sourceId": "8677064",
+      "title": "Netanyahu touts Trump endorsement on eve of vote, suggests they may restart war on Iran - Reuters",
+      "summary": "Netanyahu touts Trump endorsement on eve of vote, suggests they may restart war on Iran  Reuters",
+      "url": "https://news.google.com/rss/articles/CBMiywFBVV95cUxQUUluTlhFbGtJMWMtZ09ieVhSblh2b0Y4cWpleDVwWUVfUWVyanZIOHFhenFqaWRYZ0U0cEd6MFVjQk5xSXZkWjJNRmM4ZWdPa01KTHBRRjVHRnJPRWtlbGRwWFBNOFJnQ3F5Z2JZbjVFVE5ERUxDdmozN0FPUjRkaUpVNGIwRUFTVXhROU95dC1wby0wX2xzTlg2ODlZeDR2cmM3bHFFaHItbGJ6X3gxT2lwX0FONW11aGtoeWFXQmhmc00tWnlQZEhHQQ?oc=5",
+      "publishedAt": "2026-10-26T23:06:29.000Z",
+      "meta": {
+        "publisher": "Reuters"
+      }
+    },
+    {
+      "sourceId": "8679058",
+      "title": "Average price of gasoline during Trump's term now exceeds Biden's, as midterms loom - Reuters",
+      "summary": "Average price of gasoline during Trump's term now exceeds Biden's, as midterms loom  Reuters",
+      "url": "https://news.google.com/rss/articles/CBMixgFBVV95cUxPRHRWSHRWQUxUU1NzMl9hMEl1YkZQNFUzVlc0MklmZEtfSjZOeFV6UnNuT0ZMdGlQVHBYQmp3RkQ3UHh6MWNSNnJPXzR2VnQ2MU1feEFTa1pKLTdnSmlnQ1d5NVduSUpVbFRBMWNoendaM0tEajRHc3hJbHN2a2h0VHJ4SjlJYmxwYTBtYmVCa1VjZzRsUWFtTHVsMFVlM0JZTFF5X3o4VDJwM2tYT2RaLW1yX2lLd3hZMmdLTHdpQjRhTjVyQ2c?oc=5",
+      "publishedAt": "2026-10-26T22:46:59.000Z",
+      "meta": {
+        "publisher": "Reuters"
+      }
+    },
+    {
+      "sourceId": "8678318",
+      "title": "JetBlue posts bigger loss on fuel costs, but CEO says margins improving",
+      "summary": "JetBlue Airways is in the middle of a plan that aims to cut costs and increase premium revenue.",
+      "url": "https://www.cnbc.com/2026/10/26/jetblue-jblu-3q-2026-earnings.html",
+      "publishedAt": "2026-10-26T20:39:45.000Z",
+      "meta": {
+        "publisher": "CNBC"
+      }
+    }
+  ],
+  "finnhub_company": [
+    {
+      "sourceId": "8677064",
+      "title": "Netanyahu touts Trump endorsement on eve of vote, suggests they may restart war on Iran - Reuters",
+      "summary": "Netanyahu touts Trump endorsement on eve of vote, suggests they may restart war on Iran  Reuters",
+      "url": "https://news.google.com/rss/articles/CBMiywFBVV95cUxQUUluTlhFbGtJMWMtZ09ieVhSblh2b0Y4cWpleDVwWUVfUWVyanZIOHFhenFqaWRYZ0U0cEd6MFVjQk5xSXZkWjJNRmM4ZWdPa01KTHBRRjVHRnJPRWtlbGRwWFBNOFJnQ3F5Z2JZbjVFVE5ERUxDdmozN0FPUjRkaUpVNGIwRUFTVXhROU95dC1wby0wX2xzTlg2ODlZeDR2cmM3bHFFaHItbGJ6X3gxT2lwX0FONW11aGtoeWFXQmhmc00tWnlQZEhHQQ?oc=5",
+      "publishedAt": "2026-10-26T23:06:29.000Z",
+      "symbols": [],
+      "meta": {
+        "publisher": "Reuters"
+      }
+    },
+    {
+      "sourceId": "8679058",
+      "title": "Average price of gasoline during Trump's term now exceeds Biden's, as midterms loom - Reuters",
+      "summary": "Average price of gasoline during Trump's term now exceeds Biden's, as midterms loom  Reuters",
+      "url": "https://news.google.com/rss/articles/CBMixgFBVV95cUxPRHRWSHRWQUxUU1NzMl9hMEl1YkZQNFUzVlc0MklmZEtfSjZOeFV6UnNuT0ZMdGlQVHBYQmp3RkQ3UHh6MWNSNnJPXzR2VnQ2MU1feEFTa1pKLTdnSmlnQ1d5NVduSUpVbFRBMWNoendaM0tEajRHc3hJbHN2a2h0VHJ4SjlJYmxwYTBtYmVCa1VjZzRsUWFtTHVsMFVlM0JZTFF5X3o4VDJwM2tYT2RaLW1yX2lLd3hZMmdLTHdpQjRhTjVyQ2c?oc=5",
+      "publishedAt": "2026-10-26T22:46:59.000Z",
+      "symbols": [],
+      "meta": {
+        "publisher": "Reuters"
+      }
+    },
+    {
+      "sourceId": "8678318",
+      "title": "JetBlue posts bigger loss on fuel costs, but CEO says margins improving",
+      "summary": "JetBlue Airways is in the middle of a plan that aims to cut costs and increase premium revenue.",
+      "url": "https://www.cnbc.com/2026/10/26/jetblue-jblu-3q-2026-earnings.html",
+      "publishedAt": "2026-10-26T20:39:45.000Z",
+      "symbols": [],
+      "meta": {
+        "publisher": "CNBC"
+      }
+    }
+  ]
+}

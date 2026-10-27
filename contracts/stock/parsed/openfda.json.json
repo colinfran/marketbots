@@ -1,0 +1,5 @@
+{
+  "fixture": "openfda.json",
+  "parser": "approvalItems 20261001–20261031",
+  "output": []
+}

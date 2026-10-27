@@ -1,0 +1,4 @@
+<untrusted source="wire-event">
+- rule evaluate | LINK/USD | severity 74: Coinbase lists LINK perpetuals for US customers (T1 coinbase.com, +2 confirmations)
+- rule market_review | market-wide | severity 71: Fed announces an unscheduled press conference at 15:00 UTC
+</untrusted>

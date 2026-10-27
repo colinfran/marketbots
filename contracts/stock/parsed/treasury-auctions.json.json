@@ -1,0 +1,26 @@
+{
+  "fixture": "treasury-auctions.json",
+  "parser": "auctionStats + weakAuctionItem against the fixture as history (as treasuryPoll does)",
+  "stats": [
+    {
+      "btc": 2.59,
+      "dealerPct": 13.000947816765333,
+      "indirectPct": 45.67738055274376
+    },
+    {
+      "btc": 3.07,
+      "dealerPct": 24.094527375612405,
+      "indirectPct": 69.23801652571055
+    },
+    {
+      "btc": 2.41,
+      "dealerPct": 5.527055582897474,
+      "indirectPct": 62.037214273008765
+    }
+  ],
+  "output": [
+    null,
+    null,
+    null
+  ]
+}

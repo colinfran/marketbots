@@ -1,0 +1,27 @@
+{
+  "fixture": "cot.json",
+  "parser": "cot.map",
+  "output": [
+    {
+      "sourceId": "2026-10-20:BTC",
+      "title": "CFTC COT (2026-10-20): CME bitcoin futures, leveraged funds net -4,942 contracts (+902 on the week), asset managers net +2,999 (-643)",
+      "url": "https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm",
+      "symbols": [
+        "BTC/USD"
+      ],
+      "category": "general",
+      "kind": "derivatives",
+      "polarity": 0,
+      "baseSeverity": 20,
+      "meta": {
+        "report_date": "2026-10-20",
+        "contract_units": "(5 Bitcoins)",
+        "open_interest": 21040,
+        "lev_net": -4942,
+        "lev_net_change": 902,
+        "asset_mgr_net": 2999,
+        "asset_mgr_net_change": -643
+      }
+    }
+  ]
+}

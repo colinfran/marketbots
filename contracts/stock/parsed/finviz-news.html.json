@@ -1,0 +1,36 @@
+{
+  "fixture": "finviz-news.html",
+  "parser": "parseFinvizNews at 2026-10-27T03:00Z",
+  "output": [
+    {
+      "title": "Indian shares seen lower as oil stays near six-month high, Fed in focus",
+      "summary": "Indian shares are set to open lower on Tuesday, giving back some of the previous session's gains, as Brent crude prices remained near $115 a barrel and ​investors stayed cautious ahead of the US Federal Reserve's policy decision later ‌this week.",
+      "url": "https://www.reuters.com/world/india/indian-shares-seen-lower-oil-stays-near-six-month-high-fed-focus-2026-10-27/",
+      "publishedAt": "2026-10-27T02:28:00.000Z",
+      "tier": 2,
+      "meta": {
+        "outlet": "reuters"
+      }
+    },
+    {
+      "title": "DoorDash in advanced talks to acquire Instacart in potential $17B deal: report",
+      "summary": null,
+      "url": "https://foxbusiness.com/retail/doordash-advanced-talks-acquire-instacart-potential-17b-deal-report",
+      "publishedAt": "2026-10-27T01:59:00.000Z",
+      "tier": 2,
+      "meta": {
+        "outlet": "fox-business"
+      }
+    },
+    {
+      "title": "On Election Eve, Israeli Opposition Says Netanyahu Must Face Treason Probe",
+      "summary": "On Election Eve, Israeli Opposition Says Netanyahu Must Face Treason Probe\n\n            On the eve of Israel's high pressure legislative elections, the explosive and provocative charge of \"treason\" is being thrown around.Former Israeli Finance Minist...",
+      "url": "https://www.zerohedge.com/geopolitical/election-eve-israeli-opposition-says-netanyahu-must-face-treason-probe",
+      "publishedAt": "2026-10-27T02:35:00.000Z",
+      "tier": 3,
+      "meta": {
+        "outlet": "zero-hedge"
+      }
+    }
+  ]
+}

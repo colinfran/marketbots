@@ -1,0 +1,36 @@
+{
+  "fixture": "ff.json",
+  "parser": "macro_ff.map",
+  "output": [
+    {
+      "sourceId": "Federal Funds Rate|2026-10-28T14:00:00-04:00",
+      "title": "Scheduled: Federal Funds Rate at 2026-10-28T14:00:00-04:00 (forecast 4.00%, previous 4.00%)",
+      "url": "https://www.forexfactory.com/calendar",
+      "publishedAt": null,
+      "category": "macro_release",
+      "kind": "calendar",
+      "marketWide": true,
+      "baseSeverity": 15,
+      "meta": {
+        "event_at": "2026-10-28T18:00:00.000Z",
+        "forecast": "4.00%",
+        "previous": "4.00%"
+      }
+    },
+    {
+      "sourceId": "FOMC Statement|2026-10-28T14:00:00-04:00",
+      "title": "Scheduled: FOMC Statement at 2026-10-28T14:00:00-04:00",
+      "url": "https://www.forexfactory.com/calendar",
+      "publishedAt": null,
+      "category": "macro_release",
+      "kind": "calendar",
+      "marketWide": true,
+      "baseSeverity": 15,
+      "meta": {
+        "event_at": "2026-10-28T18:00:00.000Z",
+        "forecast": null,
+        "previous": null
+      }
+    }
+  ]
+}

@@ -1,0 +1,116 @@
+{
+  "fixture": "openinsider.html",
+  "parser": "parseOpenInsider + openInsiderItems (every ticker watched, fresh clusters)",
+  "trades": [
+    {
+      "ticker": "RVII",
+      "company": "Robinhood Ventures Fund II",
+      "insider": "Whitney Meredith",
+      "role": "director",
+      "type": "buy",
+      "price": 17.75,
+      "shares": 1500,
+      "value": 26625,
+      "tradeDate": "2026-10-23",
+      "filedAt": "2026-10-27T01:53:00.000Z",
+      "url": "http://www.sec.gov/Archives/edgar/data/2131040/000095010326016189/xslF345X03/dp255535_4-whitney.xml"
+    },
+    {
+      "ticker": "GPI",
+      "company": "Group 1 Automotive Inc",
+      "insider": "Conifer Management, L.L.C.",
+      "role": "10% owner",
+      "type": "buy",
+      "price": 242.32,
+      "shares": 100000,
+      "value": 24232209,
+      "tradeDate": "2026-10-22",
+      "filedAt": "2026-10-27T01:00:00.000Z",
+      "url": "http://www.sec.gov/Archives/edgar/data/1031203/000090514826004561/xslF345X03/form4.xml"
+    },
+    {
+      "ticker": "OPTU",
+      "company": "Optimum Communications, Inc.",
+      "insider": "Subin Neil S",
+      "role": "10% owner",
+      "type": "buy",
+      "price": 0.52,
+      "shares": 2228007,
+      "value": 1163551,
+      "tradeDate": "2026-10-22",
+      "filedAt": "2026-10-26T23:42:00.000Z",
+      "url": "http://www.sec.gov/Archives/edgar/data/1702780/000121390026112593/xslF345X03/ownership.xml"
+    }
+  ],
+  "output": [
+    {
+      "sourceId": "RVII:Whitney Meredith:2026-10-23:buy:26625",
+      "title": "RVII: director Whitney Meredith buys $27K of stock at $17.75 (Form 4, traded 2026-10-23)",
+      "url": "http://www.sec.gov/Archives/edgar/data/2131040/000095010326016189/xslF345X03/dp255535_4-whitney.xml",
+      "publishedAt": "2026-10-27T01:53:00.000Z",
+      "symbols": [
+        "RVII"
+      ],
+      "category": "insider_buy",
+      "kind": "filing",
+      "tier": 2,
+      "polarity": 1,
+      "meta": {
+        "insider": true,
+        "insider_name": "Whitney Meredith",
+        "role": "director",
+        "trade": "buy",
+        "value_usd": 26625,
+        "price": 17.75,
+        "shares": 1500,
+        "trade_date": "2026-10-23"
+      }
+    },
+    {
+      "sourceId": "GPI:Conifer Management, L.L.C.:2026-10-22:buy:24232209",
+      "title": "GPI: 10% owner Conifer Management, L.L.C. buys $24.2M of stock at $242.32 (Form 4, traded 2026-10-22)",
+      "url": "http://www.sec.gov/Archives/edgar/data/1031203/000090514826004561/xslF345X03/form4.xml",
+      "publishedAt": "2026-10-27T01:00:00.000Z",
+      "symbols": [
+        "GPI"
+      ],
+      "category": "insider_buy",
+      "kind": "filing",
+      "tier": 2,
+      "polarity": 1,
+      "meta": {
+        "insider": true,
+        "insider_name": "Conifer Management, L.L.C.",
+        "role": "10% owner",
+        "trade": "buy",
+        "value_usd": 24232209,
+        "price": 242.32,
+        "shares": 100000,
+        "trade_date": "2026-10-22"
+      }
+    },
+    {
+      "sourceId": "OPTU:Subin Neil S:2026-10-22:buy:1163551",
+      "title": "OPTU: 10% owner Subin Neil S buys $1.2M of stock at $0.52 (Form 4, traded 2026-10-22)",
+      "url": "http://www.sec.gov/Archives/edgar/data/1702780/000121390026112593/xslF345X03/ownership.xml",
+      "publishedAt": "2026-10-26T23:42:00.000Z",
+      "symbols": [
+        "OPTU"
+      ],
+      "category": "insider_buy",
+      "kind": "filing",
+      "tier": 2,
+      "polarity": 1,
+      "meta": {
+        "insider": true,
+        "insider_name": "Subin Neil S",
+        "role": "10% owner",
+        "trade": "buy",
+        "value_usd": 1163551,
+        "price": 0.52,
+        "shares": 2228007,
+        "trade_date": "2026-10-22"
+      }
+    }
+  ]
+}

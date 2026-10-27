@@ -1,0 +1,66 @@
+{
+  "fixture": "nasdaq-earnings.json",
+  "parser": "earningsItems for 2026-10-27 (every ticker watched)",
+  "output": [
+    {
+      "sourceId": "earnings:V:2026-10-27",
+      "title": "Scheduled: V reports earnings 2026-10-27 after the close (quarter ending Sep/2026), EPS forecast $3.43 from 12 estimates",
+      "url": "https://www.nasdaq.com/market-activity/stocks/v/earnings",
+      "publishedAt": null,
+      "symbols": [
+        "V"
+      ],
+      "category": "earnings",
+      "kind": "calendar",
+      "tier": 2,
+      "polarity": 0,
+      "baseSeverity": 15,
+      "meta": {
+        "event_at": "2026-10-27T20:05:00.000Z",
+        "eps_forecast": "$3.43",
+        "estimates": 12,
+        "time": "time-after-hours"
+      }
+    },
+    {
+      "sourceId": "earnings:KO:2026-10-27",
+      "title": "Scheduled: KO reports earnings 2026-10-27 before the open (quarter ending Sep/2026), EPS forecast $0.87 from 8 estimates",
+      "url": "https://www.nasdaq.com/market-activity/stocks/ko/earnings",
+      "publishedAt": null,
+      "symbols": [
+        "KO"
+      ],
+      "category": "earnings",
+      "kind": "calendar",
+      "tier": 2,
+      "polarity": 0,
+      "baseSeverity": 15,
+      "meta": {
+        "event_at": "2026-10-27T11:00:00.000Z",
+        "eps_forecast": "$0.87",
+        "estimates": 8,
+        "time": "time-pre-market"
+      }
+    },
+    {
+      "sourceId": "earnings:HSBC:2026-10-27",
+      "title": "Scheduled: HSBC reports earnings 2026-10-27 time not announced (quarter ending Sep/2026), EPS forecast $2.13 from 1 estimates",
+      "url": "https://www.nasdaq.com/market-activity/stocks/hsbc/earnings",
+      "publishedAt": null,
+      "symbols": [
+        "HSBC"
+      ],
+      "category": "earnings",
+      "kind": "calendar",
+      "tier": 2,
+      "polarity": 0,
+      "baseSeverity": 15,
+      "meta": {
+        "event_at": "2026-10-27T16:00:00.000Z",
+        "eps_forecast": "$2.13",
+        "estimates": 1,
+        "time": "time-not-supplied"
+      }
+    }
+  ]
+}

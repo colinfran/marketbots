@@ -1,0 +1,23 @@
+{
+  "fixture": "slowmist.html",
+  "parser": "hacks:slowmist.mapHtml",
+  "output": [
+    {
+      "sourceId": "2026-10-14|Pirate Chain",
+      "title": "Pirate Chain hacked: $10,746,000 lost (Transaction Validation Vulnerability)",
+      "summary": "A transaction validation vulnerability in Pirate Chain source code allowed the unauthorized creation of approximately 39.8 million ARRR, increasing the total supply by about 20%. The newly minted funds were transferred into the Sapling shielded pool. NonKYC identified suspicious deposits, restricted the associated accounts, and blocked withdrawals. The exploit combined two validation failures: bypassing the issuance check and incorrect interpretation of the output scripts. dPoW operators suspended notarizations as a precaution, and exchanges/pools were asked to pause operations while a recovery plan is developed.",
+      "url": "https://x.com/PirateChain/status/2110774266123767871",
+      "publishedAt": "2026-10-14T00:00:00.000Z",
+      "symbols": [],
+      "marketWide": true,
+      "category": "exploit",
+      "polarity": -1,
+      "meta": {
+        "target": "Pirate Chain",
+        "loss_usd": 10746000,
+        "attack_method": "Transaction Validation Vulnerability",
+        "reported_by": "slowmist"
+      }
+    }
+  ]
+}

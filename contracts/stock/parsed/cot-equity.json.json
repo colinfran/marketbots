@@ -1,0 +1,72 @@
+{
+  "fixture": "cot-equity.json",
+  "parser": "cot.map",
+  "output": [
+    {
+      "sourceId": "2026-10-20:ES",
+      "title": "CFTC COT (2026-10-20): E-mini S&P 500, leveraged funds net -371,245 contracts (+37,481 on the week), asset managers net +901,377 (-14,458)",
+      "url": "https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm",
+      "symbols": [],
+      "marketWide": true,
+      "category": "general",
+      "kind": "derivatives",
+      "tier": 1,
+      "polarity": 0,
+      "baseSeverity": 20,
+      "meta": {
+        "metric": "cot:ES",
+        "report_date": "2026-10-20",
+        "contract_units": "($50 X S&P 500 INDEX)",
+        "open_interest": 1935470,
+        "lev_net": -371245,
+        "lev_net_change": 37481,
+        "asset_mgr_net": 901377,
+        "asset_mgr_net_change": -14458
+      }
+    },
+    {
+      "sourceId": "2026-10-20:NQ",
+      "title": "CFTC COT (2026-10-20): Nasdaq-100, leveraged funds net -7,688 contracts (+14,203 on the week), asset managers net +78,767 (+2,365)",
+      "url": "https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm",
+      "symbols": [],
+      "marketWide": true,
+      "category": "general",
+      "kind": "derivatives",
+      "tier": 1,
+      "polarity": 0,
+      "baseSeverity": 20,
+      "meta": {
+        "metric": "cot:NQ",
+        "report_date": "2026-10-20",
+        "contract_units": "(NASDAQ 100 INDEX X $20)",
+        "open_interest": 285882,
+        "lev_net": -7688,
+        "lev_net_change": 14203,
+        "asset_mgr_net": 78767,
+        "asset_mgr_net_change": 2365
+      }
+    },
+    {
+      "sourceId": "2026-10-20:VX",
+      "title": "CFTC COT (2026-10-20): VIX futures, leveraged funds net -20,890 contracts (-21,995 on the week), asset managers net -57,459 (+19,836)",
+      "url": "https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm",
+      "symbols": [],
+      "marketWide": true,
+      "category": "general",
+      "kind": "derivatives",
+      "tier": 1,
+      "polarity": 0,
+      "baseSeverity": 20,
+      "meta": {
+        "metric": "cot:VX",
+        "report_date": "2026-10-20",
+        "contract_units": "($1000 X INDEX)",
+        "open_interest": 433778,
+        "lev_net": -20890,
+        "lev_net_change": -21995,
+        "asset_mgr_net": -57459,
+        "asset_mgr_net_change": 19836
+      }
+    }
+  ]
+}

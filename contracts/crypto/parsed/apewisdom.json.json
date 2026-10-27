@@ -1,0 +1,184 @@
+{
+  "fixture": "apewisdom.json",
+  "parser": "apewisdomItems (apewisdom), fresh watcher",
+  "output": [],
+  "observations": {
+    "readings": [
+      {
+        "key": "apewisdom:BTC",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "jump"
+        ]
+      },
+      {
+        "key": "apewisdom:ETH",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "jump"
+        ]
+      },
+      {
+        "key": "apewisdom:SOL",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "jump"
+        ]
+      },
+      {
+        "key": "apewisdom:XRP",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "jump"
+        ]
+      },
+      {
+        "key": "apewisdom:DOGE",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "jump"
+        ]
+      },
+      {
+        "key": "apewisdom:ADA",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "jump"
+        ]
+      },
+      {
+        "key": "apewisdom:LINK",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "jump"
+        ]
+      },
+      {
+        "key": "apewisdom:AVAX",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "jump"
+        ]
+      },
+      {
+        "key": "apewisdom:LTC",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "jump"
+        ]
+      },
+      {
+        "key": "apewisdom:DOT",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "jump"
+        ]
+      },
+      {
+        "key": "apewisdom:INIT",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "jump"
+        ]
+      },
+      {
+        "key": "apewisdom:EGLD",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "jump"
+        ]
+      },
+      {
+        "key": "apewisdom:FET",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "jump"
+        ]
+      },
+      {
+        "key": "apewisdom:XAI",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "jump"
+        ]
+      },
+      {
+        "key": "apewisdom:CAMP",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "jump"
+        ]
+      },
+      {
+        "key": "apewisdom:ZK",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "jump"
+        ]
+      },
+      {
+        "key": "apewisdom:AXIS",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "jump"
+        ]
+      },
+      {
+        "key": "apewisdom:CTR",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "jump"
+        ]
+      },
+      {
+        "key": "apewisdom:GAS",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "jump"
+        ]
+      },
+      {
+        "key": "apewisdom:CSPR",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "jump"
+        ]
+      },
+      {
+        "key": "apewisdom:XEC",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "jump"
+        ]
+      }
+    ],
+    "rules": {
+      "jump": {
+        "id": "jump",
+        "kind": "level",
+        "abs": 3
+      }
+    }
+  }
+}

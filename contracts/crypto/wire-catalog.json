@@ -1,0 +1,877 @@
+{
+  "count": 80,
+  "sources": [
+    {
+      "id": "kraken_pairs",
+      "kind": "diff",
+      "url": "https://api.kraken.com/0/public/AssetPairs",
+      "interval_s": 60,
+      "tier": 1,
+      "wire_kind": "venue",
+      "default_enabled": true,
+      "functions": [
+        "entries",
+        "describe"
+      ]
+    },
+    {
+      "id": "status_kraken",
+      "kind": "statuspage",
+      "url": "https://status.kraken.com/api/v2/summary.json",
+      "interval_s": 60,
+      "tier": 1,
+      "wire_kind": "venue",
+      "default_enabled": true
+    },
+    {
+      "id": "status_coinbase",
+      "kind": "statuspage",
+      "url": "https://status.coinbase.com/api/v2/summary.json",
+      "interval_s": 60,
+      "tier": 1,
+      "wire_kind": "venue",
+      "default_enabled": true
+    },
+    {
+      "id": "rss:coindesk",
+      "kind": "rss",
+      "url": "https://www.coindesk.com/arc/outboundfeeds/rss",
+      "interval_s": 60,
+      "tier": 2,
+      "default_enabled": true
+    },
+    {
+      "id": "rss:theblock",
+      "kind": "rss",
+      "url": "https://www.theblock.co/rss.xml",
+      "interval_s": 60,
+      "tier": 2,
+      "default_enabled": true
+    },
+    {
+      "id": "rss:decrypt",
+      "kind": "rss",
+      "url": "https://decrypt.co/feed",
+      "interval_s": 60,
+      "tier": 2,
+      "default_enabled": true
+    },
+    {
+      "id": "rss:cointelegraph",
+      "kind": "rss",
+      "url": "https://cointelegraph.com/rss",
+      "interval_s": 60,
+      "tier": 2,
+      "default_enabled": true
+    },
+    {
+      "id": "rss:blockworks",
+      "kind": "rss",
+      "url": "https://blockworks.com/feed",
+      "interval_s": 60,
+      "tier": 2,
+      "default_enabled": true
+    },
+    {
+      "id": "rss:thedefiant",
+      "kind": "rss",
+      "url": "https://thedefiant.io/api/feed",
+      "interval_s": 90,
+      "tier": 2,
+      "default_enabled": true
+    },
+    {
+      "id": "finnhub_crypto",
+      "kind": "json",
+      "url": "https://finnhub.io/api/v1/news?category=crypto",
+      "interval_s": 60,
+      "tier": 2,
+      "key_env": "FINNHUB_API_KEY",
+      "default_enabled": true,
+      "headers": {
+        "X-Finnhub-Token": "<FINNHUB_API_KEY>"
+      },
+      "functions": [
+        "map"
+      ]
+    },
+    {
+      "id": "gov:sec_press",
+      "kind": "rss",
+      "url": "https://www.sec.gov/news/pressreleases.rss",
+      "interval_s": 120,
+      "tier": 1,
+      "category_hint": "regulatory_action",
+      "key_env": "SEC_USER_AGENT",
+      "default_enabled": true
+    },
+    {
+      "id": "gov:sec_litigation",
+      "kind": "rss",
+      "url": "https://www.sec.gov/enforcement-litigation/litigation-releases/rss",
+      "interval_s": 300,
+      "tier": 1,
+      "category_hint": "regulatory_action",
+      "key_env": "SEC_USER_AGENT",
+      "default_enabled": true
+    },
+    {
+      "id": "gov:sec_suspensions",
+      "kind": "rss",
+      "url": "https://www.sec.gov/enforcement-litigation/trading-suspensions/rss",
+      "interval_s": 300,
+      "tier": 1,
+      "category_hint": "regulatory_action",
+      "key_env": "SEC_USER_AGENT",
+      "default_enabled": true
+    },
+    {
+      "id": "gov:cftc",
+      "kind": "rss",
+      "url": "https://www.cftc.gov/RSS/RSSGP/rssgp.xml",
+      "interval_s": 180,
+      "tier": 1,
+      "category_hint": "regulatory_action",
+      "default_enabled": true
+    },
+    {
+      "id": "gov:doj",
+      "kind": "json",
+      "url": "https://www.justice.gov/api/v1/press_releases.json?pagesize=25&sort=date&direction=DESC",
+      "interval_s": 300,
+      "tier": 1,
+      "category_hint": "regulatory_action",
+      "default_enabled": true,
+      "functions": [
+        "map"
+      ]
+    },
+    {
+      "id": "gov:ofac",
+      "kind": "rss",
+      "url": "https://ofac.treasury.gov/rss.xml",
+      "interval_s": 300,
+      "tier": 1,
+      "category_hint": "regulatory_action",
+      "default_enabled": true
+    },
+    {
+      "id": "gov:fed",
+      "kind": "rss",
+      "url": "https://www.federalreserve.gov/feeds/press_all.xml",
+      "interval_s": 120,
+      "tier": 1,
+      "category_hint": "macro_release",
+      "default_enabled": true
+    },
+    {
+      "id": "gov:whitehouse",
+      "kind": "rss",
+      "url": "https://www.whitehouse.gov/presidential-actions/feed/",
+      "interval_s": 300,
+      "tier": 1,
+      "category_hint": "regulatory_action",
+      "default_enabled": true
+    },
+    {
+      "id": "gnews",
+      "kind": "rss",
+      "url": "https://news.google.com/rss",
+      "symbols": "universe",
+      "interval_s": 30,
+      "tier": 3,
+      "default_enabled": true,
+      "url_for": {
+        "BTC/USD": "https://news.google.com/rss/search?q=bitcoin+when:1h&hl=en-US&gl=US&ceid=US:en",
+        "SOL/USD": "https://news.google.com/rss/search?q=solana%20crypto+when:1h&hl=en-US&gl=US&ceid=US:en"
+      }
+    },
+    {
+      "id": "truth_social",
+      "kind": "rss",
+      "url": "https://www.trumpstruth.org/feed",
+      "interval_s": 60,
+      "tier": 1,
+      "default_enabled": true,
+      "note": "trumpstruth.org mirror of Truth Social; the posts are primary statements"
+    },
+    {
+      "id": "macro_ff",
+      "kind": "json",
+      "url": "https://nfs.faireconomy.media/ff_calendar_thisweek.json",
+      "interval_s": 300,
+      "tier": 3,
+      "wire_kind": "calendar",
+      "category_hint": "macro_release",
+      "default_enabled": true,
+      "note": "ForexFactory weekly calendar (unofficial): times and forecasts for high-impact USD events",
+      "functions": [
+        "map"
+      ]
+    },
+    {
+      "id": "coinbase_products",
+      "kind": "diff",
+      "url": "https://api.exchange.coinbase.com/products",
+      "interval_s": 120,
+      "tier": 1,
+      "wire_kind": "venue",
+      "default_enabled": true,
+      "note": "Coinbase Exchange products: a new USD product for a universe asset is a listing; a status change is venue status",
+      "functions": [
+        "entries",
+        "describe"
+      ]
+    },
+    {
+      "id": "status_solana",
+      "kind": "statuspage",
+      "url": "https://status.solana.com/api/v2/summary.json",
+      "interval_s": 120,
+      "tier": 1,
+      "wire_kind": "venue",
+      "default_enabled": true,
+      "note": "Solana network status (titles name Solana, so items are tagged SOL)"
+    },
+    {
+      "id": "blog:kraken",
+      "kind": "rss",
+      "url": "https://blog.kraken.com/feed",
+      "interval_s": 120,
+      "tier": 1,
+      "wire_kind": "venue",
+      "default_enabled": true
+    },
+    {
+      "id": "binance_announcements",
+      "kind": "telegram",
+      "interval_s": 60,
+      "tier": 1,
+      "wire_kind": "venue",
+      "default_enabled": true,
+      "channel": "binance_announcements",
+      "note": "Binance's official announcements channel (t.me/s preview): listings, delistings and notices that name a universe asset",
+      "functions": [
+        "refine"
+      ]
+    },
+    {
+      "id": "telegram:WatcherGuru",
+      "kind": "telegram",
+      "interval_s": 30,
+      "tier": 3,
+      "default_enabled": true,
+      "channel": "WatcherGuru"
+    },
+    {
+      "id": "telegram:whale_alert_io",
+      "kind": "telegram",
+      "interval_s": 30,
+      "tier": 3,
+      "default_enabled": true,
+      "channel": "whale_alert_io"
+    },
+    {
+      "id": "telegram:wublockchainenglish",
+      "kind": "telegram",
+      "interval_s": 30,
+      "tier": 3,
+      "default_enabled": true,
+      "channel": "wublockchainenglish"
+    },
+    {
+      "id": "telegram:cointelegraph",
+      "kind": "telegram",
+      "interval_s": 30,
+      "tier": 3,
+      "default_enabled": true,
+      "channel": "cointelegraph"
+    },
+    {
+      "id": "bluesky",
+      "kind": "custom",
+      "interval_s": 60,
+      "tier": 3,
+      "wire_kind": "news",
+      "default_enabled": true,
+      "note": "Bluesky Jetstream, 12 curated accounts",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "newsletter:glassnode",
+      "kind": "rss",
+      "url": "https://research.glassnode.com/rss/",
+      "interval_s": 900,
+      "tier": 3,
+      "default_enabled": true
+    },
+    {
+      "id": "newsletter:unchained",
+      "kind": "rss",
+      "url": "https://unchainedcrypto.com/feed/",
+      "interval_s": 900,
+      "tier": 3,
+      "default_enabled": true
+    },
+    {
+      "id": "newsletter:bankless",
+      "kind": "rss",
+      "url": "https://www.bankless.com/rss/feed",
+      "interval_s": 900,
+      "tier": 3,
+      "default_enabled": true
+    },
+    {
+      "id": "newsletter:defiant",
+      "kind": "rss",
+      "url": "https://thedefiant.io/api/feed",
+      "interval_s": 900,
+      "tier": 3,
+      "default_enabled": true
+    },
+    {
+      "id": "newsletter:arthur_hayes",
+      "kind": "rss",
+      "url": "https://cryptohayes.substack.com/feed",
+      "interval_s": 900,
+      "tier": 3,
+      "default_enabled": true
+    },
+    {
+      "id": "gh:bitcoin",
+      "kind": "rss",
+      "url": "https://github.com/bitcoin/bitcoin/releases.atom",
+      "interval_s": 900,
+      "tier": 1,
+      "category_hint": "upgrade",
+      "default_enabled": true,
+      "functions": [
+        "refine"
+      ]
+    },
+    {
+      "id": "gh:geth",
+      "kind": "rss",
+      "url": "https://github.com/ethereum/go-ethereum/releases.atom",
+      "interval_s": 900,
+      "tier": 1,
+      "category_hint": "upgrade",
+      "default_enabled": true,
+      "functions": [
+        "refine"
+      ]
+    },
+    {
+      "id": "gh:agave",
+      "kind": "rss",
+      "url": "https://github.com/anza-xyz/agave/releases.atom",
+      "interval_s": 900,
+      "tier": 1,
+      "category_hint": "upgrade",
+      "default_enabled": true,
+      "functions": [
+        "refine"
+      ]
+    },
+    {
+      "id": "gh:rippled",
+      "kind": "rss",
+      "url": "https://github.com/XRPLF/rippled/releases.atom",
+      "interval_s": 900,
+      "tier": 1,
+      "category_hint": "upgrade",
+      "default_enabled": true,
+      "functions": [
+        "refine"
+      ]
+    },
+    {
+      "id": "gh:cardano",
+      "kind": "rss",
+      "url": "https://github.com/IntersectMBO/cardano-node/releases.atom",
+      "interval_s": 900,
+      "tier": 1,
+      "category_hint": "upgrade",
+      "default_enabled": true,
+      "functions": [
+        "refine"
+      ]
+    },
+    {
+      "id": "cb:ecb",
+      "kind": "rss",
+      "url": "https://www.ecb.europa.eu/rss/press.html",
+      "interval_s": 300,
+      "tier": 1,
+      "wire_kind": "macro",
+      "category_hint": "macro_release",
+      "default_enabled": true,
+      "functions": [
+        "refine"
+      ]
+    },
+    {
+      "id": "cb:boe",
+      "kind": "rss",
+      "url": "https://www.bankofengland.co.uk/rss/news",
+      "interval_s": 300,
+      "tier": 1,
+      "wire_kind": "macro",
+      "category_hint": "macro_release",
+      "default_enabled": true,
+      "functions": [
+        "refine"
+      ]
+    },
+    {
+      "id": "cb:boj",
+      "kind": "rss",
+      "url": "https://www.boj.or.jp/en/rss/whatsnew.xml",
+      "interval_s": 300,
+      "tier": 1,
+      "wire_kind": "macro",
+      "category_hint": "macro_release",
+      "default_enabled": true,
+      "functions": [
+        "refine"
+      ]
+    },
+    {
+      "id": "fedreg",
+      "kind": "json",
+      "url": "https://www.federalregister.gov/api/v1/documents.json?conditions%5Bterm%5D=%22digital%20asset%22&order=newest&per_page=20",
+      "interval_s": 600,
+      "tier": 1,
+      "category_hint": "regulatory_action",
+      "default_enabled": true,
+      "note": "Federal Register API (keyless): documents matching \"digital asset\"; paperwork notices dropped, the lexicon keeps those whose title is about crypto",
+      "functions": [
+        "map"
+      ]
+    },
+    {
+      "id": "fedreg:stablecoin",
+      "kind": "json",
+      "url": "https://www.federalregister.gov/api/v1/documents.json?conditions%5Bterm%5D=stablecoin&order=newest&per_page=20",
+      "interval_s": 600,
+      "tier": 1,
+      "category_hint": "regulatory_action",
+      "default_enabled": true,
+      "note": "Federal Register API (keyless): documents matching stablecoin; paperwork notices dropped, the lexicon keeps those whose title is about crypto",
+      "functions": [
+        "map"
+      ]
+    },
+    {
+      "id": "macro_actuals",
+      "kind": "custom",
+      "url": "https://api.bls.gov/publicAPI/v2/timeseries/data/",
+      "interval_s": 30,
+      "tier": 1,
+      "wire_kind": "macro",
+      "category_hint": "macro_release",
+      "key_env": "BLS_API_KEY",
+      "default_enabled": true,
+      "note": "BLS API v2 (key) and FRED (key) polled only in CPI and jobs release windows",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "rss:bitcoinmagazine",
+      "kind": "rss",
+      "url": "https://bitcoinmagazine.com/.rss/full/",
+      "interval_s": 90,
+      "tier": 2,
+      "default_enabled": true
+    },
+    {
+      "id": "rss:cryptoslate",
+      "kind": "rss",
+      "url": "https://cryptoslate.com/feed/",
+      "interval_s": 90,
+      "tier": 2,
+      "default_enabled": true
+    },
+    {
+      "id": "rss:dlnews",
+      "kind": "rss",
+      "url": "https://www.dlnews.com/arc/outboundfeeds/rss/",
+      "interval_s": 90,
+      "tier": 2,
+      "default_enabled": true
+    },
+    {
+      "id": "rss:protos",
+      "kind": "rss",
+      "url": "https://protos.com/feed/",
+      "interval_s": 120,
+      "tier": 2,
+      "default_enabled": true
+    },
+    {
+      "id": "rss:unchained",
+      "kind": "rss",
+      "url": "https://unchainedcrypto.com/feed/",
+      "interval_s": 120,
+      "tier": 2,
+      "default_enabled": true
+    },
+    {
+      "id": "rss:cryptobriefing",
+      "kind": "rss",
+      "url": "https://cryptobriefing.com/feed/",
+      "interval_s": 120,
+      "tier": 3,
+      "default_enabled": true
+    },
+    {
+      "id": "rss:beincrypto",
+      "kind": "rss",
+      "url": "https://beincrypto.com/feed/",
+      "interval_s": 120,
+      "tier": 3,
+      "default_enabled": true
+    },
+    {
+      "id": "rss:bitcoinist",
+      "kind": "rss",
+      "url": "https://bitcoinist.com/feed/",
+      "interval_s": 120,
+      "tier": 3,
+      "default_enabled": true
+    },
+    {
+      "id": "rss:newsbtc",
+      "kind": "rss",
+      "url": "https://www.newsbtc.com/feed/",
+      "interval_s": 120,
+      "tier": 3,
+      "default_enabled": true
+    },
+    {
+      "id": "rss:dailyhodl",
+      "kind": "rss",
+      "url": "https://dailyhodl.com/feed/",
+      "interval_s": 120,
+      "tier": 3,
+      "default_enabled": true
+    },
+    {
+      "id": "gdelt",
+      "kind": "json",
+      "url": "https://api.gdeltproject.org/api/v2/doc/doc?query=(bitcoin%20OR%20ethereum%20OR%20solana%20OR%20xrp%20OR%20dogecoin%20OR%20cardano%20OR%20chainlink%20OR%20avax%20OR%20litecoin%20OR%20polkadot)%20sourcelang%3Aenglish&mode=artlist&format=json&maxrecords=75&timespan=1h&sort=datedesc",
+      "interval_s": 300,
+      "tier": 3,
+      "default_enabled": true,
+      "note": "GDELT DOC 2.0 (keyless; one request per 5 s, enforced by the limiter; often answers 429 or times out, so it degrades and backs off): global breadth and confirmation, minutes to hours behind",
+      "functions": [
+        "map"
+      ]
+    },
+    {
+      "id": "cot",
+      "kind": "json",
+      "url": "https://publicreporting.cftc.gov/resource/gpe5-46if.json?$where=market_and_exchange_names%20like%20'%25CHICAGO%20MERCANTILE%20EXCHANGE'%20AND%20(contract_market_name%20%3D%20'BITCOIN'%20OR%20contract_market_name%20like%20'ETHER%25')&$order=report_date_as_yyyy_mm_dd%20DESC&$limit=8",
+      "interval_s": 3600,
+      "tier": 1,
+      "wire_kind": "derivatives",
+      "default_enabled": true,
+      "note": "CFTC Traders in Financial Futures (Socrata, keyless): CME bitcoin and ether futures; one item per report and market",
+      "functions": [
+        "map"
+      ]
+    },
+    {
+      "id": "kraken_futures",
+      "kind": "custom",
+      "url": "https://futures.kraken.com/derivatives/api/v3/tickers",
+      "interval_s": 60,
+      "tier": 1,
+      "wire_kind": "derivatives",
+      "default_enabled": true,
+      "note": "Kraken Futures public tickers: PF_ perp funding (hourly) and open interest",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "hyperliquid",
+      "kind": "custom",
+      "url": "https://api.hyperliquid.xyz/info",
+      "interval_s": 60,
+      "tier": 1,
+      "wire_kind": "derivatives",
+      "default_enabled": true,
+      "note": "Hyperliquid info API metaAndAssetCtxs: funding (hourly) and open interest for every perp",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "deribit",
+      "kind": "custom",
+      "url": "https://www.deribit.com/api/v2/public",
+      "interval_s": 60,
+      "tier": 1,
+      "wire_kind": "derivatives",
+      "default_enabled": true,
+      "note": "Deribit public API: DVOL (BTC, ETH) and perpetual funding",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "coinalyze",
+      "kind": "custom",
+      "url": "https://api.coinalyze.net/v1",
+      "interval_s": 60,
+      "tier": 2,
+      "wire_kind": "derivatives",
+      "key_env": "COINALYZE_API_KEY",
+      "default_enabled": true,
+      "note": "Coinalyze (free key, ~40 calls/min): funding and 5-minute liquidations for Binance and Bybit USDT perps, 20 symbols per call (4 calls a minute)",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "defillama",
+      "kind": "custom",
+      "url": "https://api.llama.fi/v2/chains",
+      "interval_s": 300,
+      "tier": 1,
+      "default_enabled": true,
+      "note": "DefiLlama chain TVL: a drop ≥ tvl_drop_pct within an hour (exploit signal)",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "defillama:stables",
+      "kind": "custom",
+      "url": "https://stablecoins.llama.fi/stablecoins?includePrices=false",
+      "interval_s": 1800,
+      "tier": 1,
+      "default_enabled": true,
+      "note": "DefiLlama stablecoins: USDT/USDC supply change over 24 h",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "odds:polymarket",
+      "kind": "custom",
+      "url": "https://gamma-api.polymarket.com/events?closed=false&order=volume24hr&ascending=false",
+      "interval_s": 300,
+      "tier": 2,
+      "wire_kind": "sentiment",
+      "default_enabled": true,
+      "note": "Polymarket Gamma: Fed-rate and crypto-policy markets (no price bets), liquidity ≥ $25K and ≥ $5K traded in 24 h",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "odds:kalshi",
+      "kind": "custom",
+      "url": "https://api.elections.kalshi.com/trade-api/v2/markets",
+      "interval_s": 120,
+      "tier": 2,
+      "wire_kind": "sentiment",
+      "default_enabled": true,
+      "note": "Kalshi KXFED for the next two FOMC meetings (open interest ≥ 10K contracts, spread ≤ 10¢)",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "chain:btc_fees",
+      "kind": "custom",
+      "url": "https://mempool.space/api/v1/fees/recommended",
+      "interval_s": 300,
+      "tier": 1,
+      "wire_kind": "venue",
+      "default_enabled": true,
+      "note": "mempool.space recommended fees: spikes ≥ 5× the 24-hour median and ≥ 20 sat/vB",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "chain:eth_gas",
+      "kind": "custom",
+      "url": "https://api.etherscan.io/v2/api?chainid=1&module=gastracker&action=gasoracle",
+      "interval_s": 300,
+      "tier": 1,
+      "wire_kind": "venue",
+      "key_env": "ETHERSCAN_API_KEY",
+      "default_enabled": true,
+      "note": "Etherscan gas oracle (free key): spikes ≥ 5× the 24-hour median and ≥ 2 gwei",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "apewisdom",
+      "kind": "custom",
+      "url": "https://apewisdom.io/api/v1.0/filter/all-crypto/page/1",
+      "interval_s": 900,
+      "tier": 3,
+      "wire_kind": "sentiment",
+      "default_enabled": true,
+      "note": "ApeWisdom (keyless): Reddit/4chan mention counts for crypto",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "stocktwits",
+      "kind": "custom",
+      "url": "https://api.stocktwits.com/api/2",
+      "interval_s": 180,
+      "tier": 3,
+      "wire_kind": "sentiment",
+      "default_enabled": true,
+      "note": "StockTwits public API: trending symbols, and the BTC.X/ETH.X message streams",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "coingecko",
+      "kind": "custom",
+      "url": "https://api.coingecko.com/api/v3/search/trending",
+      "interval_s": 900,
+      "tier": 3,
+      "wire_kind": "sentiment",
+      "key_env": "COINGECKO_API_KEY",
+      "default_enabled": true,
+      "note": "CoinGecko Demo: trending coins every 15 min (≈ 2,900 calls a month)",
+      "headers": {
+        "x-cg-demo-api-key": "<COINGECKO_API_KEY>"
+      },
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "appstore",
+      "kind": "custom",
+      "url": "https://rss.marketingtools.apple.com/api/v2/us/apps/top-free/100/apps.json",
+      "interval_s": 3600,
+      "tier": 3,
+      "wire_kind": "sentiment",
+      "default_enabled": true,
+      "note": "Apple App Store charts (keyless): Coinbase's rank in the US top free apps and in Finance",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "wikipedia",
+      "kind": "custom",
+      "url": "https://wikimedia.org/api/rest_v1/metrics/pageviews",
+      "interval_s": 21600,
+      "tier": 3,
+      "wire_kind": "sentiment",
+      "default_enabled": true,
+      "note": "Wikimedia pageviews API (keyless): daily views of each universe asset's article",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "fng",
+      "kind": "custom",
+      "url": "https://api.alternative.me/fng/?limit=1",
+      "interval_s": 3600,
+      "tier": 3,
+      "wire_kind": "sentiment",
+      "default_enabled": true,
+      "note": "alternative.me Crypto Fear & Greed (daily)",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "korea:upbit",
+      "kind": "diff",
+      "url": "https://api.upbit.com/v1/market/all?is_details=true",
+      "interval_s": 300,
+      "tier": 1,
+      "wire_kind": "venue",
+      "default_enabled": true,
+      "note": "Upbit Open API (keyless): KRW markets with investment warnings and caution flags, diffed",
+      "functions": [
+        "entries",
+        "describe"
+      ]
+    },
+    {
+      "id": "korea:bithumb",
+      "kind": "json",
+      "url": "https://api.bithumb.com/v1/notices?count=20",
+      "interval_s": 60,
+      "tier": 1,
+      "wire_kind": "venue",
+      "default_enabled": true,
+      "note": "Bithumb public API (keyless, 1 request/s per IP): notices for universe coins; promotions dropped",
+      "functions": [
+        "map"
+      ]
+    },
+    {
+      "id": "korea:bithumb_alerts",
+      "kind": "json",
+      "url": "https://api.bithumb.com/v1/market/virtual_asset_warning",
+      "interval_s": 300,
+      "tier": 1,
+      "wire_kind": "venue",
+      "default_enabled": true,
+      "note": "Bithumb public API (keyless): per-market trading alerts for universe coins",
+      "functions": [
+        "map"
+      ]
+    },
+    {
+      "id": "hacks:slowmist",
+      "kind": "html",
+      "url": "https://hacked.slowmist.io/",
+      "interval_s": 900,
+      "tier": 2,
+      "wire_kind": "news",
+      "default_enabled": true,
+      "note": "SlowMist Hacked database (plain HTML): incidents naming a universe asset, or $10M+ lost (market-wide)",
+      "functions": [
+        "mapHtml"
+      ]
+    },
+    {
+      "id": "anomaly",
+      "kind": "custom",
+      "interval_s": 60,
+      "tier": 1,
+      "wire_kind": "anomaly",
+      "default_enabled": true,
+      "note": "Kraken 1-minute bars and stablecoin tickers",
+      "functions": [
+        "create"
+      ]
+    },
+    {
+      "id": "coinbase_ws",
+      "kind": "custom",
+      "interval_s": 30,
+      "tier": 1,
+      "wire_kind": "sentiment",
+      "default_enabled": true,
+      "note": "Coinbase Exchange public WebSocket ticker (BTC-USD, ETH-USD) vs Kraken: the Coinbase premium",
+      "functions": [
+        "create"
+      ]
+    }
+  ]
+}

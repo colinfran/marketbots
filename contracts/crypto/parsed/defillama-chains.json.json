@@ -1,0 +1,59 @@
+{
+  "fixture": "defillama-chains.json",
+  "parser": "chainReadings + tvlItems (defillama), fresh watcher",
+  "readings": [
+    {
+      "chain": "Base",
+      "symbol": null,
+      "tvl": 6034778991.257093
+    },
+    {
+      "chain": "Ethereum",
+      "symbol": "ETH/USD",
+      "tvl": 48331278857.142654
+    },
+    {
+      "chain": "Solana",
+      "symbol": "SOL/USD",
+      "tvl": 5713801800.416853
+    }
+  ],
+  "output": [],
+  "observations": {
+    "readings": [
+      {
+        "key": "defillama:tvl:Base",
+        "value": 6034778991.257093,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "drop"
+        ]
+      },
+      {
+        "key": "defillama:tvl:Ethereum",
+        "value": 48331278857.142654,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "drop"
+        ]
+      },
+      {
+        "key": "defillama:tvl:Solana",
+        "value": 5713801800.416853,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "drop"
+        ]
+      }
+    ],
+    "rules": {
+      "drop": {
+        "id": "drop",
+        "kind": "change",
+        "windowMin": 60,
+        "pct": 15,
+        "direction": "down"
+      }
+    }
+  }
+}

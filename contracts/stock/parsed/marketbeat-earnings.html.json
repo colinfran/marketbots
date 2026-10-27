@@ -1,0 +1,132 @@
+{
+  "fixture": "marketbeat-earnings.html",
+  "parser": "parseEarnings + earningsItems (every ticker tracked, 2026-10-27T14:00Z)",
+  "rows": [
+    {
+      "ticker": "KOF",
+      "company": "Coca Cola Femsa",
+      "time": "Morning",
+      "epsEstimate": 1.89,
+      "epsActual": 1.72,
+      "revenueEstimate": "$4.31 billion",
+      "revenueActual": "$4.41 billion",
+      "url": "https://www.marketbeat.com/earnings/reports/2026-10-27-coca-cola-femsa-sab-de-cv-stock/",
+      "day": "2026-10-27"
+    },
+    {
+      "ticker": "HSBC",
+      "company": "HSBC",
+      "time": "Morning",
+      "epsEstimate": 2.2,
+      "epsActual": 2.1,
+      "revenueEstimate": "$18.98 billion",
+      "revenueActual": "$18.68 billion",
+      "url": "https://www.marketbeat.com/earnings/reports/2026-10-27-hsbc-holdings-plc-stock/",
+      "day": "2026-10-27"
+    },
+    {
+      "ticker": "AB",
+      "company": "AllianceBernstein",
+      "time": "Morning",
+      "epsEstimate": 0.86,
+      "epsActual": null,
+      "revenueEstimate": "$913.83 million",
+      "revenueActual": null,
+      "url": "https://www.marketbeat.com/earnings/reports/2026-10-27-alliancebernstein-holding-lp-stock/",
+      "day": "2026-10-27"
+    },
+    {
+      "ticker": "AAT",
+      "company": "American Assets Trust",
+      "time": "Afternoon",
+      "epsEstimate": 0.1,
+      "epsActual": null,
+      "revenueEstimate": "$111.87 million",
+      "revenueActual": null,
+      "url": "https://www.marketbeat.com/earnings/reports/2026-10-27-american-assets-trust-inc-stock/",
+      "day": "2026-10-27"
+    },
+    {
+      "ticker": "AMT",
+      "company": "American Tower",
+      "time": "Morning",
+      "epsEstimate": 1.64,
+      "epsActual": null,
+      "revenueEstimate": "$2.76 billion",
+      "revenueActual": null,
+      "url": "https://www.marketbeat.com/earnings/reports/2026-10-27-american-tower-co-reit-stock/",
+      "day": "2026-10-27"
+    },
+    {
+      "ticker": "AIT",
+      "company": "Applied Industrial Technologies",
+      "time": "Morning",
+      "epsEstimate": 2.89,
+      "epsActual": null,
+      "revenueEstimate": "$1.29 billion",
+      "revenueActual": null,
+      "url": "https://www.marketbeat.com/earnings/reports/2026-10-27-applied-industrial-technologies-inc-stock/",
+      "day": "2026-10-27"
+    },
+    {
+      "ticker": "ACGL",
+      "company": "Arch Capital Group",
+      "time": "Afternoon",
+      "epsEstimate": 2.31,
+      "epsActual": null,
+      "revenueEstimate": "$4.06 billion",
+      "revenueActual": null,
+      "url": "https://www.marketbeat.com/earnings/reports/2026-10-27-arch-capital-group-ltd-stock/",
+      "day": "2026-10-27"
+    },
+    {
+      "ticker": "ARCC",
+      "company": "Ares Capital",
+      "time": "Morning",
+      "epsEstimate": 0.48,
+      "epsActual": null,
+      "revenueEstimate": "$776.34 million",
+      "revenueActual": null,
+      "url": "https://www.marketbeat.com/earnings/reports/2026-10-27-ares-capital-co-stock/",
+      "day": "2026-10-27"
+    }
+  ],
+  "output": [
+    {
+      "sourceId": "2026-10-27|KOF|eps",
+      "title": "KOF: Coca Cola Femsa reports EPS $1.72 vs $1.89 expected (miss by 9.0%); revenue $4.41 billion vs $4.31 billion expected",
+      "url": "https://www.marketbeat.com/earnings/reports/2026-10-27-coca-cola-femsa-sab-de-cv-stock/",
+      "symbols": [
+        "KOF"
+      ],
+      "category": "earnings",
+      "polarity": -1,
+      "meta": {
+        "eps_estimate": 1.89,
+        "eps_actual": 1.72,
+        "eps_surprise_pct": -9,
+        "revenue_estimate": "$4.31 billion",
+        "revenue_actual": "$4.41 billion",
+        "release_time": "Morning"
+      }
+    },
+    {
+      "sourceId": "2026-10-27|HSBC|eps",
+      "title": "HSBC: HSBC reports EPS $2.10 vs $2.20 expected (miss by 4.5%); revenue $18.68 billion vs $18.98 billion expected",
+      "url": "https://www.marketbeat.com/earnings/reports/2026-10-27-hsbc-holdings-plc-stock/",
+      "symbols": [
+        "HSBC"
+      ],
+      "category": "earnings",
+      "polarity": -1,
+      "meta": {
+        "eps_estimate": 2.2,
+        "eps_actual": 2.1,
+        "eps_surprise_pct": -4.5,
+        "revenue_estimate": "$18.98 billion",
+        "revenue_actual": "$18.68 billion",
+        "release_time": "Morning"
+      }
+    }
+  ]
+}

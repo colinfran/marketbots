@@ -1,0 +1,73 @@
+{
+  "fixture": "tradestie-wsb.json",
+  "parser": "tradestieItems (wsb:tradestie), fresh watcher",
+  "output": [],
+  "observations": {
+    "readings": [
+      {
+        "key": "tradestie:NVDA",
+        "value": 0,
+        "at": "2026-10-27T15:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "tradestie:SOFI",
+        "value": 0,
+        "at": "2026-10-27T15:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "tradestie:GPI",
+        "value": 0,
+        "at": "2026-10-27T15:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "tradestie:AAPL",
+        "value": 0,
+        "at": "2026-10-27T15:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "tradestie:TSLA",
+        "value": 0,
+        "at": "2026-10-27T15:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "tradestie:META",
+        "value": 0,
+        "at": "2026-10-27T15:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "tradestie:RVI",
+        "value": 0,
+        "at": "2026-10-27T15:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      }
+    ],
+    "rules": {
+      "entry": {
+        "id": "entry",
+        "kind": "level",
+        "abs": 1,
+        "rearmMs": 21600000
+      }
+    }
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "fixture": "apewisdom-stocks.json",
+  "parser": "apewisdomItems (wsb:apewisdom), fresh watcher",
+  "output": [],
+  "observations": {
+    "readings": [
+      {
+        "key": "apewisdom:AAPL",
+        "value": 0,
+        "at": "2026-10-27T15:00:00.000Z",
+        "rules": [
+          "jump"
+        ]
+      },
+      {
+        "key": "apewisdom:META",
+        "value": 0,
+        "at": "2026-10-27T15:00:00.000Z",
+        "rules": [
+          "jump"
+        ]
+      },
+      {
+        "key": "apewisdom:NVDA",
+        "value": 0,
+        "at": "2026-10-27T15:00:00.000Z",
+        "rules": [
+          "jump"
+        ]
+      },
+      {
+        "key": "apewisdom:SOFI",
+        "value": 0,
+        "at": "2026-10-27T15:00:00.000Z",
+        "rules": [
+          "jump"
+        ]
+      },
+      {
+        "key": "apewisdom:TSLA",
+        "value": 6.75,
+        "at": "2026-10-27T15:00:00.000Z",
+        "rules": [
+          "jump"
+        ]
+      }
+    ],
+    "rules": {
+      "jump": {
+        "id": "jump",
+        "kind": "level",
+        "abs": 3
+      }
+    }
+  }
+}

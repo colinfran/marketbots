@@ -1,0 +1,13 @@
+{
+  "fixture": "coinalyze-markets.json",
+  "parser": "coinalyzeSymbols (coinalyze) for the universe bases",
+  "output": {
+    "BTC": [
+      "BTCUSDT.6",
+      "BTCUSDT_PERP.A"
+    ],
+    "ETH": [
+      "ETHUSDT_PERP.A"
+    ]
+  }
+}

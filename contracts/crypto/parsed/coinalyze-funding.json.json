@@ -1,0 +1,13 @@
+{
+  "fixture": "coinalyze-funding.json",
+  "parser": "coinalyzeFunding (coinalyze), symbols from coinalyze-markets.json",
+  "by_symbol": {
+    "BTCUSDT.6": "BTC",
+    "BTCUSDT_PERP.A": "BTC",
+    "ETHUSDT_PERP.A": "ETH"
+  },
+  "output": {
+    "BTC": 10.95,
+    "ETH": 9.807915
+  }
+}

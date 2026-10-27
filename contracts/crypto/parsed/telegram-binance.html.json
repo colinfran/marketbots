@@ -1,0 +1,49 @@
+{
+  "fixture": "telegram-binance.html",
+  "parser": "parseTelegram + binance_announcements.refine",
+  "parsed": [
+    {
+      "sourceId": "binance_announcements/9068",
+      "title": "Notice of Removal of Spot Trading Pairs - 2026-10-23 Based on our most recent reviews, Binance will remove and cease trading on the following spot trading pairs: - At 2026-10-23 03:00 (UTC): BONK/FDUSD, JUP/FDUSD, LDO/FDUSD and WAL/BNB 👉🏻 Learn more here",
+      "summary": null,
+      "url": "https://t.me/binance_announcements/9068",
+      "publishedAt": "2026-10-20T08:31:52.000Z",
+      "meta": {
+        "channel": "binance_announcements"
+      }
+    },
+    {
+      "sourceId": "binance_announcements/9075",
+      "title": "Spot Trading Tournament Season 7: Trade to Share Up to 400 BNB Token Vouchers Binance is thrilled to launch a Spot Trading Tournament where eligible users will have a chance to share a total prize pool of 400 BNB in token vouchers! In addition, Binance is introducing a “Sprint R…",
+      "summary": "Spot Trading Tournament Season 7: Trade to Share Up to 400 BNB Token Vouchers Binance is thrilled to launch a Spot Trading Tournament where eligible users will have a chance to share a total prize pool of 400 BNB in token vouchers! In addition, Binance is introducing a “Sprint Reward” for a limited period – the more you trade, the higher your extra rewards! 👉🏻 Learn more here Disclaimer: This is not available for users in the EEA.",
+      "url": "https://t.me/binance_announcements/9075",
+      "publishedAt": "2026-10-21T09:01:49.000Z",
+      "meta": {
+        "channel": "binance_announcements"
+      }
+    },
+    {
+      "sourceId": "binance_announcements/9086",
+      "title": "Wallet Maintenance for Ethereum Network (ETH) - 2026-10-28 Binance will perform wallet maintenance for Ethereum Network (ETH) at 2026-10-28 06:00 (UTC). To support the wallet maintenance, deposits and withdrawals on Ethereum Network (ETH) will be suspended starting from 2026-10-…",
+      "summary": "Wallet Maintenance for Ethereum Network (ETH) - 2026-10-28 Binance will perform wallet maintenance for Ethereum Network (ETH) at 2026-10-28 06:00 (UTC). To support the wallet maintenance, deposits and withdrawals on Ethereum Network (ETH) will be suspended starting from 2026-10-28 05:55 (UTC), and be resumed when the maintenance is complete. The maintenance will take about one hour. 👉🏻 Learn more here",
+      "url": "https://t.me/binance_announcements/9086",
+      "publishedAt": "2026-10-27T02:01:41.000Z",
+      "meta": {
+        "channel": "binance_announcements"
+      }
+    }
+  ],
+  "output": [
+    {
+      "sourceId": "binance_announcements/9068",
+      "title": "Notice of Removal of Spot Trading Pairs - 2026-10-23 Based on our most recent reviews, Binance will remove and cease trading on the following spot trading pairs: - At 2026-10-23 03:00 (UTC): BONK/FDUSD, JUP/FDUSD, LDO/FDUSD and WAL/BNB 👉🏻 Learn more here",
+      "summary": null,
+      "url": "https://t.me/binance_announcements/9068",
+      "publishedAt": "2026-10-20T08:31:52.000Z",
+      "meta": {
+        "channel": "binance_announcements"
+      },
+      "marketWide": false
+    }
+  ]
+}

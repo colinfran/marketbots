@@ -1,0 +1,20 @@
+{
+  "fixture": "rss-dlnews.xml",
+  "parser": "parseFeed (rss:dlnews)",
+  "output": [
+    {
+      "sourceId": "https://www.dlnews.com/articles/regulation/bank-of-russia-clears-crypto-exchangers-sberbank-and-vtb/",
+      "title": "Bank of Russia clears 17 crypto exchangers as Sberbank and VTB ready retail trading",
+      "summary": "<p>Body trimmed for the fixture.</p>",
+      "url": "https://www.dlnews.com/articles/regulation/bank-of-russia-clears-crypto-exchangers-sberbank-and-vtb/",
+      "publishedAt": "2026-10-22T23:20:00.000Z"
+    },
+    {
+      "sourceId": "https://www.dlnews.com/articles/markets/securitize-shares-fall-38percent-since-solana-stock-token-launch-or-dl-news/",
+      "title": "Securitize shares slide 38% since it put Apple and Nvidia stock on Solana",
+      "summary": "<p>Body trimmed for the fixture.</p>",
+      "url": "https://www.dlnews.com/articles/markets/securitize-shares-fall-38percent-since-solana-stock-token-launch-or-dl-news/",
+      "publishedAt": "2026-10-22T18:18:21.000Z"
+    }
+  ]
+}

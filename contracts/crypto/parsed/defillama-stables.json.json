@@ -1,0 +1,44 @@
+{
+  "fixture": "defillama-stables.json",
+  "parser": "stableReadings + stableItems (defillama:stables), fresh watcher",
+  "readings": [
+    {
+      "symbol": "USDT",
+      "supply": 181852590580.49893,
+      "change": -375147022.9091797
+    },
+    {
+      "symbol": "USDC",
+      "supply": 71206923630.52644,
+      "change": -457576938.9807129
+    }
+  ],
+  "output": [],
+  "observations": {
+    "readings": [
+      {
+        "key": "defillama:supply24h:USDT",
+        "value": -375147022.9091797,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "flow"
+        ]
+      },
+      {
+        "key": "defillama:supply24h:USDC",
+        "value": -457576938.9807129,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "flow"
+        ]
+      }
+    ],
+    "rules": {
+      "flow": {
+        "id": "flow",
+        "kind": "level",
+        "abs": 1000000000
+      }
+    }
+  }
+}

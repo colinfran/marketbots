@@ -1,0 +1,12 @@
+{
+  "fixture": "fda-adcomm.json",
+  "parser": "upcomingMeetings (next 7 days)",
+  "output": [
+    {
+      "start": "2026-10-30T12:30:00.000Z",
+      "title": "October 30, 2026: Dermatologic and Ophthalmic Drugs Advisory Committee Meeting Announcement",
+      "path": "/advisory-committees/advisory-committee-calendar/october-30-2026-dermatologic-and-ophthalmic-drugs-advisory-committee-meeting-announcement-10302026",
+      "center": "Center for Drug Evaluation and Research"
+    }
+  ]
+}

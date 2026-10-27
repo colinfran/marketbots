@@ -1,0 +1,5 @@
+{
+  "fixture": "fda-adcomm-meeting.html",
+  "parser": "agendaSponsor",
+  "output": "Sydnexis"
+}

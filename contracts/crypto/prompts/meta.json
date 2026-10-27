@@ -1,0 +1,231 @@
+{
+  "prompt_version": "crypto-v4",
+  "seed_prompt_version": "crypto-seed-v1",
+  "seed_owner_lean": "55% BTC/USD, 35% ETH/USD, 10% SOL/USD",
+  "regime": {
+    "label": "risk_on_trend",
+    "btc_trend": "up",
+    "btc_vol_pct": 42.7,
+    "breadth_pct": 100,
+    "notes": [
+      "100% of the universe trades above its 4h EMA50"
+    ]
+  },
+  "event_candidates": [
+    {
+      "instrument": "LINK/USD",
+      "symbol": "LINK/USD",
+      "strategy": "event_driven",
+      "score": 74,
+      "signal": "News engine (evaluate, severity 74): Coinbase lists LINK perpetuals for US customers (T1 coinbase.com, +2 confirmations). Verify before acting.",
+      "features": {
+        "price": 18.234,
+        "ret_24h_pct": 6.82,
+        "ret_7d_pct": 3.1,
+        "rsi14_1h": 74.1,
+        "rsi14_4h": 63.5,
+        "atr_pct_1h": 1.174,
+        "trend_4h": "flat",
+        "trend_1d": "flat",
+        "spread_bps": 2.2,
+        "move_zscore_24h": 1.62,
+        "volume_ratio_24h": 2.46
+      },
+      "stop_hint": 17.806,
+      "target_hint": 19.304000000000002
+    }
+  ],
+  "seed_candidates": [
+    {
+      "instrument": "BTC/USD",
+      "symbol": "BTC/USD",
+      "strategy": "daily_trend",
+      "score": 50,
+      "signal": "One-time seed candidate (50-day above the 200-day, price above the 200-day; 30d 9.84%).",
+      "features": {
+        "price": 112480.5,
+        "ret_24h_pct": 2.91,
+        "ret_7d_pct": 5.37,
+        "rsi14_1h": 64.2,
+        "rsi14_4h": 61.8,
+        "atr_pct_1h": 0.544,
+        "trend_4h": "up",
+        "trend_1d": "up",
+        "spread_bps": 0.4,
+        "move_zscore_24h": 1.3,
+        "volume_ratio_24h": 1.38
+      },
+      "stop_hint": 104435.3322375,
+      "target_hint": 136616.0032875
+    },
+    {
+      "instrument": "ETH/USD",
+      "symbol": "ETH/USD",
+      "strategy": "daily_trend",
+      "score": 50,
+      "signal": "One-time seed candidate (50-day above the 200-day, price above the 200-day; 30d 6.41%).",
+      "features": {
+        "price": 4012.35,
+        "ret_24h_pct": 4.12,
+        "ret_7d_pct": 7.9,
+        "rsi14_1h": 69.4,
+        "rsi14_4h": 66.1,
+        "atr_pct_1h": 0.783,
+        "trend_4h": "up",
+        "trend_1d": "up",
+        "spread_bps": 1.2,
+        "move_zscore_24h": 1.41,
+        "volume_ratio_24h": 1.71
+      },
+      "stop_hint": 3615.7292024999997,
+      "target_hint": 5202.2123925000005
+    },
+    {
+      "instrument": "LINK/USD",
+      "symbol": "LINK/USD",
+      "strategy": "daily_trend",
+      "score": 50,
+      "signal": "One-time seed candidate (50-day above the 200-day, price above the 200-day; 30d -4.75%).",
+      "features": {
+        "price": 18.234,
+        "ret_24h_pct": 6.82,
+        "ret_7d_pct": 3.1,
+        "rsi14_1h": 74.1,
+        "rsi14_4h": 63.5,
+        "atr_pct_1h": 1.174,
+        "trend_4h": "flat",
+        "trend_1d": "flat",
+        "spread_bps": 2.2,
+        "move_zscore_24h": 1.62,
+        "volume_ratio_24h": 2.46
+      },
+      "stop_hint": 16.045920000000002,
+      "target_hint": 24.79824
+    }
+  ],
+  "dossier": {
+    "items": [
+      "w-eth-treasury",
+      "w-btc-etf",
+      "w-btc-anomaly",
+      "w-fed",
+      "w-sol-outage",
+      "w-fng"
+    ],
+    "unexplained": [
+      "w-btc-anomaly"
+    ],
+    "unconfirmed": [
+      "w-eth-treasury"
+    ],
+    "calendar": [
+      "18:00Z FOMC rate decision (federalreserve.gov)",
+      "12:30Z GDP (Advance Estimate), 3rd Quarter 2026 (bea.gov)",
+      "12:30Z PCE (September 2026) (bea.gov)",
+      "12:30Z US Core PCE Price Index m/m"
+    ],
+    "urls": [
+      "https://www.coindesk.com/markets/2026/10/27/eth-treasury",
+      "https://www.theblock.co/post/bitcoin-etf-inflows-fourth-day",
+      "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261027a.htm",
+      "https://status.solana.com/incidents/abc123",
+      "https://alternative.me/crypto/fear-and-greed-index/"
+    ],
+    "id_by_url": {
+      "https://www.coindesk.com/markets/2026/10/27/eth-treasury": "w-eth-treasury",
+      "https://www.theblock.co/post/bitcoin-etf-inflows-fourth-day": "w-btc-etf",
+      "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261027a.htm": "w-fed",
+      "https://status.solana.com/incidents/abc123": "w-sol-outage",
+      "https://alternative.me/crypto/fear-and-greed-index/": "w-fng"
+    },
+    "rows": [
+      {
+        "id": "w-eth-treasury",
+        "at": "2026-10-27T07:58:00.000Z",
+        "source": "finnhub_crypto",
+        "tier": 2,
+        "category": "treasury_buy",
+        "title": "Treasury firm says it added 40,000 ETH to its balance sheet",
+        "url": "https://www.coindesk.com/markets/2026/10/27/eth-treasury",
+        "severity": 62,
+        "symbols": [
+          "ETH/USD"
+        ]
+      },
+      {
+        "id": "w-btc-etf",
+        "at": "2026-10-27T08:12:00.000Z",
+        "source": "rss:theblock",
+        "tier": 2,
+        "category": "etf_decision",
+        "title": "Bitcoin ETFs log fourth straight day of inflows as BTC tops $112,000",
+        "url": "https://www.theblock.co/post/bitcoin-etf-inflows-fourth-day",
+        "severity": 58,
+        "symbols": [
+          "BTC/USD"
+        ]
+      },
+      {
+        "id": "w-btc-anomaly",
+        "at": "2026-10-27T13:31:00.000Z",
+        "source": "anomaly",
+        "tier": 1,
+        "category": "price_shock",
+        "title": "BTC/USD 1-minute move +0.9% (z 4.6) on 3.2× volume",
+        "url": null,
+        "severity": 52,
+        "symbols": [
+          "BTC/USD"
+        ]
+      },
+      {
+        "id": "w-fed",
+        "at": "2026-10-27T12:02:00.000Z",
+        "source": "gov:fed",
+        "tier": 1,
+        "category": "macro_release",
+        "title": "Federal Reserve Board announces the agenda for the October FOMC press conference",
+        "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261027a.htm",
+        "severity": 41,
+        "symbols": []
+      },
+      {
+        "id": "w-sol-outage",
+        "at": "2026-10-27T03:20:00.000Z",
+        "source": "status_solana",
+        "tier": 1,
+        "category": "venue_outage",
+        "title": "Solana: Degraded RPC performance (resolved)",
+        "url": "https://status.solana.com/incidents/abc123",
+        "severity": 34,
+        "symbols": [
+          "SOL/USD"
+        ]
+      },
+      {
+        "id": "w-fng",
+        "at": "2026-10-27T00:05:00.000Z",
+        "source": "fng",
+        "tier": 3,
+        "category": "sentiment_spike",
+        "title": "Crypto Fear & Greed index enters Extreme Greed: 78",
+        "url": "https://alternative.me/crypto/fear-and-greed-index/",
+        "severity": 22,
+        "symbols": []
+      }
+    ],
+    "to_row": {
+      "id": "w-btc-etf",
+      "at": "2026-10-27T08:12:00.000Z",
+      "source": "rss:theblock",
+      "tier": 2,
+      "category": "etf_decision",
+      "title": "Bitcoin ETFs log fourth straight day of inflows as BTC tops $112,000",
+      "url": "https://www.theblock.co/post/bitcoin-etf-inflows-fourth-day",
+      "severity": 58,
+      "symbols": [
+        "BTC/USD"
+      ]
+    }
+  }
+}

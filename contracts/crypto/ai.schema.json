@@ -1,0 +1,366 @@
+{
+  "enums": {
+    "evidence_kinds": [
+      "fact",
+      "sourced_claim",
+      "estimate",
+      "speculation"
+    ],
+    "uncertainty": [
+      "low",
+      "medium",
+      "high"
+    ],
+    "priced_in": [
+      "not_priced",
+      "partially",
+      "fully",
+      "unknown"
+    ],
+    "regimes": [
+      "risk_on_trend",
+      "risk_off_trend",
+      "range",
+      "high_volatility",
+      "unknown"
+    ],
+    "actions": [
+      "buy",
+      "hold",
+      "reduce",
+      "close",
+      "no_trade"
+    ]
+  },
+  "limits": {
+    "max_horizon_hours": 2160,
+    "seed_max_allocations": 4,
+    "seed_min_horizon_hours": 168
+  },
+  "crypto_report": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "market_read": {
+        "type": "object",
+        "properties": {
+          "regime": {
+            "type": "string",
+            "enum": [
+              "risk_on_trend",
+              "risk_off_trend",
+              "range",
+              "high_volatility",
+              "unknown"
+            ]
+          },
+          "summary": {
+            "type": "string",
+            "description": "2-3 sentences on the crypto market right now."
+          },
+          "confidence": {
+            "type": "number",
+            "description": "0-100 confidence in this read."
+          }
+        },
+        "required": [
+          "regime",
+          "summary",
+          "confidence"
+        ]
+      },
+      "decisions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "symbol": {
+              "type": "string",
+              "description": "Pair exactly as listed, e.g. BTC/USD."
+            },
+            "action": {
+              "type": "string",
+              "enum": [
+                "buy",
+                "hold",
+                "reduce",
+                "close",
+                "no_trade"
+              ],
+              "description": "CANDIDATES (not held): buy or no_trade. HELD positions: hold, reduce or close. no_trade is a normal, often correct answer."
+            },
+            "conviction": {
+              "type": "number",
+              "description": "0-100: how strongly the evidence supports the action. It is NOT a probability."
+            },
+            "uncertainty": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high"
+              ]
+            },
+            "p_target_first": {
+              "description": "BUY only: probability 0-1 that take_profit is hit before stop_loss. A random walk gives stop_distance / (stop_distance + target_distance); deviate from that only as far as the evidence justifies. null otherwise.",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "stop_loss": {
+              "description": "BUY: stop price below the current price. HELD: a new stop price, or null to keep the current one.",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "take_profit": {
+              "description": "BUY: target price above the current price. HELD: a new target, or null to keep it.",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "horizon_hours": {
+              "type": "number",
+              "description": "Expected holding period in hours (1-2160). When it elapses the position is reviewed, not sold."
+            },
+            "size_pct_of_max": {
+              "description": "BUY only: 10-100, the share of the maximum position size the risk engine allows. Size down when uncertain. null otherwise.",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "reduce_pct": {
+              "description": "REDUCE only: % of the position to sell (10-90); the rest stays open with its stop and target. null otherwise.",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "priced_in": {
+              "type": "string",
+              "enum": [
+                "not_priced",
+                "partially",
+                "fully",
+                "unknown"
+              ],
+              "description": "How much of the thesis or catalyst the price already reflects."
+            },
+            "thesis": {
+              "type": "string",
+              "description": "2-3 sentences: why this action, why now. Cite numbers from CONTEXT or RESEARCH."
+            },
+            "bull_evidence": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "claim": {
+                    "type": "string",
+                    "description": "One concrete statement, with numbers and dates where possible."
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "fact",
+                      "sourced_claim",
+                      "estimate",
+                      "speculation"
+                    ],
+                    "description": "fact = verifiable data (exchange numbers from CONTEXT, official announcements). sourced_claim = reported by a source in RESEARCH. estimate = your own quantitative estimate. speculation = plausible but unverified."
+                  },
+                  "source_url": {
+                    "description": "A URL that appears in RESEARCH and supports the claim, or null. Never invent URLs.",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "as_of": {
+                    "description": "When the information was published or observed (ISO date/time), or null.",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "claim",
+                  "kind",
+                  "source_url",
+                  "as_of"
+                ]
+              },
+              "description": "1-5 items for upside."
+            },
+            "bear_evidence": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "claim": {
+                    "type": "string",
+                    "description": "One concrete statement, with numbers and dates where possible."
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "fact",
+                      "sourced_claim",
+                      "estimate",
+                      "speculation"
+                    ],
+                    "description": "fact = verifiable data (exchange numbers from CONTEXT, official announcements). sourced_claim = reported by a source in RESEARCH. estimate = your own quantitative estimate. speculation = plausible but unverified."
+                  },
+                  "source_url": {
+                    "description": "A URL that appears in RESEARCH and supports the claim, or null. Never invent URLs.",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "as_of": {
+                    "description": "When the information was published or observed (ISO date/time), or null.",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "claim",
+                  "kind",
+                  "source_url",
+                  "as_of"
+                ]
+              },
+              "description": "1-5 counterarguments and downside risks. Always include at least one."
+            },
+            "risks": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "1-4 key risk factors: event risk, liquidity, correlation with other holdings."
+            },
+            "invalidation": {
+              "type": "string",
+              "description": "The specific price level or event that proves the thesis wrong."
+            }
+          },
+          "required": [
+            "symbol",
+            "action",
+            "conviction",
+            "uncertainty",
+            "p_target_first",
+            "stop_loss",
+            "take_profit",
+            "horizon_hours",
+            "size_pct_of_max",
+            "reduce_pct",
+            "priced_in",
+            "thesis",
+            "bull_evidence",
+            "bear_evidence",
+            "risks",
+            "invalidation"
+          ]
+        },
+        "description": "Exactly one decision per CANDIDATE and per HELD position listed. Nothing else."
+      },
+      "data_gaps": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Missing, stale or contradictory information that lowered confidence."
+      },
+      "notification": {
+        "type": "string",
+        "description": "One-line summary for the activity feed, max 160 characters."
+      }
+    },
+    "required": [
+      "market_read",
+      "decisions",
+      "data_gaps",
+      "notification"
+    ]
+  },
+  "seed_allocation": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "allocations": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "symbol": {
+              "type": "string",
+              "description": "Pair exactly as listed in SEED CANDIDATES, e.g. BTC/USD."
+            },
+            "weight_pct": {
+              "type": "number",
+              "description": "% of the seed amount for this pair (1-100). Weights across allocations sum to at most 100; anything left stays in cash."
+            },
+            "conviction": {
+              "type": "number",
+              "description": "0-100: how strongly the evidence supports this pair as a long-term core holding. It is NOT a probability."
+            },
+            "thesis": {
+              "type": "string",
+              "description": "2-3 sentences: why this is a good long-term core holding now. Cite numbers from CONTEXT or RESEARCH."
+            },
+            "invalidation": {
+              "type": "string",
+              "description": "The specific price level or event that would prove the long-term thesis wrong."
+            },
+            "stop_loss": {
+              "description": "Stop price below the current price at a daily level (the hint is 2.5 daily ATR), or null to use the hint.",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "take_profit": {
+              "description": "Target price above the current price, or null to use the hint (3R).",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "horizon_hours": {
+              "type": "number",
+              "description": "Expected holding period in hours (168-2160). When it elapses the position is reviewed, not sold."
+            }
+          },
+          "required": [
+            "symbol",
+            "weight_pct",
+            "conviction",
+            "thesis",
+            "invalidation",
+            "stop_loss",
+            "take_profit",
+            "horizon_hours"
+          ]
+        },
+        "description": "1-4 long-term core holdings."
+      },
+      "rationale": {
+        "type": "string",
+        "description": "3-5 sentences on the allocation as a whole: why these pairs, why these weights, and the macro backdrop."
+      }
+    },
+    "required": [
+      "allocations",
+      "rationale"
+    ]
+  }
+}

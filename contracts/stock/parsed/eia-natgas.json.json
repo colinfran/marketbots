@@ -1,0 +1,40 @@
+{
+  "fixture": "eia-natgas.json",
+  "parser": "eiaValues + eiaItem (natgas, no forecast)",
+  "values": [
+    {
+      "period": "2026-10-16",
+      "value": 3644
+    },
+    {
+      "period": "2026-10-09",
+      "value": 3567
+    },
+    {
+      "period": "2026-10-02",
+      "value": 3500
+    }
+  ],
+  "output": {
+    "sourceId": "natgas:2026-10-16",
+    "title": "EIA natural gas storage +77.0 Bcf to 3644 Bcf in the week to Oct 16 (prior week +67.0 Bcf)",
+    "url": "https://ir.eia.gov/ngs/ngs.html",
+    "publishedAt": "2026-10-27T15:00:00.000Z",
+    "symbols": [],
+    "marketWide": true,
+    "category": "macro_release",
+    "kind": "macro",
+    "tier": 1,
+    "polarity": 0,
+    "baseSeverity": 30,
+    "meta": {
+      "metric": "eia:natgas",
+      "period": "2026-10-16",
+      "level": 3644,
+      "change": 77,
+      "prior_change": 67,
+      "forecast": null,
+      "surprise": null
+    }
+  }
+}

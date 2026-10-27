@@ -1,0 +1,10 @@
+{
+  "fixture": "wikipedia.json",
+  "parser": "pageviewRatio (wikipedia)",
+  "output": {
+    "at": 1792886400000,
+    "views": 2044,
+    "median": 2153,
+    "ratio": 0.9493729679516953
+  }
+}

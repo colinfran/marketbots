@@ -1,0 +1,27 @@
+{
+  "fixture": "rss-wsj-markets.xml",
+  "parser": "parseFeed (rss:wsj_markets)",
+  "output": [
+    {
+      "sourceId": "lc-wsj-stock-market-today-dow-sp-500-nasdaq-10-26-2026",
+      "title": "Stock Market News, Oct. 26, 2026: Tech Shares Rally After Anthropic Files for Historic IPO",
+      "summary": "Documents set up Claude provider to go public next month",
+      "url": "https://www.wsj.com/livecoverage/stock-market-today-dow-sp-500-nasdaq-10-26-2026?mod=rss_markets_main",
+      "publishedAt": "2026-10-26T08:24:19.000Z"
+    },
+    {
+      "sourceId": "WP-WSJ-0004009408",
+      "title": "Broadcom CEO Intervened to Seal $63 Billion Anthropic Debt Deal",
+      "summary": "The deal, announced on Monday, is the biggest ever to raise money for AI infrastructure.",
+      "url": "https://www.wsj.com/finance/broadcom-ceo-intervened-to-seal-63-billion-anthropic-debt-deal-c807754f?mod=rss_markets_main",
+      "publishedAt": "2026-10-27T01:09:00.000Z"
+    },
+    {
+      "sourceId": "WP-WSJ-0003992186",
+      "title": "The ‘Buy, Borrow and Die’ Wealth Strategy Has Become a $5 Trillion Market",
+      "summary": "A Deloitte study found a booming market in stock-based loans to billionaires—and the lesser rich.",
+      "url": "https://www.wsj.com/finance/the-buy-borrow-and-die-wealth-strategy-has-become-a-5-trillion-market-d9149a9d?mod=rss_markets_main",
+      "publishedAt": "2026-10-27T01:00:00.000Z"
+    }
+  ]
+}

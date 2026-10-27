@@ -1,0 +1,27 @@
+{
+  "fixture": "rss-politico.xml",
+  "parser": "parseFeed (rss:politico)",
+  "output": [
+    {
+      "sourceId": "000001a1-628c-d6a9-abf9-fa8ee3820001",
+      "title": "Australian treasurer says opponents want higher inflation for political gain",
+      "summary": "In a Canberra Playbook Podcast interview Jim Chalmers accused Liberals of wanting Australians to suffer, as their path back to power.",
+      "url": "https://www.politico.com/news/2026/10/22/australian-treasurer-says-opponents-want-higher-inflation-for-political-gain-01131517",
+      "publishedAt": "2026-10-22T12:32:08.000Z"
+    },
+    {
+      "sourceId": "000001a1-62aa-d632-a1af-ffba5c310001",
+      "title": "Rising bond yields will add billions to budget pressure: Australian treasurer",
+      "summary": "Jim Chalmers warns global pressures mean more domestic pain.",
+      "url": "https://www.politico.com/news/2026/10/22/rising-bond-yields-will-add-billions-to-budget-pressure-australian-treasurer-01131518",
+      "publishedAt": "2026-10-22T12:12:04.000Z"
+    },
+    {
+      "sourceId": "000001a0-77c5-d4fe-a9ae-ffcf94900000",
+      "title": "Sen. Kennedy rails against AI developers as ‘high IQ stupid people’",
+      "summary": "The Louisiana Republican’s comments come as both Democrats and Republicans have been forced to find ways to address the backlash against data centers.",
+      "url": "https://www.politico.com/news/2026/09/06/kennedy-ai-developers-high-iq-stupid-people-01066756",
+      "publishedAt": "2026-09-06T17:52:09.000Z"
+    }
+  ]
+}

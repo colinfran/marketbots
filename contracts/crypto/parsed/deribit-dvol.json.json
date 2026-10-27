@@ -1,0 +1,5 @@
+{
+  "fixture": "deribit-dvol.json",
+  "parser": "latestDvol (deribit)",
+  "output": 38.17
+}

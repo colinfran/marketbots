@@ -1,0 +1,334 @@
+{
+  "collections": {
+    "settings": "settings",
+    "engineState": "engine_state",
+    "engineStatus": "engine_status",
+    "lease": "engine_lease",
+    "events": "events",
+    "commands": "commands",
+    "audit": "audit_log",
+    "notifications": "notifications",
+    "seedRuns": "seed_runs",
+    "wireItems": "wire_items",
+    "wireTriggers": "wire_triggers",
+    "aiCalls": "ai_calls",
+    "cycles": "cycles",
+    "reports": "reports",
+    "decisions": "decisions",
+    "orders": "orders",
+    "plans": "position_plans",
+    "optionPositions": "option_positions",
+    "dailyStats": "daily_stats",
+    "cache": "cache",
+    "loginAttempts": "login_attempts",
+    "authUsers": "auth_users",
+    "authSessions": "auth_sessions",
+    "authAccounts": "auth_accounts",
+    "authVerifications": "auth_verifications"
+  },
+  "indexes": {
+    "events": [
+      {
+        "key": {
+          "expires_at": 1
+        },
+        "expireAfterSeconds": 0
+      },
+      {
+        "key": {
+          "type": 1,
+          "_id": -1
+        }
+      },
+      {
+        "key": {
+          "cycle_id": 1
+        },
+        "sparse": true
+      }
+    ],
+    "commands": [
+      {
+        "key": {
+          "status": 1,
+          "created_at": 1
+        }
+      },
+      {
+        "key": {
+          "created_at": -1
+        }
+      }
+    ],
+    "audit_log": [
+      {
+        "key": {
+          "at": -1
+        }
+      }
+    ],
+    "notifications": [
+      {
+        "key": {
+          "at": -1
+        }
+      },
+      {
+        "key": {
+          "expires_at": 1
+        },
+        "expireAfterSeconds": 0
+      }
+    ],
+    "ai_calls": [
+      {
+        "key": {
+          "day": 1
+        }
+      },
+      {
+        "key": {
+          "at": -1
+        }
+      }
+    ],
+    "cycles": [
+      {
+        "key": {
+          "started_at": -1
+        }
+      },
+      {
+        "key": {
+          "trading_day": 1,
+          "phase": 1
+        }
+      }
+    ],
+    "reports": [
+      {
+        "key": {
+          "created_at": -1
+        }
+      },
+      {
+        "key": {
+          "trading_day": 1,
+          "phase": 1
+        }
+      },
+      {
+        "key": {
+          "cycle_id": 1
+        }
+      }
+    ],
+    "decisions": [
+      {
+        "key": {
+          "created_at": -1
+        }
+      },
+      {
+        "key": {
+          "trading_day": 1
+        }
+      },
+      {
+        "key": {
+          "report_id": 1
+        }
+      },
+      {
+        "key": {
+          "symbol": 1,
+          "created_at": -1
+        }
+      }
+    ],
+    "orders": [
+      {
+        "key": {
+          "trading_day": 1
+        }
+      },
+      {
+        "key": {
+          "filled_at": -1
+        }
+      },
+      {
+        "key": {
+          "status": 1
+        }
+      },
+      {
+        "key": {
+          "symbol": 1
+        }
+      },
+      {
+        "key": {
+          "underlying": 1
+        }
+      },
+      {
+        "key": {
+          "structure_id": 1
+        },
+        "sparse": true
+      }
+    ],
+    "option_positions": [
+      {
+        "key": {
+          "status": 1
+        }
+      },
+      {
+        "key": {
+          "underlying": 1,
+          "opened_at": -1
+        }
+      },
+      {
+        "key": {
+          "closed_at": -1
+        }
+      }
+    ],
+    "cache": [
+      {
+        "key": {
+          "expires_at": 1
+        },
+        "expireAfterSeconds": 0
+      }
+    ],
+    "seed_runs": [
+      {
+        "key": {
+          "status": 1,
+          "at": 1
+        }
+      },
+      {
+        "key": {
+          "created_at": -1
+        }
+      }
+    ],
+    "wire_items": [
+      {
+        "key": {
+          "first_seen_at": -1
+        }
+      },
+      {
+        "key": {
+          "symbols": 1,
+          "first_seen_at": -1
+        }
+      },
+      {
+        "key": {
+          "cluster_id": 1
+        }
+      },
+      {
+        "key": {
+          "severity": -1,
+          "first_seen_at": -1
+        }
+      },
+      {
+        "key": {
+          "source": 1,
+          "first_seen_at": -1
+        }
+      },
+      {
+        "key": {
+          "notable": 1,
+          "first_seen_at": -1
+        }
+      },
+      {
+        "key": {
+          "expires_at": 1
+        },
+        "expireAfterSeconds": 0
+      }
+    ],
+    "wire_triggers": [
+      {
+        "key": {
+          "at": -1
+        }
+      },
+      {
+        "key": {
+          "status": 1,
+          "at": -1
+        }
+      },
+      {
+        "key": {
+          "expires_at": 1
+        },
+        "expireAfterSeconds": 0
+      }
+    ],
+    "login_attempts": [
+      {
+        "key": {
+          "expires_at": 1
+        },
+        "expireAfterSeconds": 0
+      }
+    ],
+    "auth_sessions": [
+      {
+        "key": {
+          "token": 1
+        }
+      },
+      {
+        "key": {
+          "expiresAt": 1
+        },
+        "expireAfterSeconds": 0
+      }
+    ],
+    "auth_verifications": [
+      {
+        "key": {
+          "identifier": 1
+        }
+      },
+      {
+        "key": {
+          "expiresAt": 1
+        },
+        "expireAfterSeconds": 0
+      }
+    ]
+  },
+  "filled_orders_filter": {
+    "status": {
+      "$in": [
+        "filled",
+        "partially_filled"
+      ]
+    },
+    "filled_qty": {
+      "$gt": 0
+    },
+    "role": {
+      "$ne": "spread"
+    },
+    "symbol": {
+      "$ne": ""
+    }
+  }
+}

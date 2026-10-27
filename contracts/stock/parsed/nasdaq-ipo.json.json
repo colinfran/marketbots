@@ -1,0 +1,5 @@
+{
+  "fixture": "nasdaq-ipo.json",
+  "parser": "ipoItems",
+  "output": []
+}

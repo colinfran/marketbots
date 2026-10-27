@@ -1,0 +1,39 @@
+{
+  "fixture": "appstore-finance-stocks.json",
+  "parser": "appRank per broker app, appstoreItems (finance chart), fresh watcher",
+  "ranks": {
+    "Robinhood": 3,
+    "Webull": null
+  },
+  "output": [],
+  "observations": {
+    "readings": [
+      {
+        "key": "appstore:finance:robinhood",
+        "value": 98,
+        "at": "2026-10-27T15:00:00.000Z",
+        "rules": [
+          "climb"
+        ]
+      },
+      {
+        "key": "appstore:finance:webull",
+        "value": 0,
+        "at": "2026-10-27T15:00:00.000Z",
+        "rules": [
+          "climb"
+        ]
+      }
+    ],
+    "rules": {
+      "climb": {
+        "id": "climb",
+        "kind": "change",
+        "windowMin": 1440,
+        "points": 15,
+        "direction": "up",
+        "min": 81
+      }
+    }
+  }
+}

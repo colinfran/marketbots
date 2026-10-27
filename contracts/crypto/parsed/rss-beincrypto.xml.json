@@ -1,0 +1,27 @@
+{
+  "fixture": "rss-beincrypto.xml",
+  "parser": "parseFeed (rss:beincrypto)",
+  "output": [
+    {
+      "sourceId": "https://beincrypto.com/?p=875483",
+      "title": "Crypto Payments Have a Hidden Cost Businesses Rarely Calculate",
+      "summary": "<p>Body trimmed for the fixture.</p>",
+      "url": "https://beincrypto.com/hidden-costs-crypto-payment-gateway-businesses/",
+      "publishedAt": "2026-10-27T02:04:51.000Z"
+    },
+    {
+      "sourceId": "https://beincrypto.com/?p=875448",
+      "title": "10,000 Bitcoin Simulations Say BTC's Median Path to $1M Comes in 2033",
+      "summary": "<p>Body trimmed for the fixture.</p>",
+      "url": "https://beincrypto.com/bitcoin-simulations-median-path-1m-2033/",
+      "publishedAt": "2026-10-27T01:50:00.000Z"
+    },
+    {
+      "sourceId": "https://beincrypto.com/?p=875447",
+      "title": "Cramer Says Anthropic's IPO Makes This Wall Street Bank a Buy",
+      "summary": "<p>Body trimmed for the fixture.</p>",
+      "url": "https://beincrypto.com/cramer-buy-goldman-sachs-anthropic-ipo/",
+      "publishedAt": "2026-10-27T01:21:42.000Z"
+    }
+  ]
+}

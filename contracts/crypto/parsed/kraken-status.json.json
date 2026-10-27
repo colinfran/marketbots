@@ -1,0 +1,71 @@
+{
+  "fixture": "kraken-status.json",
+  "parser": "parseStatuspage (status_kraken)",
+  "output": [
+    {
+      "sourceId": "incident:4m0rscfswypx:identified",
+      "title": "Kraken: SUI (SUI) Funding Delays (identified)",
+      "summary": "The issue has been identified and a fix is being implemented.",
+      "url": "https://stspg.io/xf73qsnz80w9",
+      "publishedAt": "2026-10-26T14:21:51.733Z",
+      "category": "venue_outage",
+      "kind": "venue",
+      "polarity": -1,
+      "marketWide": true,
+      "baseSeverity": 25,
+      "meta": {
+        "impact": "minor",
+        "status": "identified"
+      }
+    },
+    {
+      "sourceId": "incident:7zcy2j4hhxqz:investigating",
+      "title": "Kraken: Polkadot (DOT) Funding Delays (investigating)",
+      "summary": "We're investigating an issue with the Polkadot (DOT) funding gateway. Deposits and withdrawals may be delayed at this time. All other funding methods are operating normally. We are working diligently to resolve the issue and will keep you updated.",
+      "url": "https://stspg.io/j50yvjychny4",
+      "publishedAt": "2026-10-26T09:55:01.322Z",
+      "category": "venue_outage",
+      "kind": "venue",
+      "polarity": -1,
+      "marketWide": true,
+      "baseSeverity": 25,
+      "meta": {
+        "impact": "minor",
+        "status": "investigating"
+      }
+    },
+    {
+      "sourceId": "incident:by3j8r6q39ld:investigating",
+      "title": "Kraken: Initia (INIT) Deposits and Withdrawals Temporarily Paused (investigating)",
+      "summary": "Deposits and withdrawals for Initia (INIT) are temporarily paused due to an issue affecting the Initia network. All other funding methods are operational. We are closely monitoring the situation and will provide updates as more information becomes available. We appreciate your patience and understanding.",
+      "url": "https://stspg.io/fm0n8q11k450",
+      "publishedAt": "2026-10-23T16:20:16.686Z",
+      "category": "venue_outage",
+      "kind": "venue",
+      "polarity": -1,
+      "marketWide": true,
+      "baseSeverity": 25,
+      "meta": {
+        "impact": "minor",
+        "status": "investigating"
+      }
+    },
+    {
+      "sourceId": "maintenance:jdbk8wj1lvhz:scheduled",
+      "title": "Kraken: maintenance scheduled: Order Entry System Maintenance (2026-10-27T10:00:00.000Z to 2026-10-27T11:00:00.000Z)",
+      "url": "https://stspg.io/680x6bls6zc5",
+      "publishedAt": "2026-10-27T12:00:00.000Z",
+      "category": "venue_status",
+      "kind": "venue",
+      "polarity": -1,
+      "marketWide": true,
+      "baseSeverity": 45,
+      "meta": {
+        "status": "scheduled",
+        "starts_at": "2026-10-27T10:00:00.000Z",
+        "ends_at": "2026-10-27T11:00:00.000Z",
+        "trading": true
+      }
+    }
+  ]
+}

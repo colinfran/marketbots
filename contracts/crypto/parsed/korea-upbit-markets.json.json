@@ -1,0 +1,106 @@
+{
+  "fixture": "korea-upbit-markets.json",
+  "parser": "korea:upbit.entries, then korea:upbit.describe for each entry as added and as removed",
+  "entries": {
+    "KRW-DOGE": "||Dogecoin",
+    "KRW-ETH": "||Ethereum",
+    "KRW-XRP": "||XRP",
+    "KRW-SOL": "||Solana",
+    "KRW-BTC": "||Bitcoin",
+    "KRW-FIL": "|DEPOSIT_AMOUNT_SOARING|Filecoin",
+    "KRW-BEAM": "|DEPOSIT_AMOUNT_SOARING,TRADING_VOLUME_SOARING|Beam"
+  },
+  "added": [],
+  "removed": [
+    {
+      "sourceId": "KRW-DOGE|removed|2026-10-27",
+      "title": "Upbit removes Dogecoin (DOGE) from its KRW market",
+      "url": "https://upbit.com/exchange?code=CRIX.UPBIT.KRW-DOGE",
+      "publishedAt": "2026-10-27T12:00:00.000Z",
+      "symbols": [
+        "DOGE/USD"
+      ],
+      "kind": "venue",
+      "category": "venue_status",
+      "polarity": -1,
+      "baseSeverity": 75,
+      "meta": {
+        "exchange": "upbit",
+        "market": "KRW-DOGE",
+        "change": "removed"
+      }
+    },
+    {
+      "sourceId": "KRW-ETH|removed|2026-10-27",
+      "title": "Upbit removes Ethereum (ETH) from its KRW market",
+      "url": "https://upbit.com/exchange?code=CRIX.UPBIT.KRW-ETH",
+      "publishedAt": "2026-10-27T12:00:00.000Z",
+      "symbols": [
+        "ETH/USD"
+      ],
+      "kind": "venue",
+      "category": "venue_status",
+      "polarity": -1,
+      "baseSeverity": 75,
+      "meta": {
+        "exchange": "upbit",
+        "market": "KRW-ETH",
+        "change": "removed"
+      }
+    },
+    {
+      "sourceId": "KRW-XRP|removed|2026-10-27",
+      "title": "Upbit removes XRP (XRP) from its KRW market",
+      "url": "https://upbit.com/exchange?code=CRIX.UPBIT.KRW-XRP",
+      "publishedAt": "2026-10-27T12:00:00.000Z",
+      "symbols": [
+        "XRP/USD"
+      ],
+      "kind": "venue",
+      "category": "venue_status",
+      "polarity": -1,
+      "baseSeverity": 75,
+      "meta": {
+        "exchange": "upbit",
+        "market": "KRW-XRP",
+        "change": "removed"
+      }
+    },
+    {
+      "sourceId": "KRW-SOL|removed|2026-10-27",
+      "title": "Upbit removes Solana (SOL) from its KRW market",
+      "url": "https://upbit.com/exchange?code=CRIX.UPBIT.KRW-SOL",
+      "publishedAt": "2026-10-27T12:00:00.000Z",
+      "symbols": [
+        "SOL/USD"
+      ],
+      "kind": "venue",
+      "category": "venue_status",
+      "polarity": -1,
+      "baseSeverity": 75,
+      "meta": {
+        "exchange": "upbit",
+        "market": "KRW-SOL",
+        "change": "removed"
+      }
+    },
+    {
+      "sourceId": "KRW-BTC|removed|2026-10-27",
+      "title": "Upbit removes Bitcoin (BTC) from its KRW market",
+      "url": "https://upbit.com/exchange?code=CRIX.UPBIT.KRW-BTC",
+      "publishedAt": "2026-10-27T12:00:00.000Z",
+      "symbols": [
+        "BTC/USD"
+      ],
+      "kind": "venue",
+      "category": "venue_status",
+      "polarity": -1,
+      "baseSeverity": 75,
+      "meta": {
+        "exchange": "upbit",
+        "market": "KRW-BTC",
+        "change": "removed"
+      }
+    }
+  ]
+}

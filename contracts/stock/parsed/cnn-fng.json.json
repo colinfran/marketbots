@@ -1,0 +1,35 @@
+{
+  "fixture": "cnn-fng.json",
+  "parser": "cnnFngItems (fng), fresh watcher",
+  "output": [],
+  "observations": {
+    "readings": [
+      {
+        "key": "cnn_fng:fear",
+        "value": 22.9211087420043,
+        "at": "2026-10-26T23:59:53.000Z",
+        "rules": [
+          "extreme"
+        ]
+      },
+      {
+        "key": "cnn_fng:greed",
+        "value": 0,
+        "at": "2026-10-26T23:59:53.000Z",
+        "rules": [
+          "extreme"
+        ]
+      }
+    ],
+    "rules": {
+      "extreme": {
+        "id": "extreme",
+        "kind": "level",
+        "abs": 25,
+        "rearmAt": 0.8,
+        "rearmMs": 3600000,
+        "exits": true
+      }
+    }
+  }
+}

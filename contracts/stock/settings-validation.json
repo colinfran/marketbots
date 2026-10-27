@@ -1,0 +1,100 @@
+{
+  "defaults": {
+    "ok": true,
+    "equals_input": true
+  },
+  "wire.thresholds not ascending": {
+    "ok": false,
+    "issues": [
+      {
+        "path": "wire.thresholds",
+        "code": "custom",
+        "message": "thresholds must ascend: annotate < review < evaluate < critical"
+      }
+    ]
+  },
+  "risk.min_stop_pct >= max_stop_pct": {
+    "ok": false,
+    "issues": [
+      {
+        "path": "risk.min_stop_pct",
+        "code": "custom",
+        "message": "min_stop_pct must be below max_stop_pct"
+      }
+    ]
+  },
+  "risk.default_stop_pct outside the stop bounds": {
+    "ok": false,
+    "issues": [
+      {
+        "path": "risk.default_stop_pct",
+        "code": "custom",
+        "message": "default_stop_pct must be between min_stop_pct and max_stop_pct"
+      }
+    ]
+  },
+  "risk.max_daily_loss_pct >= flatten_loss_pct": {
+    "ok": false,
+    "issues": [
+      {
+        "path": "risk.max_daily_loss_pct",
+        "code": "custom",
+        "message": "max_daily_loss_pct must be below flatten_loss_pct"
+      }
+    ]
+  },
+  "options.min_dte >= max_dte": {
+    "ok": false,
+    "issues": [
+      {
+        "path": "options.min_dte",
+        "code": "custom",
+        "message": "min_dte must be below max_dte"
+      }
+    ]
+  },
+  "options.close_at_dte >= min_dte": {
+    "ok": false,
+    "issues": [
+      {
+        "path": "options.close_at_dte",
+        "code": "custom",
+        "message": "close_at_dte must be below min_dte"
+      }
+    ]
+  },
+  "options.min_delta >= max_delta": {
+    "ok": false,
+    "issues": [
+      {
+        "path": "options.min_delta",
+        "code": "custom",
+        "message": "min_delta must be below max_delta"
+      }
+    ]
+  },
+  "options.max_premium_per_trade_pct > max_total_premium_pct": {
+    "ok": false,
+    "issues": [
+      {
+        "path": "options.max_premium_per_trade_pct",
+        "code": "custom",
+        "message": "max_premium_per_trade_pct can't exceed max_total_premium_pct"
+      }
+    ]
+  },
+  "duplicate benchmarks": {
+    "ok": false,
+    "issues": [
+      {
+        "path": "universe.benchmarks",
+        "code": "custom",
+        "message": "duplicate symbols"
+      }
+    ]
+  },
+  "unknown keys are dropped": {
+    "ok": true,
+    "equals_input": false
+  }
+}

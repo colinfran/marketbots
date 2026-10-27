@@ -1,0 +1,27 @@
+{
+  "fixture": "rss-cnbc.xml",
+  "parser": "parseFeed (rss:cnbc)",
+  "output": [
+    {
+      "sourceId": "108360561",
+      "title": "From Wall Street to Silicon Valley, Anthropic IPO poised to have massive 'trickle-down effect'",
+      "summary": "With the AI trade sputtering of late and interest rates on the rise, Anthropic's IPO is taking on outsized importance.",
+      "url": "https://www.cnbc.com/2026/10/26/anthropic-ipo-might-trigger-tech-reset-if-ipo-underperforms.html",
+      "publishedAt": "2026-10-26T22:50:07.000Z"
+    },
+    {
+      "sourceId": "108464652",
+      "title": "Microsoft offers voluntary buyouts to 60,000 employees as AI leads to efficiency push",
+      "summary": "Microsoft is trying to balance a rapid AI infrastructure build-out with capital efficiency.",
+      "url": "https://www.cnbc.com/2026/10/26/microsoft-msft-voluntary-buyouts.html",
+      "publishedAt": "2026-10-27T01:05:06.000Z"
+    },
+    {
+      "sourceId": "108466212",
+      "title": "China industrial profits post strongest growth in three months, rising 14.4%",
+      "summary": "The global AI boom and higher commodity prices stemming from the war in Iran have lifted earnings at miners, chipmakers and raw-material suppliers.",
+      "url": "https://www.cnbc.com/2026/10/27/china-industrial-profits-september-ai-tech-exports-.html",
+      "publishedAt": "2026-10-27T02:23:29.000Z"
+    }
+  ]
+}

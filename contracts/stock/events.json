@@ -1,0 +1,638 @@
+{
+  "event_schema_version": 1,
+  "stream_protocol_version": 1,
+  "stream_token_ttl_seconds": 60,
+  "event_types": [
+    {
+      "type": "engine.started",
+      "data_keys": [
+        "version",
+        "instance"
+      ]
+    },
+    {
+      "type": "engine.stopping",
+      "data_keys": [
+        "reason"
+      ]
+    },
+    {
+      "type": "engine.status",
+      "data_keys": [
+        "status",
+        "kill_switch",
+        "reason?"
+      ]
+    },
+    {
+      "type": "engine.heartbeat",
+      "data_keys": [
+        "status",
+        "cycle_state",
+        "ws_clients",
+        "uptime_s",
+        "ai_spend_today_usd",
+        "ai_budget_usd"
+      ]
+    },
+    {
+      "type": "market.ticker",
+      "data_keys": [
+        "symbol",
+        "price",
+        "bid",
+        "ask",
+        "change_pct"
+      ]
+    },
+    {
+      "type": "market.session",
+      "data_keys": [
+        "state",
+        "day"
+      ]
+    },
+    {
+      "type": "broker.connected",
+      "data_keys": [
+        "channel"
+      ]
+    },
+    {
+      "type": "broker.disconnected",
+      "data_keys": [
+        "channel",
+        "reason"
+      ]
+    },
+    {
+      "type": "broker.error",
+      "data_keys": [
+        "scope",
+        "message"
+      ]
+    },
+    {
+      "type": "cycle.started",
+      "data_keys": [
+        "cycle_id",
+        "phase",
+        "trigger"
+      ]
+    },
+    {
+      "type": "cycle.state",
+      "data_keys": [
+        "cycle_id",
+        "state",
+        "detail?"
+      ]
+    },
+    {
+      "type": "cycle.step",
+      "data_keys": [
+        "cycle_id",
+        "name",
+        "ok",
+        "detail"
+      ]
+    },
+    {
+      "type": "cycle.completed",
+      "data_keys": [
+        "cycle_id",
+        "phase",
+        "report_id",
+        "duration_ms",
+        "decisions",
+        "executed",
+        "rejected",
+        "failed",
+        "ai_cost_usd",
+        "headline"
+      ]
+    },
+    {
+      "type": "cycle.failed",
+      "data_keys": [
+        "cycle_id",
+        "phase",
+        "error"
+      ]
+    },
+    {
+      "type": "cycle.skipped",
+      "data_keys": [
+        "phase",
+        "reason"
+      ]
+    },
+    {
+      "type": "context.built",
+      "data_keys": [
+        "cycle_id",
+        "positions",
+        "option_positions",
+        "instruments",
+        "headlines",
+        "equity",
+        "day_pnl_pct",
+        "new_buys_allowed",
+        "flags"
+      ]
+    },
+    {
+      "type": "options.chains",
+      "data_keys": [
+        "cycle_id",
+        "underlyings"
+      ]
+    },
+    {
+      "type": "research.started",
+      "data_keys": [
+        "cycle_id",
+        "research_id",
+        "phase",
+        "model",
+        "focus"
+      ]
+    },
+    {
+      "type": "research.query",
+      "data_keys": [
+        "research_id",
+        "query",
+        "tool"
+      ]
+    },
+    {
+      "type": "research.source",
+      "data_keys": [
+        "research_id",
+        "title",
+        "url",
+        "domain"
+      ]
+    },
+    {
+      "type": "research.progress",
+      "data_keys": [
+        "research_id",
+        "chars",
+        "excerpt"
+      ]
+    },
+    {
+      "type": "research.completed",
+      "data_keys": [
+        "research_id",
+        "sources",
+        "queries",
+        "duration_ms",
+        "cost_usd",
+        "error"
+      ]
+    },
+    {
+      "type": "ai.reasoning",
+      "data_keys": [
+        "cycle_id",
+        "task",
+        "chars",
+        "excerpt"
+      ]
+    },
+    {
+      "type": "ai.decision.started",
+      "data_keys": [
+        "cycle_id",
+        "model"
+      ]
+    },
+    {
+      "type": "ai.decision.progress",
+      "data_keys": [
+        "cycle_id",
+        "chars",
+        "headline",
+        "decisions"
+      ]
+    },
+    {
+      "type": "ai.decision.completed",
+      "data_keys": [
+        "cycle_id",
+        "decisions",
+        "attempts",
+        "repaired",
+        "cost_usd"
+      ]
+    },
+    {
+      "type": "ai.decision.failed",
+      "data_keys": [
+        "cycle_id",
+        "error"
+      ]
+    },
+    {
+      "type": "ai.report",
+      "data_keys": [
+        "cycle_id",
+        "phase",
+        "headline",
+        "summary",
+        "sentiment",
+        "regime",
+        "stance",
+        "confidence",
+        "key_drivers",
+        "watchlist"
+      ]
+    },
+    {
+      "type": "ai.decision.proposed",
+      "data_keys": [
+        "cycle_id",
+        "symbol",
+        "instrument",
+        "action",
+        "conviction",
+        "rationale",
+        "detail"
+      ]
+    },
+    {
+      "type": "risk.checked",
+      "data_keys": [
+        "decision_id",
+        "symbol",
+        "action",
+        "approved",
+        "reasons",
+        "checks",
+        "qty",
+        "notional_usd"
+      ]
+    },
+    {
+      "type": "decision.result",
+      "data_keys": [
+        "decision_id",
+        "symbol",
+        "action",
+        "status",
+        "reason"
+      ]
+    },
+    {
+      "type": "order.submitted",
+      "data_keys": [
+        "order_id",
+        "symbol",
+        "side",
+        "type",
+        "qty",
+        "limit_price",
+        "purpose",
+        "asset_class"
+      ]
+    },
+    {
+      "type": "order.updated",
+      "data_keys": [
+        "order_id",
+        "symbol",
+        "status",
+        "filled_qty"
+      ]
+    },
+    {
+      "type": "order.filled",
+      "data_keys": [
+        "order_id",
+        "symbol",
+        "side",
+        "qty",
+        "price",
+        "partial",
+        "asset_class"
+      ]
+    },
+    {
+      "type": "order.canceled",
+      "data_keys": [
+        "order_id",
+        "symbol",
+        "reason"
+      ]
+    },
+    {
+      "type": "order.rejected",
+      "data_keys": [
+        "order_id",
+        "symbol",
+        "reason"
+      ]
+    },
+    {
+      "type": "position.opened",
+      "data_keys": [
+        "symbol",
+        "asset_class",
+        "qty",
+        "price",
+        "structure_id"
+      ]
+    },
+    {
+      "type": "position.closed",
+      "data_keys": [
+        "symbol",
+        "asset_class",
+        "realized_pnl_usd",
+        "return_pct",
+        "reason",
+        "structure_id"
+      ]
+    },
+    {
+      "type": "protection.placed",
+      "data_keys": [
+        "symbol",
+        "stop",
+        "target"
+      ]
+    },
+    {
+      "type": "protection.triggered",
+      "data_keys": [
+        "symbol",
+        "kind",
+        "price",
+        "structure_id"
+      ]
+    },
+    {
+      "type": "budget.exhausted",
+      "data_keys": [
+        "spent_usd",
+        "budget_usd"
+      ]
+    },
+    {
+      "type": "command.received",
+      "data_keys": [
+        "command_id",
+        "type"
+      ]
+    },
+    {
+      "type": "command.completed",
+      "data_keys": [
+        "command_id",
+        "type",
+        "result"
+      ]
+    },
+    {
+      "type": "command.failed",
+      "data_keys": [
+        "command_id",
+        "type",
+        "error"
+      ]
+    },
+    {
+      "type": "summary.periodic",
+      "data_keys": [
+        "equity_usd",
+        "day_pnl_usd",
+        "day_pnl_pct",
+        "total_return_pct",
+        "positions",
+        "option_positions"
+      ]
+    },
+    {
+      "type": "daily.stats",
+      "data_keys": [
+        "day",
+        "pnl",
+        "pnl_pct",
+        "spy_pct"
+      ]
+    },
+    {
+      "type": "wire.item",
+      "data_keys": [
+        "id",
+        "source",
+        "tier",
+        "kind",
+        "category",
+        "title",
+        "url",
+        "symbols",
+        "severity",
+        "first_seen_at",
+        "notable",
+        "notable_reasons"
+      ]
+    },
+    {
+      "type": "wire.notable",
+      "data_keys": [
+        "id",
+        "reason",
+        "notable_reasons",
+        "title",
+        "symbols",
+        "severity"
+      ]
+    },
+    {
+      "type": "wire.dossier",
+      "data_keys": [
+        "cycle_id",
+        "rows",
+        "total"
+      ]
+    },
+    {
+      "type": "wire.trigger",
+      "data_keys": [
+        "trigger_id",
+        "rule",
+        "action",
+        "status",
+        "reason",
+        "symbols",
+        "severity",
+        "item_ids"
+      ]
+    },
+    {
+      "type": "wire.source",
+      "data_keys": [
+        "id",
+        "state",
+        "error"
+      ]
+    },
+    {
+      "type": "seed.started",
+      "data_keys": [
+        "seed_id",
+        "cycle_id",
+        "amount_usd"
+      ]
+    },
+    {
+      "type": "seed.completed",
+      "data_keys": [
+        "seed_id",
+        "cycle_id",
+        "status",
+        "allocations",
+        "executed",
+        "error"
+      ]
+    },
+    {
+      "type": "error",
+      "data_keys": [
+        "scope",
+        "message"
+      ]
+    },
+    {
+      "type": "alert",
+      "data_keys": [
+        "level",
+        "title",
+        "message"
+      ]
+    }
+  ],
+  "owner_only": [
+    "command.received",
+    "command.completed",
+    "command.failed",
+    "error",
+    "broker.error"
+  ],
+  "ephemeral": [
+    "market.ticker",
+    "engine.heartbeat",
+    "research.progress",
+    "ai.decision.progress",
+    "ai.reasoning"
+  ],
+  "envelope_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "v": {
+        "type": "number"
+      },
+      "seq": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      },
+      "ts": {
+        "type": "string"
+      },
+      "type": {
+        "type": "string"
+      },
+      "level": {
+        "type": "string",
+        "enum": [
+          "debug",
+          "info",
+          "warn",
+          "error"
+        ]
+      },
+      "visibility": {
+        "type": "string",
+        "enum": [
+          "public",
+          "owner"
+        ]
+      },
+      "summary": {
+        "type": "string"
+      },
+      "instrument": {
+        "type": "string"
+      },
+      "cycle_id": {
+        "type": "string"
+      },
+      "data": {
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    "required": [
+      "v",
+      "seq",
+      "ts",
+      "type",
+      "level",
+      "visibility",
+      "summary",
+      "data"
+    ]
+  },
+  "client_frame_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "oneOf": [
+      {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "auth"
+          },
+          "token": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 2000
+          },
+          "since": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "type",
+          "token"
+        ]
+      },
+      {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "pong"
+          },
+          "t": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      }
+    ]
+  }
+}

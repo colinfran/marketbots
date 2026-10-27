@@ -1,0 +1,5 @@
+{
+  "fixture": "fedreg-tariff.json",
+  "parser": "fedreg:tariff.map",
+  "output": []
+}

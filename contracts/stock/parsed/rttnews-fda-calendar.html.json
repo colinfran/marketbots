@@ -1,0 +1,147 @@
+{
+  "fixture": "rttnews-fda-calendar.html",
+  "parser": "parseFdaCalendar + fdaCalendarItems (every ticker tracked, 2026-10-27T14:00Z)",
+  "page": {
+    "rows": [
+      {
+        "id": "2656",
+        "company": "Pfizer Inc.",
+        "tickers": [
+          "PFE"
+        ],
+        "drug": "TALZENNA Plus XTANDI (sNDA)",
+        "due": null,
+        "event": "FDA decision on TALZENNA in combination with XTANDI for the treatment of metastatic hormone-sensitive prostate cancer",
+        "outcome": "FDA expanded approval of TALZENNA in combination with XTANDI to the treatment of men with metastatic androgen pathway modulation-naïve or -sensitive prostate cancer on 26th Oct. 2026",
+        "outcomeDay": "2026-10-26"
+      },
+      {
+        "id": "2612",
+        "company": "Eisai Co Ltd",
+        "tickers": [],
+        "drug": "WELIREG plus LENVIMA (sNDA)",
+        "due": "2026-10-04",
+        "event": "FDA decision on WELIREG plus LENVIMA in patients with advanced renal cell carcinoma (RCC)",
+        "outcome": null,
+        "outcomeDay": null
+      },
+      {
+        "id": "2613",
+        "company": "Merck & Co Inc.",
+        "tickers": [
+          "MRK"
+        ],
+        "drug": "WELIREG plus LENVIMA (sNDA)",
+        "due": "2026-10-04",
+        "event": "FDA decision on WELIREG plus LENVIMA in patients with advanced renal cell carcinoma (RCC)",
+        "outcome": "FDA approved WELIREG plus LENVIMA in patients with advanced renal cell carcinoma on Sep.25, 2026",
+        "outcomeDay": "2026-09-25"
+      },
+      {
+        "id": "2619",
+        "company": "Merck & Co Inc.",
+        "tickers": [
+          "MRK"
+        ],
+        "drug": "Ifinatamab deruxtecan (I-DXd) (BLA)",
+        "due": "2026-10-10",
+        "event": "FDA decision on ifinatamab deruxtecan for the treatment of adult patients with extensive-stage small cell lung cancer (ES-SCLC)",
+        "outcome": null,
+        "outcomeDay": null
+      },
+      {
+        "id": "2620",
+        "company": "Daiichi Sankyo Company Limited",
+        "tickers": [
+          "DSKYF"
+        ],
+        "drug": "Ifinatamab deruxtecan (I-DXd) (BLA)",
+        "due": "2026-10-10",
+        "event": "FDA decision on ifinatamab deruxtecan for the treatment of adult patients with extensive-stage small cell lung cancer (ES-SCLC)",
+        "outcome": null,
+        "outcomeDay": null
+      },
+      {
+        "id": "2643",
+        "company": "Roche Holding AG",
+        "tickers": [
+          "RHHBY"
+        ],
+        "drug": "Enspryng (sBLA)",
+        "due": "2026-10-15",
+        "event": "FDA decision on Enspryng for the treatment of Thyroid Eye Disease",
+        "outcome": "FDA approved Enspryng (satralizumab) for the treatment of adults with thyroid eye disease on 16th Oct. 2026.",
+        "outcomeDay": "2026-10-16"
+      },
+      {
+        "id": "2574",
+        "company": "Viatris Inc.",
+        "tickers": [
+          "VTRS"
+        ],
+        "drug": "Ryzumvi (MR-141) (phentolamine ophthalmic solution 0.75%) (sNDA)",
+        "due": "2026-10-17",
+        "event": "FDA decision on Ryzumvi for the Treatment of Presbyopia",
+        "outcome": "FDA approved RYZUMVI (phentolamine ophthalmic solution 0.75%) for the treatment of presbyopia in adults on 16th Oct. 2026",
+        "outcomeDay": "2026-10-16"
+      },
+      {
+        "id": "2557",
+        "company": "Opus Genetics, Inc.",
+        "tickers": [
+          "IRD"
+        ],
+        "drug": "Ryzumvi (phentolamine ophthalmic solution 0.75%) (sNDA)",
+        "due": "2026-10-17",
+        "event": "FDA decision on Ryzumvi for the treatment of presbyopia",
+        "outcome": "FDA approved RYZUMVI (phentolamine ophthalmic solution 0.75%) for the treatment of presbyopia in adults on 16th Oct. 2026",
+        "outcomeDay": "2026-10-16"
+      },
+      {
+        "id": "2624",
+        "company": "Pharming Group N.V.",
+        "tickers": [
+          "PHAR"
+        ],
+        "drug": "Joenja (resubmitted sNDA)",
+        "due": "2026-10-24",
+        "event": "FDA decision on Joenja as a treatment for children aged 4 to 11 years with activated phosphoinositide 3-kinase delta syndrome",
+        "outcome": "FDA approved sNDA for 40 mg and 50 mg twice-daily dosing of Joenja as a treatment for children aged 4 to 11 years weighing at least 27 kg with APDS on 11th Sept. 2026.",
+        "outcomeDay": "2026-09-11"
+      },
+      {
+        "id": "2621",
+        "company": "Ionis Pharmaceuticals, Inc.",
+        "tickers": [
+          "IONS"
+        ],
+        "drug": "Bepirovirsen (NDA)",
+        "due": "2026-10-26",
+        "event": "FDA decision on Bepirovirsen for the treatment of adults with chronic hepatitis B",
+        "outcome": "FDA approved Hibsago (bepirovirsen) for the Treatment of Chronic Hepatitis B on 20th Oct. 2026.",
+        "outcomeDay": "2026-10-20"
+      }
+    ],
+    "laterPage": 5
+  },
+  "output": [
+    {
+      "sourceId": "2656|outcome",
+      "title": "PFE: FDA expanded approval of TALZENNA in combination with XTANDI to the treatment of men with metastatic androgen pathway modulation-naïve or -sensitive prostate cancer on 26th Oct. 2026",
+      "summary": "TALZENNA Plus XTANDI (sNDA): FDA decision on TALZENNA in combination with XTANDI for the treatment of metastatic hormone-sensitive prostate cancer",
+      "url": "https://www.rttnews.com/corpinfo/FDADetail.aspx?ID=2656",
+      "publishedAt": "2026-10-26T00:00:00.000Z",
+      "symbols": [
+        "PFE"
+      ],
+      "category": "fda",
+      "polarity": 1,
+      "baseSeverity": 45,
+      "meta": {
+        "drug": "TALZENNA Plus XTANDI (sNDA)",
+        "outcome_on": "2026-10-26",
+        "rtt_id": "2656"
+      }
+    }
+  ]
+}

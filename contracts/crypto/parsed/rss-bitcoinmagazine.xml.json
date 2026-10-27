@@ -1,0 +1,20 @@
+{
+  "fixture": "rss-bitcoinmagazine.xml",
+  "parser": "parseFeed (rss:bitcoinmagazine)",
+  "output": [
+    {
+      "sourceId": "https://bitcoinmagazine.com/?p=56258",
+      "title": "Cold Storage Goes South: bitcoin++ Announces Antarctica Edition",
+      "summary": "<p>Body trimmed for the fixture.</p>",
+      "url": "https://bitcoinmagazine.com/news/cold-storage-bitcoin-antarctica",
+      "publishedAt": "2026-10-27T00:00:04.000Z"
+    },
+    {
+      "sourceId": "https://bitcoinmagazine.com/?p=56242",
+      "title": "Blink Wallet Adds Inactivity Fee to Custodial Accounts, Accelerating Migration to Self Custody",
+      "summary": "<p>Body trimmed for the fixture.</p>",
+      "url": "https://bitcoinmagazine.com/business/blink-wallet-adds-inactivity-fee-to-custodial-accounts-accelerating-migration-to-self-custody",
+      "publishedAt": "2026-10-26T21:14:23.000Z"
+    }
+  ]
+}

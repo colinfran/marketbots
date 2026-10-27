@@ -1,0 +1,26 @@
+{
+  "fixture": "kalshi-recession.json",
+  "parser": "kalshiMarkets (KXRECSSNBER)",
+  "series": {
+    "series": "KXRECSSNBER",
+    "minOpenInterest": 10000
+  },
+  "output": [
+    {
+      "key": "kalshi:KXRECSSNBER-27",
+      "group": "kalshi:KXRECSSNBER-27",
+      "question": "Will there be a recession in 2027?",
+      "prob": 19.5,
+      "url": "https://kalshi.com/markets/kxrecssnber",
+      "venue": "Kalshi"
+    },
+    {
+      "key": "kalshi:KXRECSSNBER-26",
+      "group": "kalshi:KXRECSSNBER-26",
+      "question": "Will there be a recession in 2026?",
+      "prob": 2.5,
+      "url": "https://kalshi.com/markets/kxrecssnber",
+      "venue": "Kalshi"
+    }
+  ]
+}

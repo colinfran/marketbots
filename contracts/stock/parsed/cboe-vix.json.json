@@ -1,0 +1,47 @@
+{
+  "fixture": "cboe-vix.json",
+  "parser": "vixItems (vol_rates:vix), fresh watcher",
+  "output": [],
+  "observations": {
+    "readings": [
+      {
+        "key": "vix",
+        "value": 18.39,
+        "at": "2026-10-27T15:00:00.000Z",
+        "rules": [
+          "level",
+          "hour"
+        ]
+      },
+      {
+        "key": "vix:day_pct",
+        "value": 0,
+        "at": "2026-10-27T15:00:00.000Z",
+        "rules": [
+          "day"
+        ]
+      }
+    ],
+    "rules": {
+      "level": {
+        "id": "level",
+        "kind": "level",
+        "abs": 30,
+        "rearmAt": 0.8333333333333334
+      },
+      "hour": {
+        "id": "hour",
+        "kind": "change",
+        "windowMin": 60,
+        "pct": 15,
+        "direction": "up",
+        "min": 12
+      },
+      "day": {
+        "id": "day",
+        "kind": "level",
+        "abs": 20
+      }
+    }
+  }
+}

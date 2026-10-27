@@ -1,0 +1,196 @@
+{
+  "fixture": "edgar-8k.xml",
+  "parser": "parseFeed + parseEdgarTitle + parseEdgarItems, then edgarItem with each CIK mapped to EDGA, EDGB, …",
+  "entries": [
+    {
+      "entry": {
+        "sourceId": "urn:tag:sec.gov,2008:accession-number=0001104659-26-118875",
+        "title": "8-K - PERPETUA RESOURCES CORP. (0001526243) (Filer)",
+        "summary": "<b>Filed:</b> 2026-10-26 <b>AccNo:</b> 0001104659-26-118875 <b>Size:</b> 194 KB\n<br>Item 3.02: Unregistered Sales of Equity Securities\n<br>Item 8.01: Other Events",
+        "url": "https://www.sec.gov/Archives/edgar/data/1526243/000110465926118875/0001104659-26-118875-index.htm",
+        "publishedAt": "2026-10-26T21:30:28.000Z"
+      },
+      "title": {
+        "form": "8-K",
+        "company": "PERPETUA RESOURCES CORP.",
+        "cik": 1526243,
+        "role": "Filer"
+      },
+      "items": [
+        {
+          "item": "3.02",
+          "name": "Unregistered Sales of Equity Securities"
+        },
+        {
+          "item": "8.01",
+          "name": "Other Events"
+        }
+      ]
+    },
+    {
+      "entry": {
+        "sourceId": "urn:tag:sec.gov,2008:accession-number=0001193125-26-432193",
+        "title": "8-K - North Haven Private Income Fund LLC (0001851322) (Filer)",
+        "summary": "<b>Filed:</b> 2026-10-26 <b>AccNo:</b> 0001193125-26-432193 <b>Size:</b> 290 KB\n<br>Item 3.02: Unregistered Sales of Equity Securities\n<br>Item 7.01: Regulation FD Disclosure",
+        "url": "https://www.sec.gov/Archives/edgar/data/1851322/000119312526432193/0001193125-26-432193-index.htm",
+        "publishedAt": "2026-10-26T21:27:58.000Z"
+      },
+      "title": {
+        "form": "8-K",
+        "company": "North Haven Private Income Fund LLC",
+        "cik": 1851322,
+        "role": "Filer"
+      },
+      "items": [
+        {
+          "item": "3.02",
+          "name": "Unregistered Sales of Equity Securities"
+        },
+        {
+          "item": "7.01",
+          "name": "Regulation FD Disclosure"
+        }
+      ]
+    },
+    {
+      "entry": {
+        "sourceId": "urn:tag:sec.gov,2008:accession-number=0001213900-26-112559",
+        "title": "8-K - Bold Eagle Acquisition Corp. (0001852207) (Filer)",
+        "summary": "<b>Filed:</b> 2026-10-26 <b>AccNo:</b> 0001213900-26-112559 <b>Size:</b> 295 KB\n<br>Item 1.01: Entry into a Material Definitive Agreement\n<br>Item 3.02: Unregistered Sales of Equity Securities\n<br>Item 3.03: Material Modifications to Rights of Security Holders\n<br>Item 5.07: Submission of Matters to a Vote of Security Holders\n<br>Item 8.01: Other Events\n<br>Item 9.01: Financial Statements and Exhibits",
+        "url": "https://www.sec.gov/Archives/edgar/data/1852207/000121390026112559/0001213900-26-112559-index.htm",
+        "publishedAt": "2026-10-26T21:27:29.000Z"
+      },
+      "title": {
+        "form": "8-K",
+        "company": "Bold Eagle Acquisition Corp.",
+        "cik": 1852207,
+        "role": "Filer"
+      },
+      "items": [
+        {
+          "item": "1.01",
+          "name": "Entry into a Material Definitive Agreement"
+        },
+        {
+          "item": "3.02",
+          "name": "Unregistered Sales of Equity Securities"
+        },
+        {
+          "item": "3.03",
+          "name": "Material Modifications to Rights of Security Holders"
+        },
+        {
+          "item": "5.07",
+          "name": "Submission of Matters to a Vote of Security Holders"
+        },
+        {
+          "item": "8.01",
+          "name": "Other Events"
+        },
+        {
+          "item": "9.01",
+          "name": "Financial Statements and Exhibits"
+        }
+      ]
+    },
+    {
+      "entry": {
+        "sourceId": "urn:tag:sec.gov,2008:accession-number=0001104659-26-118869",
+        "title": "8-K - DOLLAR GENERAL CORP (0000029534) (Filer)",
+        "summary": "<b>Filed:</b> 2026-10-26 <b>AccNo:</b> 0001104659-26-118869 <b>Size:</b> 194 KB\n<br>Item 8.01: Other Events\n<br>Item 9.01: Financial Statements and Exhibits",
+        "url": "https://www.sec.gov/Archives/edgar/data/29534/000110465926118869/0001104659-26-118869-index.htm",
+        "publishedAt": "2026-10-26T21:26:19.000Z"
+      },
+      "title": {
+        "form": "8-K",
+        "company": "DOLLAR GENERAL CORP",
+        "cik": 29534,
+        "role": "Filer"
+      },
+      "items": [
+        {
+          "item": "8.01",
+          "name": "Other Events"
+        },
+        {
+          "item": "9.01",
+          "name": "Financial Statements and Exhibits"
+        }
+      ]
+    }
+  ],
+  "output": [
+    {
+      "sourceId": "urn:tag:sec.gov,2008:accession-number=0001104659-26-118875",
+      "title": "EDGA 8-K: 3.02 Unregistered Sales of Equity Securities; 8.01 Other Events",
+      "summary": "PERPETUA RESOURCES CORP. (CIK 1526243)",
+      "url": "https://www.sec.gov/Archives/edgar/data/1526243/000110465926118875/0001104659-26-118875-index.htm",
+      "publishedAt": "2026-10-26T21:30:28.000Z",
+      "symbols": [
+        "EDGA"
+      ],
+      "category": "offering",
+      "kind": "filing",
+      "tier": 1,
+      "meta": {
+        "form": "8-K",
+        "cik": 1526243,
+        "items": "3.02,8.01"
+      }
+    },
+    {
+      "sourceId": "urn:tag:sec.gov,2008:accession-number=0001193125-26-432193",
+      "title": "EDGB 8-K: 3.02 Unregistered Sales of Equity Securities; 7.01 Regulation FD Disclosure",
+      "summary": "North Haven Private Income Fund LLC (CIK 1851322)",
+      "url": "https://www.sec.gov/Archives/edgar/data/1851322/000119312526432193/0001193125-26-432193-index.htm",
+      "publishedAt": "2026-10-26T21:27:58.000Z",
+      "symbols": [
+        "EDGB"
+      ],
+      "category": "offering",
+      "kind": "filing",
+      "tier": 1,
+      "meta": {
+        "form": "8-K",
+        "cik": 1851322,
+        "items": "3.02,7.01"
+      }
+    },
+    {
+      "sourceId": "urn:tag:sec.gov,2008:accession-number=0001213900-26-112559",
+      "title": "EDGC 8-K: 1.01 Entry into a Material Definitive Agreement; 3.02 Unregistered Sales of Equity Securities; 3.03 Material Modifications to Rights of Security Holders; 5.07 Submission of Matters to a Vote of Security Holders; 8.01 Other Events",
+      "summary": "Bold Eagle Acquisition Corp. (CIK 1852207)",
+      "url": "https://www.sec.gov/Archives/edgar/data/1852207/000121390026112559/0001213900-26-112559-index.htm",
+      "publishedAt": "2026-10-26T21:27:29.000Z",
+      "symbols": [
+        "EDGC"
+      ],
+      "category": "offering",
+      "kind": "filing",
+      "tier": 1,
+      "meta": {
+        "form": "8-K",
+        "cik": 1852207,
+        "items": "1.01,3.02,3.03,5.07,8.01,9.01"
+      }
+    },
+    {
+      "sourceId": "urn:tag:sec.gov,2008:accession-number=0001104659-26-118869",
+      "title": "EDGD 8-K: 8.01 Other Events",
+      "summary": "DOLLAR GENERAL CORP (CIK 29534)",
+      "url": "https://www.sec.gov/Archives/edgar/data/29534/000110465926118869/0001104659-26-118869-index.htm",
+      "publishedAt": "2026-10-26T21:26:19.000Z",
+      "symbols": [
+        "EDGD"
+      ],
+      "category": "general",
+      "kind": "filing",
+      "tier": 1,
+      "meta": {
+        "form": "8-K",
+        "cik": 29534,
+        "items": "8.01,9.01"
+      }
+    }
+  ]
+}

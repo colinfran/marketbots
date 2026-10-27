@@ -1,0 +1,185 @@
+{
+  "fixture": "coingecko-trending.json",
+  "parser": "coingeckoItems (coingecko), fresh watcher",
+  "output": [],
+  "observations": {
+    "readings": [
+      {
+        "key": "coingecko:trending:BTC",
+        "value": 1,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "coingecko:trending:ETH",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "coingecko:trending:SOL",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "coingecko:trending:XRP",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "coingecko:trending:DOGE",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "coingecko:trending:ADA",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "coingecko:trending:LINK",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "coingecko:trending:AVAX",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "coingecko:trending:LTC",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "coingecko:trending:DOT",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "coingecko:trending:INIT",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "coingecko:trending:EGLD",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "coingecko:trending:FET",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "coingecko:trending:XAI",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "coingecko:trending:CAMP",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "coingecko:trending:ZK",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "coingecko:trending:AXIS",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "coingecko:trending:CTR",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "coingecko:trending:GAS",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "coingecko:trending:CSPR",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      },
+      {
+        "key": "coingecko:trending:XEC",
+        "value": 0,
+        "at": "2026-10-27T12:00:00.000Z",
+        "rules": [
+          "entry"
+        ]
+      }
+    ],
+    "rules": {
+      "entry": {
+        "id": "entry",
+        "kind": "level",
+        "abs": 1,
+        "rearmMs": 21600000
+      }
+    }
+  }
+}

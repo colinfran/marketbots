@@ -1,0 +1,100 @@
+{
+  "fixture": "house-fd-index.zip",
+  "parser": "unzip + parseFilingIndex",
+  "files": {
+    "2026FD.txt": 536,
+    "2026FD.xml": 2535
+  },
+  "output": [
+    {
+      "docId": "8068",
+      "type": "W",
+      "year": "2026",
+      "filed": "2026-04-15",
+      "first": "Richard",
+      "last": "Aaron",
+      "suffix": "",
+      "district": "MI04"
+    },
+    {
+      "docId": "10078673",
+      "type": "C",
+      "year": "2026",
+      "filed": "2026-06-11",
+      "first": "Abdisallam",
+      "last": "Abdulle",
+      "suffix": "",
+      "district": "MN02"
+    },
+    {
+      "docId": "30028196",
+      "type": "X",
+      "year": "2026",
+      "filed": "2026-05-20",
+      "first": "Abdisallam",
+      "last": "Abdulle",
+      "suffix": "",
+      "district": "MN02"
+    },
+    {
+      "docId": "20035669",
+      "type": "P",
+      "year": "2026",
+      "filed": "2026-10-22",
+      "first": "Cleo",
+      "last": "Fields",
+      "suffix": "",
+      "district": "LA06"
+    },
+    {
+      "docId": "20035590",
+      "type": "P",
+      "year": "2026",
+      "filed": "2026-10-07",
+      "first": "Josh",
+      "last": "Gottheimer",
+      "suffix": "",
+      "district": "NJ05"
+    },
+    {
+      "docId": "20035700",
+      "type": "P",
+      "year": "2026",
+      "filed": "2026-10-22",
+      "first": "Darrell E.",
+      "last": "Issa",
+      "suffix": "",
+      "district": "CA48"
+    },
+    {
+      "docId": "9116378",
+      "type": "P",
+      "year": "2026",
+      "filed": "2026-10-14",
+      "first": "Michael T.",
+      "last": "McCaul",
+      "suffix": "",
+      "district": "TX10"
+    },
+    {
+      "docId": "20033725",
+      "type": "P",
+      "year": "2026",
+      "filed": "2026-01-23",
+      "first": "Nancy",
+      "last": "Pelosi",
+      "suffix": "",
+      "district": "CA11"
+    },
+    {
+      "docId": "20035660",
+      "type": "P",
+      "year": "2026",
+      "filed": "2026-10-15",
+      "first": "David J.",
+      "last": "Taylor",
+      "suffix": "",
+      "district": "OH02"
+    }
+  ]
+}

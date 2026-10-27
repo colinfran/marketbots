@@ -1,0 +1,1209 @@
+{
+  "input": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "account": {
+        "type": "object",
+        "properties": {
+          "starting_capital": {
+            "type": "number",
+            "minimum": 100,
+            "maximum": 10000000
+          }
+        },
+        "required": [
+          "starting_capital"
+        ]
+      },
+      "risk": {
+        "type": "object",
+        "properties": {
+          "max_position_pct": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "max_open_positions": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30
+          },
+          "max_new_buys_per_cycle": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10
+          },
+          "cash_reserve_pct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 90
+          },
+          "max_daily_loss_pct": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 50
+          },
+          "flatten_loss_pct": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 50
+          },
+          "profit_lock_pct": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 50
+          },
+          "max_trades_per_day": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 500
+          },
+          "min_price": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 1000
+          },
+          "min_conviction": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10
+          },
+          "min_stop_pct": {
+            "type": "number",
+            "minimum": 0.05,
+            "maximum": 20
+          },
+          "max_stop_pct": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 50
+          },
+          "default_stop_pct": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 20
+          },
+          "min_reward_risk": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 10
+          },
+          "rebuy_cooldown_minutes": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1440
+          },
+          "max_overnight_pct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "max_position_pct",
+          "max_open_positions",
+          "max_new_buys_per_cycle",
+          "cash_reserve_pct",
+          "max_daily_loss_pct",
+          "flatten_loss_pct",
+          "profit_lock_pct",
+          "max_trades_per_day",
+          "min_price",
+          "min_conviction",
+          "min_stop_pct",
+          "max_stop_pct",
+          "default_stop_pct",
+          "min_reward_risk",
+          "rebuy_cooldown_minutes",
+          "max_overnight_pct"
+        ]
+      },
+      "options": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "allow_spreads": {
+            "type": "boolean"
+          },
+          "max_premium_per_trade_pct": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 20
+          },
+          "max_total_premium_pct": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 50
+          },
+          "max_open_positions": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 20
+          },
+          "max_contracts_per_trade": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "min_conviction": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10
+          },
+          "min_dte": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 365
+          },
+          "max_dte": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 730
+          },
+          "close_at_dte": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 30
+          },
+          "min_delta": {
+            "type": "number",
+            "minimum": 0.05,
+            "maximum": 0.95
+          },
+          "max_delta": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 0.99
+          },
+          "min_open_interest": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000
+          },
+          "max_spread_pct": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "min_spread_reward_risk": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 10
+          },
+          "default_stop_loss_pct": {
+            "type": "number",
+            "minimum": 10,
+            "maximum": 95
+          },
+          "default_take_profit_pct": {
+            "type": "number",
+            "minimum": 10,
+            "maximum": 1000
+          },
+          "entry_aggression": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "fill_timeout_seconds": {
+            "type": "integer",
+            "minimum": 5,
+            "maximum": 300
+          },
+          "monitor_seconds": {
+            "type": "integer",
+            "minimum": 5,
+            "maximum": 300
+          },
+          "max_underlyings_per_cycle": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 12
+          },
+          "contracts_per_underlying": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 30
+          }
+        },
+        "required": [
+          "enabled",
+          "allow_spreads",
+          "max_premium_per_trade_pct",
+          "max_total_premium_pct",
+          "max_open_positions",
+          "max_contracts_per_trade",
+          "min_conviction",
+          "min_dte",
+          "max_dte",
+          "close_at_dte",
+          "min_delta",
+          "max_delta",
+          "min_open_interest",
+          "max_spread_pct",
+          "min_spread_reward_risk",
+          "default_stop_loss_pct",
+          "default_take_profit_pct",
+          "entry_aggression",
+          "fill_timeout_seconds",
+          "monitor_seconds",
+          "max_underlyings_per_cycle",
+          "contracts_per_underlying"
+        ]
+      },
+      "ai": {
+        "type": "object",
+        "properties": {
+          "daily_budget_usd": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "models": {
+            "type": "object",
+            "properties": {
+              "research": {
+                "type": "string",
+                "pattern": "^[a-z0-9-]+\\/[a-z0-9][a-z0-9.\\-]*$"
+              },
+              "decision": {
+                "type": "string",
+                "pattern": "^[a-z0-9-]+\\/[a-z0-9][a-z0-9.\\-]*$"
+              },
+              "fallback": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[a-z0-9-]+\\/[a-z0-9][a-z0-9.\\-]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "research",
+              "decision",
+              "fallback"
+            ]
+          },
+          "x_search": {
+            "type": "boolean"
+          },
+          "stream_reasoning": {
+            "type": "boolean"
+          },
+          "research_timeout_seconds": {
+            "type": "number",
+            "minimum": 30,
+            "maximum": 600
+          },
+          "decision_timeout_seconds": {
+            "type": "number",
+            "minimum": 20,
+            "maximum": 300
+          }
+        },
+        "required": [
+          "daily_budget_usd",
+          "models",
+          "x_search",
+          "stream_reasoning",
+          "research_timeout_seconds",
+          "decision_timeout_seconds"
+        ]
+      },
+      "schedule": {
+        "type": "object",
+        "properties": {
+          "premarket_lead_minutes": {
+            "type": "number",
+            "minimum": 10,
+            "maximum": 240
+          },
+          "open_buffer_minutes": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 60
+          },
+          "trade_interval_minutes": {
+            "type": "number",
+            "minimum": 5,
+            "maximum": 240
+          },
+          "close_window_minutes": {
+            "type": "number",
+            "minimum": 5,
+            "maximum": 60
+          },
+          "postmarket_delay_minutes": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 120
+          },
+          "max_phase_attempts": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "trigger_move_pct": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 20
+          },
+          "trigger_cooldown_minutes": {
+            "type": "number",
+            "minimum": 5,
+            "maximum": 240
+          },
+          "min_cycle_gap_minutes": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 60
+          }
+        },
+        "required": [
+          "premarket_lead_minutes",
+          "open_buffer_minutes",
+          "trade_interval_minutes",
+          "close_window_minutes",
+          "postmarket_delay_minutes",
+          "max_phase_attempts",
+          "trigger_move_pct",
+          "trigger_cooldown_minutes",
+          "min_cycle_gap_minutes"
+        ]
+      },
+      "universe": {
+        "type": "object",
+        "properties": {
+          "benchmarks": {
+            "minItems": 1,
+            "maxItems": 40,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z.]{0,9}$"
+            }
+          },
+          "stream_max_symbols": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          }
+        },
+        "required": [
+          "benchmarks",
+          "stream_max_symbols"
+        ]
+      },
+      "wire": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "off",
+              "shadow",
+              "live"
+            ]
+          },
+          "research_mode": {
+            "type": "string",
+            "enum": [
+              "full",
+              "gap_fill",
+              "auto"
+            ]
+          },
+          "thresholds": {
+            "type": "object",
+            "properties": {
+              "annotate": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "review": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "evaluate": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "critical": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              }
+            },
+            "required": [
+              "annotate",
+              "review",
+              "evaluate",
+              "critical"
+            ]
+          },
+          "entry_confirmation": {
+            "type": "boolean"
+          },
+          "trigger_max_age_minutes": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 240
+          },
+          "symbol_cooldown_minutes": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 720
+          },
+          "event_min_gap_seconds": {
+            "type": "number",
+            "minimum": 15,
+            "maximum": 3600
+          },
+          "max_event_cycles_per_hour": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 30
+          },
+          "max_event_cycles_per_day": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 200
+          },
+          "event_budget_reserve_pct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 90
+          },
+          "event_research": {
+            "type": "string",
+            "enum": [
+              "none",
+              "x_verify"
+            ]
+          },
+          "event_research_timeout_seconds": {
+            "type": "number",
+            "minimum": 15,
+            "maximum": 300
+          },
+          "event_decision_timeout_seconds": {
+            "type": "number",
+            "minimum": 20,
+            "maximum": 300
+          },
+          "emergency_action": {
+            "type": "string",
+            "enum": [
+              "review",
+              "exit"
+            ]
+          },
+          "anomaly": {
+            "type": "object",
+            "properties": {
+              "price_z": {
+                "type": "number",
+                "minimum": 2,
+                "maximum": 20
+              },
+              "volume_multiple": {
+                "type": "number",
+                "minimum": 1.5,
+                "maximum": 50
+              },
+              "market_z": {
+                "type": "number",
+                "minimum": 2,
+                "maximum": 20
+              }
+            },
+            "required": [
+              "price_z",
+              "volume_multiple",
+              "market_z"
+            ]
+          },
+          "disabled_sources": {
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          },
+          "retention_days": {
+            "type": "integer",
+            "minimum": 7,
+            "maximum": 730
+          },
+          "odds_swing_pts": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "scan_max_symbols": {
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 5000
+          },
+          "scan_min_dollar_volume": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10000000000
+          }
+        },
+        "required": [
+          "mode",
+          "research_mode",
+          "thresholds",
+          "entry_confirmation",
+          "trigger_max_age_minutes",
+          "symbol_cooldown_minutes",
+          "event_min_gap_seconds",
+          "max_event_cycles_per_hour",
+          "max_event_cycles_per_day",
+          "event_budget_reserve_pct",
+          "event_research",
+          "event_research_timeout_seconds",
+          "event_decision_timeout_seconds",
+          "emergency_action",
+          "anomaly",
+          "disabled_sources",
+          "retention_days",
+          "odds_swing_pts",
+          "scan_max_symbols",
+          "scan_min_dollar_volume"
+        ]
+      }
+    },
+    "required": [
+      "account",
+      "risk",
+      "options",
+      "ai",
+      "schedule",
+      "universe",
+      "wire"
+    ]
+  },
+  "output": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "account": {
+        "type": "object",
+        "properties": {
+          "starting_capital": {
+            "type": "number",
+            "minimum": 100,
+            "maximum": 10000000
+          }
+        },
+        "required": [
+          "starting_capital"
+        ],
+        "additionalProperties": false
+      },
+      "risk": {
+        "type": "object",
+        "properties": {
+          "max_position_pct": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "max_open_positions": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30
+          },
+          "max_new_buys_per_cycle": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10
+          },
+          "cash_reserve_pct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 90
+          },
+          "max_daily_loss_pct": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 50
+          },
+          "flatten_loss_pct": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 50
+          },
+          "profit_lock_pct": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 50
+          },
+          "max_trades_per_day": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 500
+          },
+          "min_price": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 1000
+          },
+          "min_conviction": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10
+          },
+          "min_stop_pct": {
+            "type": "number",
+            "minimum": 0.05,
+            "maximum": 20
+          },
+          "max_stop_pct": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 50
+          },
+          "default_stop_pct": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 20
+          },
+          "min_reward_risk": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 10
+          },
+          "rebuy_cooldown_minutes": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1440
+          },
+          "max_overnight_pct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "max_position_pct",
+          "max_open_positions",
+          "max_new_buys_per_cycle",
+          "cash_reserve_pct",
+          "max_daily_loss_pct",
+          "flatten_loss_pct",
+          "profit_lock_pct",
+          "max_trades_per_day",
+          "min_price",
+          "min_conviction",
+          "min_stop_pct",
+          "max_stop_pct",
+          "default_stop_pct",
+          "min_reward_risk",
+          "rebuy_cooldown_minutes",
+          "max_overnight_pct"
+        ],
+        "additionalProperties": false
+      },
+      "options": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "allow_spreads": {
+            "type": "boolean"
+          },
+          "max_premium_per_trade_pct": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 20
+          },
+          "max_total_premium_pct": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 50
+          },
+          "max_open_positions": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 20
+          },
+          "max_contracts_per_trade": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "min_conviction": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10
+          },
+          "min_dte": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 365
+          },
+          "max_dte": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 730
+          },
+          "close_at_dte": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 30
+          },
+          "min_delta": {
+            "type": "number",
+            "minimum": 0.05,
+            "maximum": 0.95
+          },
+          "max_delta": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 0.99
+          },
+          "min_open_interest": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000
+          },
+          "max_spread_pct": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "min_spread_reward_risk": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 10
+          },
+          "default_stop_loss_pct": {
+            "type": "number",
+            "minimum": 10,
+            "maximum": 95
+          },
+          "default_take_profit_pct": {
+            "type": "number",
+            "minimum": 10,
+            "maximum": 1000
+          },
+          "entry_aggression": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "fill_timeout_seconds": {
+            "type": "integer",
+            "minimum": 5,
+            "maximum": 300
+          },
+          "monitor_seconds": {
+            "type": "integer",
+            "minimum": 5,
+            "maximum": 300
+          },
+          "max_underlyings_per_cycle": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 12
+          },
+          "contracts_per_underlying": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 30
+          }
+        },
+        "required": [
+          "enabled",
+          "allow_spreads",
+          "max_premium_per_trade_pct",
+          "max_total_premium_pct",
+          "max_open_positions",
+          "max_contracts_per_trade",
+          "min_conviction",
+          "min_dte",
+          "max_dte",
+          "close_at_dte",
+          "min_delta",
+          "max_delta",
+          "min_open_interest",
+          "max_spread_pct",
+          "min_spread_reward_risk",
+          "default_stop_loss_pct",
+          "default_take_profit_pct",
+          "entry_aggression",
+          "fill_timeout_seconds",
+          "monitor_seconds",
+          "max_underlyings_per_cycle",
+          "contracts_per_underlying"
+        ],
+        "additionalProperties": false
+      },
+      "ai": {
+        "type": "object",
+        "properties": {
+          "daily_budget_usd": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "models": {
+            "type": "object",
+            "properties": {
+              "research": {
+                "type": "string",
+                "pattern": "^[a-z0-9-]+\\/[a-z0-9][a-z0-9.\\-]*$"
+              },
+              "decision": {
+                "type": "string",
+                "pattern": "^[a-z0-9-]+\\/[a-z0-9][a-z0-9.\\-]*$"
+              },
+              "fallback": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[a-z0-9-]+\\/[a-z0-9][a-z0-9.\\-]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "research",
+              "decision",
+              "fallback"
+            ],
+            "additionalProperties": false
+          },
+          "x_search": {
+            "type": "boolean"
+          },
+          "stream_reasoning": {
+            "type": "boolean"
+          },
+          "research_timeout_seconds": {
+            "type": "number",
+            "minimum": 30,
+            "maximum": 600
+          },
+          "decision_timeout_seconds": {
+            "type": "number",
+            "minimum": 20,
+            "maximum": 300
+          }
+        },
+        "required": [
+          "daily_budget_usd",
+          "models",
+          "x_search",
+          "stream_reasoning",
+          "research_timeout_seconds",
+          "decision_timeout_seconds"
+        ],
+        "additionalProperties": false
+      },
+      "schedule": {
+        "type": "object",
+        "properties": {
+          "premarket_lead_minutes": {
+            "type": "number",
+            "minimum": 10,
+            "maximum": 240
+          },
+          "open_buffer_minutes": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 60
+          },
+          "trade_interval_minutes": {
+            "type": "number",
+            "minimum": 5,
+            "maximum": 240
+          },
+          "close_window_minutes": {
+            "type": "number",
+            "minimum": 5,
+            "maximum": 60
+          },
+          "postmarket_delay_minutes": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 120
+          },
+          "max_phase_attempts": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "trigger_move_pct": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 20
+          },
+          "trigger_cooldown_minutes": {
+            "type": "number",
+            "minimum": 5,
+            "maximum": 240
+          },
+          "min_cycle_gap_minutes": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 60
+          }
+        },
+        "required": [
+          "premarket_lead_minutes",
+          "open_buffer_minutes",
+          "trade_interval_minutes",
+          "close_window_minutes",
+          "postmarket_delay_minutes",
+          "max_phase_attempts",
+          "trigger_move_pct",
+          "trigger_cooldown_minutes",
+          "min_cycle_gap_minutes"
+        ],
+        "additionalProperties": false
+      },
+      "universe": {
+        "type": "object",
+        "properties": {
+          "benchmarks": {
+            "minItems": 1,
+            "maxItems": 40,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z.]{0,9}$"
+            }
+          },
+          "stream_max_symbols": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          }
+        },
+        "required": [
+          "benchmarks",
+          "stream_max_symbols"
+        ],
+        "additionalProperties": false
+      },
+      "wire": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "off",
+              "shadow",
+              "live"
+            ]
+          },
+          "research_mode": {
+            "type": "string",
+            "enum": [
+              "full",
+              "gap_fill",
+              "auto"
+            ]
+          },
+          "thresholds": {
+            "type": "object",
+            "properties": {
+              "annotate": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "review": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "evaluate": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "critical": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              }
+            },
+            "required": [
+              "annotate",
+              "review",
+              "evaluate",
+              "critical"
+            ],
+            "additionalProperties": false
+          },
+          "entry_confirmation": {
+            "type": "boolean"
+          },
+          "trigger_max_age_minutes": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 240
+          },
+          "symbol_cooldown_minutes": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 720
+          },
+          "event_min_gap_seconds": {
+            "type": "number",
+            "minimum": 15,
+            "maximum": 3600
+          },
+          "max_event_cycles_per_hour": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 30
+          },
+          "max_event_cycles_per_day": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 200
+          },
+          "event_budget_reserve_pct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 90
+          },
+          "event_research": {
+            "type": "string",
+            "enum": [
+              "none",
+              "x_verify"
+            ]
+          },
+          "event_research_timeout_seconds": {
+            "type": "number",
+            "minimum": 15,
+            "maximum": 300
+          },
+          "event_decision_timeout_seconds": {
+            "type": "number",
+            "minimum": 20,
+            "maximum": 300
+          },
+          "emergency_action": {
+            "type": "string",
+            "enum": [
+              "review",
+              "exit"
+            ]
+          },
+          "anomaly": {
+            "type": "object",
+            "properties": {
+              "price_z": {
+                "type": "number",
+                "minimum": 2,
+                "maximum": 20
+              },
+              "volume_multiple": {
+                "type": "number",
+                "minimum": 1.5,
+                "maximum": 50
+              },
+              "market_z": {
+                "type": "number",
+                "minimum": 2,
+                "maximum": 20
+              }
+            },
+            "required": [
+              "price_z",
+              "volume_multiple",
+              "market_z"
+            ],
+            "additionalProperties": false
+          },
+          "disabled_sources": {
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          },
+          "retention_days": {
+            "type": "integer",
+            "minimum": 7,
+            "maximum": 730
+          },
+          "odds_swing_pts": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "scan_max_symbols": {
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 5000
+          },
+          "scan_min_dollar_volume": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10000000000
+          }
+        },
+        "required": [
+          "mode",
+          "research_mode",
+          "thresholds",
+          "entry_confirmation",
+          "trigger_max_age_minutes",
+          "symbol_cooldown_minutes",
+          "event_min_gap_seconds",
+          "max_event_cycles_per_hour",
+          "max_event_cycles_per_day",
+          "event_budget_reserve_pct",
+          "event_research",
+          "event_research_timeout_seconds",
+          "event_decision_timeout_seconds",
+          "emergency_action",
+          "anomaly",
+          "disabled_sources",
+          "retention_days",
+          "odds_swing_pts",
+          "scan_max_symbols",
+          "scan_min_dollar_volume"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "account",
+      "risk",
+      "options",
+      "ai",
+      "schedule",
+      "universe",
+      "wire"
+    ],
+    "additionalProperties": false
+  }
+}

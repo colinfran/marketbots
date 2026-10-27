@@ -1,0 +1,126 @@
+{
+  "account": {
+    "starting_capital": 10000
+  },
+  "risk": {
+    "max_position_pct": 20,
+    "max_open_positions": 6,
+    "max_new_buys_per_cycle": 3,
+    "cash_reserve_pct": 5,
+    "max_daily_loss_pct": 2.5,
+    "flatten_loss_pct": 4,
+    "profit_lock_pct": 1.5,
+    "max_trades_per_day": 30,
+    "min_price": 5,
+    "min_conviction": 6,
+    "min_stop_pct": 0.4,
+    "max_stop_pct": 8,
+    "default_stop_pct": 2,
+    "min_reward_risk": 1.2,
+    "rebuy_cooldown_minutes": 30,
+    "max_overnight_pct": 50
+  },
+  "options": {
+    "enabled": true,
+    "allow_spreads": true,
+    "max_premium_per_trade_pct": 2,
+    "max_total_premium_pct": 15,
+    "max_open_positions": 4,
+    "max_contracts_per_trade": 10,
+    "min_conviction": 7,
+    "min_dte": 14,
+    "max_dte": 45,
+    "close_at_dte": 1,
+    "min_delta": 0.3,
+    "max_delta": 0.7,
+    "min_open_interest": 500,
+    "max_spread_pct": 10,
+    "min_spread_reward_risk": 0.5,
+    "default_stop_loss_pct": 50,
+    "default_take_profit_pct": 100,
+    "entry_aggression": 0.5,
+    "fill_timeout_seconds": 30,
+    "monitor_seconds": 15,
+    "max_underlyings_per_cycle": 6,
+    "contracts_per_underlying": 10
+  },
+  "ai": {
+    "daily_budget_usd": 10,
+    "models": {
+      "research": "spacexai/grok-4.5",
+      "decision": "spacexai/grok-4.7",
+      "fallback": null
+    },
+    "x_search": true,
+    "stream_reasoning": true,
+    "research_timeout_seconds": 180,
+    "decision_timeout_seconds": 240
+  },
+  "schedule": {
+    "premarket_lead_minutes": 90,
+    "open_buffer_minutes": 10,
+    "trade_interval_minutes": 30,
+    "close_window_minutes": 25,
+    "postmarket_delay_minutes": 10,
+    "max_phase_attempts": 3,
+    "trigger_move_pct": 3,
+    "trigger_cooldown_minutes": 30,
+    "min_cycle_gap_minutes": 8
+  },
+  "universe": {
+    "benchmarks": [
+      "SPY",
+      "QQQ",
+      "IWM",
+      "DIA",
+      "VIXY",
+      "TLT",
+      "GLD",
+      "USO",
+      "UUP",
+      "XLK",
+      "SMH",
+      "XLF",
+      "XLE",
+      "XLV",
+      "XLY",
+      "XLP",
+      "XLI",
+      "XLU",
+      "XLC",
+      "XLRE"
+    ],
+    "stream_max_symbols": 30
+  },
+  "wire": {
+    "mode": "live",
+    "research_mode": "auto",
+    "thresholds": {
+      "annotate": 30,
+      "review": 55,
+      "evaluate": 70,
+      "critical": 85
+    },
+    "entry_confirmation": true,
+    "trigger_max_age_minutes": 15,
+    "symbol_cooldown_minutes": 30,
+    "event_min_gap_seconds": 60,
+    "max_event_cycles_per_hour": 4,
+    "max_event_cycles_per_day": 24,
+    "event_budget_reserve_pct": 30,
+    "event_research": "x_verify",
+    "event_research_timeout_seconds": 45,
+    "event_decision_timeout_seconds": 90,
+    "emergency_action": "review",
+    "anomaly": {
+      "price_z": 4,
+      "volume_multiple": 5,
+      "market_z": 4
+    },
+    "disabled_sources": [],
+    "retention_days": 30,
+    "odds_swing_pts": 15,
+    "scan_max_symbols": 1500,
+    "scan_min_dollar_volume": 20000000
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "fixture": "polymarket-fed.json",
+  "parser": "polymarketMarkets fed (odds:polymarket)",
+  "output": [
+    {
+      "key": "polymarket:2589810",
+      "group": "polymarket:606422",
+      "question": "Will the Fed decrease interest rates by 50+ bps after the October 2026 meeting?",
+      "prob": 0.05,
+      "url": "https://polymarket.com/event/fed-decision-in-october-20260617190323537",
+      "fed": true,
+      "venue": "Polymarket"
+    },
+    {
+      "key": "polymarket:2589811",
+      "group": "polymarket:606422",
+      "question": "Will the Fed decrease interest rates by 25 bps after the October 2026 meeting?",
+      "prob": 0.05,
+      "url": "https://polymarket.com/event/fed-decision-in-october-20260617190323537",
+      "fed": true,
+      "venue": "Polymarket"
+    },
+    {
+      "key": "polymarket:2589812",
+      "group": "polymarket:606422",
+      "question": "Will there be no change in Fed interest rates after the October 2026 meeting?",
+      "prob": 93.55,
+      "url": "https://polymarket.com/event/fed-decision-in-october-20260617190323537",
+      "fed": true,
+      "venue": "Polymarket"
+    }
+  ]
+}

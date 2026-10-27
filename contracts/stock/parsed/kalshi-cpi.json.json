@@ -1,0 +1,26 @@
+{
+  "fixture": "kalshi-cpi.json",
+  "parser": "kalshiMarkets (KXCPI)",
+  "series": {
+    "series": "KXCPI",
+    "minOpenInterest": 3000
+  },
+  "output": [
+    {
+      "key": "kalshi:KXCPI-26NOV-T0.4",
+      "group": "kalshi:KXCPI-26NOV",
+      "question": "Will CPI rise more than 0.4% in November 2026?",
+      "prob": 21.000000000000004,
+      "url": "https://kalshi.com/markets/kxcpi",
+      "venue": "Kalshi"
+    },
+    {
+      "key": "kalshi:KXCPI-26OCT-T1.0",
+      "group": "kalshi:KXCPI-26OCT",
+      "question": "Will CPI rise more than 1.0% in October 2026?",
+      "prob": 1,
+      "url": "https://kalshi.com/markets/kxcpi",
+      "venue": "Kalshi"
+    }
+  ]
+}

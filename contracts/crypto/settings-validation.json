@@ -1,0 +1,50 @@
+{
+  "defaults": {
+    "ok": true,
+    "equals_input": true
+  },
+  "wire.thresholds not ascending": {
+    "ok": false,
+    "issues": [
+      {
+        "path": "wire.thresholds",
+        "code": "custom",
+        "message": "thresholds must ascend: annotate < review < evaluate < critical"
+      }
+    ]
+  },
+  "kraken.min_stop_pct >= max_stop_pct": {
+    "ok": false,
+    "issues": [
+      {
+        "path": "kraken.min_stop_pct",
+        "code": "custom",
+        "message": "min_stop_pct must be below max_stop_pct"
+      }
+    ]
+  },
+  "kraken.max_position_pct > max_asset_exposure_pct": {
+    "ok": false,
+    "issues": [
+      {
+        "path": "kraken.max_position_pct",
+        "code": "custom",
+        "message": "max_position_pct can't exceed max_asset_exposure_pct"
+      }
+    ]
+  },
+  "duplicate universe symbols": {
+    "ok": false,
+    "issues": [
+      {
+        "path": "universe.kraken_symbols",
+        "code": "custom",
+        "message": "duplicate symbols"
+      }
+    ]
+  },
+  "unknown keys are dropped": {
+    "ok": true,
+    "equals_input": false
+  }
+}

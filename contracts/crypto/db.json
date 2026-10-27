@@ -1,0 +1,357 @@
+{
+  "collections": {
+    "settings": "settings",
+    "engineState": "engine_state",
+    "engineStatus": "engine_status",
+    "lease": "engine_lease",
+    "events": "events",
+    "commands": "commands",
+    "audit": "audit_log",
+    "accounts": "accounts",
+    "positions": "positions",
+    "orders": "orders",
+    "fills": "fills",
+    "cycles": "cycles",
+    "research": "research",
+    "decisions": "decisions",
+    "snapshots": "portfolio_snapshots",
+    "dailyStats": "daily_stats",
+    "aiCalls": "ai_calls",
+    "backtests": "backtests",
+    "notifications": "notifications",
+    "seedRuns": "seed_runs",
+    "wireItems": "wire_items",
+    "wireTriggers": "wire_triggers",
+    "loginAttempts": "login_attempts",
+    "authUsers": "auth_users",
+    "authSessions": "auth_sessions",
+    "authAccounts": "auth_accounts",
+    "authVerifications": "auth_verifications"
+  },
+  "indexes": {
+    "events": [
+      {
+        "key": {
+          "expires_at": 1
+        },
+        "expireAfterSeconds": 0
+      },
+      {
+        "key": {
+          "type": 1,
+          "_id": -1
+        }
+      },
+      {
+        "key": {
+          "cycle_id": 1
+        },
+        "sparse": true
+      }
+    ],
+    "commands": [
+      {
+        "key": {
+          "status": 1,
+          "created_at": 1
+        }
+      },
+      {
+        "key": {
+          "created_at": -1
+        }
+      }
+    ],
+    "audit_log": [
+      {
+        "key": {
+          "at": -1
+        }
+      }
+    ],
+    "positions": [
+      {
+        "key": {
+          "account_id": 1,
+          "status": 1
+        }
+      },
+      {
+        "key": {
+          "account_id": 1,
+          "instrument": 1
+        },
+        "name": "one_open_position_per_instrument",
+        "unique": true,
+        "partialFilterExpression": {
+          "status": "open"
+        }
+      },
+      {
+        "key": {
+          "closed_at": -1
+        }
+      }
+    ],
+    "orders": [
+      {
+        "key": {
+          "account_id": 1,
+          "status": 1
+        }
+      },
+      {
+        "key": {
+          "created_at": -1
+        }
+      },
+      {
+        "key": {
+          "decision_id": 1
+        }
+      }
+    ],
+    "fills": [
+      {
+        "key": {
+          "at": -1
+        }
+      },
+      {
+        "key": {
+          "account_id": 1,
+          "at": -1
+        }
+      },
+      {
+        "key": {
+          "order_id": 1
+        }
+      },
+      {
+        "key": {
+          "decision_id": 1
+        }
+      },
+      {
+        "key": {
+          "venue_trade_id": 1
+        },
+        "sparse": true
+      }
+    ],
+    "cycles": [
+      {
+        "key": {
+          "started_at": -1
+        }
+      }
+    ],
+    "research": [
+      {
+        "key": {
+          "started_at": -1
+        }
+      },
+      {
+        "key": {
+          "cycle_id": 1
+        }
+      }
+    ],
+    "decisions": [
+      {
+        "key": {
+          "created_at": -1
+        }
+      },
+      {
+        "key": {
+          "cycle_id": 1
+        }
+      },
+      {
+        "key": {
+          "instrument": 1,
+          "created_at": -1
+        }
+      },
+      {
+        "key": {
+          "outcome_due_at": 1
+        },
+        "name": "outcome_pending",
+        "partialFilterExpression": {
+          "outcome": null
+        }
+      }
+    ],
+    "portfolio_snapshots": [
+      {
+        "key": {
+          "account_id": 1,
+          "at": -1
+        }
+      },
+      {
+        "key": {
+          "expires_at": 1
+        },
+        "expireAfterSeconds": 0
+      }
+    ],
+    "daily_stats": [
+      {
+        "key": {
+          "account_id": 1,
+          "day": -1
+        }
+      }
+    ],
+    "ai_calls": [
+      {
+        "key": {
+          "day": 1
+        }
+      },
+      {
+        "key": {
+          "at": -1
+        }
+      }
+    ],
+    "backtests": [
+      {
+        "key": {
+          "created_at": -1
+        }
+      }
+    ],
+    "notifications": [
+      {
+        "key": {
+          "at": -1
+        }
+      },
+      {
+        "key": {
+          "expires_at": 1
+        },
+        "expireAfterSeconds": 0
+      }
+    ],
+    "seed_runs": [
+      {
+        "key": {
+          "status": 1,
+          "at": 1
+        }
+      },
+      {
+        "key": {
+          "created_at": -1
+        }
+      }
+    ],
+    "wire_items": [
+      {
+        "key": {
+          "first_seen_at": -1
+        }
+      },
+      {
+        "key": {
+          "symbols": 1,
+          "first_seen_at": -1
+        }
+      },
+      {
+        "key": {
+          "cluster_id": 1
+        }
+      },
+      {
+        "key": {
+          "severity": -1,
+          "first_seen_at": -1
+        }
+      },
+      {
+        "key": {
+          "source": 1,
+          "first_seen_at": -1
+        }
+      },
+      {
+        "key": {
+          "notable": 1,
+          "first_seen_at": -1
+        }
+      },
+      {
+        "key": {
+          "expires_at": 1
+        },
+        "expireAfterSeconds": 0
+      }
+    ],
+    "wire_triggers": [
+      {
+        "key": {
+          "at": -1
+        }
+      },
+      {
+        "key": {
+          "status": 1,
+          "at": -1
+        }
+      },
+      {
+        "key": {
+          "expires_at": 1
+        },
+        "expireAfterSeconds": 0
+      }
+    ],
+    "login_attempts": [
+      {
+        "key": {
+          "expires_at": 1
+        },
+        "expireAfterSeconds": 0
+      }
+    ],
+    "auth_sessions": [
+      {
+        "key": {
+          "token": 1
+        }
+      },
+      {
+        "key": {
+          "expiresAt": 1
+        },
+        "expireAfterSeconds": 0
+      }
+    ],
+    "auth_verifications": [
+      {
+        "key": {
+          "identifier": 1
+        }
+      },
+      {
+        "key": {
+          "expiresAt": 1
+        },
+        "expireAfterSeconds": 0
+      }
+    ]
+  },
+  "terminal_order_statuses": [
+    "filled",
+    "canceled",
+    "rejected"
+  ]
+}

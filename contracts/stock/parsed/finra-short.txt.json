@@ -1,0 +1,29 @@
+{
+  "fixture": "finra-short.txt",
+  "parser": "parseShortVolume (default minimum volume)",
+  "output": {
+    "day": "2026-10-23",
+    "rows": {
+      "AA": {
+        "short": 654374.122102,
+        "total": 1472078.973339
+      },
+      "AAPL": {
+        "short": 8437771.038842,
+        "total": 13458627.278196
+      },
+      "NVDA": {
+        "short": 9498803.375829,
+        "total": 32380765.151177
+      },
+      "SPY": {
+        "short": 6617695.161255,
+        "total": 11594302.553178
+      },
+      "TSLA": {
+        "short": 11003513.027173,
+        "total": 19028662.114499
+      }
+    }
+  }
+}

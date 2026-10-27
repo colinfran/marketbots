@@ -1,0 +1,5 @@
+{
+  "fixture": "deribit-perp.json",
+  "parser": "deribitFundingAnnualPct (deribit)",
+  "output": 7.282845
+}

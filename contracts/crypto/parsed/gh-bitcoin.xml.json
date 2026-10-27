@@ -1,0 +1,135 @@
+{
+  "fixture": "gh-bitcoin.xml",
+  "parser": "parseFeed + gh:bitcoin.refine",
+  "parsed": [
+    {
+      "sourceId": "tag:github.com,2008:Repository/1181927/v32.1",
+      "title": "v32.1: Bitcoin Core 32.1 final",
+      "summary": "<p>Body trimmed for the fixture.</p>",
+      "url": "https://github.com/bitcoin/bitcoin/releases/tag/v32.1",
+      "publishedAt": "2026-10-26T18:04:03.000Z"
+    },
+    {
+      "sourceId": "tag:github.com,2008:Repository/1181927/v31.2",
+      "title": "v31.2: Bitcoin Core 31.2 final",
+      "summary": "<p>Body trimmed for the fixture.</p>",
+      "url": "https://github.com/bitcoin/bitcoin/releases/tag/v31.2",
+      "publishedAt": "2026-10-26T19:36:53.000Z"
+    },
+    {
+      "sourceId": "tag:github.com,2008:Repository/1181927/v30.4",
+      "title": "v30.4: Bitcoin Core 30.4 final",
+      "summary": "<p>Body trimmed for the fixture.</p>",
+      "url": "https://github.com/bitcoin/bitcoin/releases/tag/v30.4",
+      "publishedAt": "2026-10-26T20:59:30.000Z"
+    },
+    {
+      "sourceId": "tag:github.com,2008:Repository/1181927/v29.5",
+      "title": "v29.5: Bitcoin Core 29.5 final",
+      "summary": "<p>Body trimmed for the fixture.</p>",
+      "url": "https://github.com/bitcoin/bitcoin/releases/tag/v29.5",
+      "publishedAt": "2026-10-26T22:08:49.000Z"
+    },
+    {
+      "sourceId": "tag:github.com,2008:Repository/1181927/v32.0",
+      "title": "v32.0: Bitcoin Core 32.0 final",
+      "summary": "<p>Body trimmed for the fixture.</p>",
+      "url": "https://github.com/bitcoin/bitcoin/releases/tag/v32.0",
+      "publishedAt": "2026-10-21T13:27:27.000Z"
+    },
+    {
+      "sourceId": "tag:github.com,2008:Repository/1181927/v32.0rc4",
+      "title": "v32.0rc4: Bitcoin Core 32.0 release candidate 4",
+      "summary": "<p>Body trimmed for the fixture.</p>",
+      "url": "https://github.com/bitcoin/bitcoin/releases/tag/v32.0rc4",
+      "publishedAt": "2026-10-12T04:05:19.000Z"
+    }
+  ],
+  "output": [
+    {
+      "sourceId": "tag:github.com,2008:Repository/1181927/v32.1",
+      "title": "v32.1: Bitcoin Core 32.1 final",
+      "summary": null,
+      "url": "https://github.com/bitcoin/bitcoin/releases/tag/v32.1",
+      "publishedAt": "2026-10-26T18:04:03.000Z",
+      "symbols": [
+        "BTC/USD"
+      ],
+      "category": "upgrade",
+      "polarity": 0,
+      "baseSeverity": 20,
+      "meta": {
+        "release": true,
+        "new_line": false
+      }
+    },
+    {
+      "sourceId": "tag:github.com,2008:Repository/1181927/v31.2",
+      "title": "v31.2: Bitcoin Core 31.2 final",
+      "summary": null,
+      "url": "https://github.com/bitcoin/bitcoin/releases/tag/v31.2",
+      "publishedAt": "2026-10-26T19:36:53.000Z",
+      "symbols": [
+        "BTC/USD"
+      ],
+      "category": "upgrade",
+      "polarity": 0,
+      "baseSeverity": 20,
+      "meta": {
+        "release": true,
+        "new_line": false
+      }
+    },
+    {
+      "sourceId": "tag:github.com,2008:Repository/1181927/v30.4",
+      "title": "v30.4: Bitcoin Core 30.4 final",
+      "summary": null,
+      "url": "https://github.com/bitcoin/bitcoin/releases/tag/v30.4",
+      "publishedAt": "2026-10-26T20:59:30.000Z",
+      "symbols": [
+        "BTC/USD"
+      ],
+      "category": "upgrade",
+      "polarity": 0,
+      "baseSeverity": 20,
+      "meta": {
+        "release": true,
+        "new_line": false
+      }
+    },
+    {
+      "sourceId": "tag:github.com,2008:Repository/1181927/v29.5",
+      "title": "v29.5: Bitcoin Core 29.5 final",
+      "summary": null,
+      "url": "https://github.com/bitcoin/bitcoin/releases/tag/v29.5",
+      "publishedAt": "2026-10-26T22:08:49.000Z",
+      "symbols": [
+        "BTC/USD"
+      ],
+      "category": "upgrade",
+      "polarity": 0,
+      "baseSeverity": 20,
+      "meta": {
+        "release": true,
+        "new_line": false
+      }
+    },
+    {
+      "sourceId": "tag:github.com,2008:Repository/1181927/v32.0",
+      "title": "v32.0: Bitcoin Core 32.0 final",
+      "summary": null,
+      "url": "https://github.com/bitcoin/bitcoin/releases/tag/v32.0",
+      "publishedAt": "2026-10-21T13:27:27.000Z",
+      "symbols": [
+        "BTC/USD"
+      ],
+      "category": "upgrade",
+      "polarity": 0,
+      "baseSeverity": 30,
+      "meta": {
+        "release": true,
+        "new_line": true
+      }
+    }
+  ]
+}

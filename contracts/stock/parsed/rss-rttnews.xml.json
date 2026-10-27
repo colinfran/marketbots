@@ -1,0 +1,27 @@
+{
+  "fixture": "rss-rttnews.xml",
+  "parser": "parseFeed (rss:rttnews)",
+  "output": [
+    {
+      "sourceId": "https://www.rttnews.com/story.aspx?Id=3703009",
+      "title": "Bargain Hunting Contributes To Rebound On Wall Street",
+      "summary": "Following the pullback seen over the last two sessions of the previous week, stocks moved back to the upside during trading on Monday. The major averages all moved higher on the day, although the Dow posted a relatively modest gain. The major averages finished the day off their highs of the session but still in positive territory.",
+      "url": "https://www.rttnews.com/story.aspx?Id=3703009",
+      "publishedAt": "2026-10-26T20:11:08.000Z"
+    },
+    {
+      "sourceId": "https://www.rttnews.com/story.aspx?Id=3702965",
+      "title": "U.S. Stocks Showing Strong Move Back To The Upside",
+      "summary": "Stocks have moved mostly higher over the course of the trading day on Monday, regaining ground following the pullback seen over the two previous sessions. The major averages have all moved to the upside, with the tech-heavy Nasdaq leading the charge. Currently, the Nasdaq and S&P 500 are near their best levels of the day.",
+      "url": "https://www.rttnews.com/story.aspx?Id=3702965",
+      "publishedAt": "2026-10-26T15:13:21.000Z"
+    },
+    {
+      "sourceId": "https://www.rttnews.com/story.aspx?Id=3702953",
+      "title": "Verizon Lifts FY26 Outlook After Higher Q3; Signs $2 Bln AI Deal With AWS; Stock Drops",
+      "summary": "Telecom major Verizon Communications Inc. on Monday reported higher third-quarter results and raised fiscal 2026 forecast. Further, the company announced that it has signed an agreement valued at more than $2.0 billion with Amazon Web Services or AWS to expand its AI Infrastructure. In the early morning trading on the NYSE, VZ shares were losing around 2.34 percent.",
+      "url": "https://www.rttnews.com/story.aspx?Id=3702953",
+      "publishedAt": "2026-10-26T14:33:17.000Z"
+    }
+  ]
+}

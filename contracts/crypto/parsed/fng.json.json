@@ -1,0 +1,27 @@
+{
+  "fixture": "fng.json",
+  "parser": "fngItems (fng), fresh watcher",
+  "output": [],
+  "observations": {
+    "readings": [
+      {
+        "key": "fng",
+        "value": 0,
+        "at": "2026-10-27T00:00:00.000Z",
+        "rules": [
+          "extreme"
+        ]
+      }
+    ],
+    "rules": {
+      "extreme": {
+        "id": "extreme",
+        "kind": "level",
+        "abs": 1,
+        "rearmAt": 1,
+        "rearmMs": 0,
+        "exits": true
+      }
+    }
+  }
+}

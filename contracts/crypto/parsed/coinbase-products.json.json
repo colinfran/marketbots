@@ -1,0 +1,53 @@
+{
+  "fixture": "coinbase-products.json",
+  "parser": "coinbase_products.entries, then coinbase_products.describe for each entry as added and as removed",
+  "entries": {
+    "ETH/USD": "online",
+    "SOL/USD": "online",
+    "SENT/USD": "online"
+  },
+  "added": [
+    {
+      "sourceId": "added:ETH/USD",
+      "title": "Coinbase lists ETH/USD (new ETH-USD product, online)",
+      "symbols": [
+        "ETH/USD"
+      ],
+      "category": "listing_major",
+      "polarity": 1,
+      "url": "https://exchange.coinbase.com/trade/ETH-USD"
+    },
+    {
+      "sourceId": "added:SOL/USD",
+      "title": "Coinbase lists SOL/USD (new SOL-USD product, online)",
+      "symbols": [
+        "SOL/USD"
+      ],
+      "category": "listing_major",
+      "polarity": 1,
+      "url": "https://exchange.coinbase.com/trade/SOL-USD"
+    }
+  ],
+  "removed": [
+    {
+      "sourceId": "removed:ETH/USD",
+      "title": "Coinbase no longer lists ETH/USD",
+      "symbols": [
+        "ETH/USD"
+      ],
+      "category": "venue_status",
+      "polarity": -1,
+      "url": "https://exchange.coinbase.com/trade/ETH-USD"
+    },
+    {
+      "sourceId": "removed:SOL/USD",
+      "title": "Coinbase no longer lists SOL/USD",
+      "symbols": [
+        "SOL/USD"
+      ],
+      "category": "venue_status",
+      "polarity": -1,
+      "url": "https://exchange.coinbase.com/trade/SOL-USD"
+    }
+  ]
+}

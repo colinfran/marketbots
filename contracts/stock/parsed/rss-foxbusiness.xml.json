@@ -1,0 +1,27 @@
+{
+  "fixture": "rss-foxbusiness.xml",
+  "parser": "parseFeed (rss:foxbusiness)",
+  "output": [
+    {
+      "sourceId": "https://www.foxbusiness.com/markets/microsoft-offers-voluntary-buyouts-60000-employees-tech-giant-reshapes-its-workforce",
+      "title": "Microsoft offers voluntary buyouts to 60,000 employees as tech giant reshapes its workforce",
+      "summary": "Microsoft&apos;s voluntary buyout covers about 60,000 eligible employees, more than a quarter of its global workforce, across multiple countries.",
+      "url": "https://www.foxbusiness.com/markets/microsoft-offers-voluntary-buyouts-60000-employees-tech-giant-reshapes-its-workforce",
+      "publishedAt": "2026-10-26T20:03:11.000Z"
+    },
+    {
+      "sourceId": "https://www.foxbusiness.com/markets/anthropic-files-sec-paperwork-ai-giant-prepares-major-ipo",
+      "title": "Anthropic files SEC paperwork as AI giant prepares for major IPO",
+      "summary": "Anthropic filed its pre-IPO prospectus with the SEC ahead of the tech giant&apos;s highly-anticipated debut on the Nasdaq later this year as it seeks capital for the AI buildout.",
+      "url": "https://www.foxbusiness.com/markets/anthropic-files-sec-paperwork-ai-giant-prepares-major-ipo",
+      "publishedAt": "2026-10-26T13:28:06.000Z"
+    },
+    {
+      "sourceId": "https://www.foxbusiness.com/markets/microsoft-says-its-ai-tool-outperforms-generalist-doctors-complex-diagnoses",
+      "title": "Microsoft says its AI tool outperforms generalist doctors in complex diagnoses",
+      "summary": "Microsoft&apos;s new orchestrator AI diagnoses complex medical cases by simulating a panel of clinical experts, outperforming general physicians in accuracy.",
+      "url": "https://www.foxbusiness.com/markets/microsoft-says-its-ai-tool-outperforms-generalist-doctors-complex-diagnoses",
+      "publishedAt": "2026-10-23T19:22:04.000Z"
+    }
+  ]
+}

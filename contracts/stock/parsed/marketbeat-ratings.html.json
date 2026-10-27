@@ -1,0 +1,356 @@
+{
+  "fixture": "marketbeat-ratings.html",
+  "parser": "parseRatings + ratingItems (every ticker tracked)",
+  "rows": [
+    {
+      "ticker": "BAH",
+      "company": "Booz Allen Hamilton",
+      "action": "Upgraded by",
+      "broker": "TD Cowen",
+      "targetFrom": 77,
+      "targetTo": 95,
+      "ratingFrom": "Hold",
+      "ratingTo": "Buy"
+    },
+    {
+      "ticker": "BTU",
+      "company": "Peabody Energy",
+      "action": "Upgraded by",
+      "broker": "B. Riley Financial",
+      "targetFrom": 29,
+      "targetTo": 30,
+      "ratingFrom": "Neutral",
+      "ratingTo": "Buy"
+    },
+    {
+      "ticker": "AARD",
+      "company": "Aardvark Therapeutics",
+      "action": "Downgraded by",
+      "broker": "Oppenheimer",
+      "targetFrom": null,
+      "targetTo": null,
+      "ratingFrom": "Outperform",
+      "ratingTo": "Market Perform"
+    },
+    {
+      "ticker": "APR.UN",
+      "company": "Automotive Properties Real Est Invt TR",
+      "action": "Downgraded by",
+      "broker": "Canaccord Genuity Group",
+      "targetFrom": null,
+      "targetTo": null,
+      "ratingFrom": "Buy",
+      "ratingTo": "Hold"
+    },
+    {
+      "ticker": "ACG",
+      "company": "ACG Acquisition",
+      "action": "Target Raised by",
+      "broker": "Berenberg Bank",
+      "targetFrom": null,
+      "targetTo": null,
+      "ratingFrom": null,
+      "ratingTo": "Buy"
+    },
+    {
+      "ticker": "ACN",
+      "company": "Accenture",
+      "action": "Target Raised by",
+      "broker": "Wells Fargo & Company",
+      "targetFrom": 210,
+      "targetTo": 252,
+      "ratingFrom": "Equal Weight",
+      "ratingTo": "Equal Weight"
+    },
+    {
+      "ticker": "AARD",
+      "company": "Aardvark Therapeutics",
+      "action": "Target Lowered by",
+      "broker": "HC Wainwright",
+      "targetFrom": 4,
+      "targetTo": 2,
+      "ratingFrom": "Neutral",
+      "ratingTo": "Neutral"
+    },
+    {
+      "ticker": "ACR",
+      "company": "ACRES Commercial Realty",
+      "action": "Target Lowered by",
+      "broker": "Citizens Jmp",
+      "targetFrom": 23,
+      "targetTo": 17,
+      "ratingFrom": "Market Outperform",
+      "ratingTo": "Market Outperform"
+    },
+    {
+      "ticker": "A",
+      "company": "Agilent Technologies",
+      "action": "Initiated by",
+      "broker": "Deutsche Bank Aktiengesellschaft",
+      "targetFrom": null,
+      "targetTo": 190,
+      "ratingFrom": null,
+      "ratingTo": "Buy"
+    },
+    {
+      "ticker": "AAP",
+      "company": "Advance Auto Parts",
+      "action": "Initiated by",
+      "broker": "Bank of America",
+      "targetFrom": null,
+      "targetTo": 42,
+      "ratingFrom": null,
+      "ratingTo": "Underperform"
+    },
+    {
+      "ticker": "AAP",
+      "company": "Advance Auto Parts",
+      "action": "Reiterated by",
+      "broker": "Rothschild & Co Redburn",
+      "targetFrom": 45,
+      "targetTo": 32,
+      "ratingFrom": "Neutral",
+      "ratingTo": "Sell"
+    },
+    {
+      "ticker": "AARD",
+      "company": "Aardvark Therapeutics",
+      "action": "Reiterated by",
+      "broker": "HC Wainwright",
+      "targetFrom": null,
+      "targetTo": 2,
+      "ratingFrom": "Hold",
+      "ratingTo": "Hold"
+    }
+  ],
+  "output": [
+    {
+      "sourceId": "BAH|Upgraded by|TD Cowen|77>95|Hold>Buy",
+      "title": "BAH: TD Cowen upgrades to Buy from Hold, target $77.00 to $95.00",
+      "url": "https://www.marketbeat.com/stocks/BAH/forecast/",
+      "symbols": [
+        "BAH"
+      ],
+      "category": "analyst_action",
+      "polarity": 1,
+      "baseSeverity": 45,
+      "meta": {
+        "broker": "TD Cowen",
+        "action": "Upgraded by",
+        "rating_from": "Hold",
+        "rating_to": "Buy",
+        "target_from": 77,
+        "target_to": 95
+      }
+    },
+    {
+      "sourceId": "BTU|Upgraded by|B. Riley Financial|29>30|Neutral>Buy",
+      "title": "BTU: B. Riley Financial upgrades to Buy from Neutral, target $29.00 to $30.00",
+      "url": "https://www.marketbeat.com/stocks/BTU/forecast/",
+      "symbols": [
+        "BTU"
+      ],
+      "category": "analyst_action",
+      "polarity": 1,
+      "baseSeverity": 45,
+      "meta": {
+        "broker": "B. Riley Financial",
+        "action": "Upgraded by",
+        "rating_from": "Neutral",
+        "rating_to": "Buy",
+        "target_from": 29,
+        "target_to": 30
+      }
+    },
+    {
+      "sourceId": "AARD|Downgraded by|Oppenheimer|>|Outperform>Market Perform",
+      "title": "AARD: Oppenheimer downgrades to Market Perform from Outperform",
+      "url": "https://www.marketbeat.com/stocks/AARD/forecast/",
+      "symbols": [
+        "AARD"
+      ],
+      "category": "analyst_action",
+      "polarity": -1,
+      "baseSeverity": 45,
+      "meta": {
+        "broker": "Oppenheimer",
+        "action": "Downgraded by",
+        "rating_from": "Outperform",
+        "rating_to": "Market Perform",
+        "target_from": null,
+        "target_to": null
+      }
+    },
+    {
+      "sourceId": "APR.UN|Downgraded by|Canaccord Genuity Group|>|Buy>Hold",
+      "title": "APR.UN: Canaccord Genuity Group downgrades to Hold from Buy",
+      "url": "https://www.marketbeat.com/stocks/APR.UN/forecast/",
+      "symbols": [
+        "APR.UN"
+      ],
+      "category": "analyst_action",
+      "polarity": -1,
+      "baseSeverity": 45,
+      "meta": {
+        "broker": "Canaccord Genuity Group",
+        "action": "Downgraded by",
+        "rating_from": "Buy",
+        "rating_to": "Hold",
+        "target_from": null,
+        "target_to": null
+      }
+    },
+    {
+      "sourceId": "ACG|Target Raised by|Berenberg Bank|>|>Buy",
+      "title": "ACG: Berenberg Bank raises its target, Buy",
+      "url": "https://www.marketbeat.com/stocks/ACG/forecast/",
+      "symbols": [
+        "ACG"
+      ],
+      "category": "analyst_action",
+      "polarity": 1,
+      "baseSeverity": 30,
+      "meta": {
+        "broker": "Berenberg Bank",
+        "action": "Target Raised by",
+        "rating_from": null,
+        "rating_to": "Buy",
+        "target_from": null,
+        "target_to": null
+      }
+    },
+    {
+      "sourceId": "ACN|Target Raised by|Wells Fargo & Company|210>252|Equal Weight>Equal Weight",
+      "title": "ACN: Wells Fargo & Company raises target to $252.00 from $210.00, Equal Weight",
+      "url": "https://www.marketbeat.com/stocks/ACN/forecast/",
+      "symbols": [
+        "ACN"
+      ],
+      "category": "analyst_action",
+      "polarity": 1,
+      "baseSeverity": 30,
+      "meta": {
+        "broker": "Wells Fargo & Company",
+        "action": "Target Raised by",
+        "rating_from": "Equal Weight",
+        "rating_to": "Equal Weight",
+        "target_from": 210,
+        "target_to": 252
+      }
+    },
+    {
+      "sourceId": "AARD|Target Lowered by|HC Wainwright|4>2|Neutral>Neutral",
+      "title": "AARD: HC Wainwright lowers target to $2.00 from $4.00, Neutral",
+      "url": "https://www.marketbeat.com/stocks/AARD/forecast/",
+      "symbols": [
+        "AARD"
+      ],
+      "category": "analyst_action",
+      "polarity": -1,
+      "baseSeverity": 30,
+      "meta": {
+        "broker": "HC Wainwright",
+        "action": "Target Lowered by",
+        "rating_from": "Neutral",
+        "rating_to": "Neutral",
+        "target_from": 4,
+        "target_to": 2
+      }
+    },
+    {
+      "sourceId": "ACR|Target Lowered by|Citizens Jmp|23>17|Market Outperform>Market Outperform",
+      "title": "ACR: Citizens Jmp lowers target to $17.00 from $23.00, Market Outperform",
+      "url": "https://www.marketbeat.com/stocks/ACR/forecast/",
+      "symbols": [
+        "ACR"
+      ],
+      "category": "analyst_action",
+      "polarity": -1,
+      "baseSeverity": 30,
+      "meta": {
+        "broker": "Citizens Jmp",
+        "action": "Target Lowered by",
+        "rating_from": "Market Outperform",
+        "rating_to": "Market Outperform",
+        "target_from": 23,
+        "target_to": 17
+      }
+    },
+    {
+      "sourceId": "A|Initiated by|Deutsche Bank Aktiengesellschaft|>190|>Buy",
+      "title": "A: Deutsche Bank Aktiengesellschaft initiates at Buy, target $190.00",
+      "url": "https://www.marketbeat.com/stocks/A/forecast/",
+      "symbols": [
+        "A"
+      ],
+      "category": "analyst_action",
+      "polarity": 1,
+      "baseSeverity": 30,
+      "meta": {
+        "broker": "Deutsche Bank Aktiengesellschaft",
+        "action": "Initiated by",
+        "rating_from": null,
+        "rating_to": "Buy",
+        "target_from": null,
+        "target_to": 190
+      }
+    },
+    {
+      "sourceId": "AAP|Initiated by|Bank of America|>42|>Underperform",
+      "title": "AAP: Bank of America initiates at Underperform, target $42.00",
+      "url": "https://www.marketbeat.com/stocks/AAP/forecast/",
+      "symbols": [
+        "AAP"
+      ],
+      "category": "analyst_action",
+      "polarity": -1,
+      "baseSeverity": 30,
+      "meta": {
+        "broker": "Bank of America",
+        "action": "Initiated by",
+        "rating_from": null,
+        "rating_to": "Underperform",
+        "target_from": null,
+        "target_to": 42
+      }
+    },
+    {
+      "sourceId": "AAP|Reiterated by|Rothschild & Co Redburn|45>32|Neutral>Sell",
+      "title": "AAP: Rothschild & Co Redburn reiterated Sell, target $45.00 to $32.00",
+      "url": "https://www.marketbeat.com/stocks/AAP/forecast/",
+      "symbols": [
+        "AAP"
+      ],
+      "category": "analyst_action",
+      "polarity": -1,
+      "baseSeverity": 20,
+      "meta": {
+        "broker": "Rothschild & Co Redburn",
+        "action": "Reiterated by",
+        "rating_from": "Neutral",
+        "rating_to": "Sell",
+        "target_from": 45,
+        "target_to": 32
+      }
+    },
+    {
+      "sourceId": "AARD|Reiterated by|HC Wainwright|>2|Hold>Hold",
+      "title": "AARD: HC Wainwright reiterated Hold, target $2.00",
+      "url": "https://www.marketbeat.com/stocks/AARD/forecast/",
+      "symbols": [
+        "AARD"
+      ],
+      "category": "analyst_action",
+      "polarity": 0,
+      "baseSeverity": 20,
+      "meta": {
+        "broker": "HC Wainwright",
+        "action": "Reiterated by",
+        "rating_from": "Hold",
+        "rating_to": "Hold",
+        "target_from": null,
+        "target_to": 2
+      }
+    }
+  ]
+}

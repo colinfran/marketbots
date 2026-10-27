@@ -1,0 +1,37 @@
+{
+  "fixture": "massive.json",
+  "parser": "massive_news.map",
+  "output": [
+    {
+      "sourceId": "53ad4b32a368f68feb4d934744aef540603e81f627a9633cec7a8a88cd963c61",
+      "title": "ROSEN, NATIONAL TRIAL COUNSEL, Encourages Fluence Energy, Inc. Investors to Secure Counsel Before Important Deadline in Securities Class Action – FLNC",
+      "summary": "Rosen Law Firm is soliciting investors who purchased securities of Fluence Energy, Duolingo, and Tigo Energy during specified periods to join class action lawsuits. The firm alleges that Fluence Energy made false statements about its ability to deliver backlog and revenue guidance due to manufacturing facility issues. Similar class actions have been filed against the other companies, with a November 30, 2026 deadline for lead plaintiff claims.",
+      "url": "https://www.globenewswire.com/news-release/2026/10/27/3388660/673/en/rosen-national-trial-counsel-encourages-fluence-energy-inc-investors-to-secure-counsel-before-important-deadline-in-securities-class-action-flnc.html",
+      "publishedAt": "2026-10-27T01:00:00.000Z",
+      "symbols": [
+        "FLNC",
+        "DUOL",
+        "TYGO"
+      ],
+      "meta": {
+        "publisher": "GlobeNewswire Inc."
+      }
+    },
+    {
+      "sourceId": "4c65aa3f65796da9ec30c5536564b9fef470adc706e203f7b8e4762ae9e19f54",
+      "title": "Alphabet Must Show This on Oct. 28 or the Stock Could Stall",
+      "summary": "Alphabet's Oct. 28 earnings report will be critical for investors to assess whether Google Cloud's growing profits are translating into actual cash flow. The company posted negative free cash flow of $5.9 billion in Q2 despite strong cloud growth, and is now spending more on capex ($195-205B annually) than it generates in operating cash flow ($185.7B over trailing 12 months). Investors should focus on whether operating cash flow returns to the $45-50 billion range to confirm the AI investment is self-funding, or if the company continues relying on shareholder capital.",
+      "url": "https://www.fool.com/investing/2026/10/26/alphabet-must-show-this-on-oct-28-or-the-stock-cou/?source=iedfolrf0000001",
+      "publishedAt": "2026-10-27T01:00:00.000Z",
+      "symbols": [
+        "GOOG",
+        "GOOGL",
+        "GOOGM",
+        "GOOGN"
+      ],
+      "meta": {
+        "publisher": "The Motley Fool"
+      }
+    }
+  ]
+}

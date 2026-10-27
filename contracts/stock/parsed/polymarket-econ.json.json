@@ -1,0 +1,46 @@
+{
+  "fixture": "polymarket-econ.json",
+  "parser": "polymarketMarkets",
+  "output": [
+    {
+      "key": "polymarket:2589810",
+      "group": "polymarket:606422",
+      "question": "Will the Fed decrease interest rates by 50+ bps after the October 2026 meeting?",
+      "prob": 0.05,
+      "url": "https://polymarket.com/event/fed-decision-in-october-20260617190323537",
+      "venue": "Polymarket"
+    },
+    {
+      "key": "polymarket:2589811",
+      "group": "polymarket:606422",
+      "question": "Will the Fed decrease interest rates by 25 bps after the October 2026 meeting?",
+      "prob": 0.05,
+      "url": "https://polymarket.com/event/fed-decision-in-october-20260617190323537",
+      "venue": "Polymarket"
+    },
+    {
+      "key": "polymarket:2589812",
+      "group": "polymarket:606422",
+      "question": "Will there be no change in Fed interest rates after the October 2026 meeting?",
+      "prob": 93.8,
+      "url": "https://polymarket.com/event/fed-decision-in-october-20260617190323537",
+      "venue": "Polymarket"
+    },
+    {
+      "key": "polymarket:3215006",
+      "group": "polymarket:770450",
+      "question": "Will the Fed decrease interest rates by 25 bps after the December 2026 meeting?",
+      "prob": 0.65,
+      "url": "https://polymarket.com/event/fed-decision-in-december-20260729232808632",
+      "venue": "Polymarket"
+    },
+    {
+      "key": "polymarket:3215007",
+      "group": "polymarket:770450",
+      "question": "Will there be no change in Fed interest rates after the December 2026 meeting?",
+      "prob": 21.5,
+      "url": "https://polymarket.com/event/fed-decision-in-december-20260729232808632",
+      "venue": "Polymarket"
+    }
+  ]
+}

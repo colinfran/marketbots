@@ -1,0 +1,30 @@
+{
+  "fixture": "yahoo-pricing.json",
+  "parser": "decodePricing per message",
+  "output": [
+    {
+      "id": "BTC-USD",
+      "price": 79899.9922,
+      "at": 1793067326000,
+      "dayVolume": 26003152896
+    },
+    {
+      "id": "ETH-USD",
+      "price": 2317.1399,
+      "at": 1793067327000,
+      "dayVolume": 9315267584
+    },
+    {
+      "id": "BTC-USD",
+      "price": 79899.0938,
+      "at": 1793067331000,
+      "dayVolume": 26003152896
+    },
+    {
+      "id": "ETH-USD",
+      "price": 2317.21,
+      "at": 1793067332000,
+      "dayVolume": 9315267584
+    }
+  ]
+}
