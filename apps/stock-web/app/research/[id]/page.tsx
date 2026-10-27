@@ -43,7 +43,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
   return (
     <div className="space-y-4">
       <script type="application/ld+json" dangerouslySetInnerHTML={jsonLd(article)} />
-      <Link prefetch href={`/journal/${data.report.trading_day}`} className="text-muted-foreground text-sm hover:underline">
+      <Link href={`/journal/${data.report.trading_day}`} className="text-muted-foreground text-sm hover:underline">
         ← {formatDay(data.report.trading_day)}
       </Link>
       <ReportView doc={data.report} decisions={data.decisions} cycle={data.cycle} events={events} wire={wire} />

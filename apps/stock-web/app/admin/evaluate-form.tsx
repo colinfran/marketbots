@@ -44,7 +44,7 @@ export function EvaluateForm({ disabled }: { disabled: boolean }) {
       {!valid && <p className="text-loss text-xs">Up to 5 tickers, like NVDA or BRK.B.</p>}
       <CommandResult result={result} error={error} />
       {result && (
-        <Link prefetch href="/live" className="text-muted-foreground text-xs hover:underline">
+        <Link href="/live" className="text-muted-foreground text-xs hover:underline">
           Watch it live
         </Link>
       )}

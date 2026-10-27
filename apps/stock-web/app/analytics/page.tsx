@@ -142,7 +142,7 @@ export default async function AnalyticsPage() {
         <section>
           <SectionTitle
             action={
-              <Link prefetch href="/strategies" className="text-muted-foreground text-sm hover:underline">
+              <Link href="/strategies" className="text-muted-foreground text-sm hover:underline">
                 All setups
               </Link>
             }

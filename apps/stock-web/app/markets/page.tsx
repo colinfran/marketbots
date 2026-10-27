@@ -47,7 +47,7 @@ export default async function MarketsPage() {
               <>
                 {" "}
                 (
-                <Link prefetch href={`/research/${report._id}`} className="hover:underline">
+                <Link href={`/research/${report._id}`} className="hover:underline">
                   {titleCase(report.phase)}, {ago(report.created_at)}
                 </Link>
                 )
@@ -107,7 +107,7 @@ export default async function MarketsPage() {
                     <TableCell className="text-right tabular-nums">{w ? `${w.conviction}/10` : "—"}</TableCell>
                     <TableCell className="text-sm">
                       {d ? (
-                        <Link prefetch href={`/research/${d.report_id}`} className="inline-flex items-center gap-1.5 hover:underline">
+                        <Link href={`/research/${d.report_id}`} className="inline-flex items-center gap-1.5 hover:underline">
                           <ActionBadge action={d.action} /> <span className="text-muted-foreground text-xs">{ago(d.at)}</span>
                         </Link>
                       ) : (

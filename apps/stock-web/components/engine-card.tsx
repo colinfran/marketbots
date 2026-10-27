@@ -35,7 +35,7 @@ export function EngineCard({ engine, last }: { engine: EngineSummary; last: Pick
               Latest cycle <PhaseBadge phase={last.phase} /> <StatusBadge status={last.status} /> {ago(last.started_at)}
             </p>
             {(headline ?? last.error) && <p className="line-clamp-3 text-sm">{headline ?? last.error}</p>}
-            <Link prefetch href={last.report_id ? `/research/${last.report_id}` : "/live"} className="mt-1 inline-flex items-center gap-1 text-sm font-medium hover:underline">
+            <Link href={last.report_id ? `/research/${last.report_id}` : "/live"} className="mt-1 inline-flex items-center gap-1 text-sm font-medium hover:underline">
               {last.report_id ? "Full report" : "Watch it live"} <ArrowRightIcon className="size-3.5" aria-hidden />
             </Link>
           </>

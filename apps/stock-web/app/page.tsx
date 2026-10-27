@@ -123,7 +123,7 @@ export default async function DashboardPage() {
               <p>
                 <span className="font-medium">Next focus:</span> <span className="text-muted-foreground">{latest.report.next_focus}</span>
               </p>
-              <Link prefetch href={`/research/${latest._id}`} className="inline-flex items-center gap-1 font-medium hover:underline">
+              <Link href={`/research/${latest._id}`} className="inline-flex items-center gap-1 font-medium hover:underline">
                 Full report <ArrowRightIcon className="size-3.5" />
               </Link>
             </CardContent>
@@ -152,7 +152,7 @@ export default async function DashboardPage() {
       <section>
         <SectionTitle
           action={
-            <Link prefetch href="/holdings" className="text-muted-foreground text-sm hover:underline">
+            <Link href="/holdings" className="text-muted-foreground text-sm hover:underline">
               All holdings
             </Link>
           }
@@ -164,7 +164,7 @@ export default async function DashboardPage() {
       <section>
         <SectionTitle
           action={
-            <Link prefetch href="/trades?tab=options" className="text-muted-foreground text-sm hover:underline">
+            <Link href="/trades?tab=options" className="text-muted-foreground text-sm hover:underline">
               All options
             </Link>
           }
@@ -176,7 +176,7 @@ export default async function DashboardPage() {
       <section>
         <SectionTitle
           action={
-            <Link prefetch href={`/journal/${today}`} className="text-muted-foreground text-sm hover:underline">
+            <Link href={`/journal/${today}`} className="text-muted-foreground text-sm hover:underline">
               Today&apos;s journal
             </Link>
           }
@@ -188,7 +188,7 @@ export default async function DashboardPage() {
       <section>
         <SectionTitle
           action={
-            <Link prefetch href="/trades" className="text-muted-foreground text-sm hover:underline">
+            <Link href="/trades" className="text-muted-foreground text-sm hover:underline">
               All trades
             </Link>
           }

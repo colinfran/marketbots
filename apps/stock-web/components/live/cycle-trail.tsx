@@ -387,7 +387,7 @@ export function CycleTrailView({ trail, live, triggerItems = [] }: { trail: Trai
               </span>
               <span className="text-muted-foreground text-xs">${trail.completed.ai_cost_usd.toFixed(2)} of AI</span>
               {live && (
-                <Link prefetch href={`/research/${trail.completed.report_id}`} className="ml-auto inline-flex items-center gap-1 font-medium hover:underline">
+                <Link href={`/research/${trail.completed.report_id}`} className="ml-auto inline-flex items-center gap-1 font-medium hover:underline">
                   Full report <ExternalLinkIcon className="size-3.5" aria-hidden />
                 </Link>
               )}

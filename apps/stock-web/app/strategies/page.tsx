@@ -94,7 +94,7 @@ export default async function StrategiesPage() {
           A trade&apos;s realized P&L counts toward the setup and book of the decision that opened it, including stop-loss and take-profit exits the broker triggered. Setups
           aren&apos;t backtested: they are the AI&apos;s calls, and a model asked about past prices has probably seen what happened next. They are judged going forward instead,
           on these results and on{" "}
-          <Link prefetch href="/analytics" className="text-foreground underline underline-offset-2">
+          <Link href="/analytics" className="text-foreground underline underline-offset-2">
             Analytics
           </Link>
           . Nothing changes automatically: the prompt and rules change only by hand.

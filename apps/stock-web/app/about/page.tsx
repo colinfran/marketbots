@@ -75,7 +75,7 @@ export default async function AboutPage() {
         <ol className="text-muted-foreground list-decimal space-y-2 pl-5 text-sm leading-relaxed">
           <li>
             <span className="text-foreground font-medium">Research</span> ({settings.ai.models.research}): live web search and X search produce a sourced memo with timestamps. Grok does not decide anything here.
-            Every search query and source streams to the <Link prefetch href="/live" className="underline underline-offset-2">Live</Link> page as it happens.
+            Every search query and source streams to the <Link href="/live" className="underline underline-offset-2">Live</Link> page as it happens.
           </li>
           <li>
             <span className="text-foreground font-medium">Decision</span> ({settings.ai.models.decision}): the memo, the broker&apos;s ground-truth data, the option chains and the risk limits become one fixed JSON

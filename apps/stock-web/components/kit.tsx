@@ -123,12 +123,12 @@ const links = (e: EngineEvent): React.ReactNode => {
   return (
     <p className="mt-0.5 flex gap-3 text-xs">
       {e.instrument && (
-        <Link prefetch href={`/markets/${encodeURIComponent(e.instrument)}`} className="text-muted-foreground hover:text-foreground font-mono underline underline-offset-2">
+        <Link href={`/markets/${encodeURIComponent(e.instrument)}`} className="text-muted-foreground hover:text-foreground font-mono underline underline-offset-2">
           {e.instrument}
         </Link>
       )}
       {reportId && (
-        <Link prefetch href={`/research/${reportId}`} className="text-muted-foreground hover:text-foreground underline underline-offset-2">
+        <Link href={`/research/${reportId}`} className="text-muted-foreground hover:text-foreground underline underline-offset-2">
           View report
         </Link>
       )}

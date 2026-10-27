@@ -72,7 +72,7 @@ export default async function LivePage() {
               <span className="text-muted-foreground text-xs">{duration(c.duration_ms)}</span>
               <span className="text-muted-foreground text-xs">{c.kind === "event" ? c.trigger.replace(/^event:\s*/, "") : c.trigger}</span>
               {c.report_id ? (
-                <Link prefetch href={`/research/${c.report_id}`} className="ml-auto text-xs font-medium hover:underline">
+                <Link href={`/research/${c.report_id}`} className="ml-auto text-xs font-medium hover:underline">
                   Report
                 </Link>
               ) : (
