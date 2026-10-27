@@ -1,0 +1,25 @@
+{
+ "symbols": [
+  {
+   "id": 12613,
+   "symbol": "SOFI",
+   "title": "SoFi Technologies Inc",
+   "exchange": "NASDAQ",
+   "trending_score": 9.25505
+  },
+  {
+   "id": 4760,
+   "symbol": "CLS",
+   "title": "Celestica, Inc.",
+   "exchange": "NYSE",
+   "trending_score": 7.23022
+  },
+  {
+   "id": 15484,
+   "symbol": "XP",
+   "title": "XP Inc - Ordinary Shares - Class A",
+   "exchange": "NASDAQ",
+   "trending_score": 6.67718
+  }
+ ]
+}

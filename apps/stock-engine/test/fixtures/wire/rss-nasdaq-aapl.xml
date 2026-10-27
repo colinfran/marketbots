@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:content="http://purl.org/rss/1.0/modules/content/"
+  xmlns:foaf="http://xmlns.com/foaf/0.1/" xmlns:og="http://ogp.me/ns#"
+  xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#" xmlns:schema="http://schema.org/"
+  xmlns:sioc="http://rdfs.org/sioc/ns#" xmlns:sioct="http://rdfs.org/sioc/types#"
+  xmlns:skos="http://www.w3.org/2004/02/skos/core#" xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
+  xmlns:nasdaq="http://nasdaq.com/reference/feeds/1.0" version="2.0" xml:base="https://www.nasdaq.com/feed/rssoutbound">
+ <channel>
+  <title>AAPL Feed</title>
+  <link>https://www.nasdaq.com/feed/rssoutbound</link>
+  <description>This feed is responsible for generating the rss feed related to the topic AAPL</description>
+  <language>en</language>
+  <item>
+   <title>Prediction: 3 Stocks That Will Be Worth More Than Apple 5 Years From Now</title>
+   <link>https://www.nasdaq.com/articles/prediction-3-stocks-will-be-worth-more-apple-5-years-now</link>
+   <description>
+        Key PointsSpaceX has the potential to see its shares skyrocket on the back of its AI infrastructure growth.
+    </description>
+   <pubDate>Tue, 27 Oct 2026 01:20:00 +0000</pubDate>
+   <guid isPermaLink="true">https://www.nasdaq.com/articles/prediction-3-stocks-will-be-worth-more-apple-5-years-now?time=1793064000</guid>
+   <dc:creator>The Motley Fool</dc:creator>
+   <category>Markets</category>
+   <nasdaq:tickers>AAPL,AAPL,GOOGL,NVDA,GOOG</nasdaq:tickers>
+  </item>
+<item>
+   <title>Apple (AAPL) Stock Falls Amid Market Uptick: What Investors Need to Know</title>
+   <link>https://www.nasdaq.com/articles/apple-aapl-stock-falls-amid-market-uptick-what-investors-need-know</link>
+   <description>
+        Apple (AAPL) closed the most recent trading day at $344.02, moving 1.07% from the previous trading session.
+    </description>
+   <pubDate>Mon, 26 Oct 2026 20:45:03 +0000</pubDate>
+   <guid isPermaLink="true">https://www.nasdaq.com/articles/apple-aapl-stock-falls-amid-market-uptick-what-investors-need-know?time=1793047503</guid>
+   <dc:creator>Zacks</dc:creator>
+   <category>Technology</category>
+   <nasdaq:tickers>AAPL</nasdaq:tickers>
+  </item>
+<item>
+   <title>Dow Movers: AAPL, HONIV  </title>
+   <link>https://www.nasdaq.com/articles/dow-movers-aapl-honiv-2</link>
+   <description>
+        In early trading on Monday, shares of Honeywell International topped the list of the day's best performing Dow Jones Industrial Average components, trading up 7.5%.  Year to date, Honeywell International registers a 42.2% gain.
+
+And the worst performing Dow component thus far on
+    </description>
+   <pubDate>Mon, 26 Oct 2026 15:48:55 +0000</pubDate>
+   <guid isPermaLink="true">https://www.nasdaq.com/articles/dow-movers-aapl-honiv-2?time=1793029735</guid>
+   <dc:creator>BNK Invest</dc:creator>
+   <category>Markets,Stocks</category>
+   <nasdaq:tickers>AAPL,AAPL,CVX,NVDA</nasdaq:tickers>
+   <nasdaq:partnerlink url="http://www.marketnewsvideo.com/slideshows/cheaper-stocks-than-insiders/">10 Bargains You Can Buy Cheaper Than Insiders Did</nasdaq:partnerlink>
+   <nasdaq:partnerlink url="http://www.marketnewsvideo.com/slideshows/ten-stocks-below-book/">10 Stocks Crossing Below Book Value</nasdaq:partnerlink>
+   <nasdaq:partnerlink url="http://www.marketnewsvideo.com/slideshows/ten-oversold-stocks/">10 Oversold Stocks You Need To Know About</nasdaq:partnerlink>
+  </item>
+</channel>
+</rss>

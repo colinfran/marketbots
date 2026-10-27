@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html><body>
+    <div class="case-content">
+        <ul>
+            <li>
+                    <span class="time">2026-10-26</span>
+                    <h3><em>Hacked target: </em>Bloom Trading</h3>
+                    <p><em>Description of the event: </em>The cross-chain trading automation platform Bloom Trading suffered a security incident. Attackers exploited a Remote Code Execution (RCE) vulnerability in a third-party module, draining approximately 9,408 SOL (about $947,000) from 49 wallet addresses belonging to 9 users. The team confirmed no private keys were compromised, other wallets remain safe, pledged full reimbursement to affected users, and temporarily paused some services while investigating.</p>
+                    <p><span><em>Amount of loss: </em>
+                        
+                            $ 947,000
+                        
+                    </span><span><em>Attack method: </em>Supply Chain Attack</span></p>
+
+                    
+                    <p class="link-reference"><a href="https://x.com/BloomTrading/status/2114646392010359238" rel="nofollow" target="_blank">View Reference Sources</a></p>
+                    
+                </li>
+            <li>
+                    <span class="time">2026-10-25</span>
+                    <h3><em>Hacked target: </em>Yapeswap</h3>
+                    <p><em>Description of the event: </em>The Ethereum DeFi protocol Yapeswap (an AMM DEX) was hit by a governance attack. WorkersUnion’s zero-quorum setting allowed a proposal backed by only ~0.000055% of voting power to transfer YapeFactory’s feeToSetter role to the attacker. The attacker then installed a malicious Registry that made latestVault() return fake vaults while vaults() still listed real ones. YapePair counted the diverted deposits as farming assets without issuing redeemable shares, resulting in a loss of approximately $21,900.</p>
+                    <p><span><em>Amount of loss: </em>
+                        
+                            $ 21900
+                        
+                    </span><span><em>Attack method: </em>Governance Attack</span></p>
+
+                    
+                    <p class="link-reference"><a href="https://x.com/SlowMist_Team/status/2114290073546219799" rel="nofollow" target="_blank">View Reference Sources</a></p>
+                    
+                </li>
+            <li>
+                    <span class="time">2026-10-21</span>
+                    <h3><em>Hacked target: </em>Fearless Wallet</h3>
+                    <p><em>Description of the event: </em>Polkadot issued a security alert stating that the Fearless Wallet browser extension (a third-party wallet) had been compromised since February 2025. Malicious code sent users’ private keys to an attacker-controlled server when the wallet was unlocked. Eight users have reported unauthorized transactions totaling 17,286 DOT. Affected users are urged to create new keypairs in a different wallet and move funds immediately.</p>
+                    <p><span><em>Amount of loss: </em>
+                        
+                            $ 20000
+                        
+                    </span><span><em>Attack method: </em>Private Key Leakage</span></p>
+
+                    
+                    <p class="link-reference"><a href="https://x.com/Polkadot/status/2112910039207800970" rel="nofollow" target="_blank">View Reference Sources</a></p>
+                    
+                </li>
+            <li>
+                    <span class="time">2026-10-14</span>
+                    <h3><em>Hacked target: </em>Pirate Chain</h3>
+                    <p><em>Description of the event: </em>A transaction validation vulnerability in Pirate Chain source code allowed the unauthorized creation of approximately 39.8 million ARRR, increasing the total supply by about 20%. The newly minted funds were transferred into the Sapling shielded pool. NonKYC identified suspicious deposits, restricted the associated accounts, and blocked withdrawals. The exploit combined two validation failures: bypassing the issuance check and incorrect interpretation of the output scripts. dPoW operators suspended notarizations as a precaution, and exchanges/pools were asked to pause operations while a recovery plan is developed.</p>
+                    <p><span><em>Amount of loss: </em>
+                        
+                            $ 10,746,000
+                        
+                    </span><span><em>Attack method: </em>Transaction Validation Vulnerability</span></p>
+
+                    
+                    <p class="link-reference"><a href="https://x.com/PirateChain/status/2110774266123767871" rel="nofollow" target="_blank">View Reference Sources</a></p>
+                    
+                </li>
+            <li>
+                    <span class="time">2026-10-09</span>
+                    <h3><em>Hacked target: </em>EtherVista</h3>
+                    <p><em>Description of the event: </em>EtherVista’s liquidity pool was exploited due to an integer overflow in the K-invariant check inside EtherVistaPair.swap(). Both reserves are uint112, so their product can wrap around and the check can pass even when the real reserve product drops sharply. The attacker registered a self-controlled contract as an authorized router and ran two crafted swaps to drain WETH and VISTA, with a loss of about $18,600.</p>
+                    <p><span><em>Amount of loss: </em>
+                        
+                            $ 18600
+                        
+                    </span><span><em>Attack method: </em>Smart Contract Vulnerability</span></p>
+
+                    
+                    <p class="link-reference"><a href="https://x.com/SlowMist_Team/status/2108427455572918626" rel="nofollow" target="_blank">View Reference Sources</a></p>
+                    
+                </li>
+        </ul>
+    </div>
+</body></html>

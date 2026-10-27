@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:media="http://search.yahoo.com/mrss/" version="2.0">
+  <channel>
+    <title>Economy</title>
+    <link>https://rss.politico.com/economy.xml</link>
+    <description>News, Analysis and Opinion from POLITICO</description>
+    <language>en-us</language>
+    <lastBuildDate>Thu, 22 Oct 2026 08:32:08 EDT</lastBuildDate>
+    <item xmlns:dcterms="http://purl.org/dc/terms/">
+      <title>Australian treasurer says opponents want higher inflation for political gain</title>
+      <link>https://www.politico.com/news/2026/10/22/australian-treasurer-says-opponents-want-higher-inflation-for-political-gain-01131517</link>
+      <description>In a Canberra Playbook Podcast interview Jim Chalmers accused Liberals of wanting Australians to suffer, as their path back to power.</description>
+      <category>Australia</category>
+      <category>DC</category>
+      <category>Australian Labor Party</category>
+      <category>Jim Chalmers</category>
+      <category>Australia</category>
+      <category>Economy</category>
+      <category>Cost Of Living</category>
+      <guid isPermaLink="false">000001a1-628c-d6a9-abf9-fa8ee3820001</guid>
+      <pubDate>Thu, 22 Oct 2026 08:32:08 EDT</pubDate>
+      <media:content type="application/octet-stream" url="https://static.politico.com/e3/4d/880b51034a4b9e30127ff470bdd2/https-delivery-gettyimages.com/downloads/2271054456">
+        <media:credit scheme="urn:ebu">Kent Nishimura/AFP via Getty Images</media:credit>
+        <media:title>Australia's Treasurer Jim Chalmers speaks during a television interview during the 2026 IMF and World Bank Group Spring Meetings in Washington.</media:title>
+        <media:thumbnail url="https://static.politico.com/e3/4d/880b51034a4b9e30127ff470bdd2/https-delivery-gettyimages.com/downloads/2271054456" />
+      </media:content>
+      <dc:creator>By Ryan Heath and Amanda Copp</dc:creator>
+      <dc:contributor>By Ryan Heath and Amanda Copp</dc:contributor>
+    </item>
+<item xmlns:dcterms="http://purl.org/dc/terms/">
+      <title>Rising bond yields will add billions to budget pressure: Australian treasurer</title>
+      <link>https://www.politico.com/news/2026/10/22/rising-bond-yields-will-add-billions-to-budget-pressure-australian-treasurer-01131518</link>
+      <description>Jim Chalmers warns global pressures mean more domestic pain.</description>
+      <category>Australia</category>
+      <category>DC</category>
+      <category>Economy</category>
+      <category>Global Economy</category>
+      <category>Jim Chalmers</category>
+      <category>Tim Wilson</category>
+      <category>Barnaby Joyce</category>
+      <category>Australia</category>
+      <guid isPermaLink="false">000001a1-62aa-d632-a1af-ffba5c310001</guid>
+      <pubDate>Thu, 22 Oct 2026 08:12:04 EDT</pubDate>
+      <media:content type="application/octet-stream" url="https://static.politico.com/5f/55/6234ceba46769c574a252d326620/https-delivery-gettyimages.com/downloads/2206729014">
+        <media:credit scheme="urn:ebu">Hilary Wardhaugh/Getty Images</media:credit>
+        <media:title>Treasurer of Australia Jim Chalmers speaks to the media as he arrives to deliver the budget at Parliament House on March 25, 2025.</media:title>
+        <media:thumbnail url="https://static.politico.com/5f/55/6234ceba46769c574a252d326620/https-delivery-gettyimages.com/downloads/2206729014" />
+      </media:content>
+      <dc:creator>By Amanda Copp</dc:creator>
+      <dc:contributor>By Amanda Copp</dc:contributor>
+    </item>
+<item xmlns:dcterms="http://purl.org/dc/terms/">
+      <title>Sen. Kennedy rails against AI developers as ‘high IQ stupid people’</title>
+      <link>https://www.politico.com/news/2026/09/06/kennedy-ai-developers-high-iq-stupid-people-01066756</link>
+      <description>The Louisiana Republican’s comments come as both Democrats and Republicans have been forced to find ways to address the backlash against data centers.</description>
+      <category>Congress</category>
+      <category>DC</category>
+      <category>John N. Kennedy</category>
+      <category>AI</category>
+      <category>Data</category>
+      <category>Scott Bessent</category>
+      <category>Economy</category>
+      <category>Technology</category>
+      <category>Meet The Press</category>
+      <guid isPermaLink="false">000001a0-77c5-d4fe-a9ae-ffcf94900000</guid>
+      <pubDate>Sun, 06 Sep 2026 13:52:09 EDT</pubDate>
+      <media:content type="image/jpeg" url="https://static.politico.com/a7/c3/3cab1b7142c6ad18404ecc78f79f/senate-federal-reserve-2-836.jpg">
+        <media:credit scheme="urn:ebu">Jose Luis Magana/AP</media:credit>
+        <media:title>“I mean, the buildings they build now — they look like a broken arm with the bones sticking out,” John N. Kennedy said of data centers.</media:title>
+        <media:thumbnail url="https://static.politico.com/a7/c3/3cab1b7142c6ad18404ecc78f79f/senate-federal-reserve-2-836.jpg" />
+      </media:content>
+      <dc:creator>By Jalen Beckford</dc:creator>
+      <dc:contributor>By Jalen Beckford</dc:contributor>
+    </item>
+</channel>
+</rss>

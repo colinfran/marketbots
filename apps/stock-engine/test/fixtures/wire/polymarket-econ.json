@@ -1,0 +1,82 @@
+[
+ {
+  "id": "606422",
+  "slug": "fed-decision-in-october-20260617190323537",
+  "title": "Fed Decision in October?",
+  "markets": [
+   {
+    "id": "2589810",
+    "question": "Will the Fed decrease interest rates by 50+ bps after the October 2026 meeting?",
+    "outcomes": "[\"Yes\", \"No\"]",
+    "outcomePrices": "[\"0.0005\", \"0.9995\"]",
+    "liquidityNum": 3748702.77158,
+    "volume24hr": 267304.81,
+    "active": true,
+    "closed": false,
+    "endDate": "2026-10-29T03:59:00Z"
+   },
+   {
+    "id": "2589811",
+    "question": "Will the Fed decrease interest rates by 25 bps after the October 2026 meeting?",
+    "outcomes": "[\"Yes\", \"No\"]",
+    "outcomePrices": "[\"0.0005\", \"0.9995\"]",
+    "liquidityNum": 727665.11967,
+    "volume24hr": 1402459.761,
+    "active": true,
+    "closed": false,
+    "endDate": "2026-10-29T03:59:00Z"
+   },
+   {
+    "id": "2589812",
+    "question": "Will there be no change in Fed interest rates after the October 2026 meeting?",
+    "outcomes": "[\"Yes\", \"No\"]",
+    "outcomePrices": "[\"0.938\", \"0.062\"]",
+    "liquidityNum": 1705963.89918,
+    "volume24hr": 3614521.2816589996,
+    "active": true,
+    "closed": false,
+    "endDate": "2026-10-29T03:59:00Z"
+   }
+  ]
+ },
+ {
+  "id": "770450",
+  "slug": "fed-decision-in-december-20260729232808632",
+  "title": "Fed Decision in December?",
+  "markets": [
+   {
+    "id": "3215005",
+    "question": "Will the Fed decrease interest rates by 50+ bps after the December 2026 meeting?",
+    "outcomes": "[\"Yes\", \"No\"]",
+    "outcomePrices": "[\"0.0095\", \"0.9905\"]",
+    "liquidityNum": 101820.28608,
+    "volume24hr": 2495.2266250000002,
+    "active": true,
+    "closed": false,
+    "endDate": "2026-12-09T23:59:00Z"
+   },
+   {
+    "id": "3215006",
+    "question": "Will the Fed decrease interest rates by 25 bps after the December 2026 meeting?",
+    "outcomes": "[\"Yes\", \"No\"]",
+    "outcomePrices": "[\"0.0065\", \"0.9935\"]",
+    "liquidityNum": 202670.0096,
+    "volume24hr": 40694.749027,
+    "active": true,
+    "closed": false,
+    "endDate": "2026-12-09T23:59:00Z"
+   },
+   {
+    "id": "3215007",
+    "question": "Will there be no change in Fed interest rates after the December 2026 meeting?",
+    "outcomes": "[\"Yes\", \"No\"]",
+    "outcomePrices": "[\"0.215\", \"0.785\"]",
+    "liquidityNum": 204262.928,
+    "volume24hr": 11139.451227,
+    "active": true,
+    "closed": false,
+    "endDate": "2026-12-09T23:59:00Z"
+   }
+  ]
+ }
+]

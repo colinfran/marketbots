@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/" xml:lang="en-US">
+  <id>tag:github.com,2008:https://github.com/XRPLF/rippled/releases</id>
+  <link type="text/html" rel="alternate" href="https://github.com/XRPLF/rippled/releases"/>
+  <link type="application/atom+xml" rel="self" href="https://github.com/XRPLF/rippled/releases.atom"/>
+  <title>Release notes from rippled</title>
+  <updated>2026-10-20T12:49:40Z</updated>
+  <entry>
+    <id>tag:github.com,2008:Repository/2724167/3.5.0-rc1</id>
+    <updated>2026-10-20T12:49:40Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/XRPLF/rippled/releases/tag/3.5.0-rc1"/>
+    <title>3.5.0-rc1</title>
+    <content type="html"><![CDATA[<p>Body trimmed for the fixture.</p>]]></content>
+    <author>
+      <name>mathbunnyru</name>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/12270691?s=60&amp;v=4"/>
+  </entry>
+<entry>
+    <id>tag:github.com,2008:Repository/2724167/3.4.1</id>
+    <updated>2026-10-10T00:04:48Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/XRPLF/rippled/releases/tag/3.4.1"/>
+    <title>3.4.1</title>
+    <content type="html"><![CDATA[<p>Body trimmed for the fixture.</p>]]></content>
+    <author>
+      <name>mathbunnyru</name>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/12270691?s=60&amp;v=4"/>
+  </entry>
+<entry>
+    <id>tag:github.com,2008:Repository/2724167/3.5.0-custom-2</id>
+    <updated>2026-09-29T20:44:49Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/XRPLF/rippled/releases/tag/3.5.0-custom-2"/>
+    <title>3.5.0-custom-2</title>
+    <content type="html"><![CDATA[<p>Body trimmed for the fixture.</p>]]></content>
+    <author>
+      <name>mathbunnyru</name>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/12270691?s=60&amp;v=4"/>
+  </entry>
+</feed>

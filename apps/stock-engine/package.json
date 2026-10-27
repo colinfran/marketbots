@@ -1,0 +1,36 @@
+{
+  "name": "@mb/stock-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=../../stock.env --env-file-if-exists=../../stock.local.env src/main.ts",
+    "start": "node --enable-source-maps dist/main.js",
+    "build": "node build.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@ai-sdk/xai": "^5.0.30",
+    "@mb/stock-core": "workspace:*",
+    "ai": "^7.0.153",
+    "cheerio": "1.2.0",
+    "fast-xml-parser": "5.11.2",
+    "mongodb": "^7.7.0",
+    "unpdf": "1.8.1",
+    "ws": "^8.22.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@mb/config": "workspace:*",
+    "@types/node": "^22",
+    "@types/ws": "^8.18.2",
+    "esbuild": "^0.28.2",
+    "eslint": "^9",
+    "mongodb-memory-server": "^11.3.0",
+    "tsx": "^4.23.15",
+    "typescript": "^5",
+    "vitest": "^4.1.12"
+  }
+}

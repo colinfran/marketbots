@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:media="http://search.yahoo.com/mrss/" xmlns:dc="http://purl.org/dc/elements/1.1/" version="2.0"
+>
+<channel>
+<title>WSJ.com: Markets</title>
+<description>Markets</description>
+<link>https://www.wsj.com/finance</link>
+<language>en-us</language>
+<copyright>Copyright &#169; Dow Jones &amp; Company, Inc. All rights reserved.</copyright>
+<lastBuildDate>Tue, 27 Oct 2026 02:44:20 GMT</lastBuildDate>
+<image>
+<title>WSJ.com: Markets</title>
+<url>http://online.wsj.com/img/wsj_sm_logo.gif</url>
+<link>https://www.wsj.com/finance</link>
+</image>
+<item>
+<guid isPermaLink="false">lc-wsj-stock-market-today-dow-sp-500-nasdaq-10-26-2026</guid>
+<title>Stock Market News, Oct. 26, 2026: Tech Shares Rally After Anthropic Files for Historic IPO</title>
+<description>Documents set up Claude provider to go public next month</description>
+<link>https://www.wsj.com/livecoverage/stock-market-today-dow-sp-500-nasdaq-10-26-2026?mod=rss_markets_main</link>
+<pubDate>Mon, 26 Oct 2026 08:24:19 GMT</pubDate>
+<media:content url="https://images.wsj.net/im-925349" medium="image" type="image/jpeg">
+</media:content>
+</item>
+<item>
+<guid isPermaLink="false">WP-WSJ-0004009408</guid>
+<title>Broadcom CEO Intervened to Seal $63 Billion Anthropic Debt Deal</title>
+<description>The deal, announced on Monday, is the biggest ever to raise money for AI infrastructure.</description>
+<link>https://www.wsj.com/finance/broadcom-ceo-intervened-to-seal-63-billion-anthropic-debt-deal-c807754f?mod=rss_markets_main</link>
+<pubDate>Tue, 27 Oct 2026 01:09:00 GMT</pubDate>
+<dc:creator>Alexander Saeedy</dc:creator>
+<dc:creator>Anissa Gardizy</dc:creator>
+<dc:creator>Matt Wirz</dc:creator>
+<media:content url="https://images.wsj.net/im-90626607" medium="image" type="image/jpeg">
+<media:credit>Chris Ratcliffe/Bloomberg News</media:credit>
+</media:content>
+</item>
+<item>
+<guid isPermaLink="false">WP-WSJ-0003992186</guid>
+<title>The &#x2018;Buy, Borrow and Die&#x2019; Wealth Strategy Has Become a $5 Trillion Market</title>
+<description>A Deloitte study found a booming market in stock-based loans to billionaires&#x2014;and the lesser rich.</description>
+<link>https://www.wsj.com/finance/the-buy-borrow-and-die-wealth-strategy-has-become-a-5-trillion-market-d9149a9d?mod=rss_markets_main</link>
+<pubDate>Tue, 27 Oct 2026 01:00:00 GMT</pubDate>
+<dc:creator>Margot Patrick</dc:creator>
+<media:content url="https://images.wsj.net/im-71175148" medium="image" type="image/jpeg">
+<media:credit>Rachel Mendelson/WSJ; iStock</media:credit>
+</media:content>
+</item>
+</channel>
+</rss>

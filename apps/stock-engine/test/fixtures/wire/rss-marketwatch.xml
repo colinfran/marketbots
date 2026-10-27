@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:media="http://search.yahoo.com/mrss/" xmlns:dc="http://purl.org/dc/elements/1.1/" version="2.0"
+>
+<channel>
+<title>MarketWatch.com - Top Stories</title>
+<description>MarketWatch, a leading publisher of business and financial news, offers users up-to-the minute news, investment tools, and subscription products.</description>
+<link>http://www.marketwatch.com/</link>
+<language>en-us</language>
+<copyright>Copyright &#169; Dow Jones &amp; Company, Inc. All rights reserved.</copyright>
+<lastBuildDate>Tue, 27 Oct 2026 02:42:36 GMT</lastBuildDate>
+<ttl>60</ttl>
+<image>
+<title>MarketWatch.com - Top Stories</title>
+<url>https://www.marketwatch.com/rss/marketwatch.gif</url>
+<link>http://www.marketwatch.com/</link>
+</image>
+<item>
+<guid isPermaLink="false">WP-MKTW-0005307700</guid>
+<title>&#x2018;You need only watch episodes of Judge Judy&#x2019;: I&#x2019;m in my 70s. Why do people keep making the same avoidable financial mistakes?</title>
+<description>&#x201c;Consider some familiar examples of poor decisions: accumulating credit-card debt or failing to plan for retirement.&#x201d;</description>
+<link>https://www.marketwatch.com/story/you-need-only-watch-episodes-of-judge-judy-im-in-my-70s-why-do-people-keep-making-the-same-avoidable-financial-mistakes-bbf60fe4?mod=mw_rss_topstories</link>
+<pubDate>Mon, 26 Oct 2026 22:30:00 GMT</pubDate>
+<dc:creator>Quentin Fottrell</dc:creator>
+<media:content url="https://images.mktw.net/im-19205579" medium="image" type="image/jpeg">
+<media:credit>Getty Images</media:credit>
+</media:content>
+</item>
+<item>
+<guid isPermaLink="false">WP-MKTW-0005308685</guid>
+<title>Dividend stocks are having an excellent October as tech sector struggles</title>
+<description>ETFs focused on dividend stocks are seeing a powerful rally in October, adding to huge gains in 2026.</description>
+<link>https://www.marketwatch.com/story/dividend-stocks-are-having-an-excellent-october-as-tech-sector-struggles-5ae40b02?mod=mw_rss_topstories</link>
+<pubDate>Mon, 26 Oct 2026 22:10:00 GMT</pubDate>
+<dc:creator>Christine Idzelis</dc:creator>
+<media:content url="https://images.mktw.net/im-05706147" medium="image" type="image/jpeg">
+<media:credit>Getty Images</media:credit>
+</media:content>
+</item>
+<item>
+<guid isPermaLink="false">WP-MKTW-0005307376</guid>
+<title>Options traders are seizing control of the S&amp;P 500</title>
+<description>There&#x2019;s a reason the index hasn&#x2019;t moved much since June, according to a team at UBS.</description>
+<link>https://www.marketwatch.com/story/options-traders-are-seizing-control-of-the-s-p-500-1add94ca?mod=mw_rss_topstories</link>
+<pubDate>Mon, 26 Oct 2026 22:03:00 GMT</pubDate>
+<dc:creator>Joseph Adinolfi</dc:creator>
+<media:content url="https://images.mktw.net/im-64453953" medium="image" type="image/jpeg">
+<media:credit>Scott Olson/Getty Images</media:credit>
+</media:content>
+</item>
+</channel>
+</rss>

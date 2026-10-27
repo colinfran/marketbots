@@ -1,0 +1,26 @@
+[
+ {
+  "title": "Federal Funds Rate",
+  "country": "USD",
+  "date": "2026-10-28T14:00:00-04:00",
+  "impact": "High",
+  "forecast": "4.00%",
+  "previous": "4.00%"
+ },
+ {
+  "title": "FOMC Statement",
+  "country": "USD",
+  "date": "2026-10-28T14:00:00-04:00",
+  "impact": "High",
+  "forecast": "",
+  "previous": ""
+ },
+ {
+  "title": "Bank Holiday",
+  "country": "NZD",
+  "date": "2026-10-25T15:00:00-04:00",
+  "impact": "Holiday",
+  "forecast": "",
+  "previous": ""
+ }
+]

@@ -1,0 +1,50 @@
+{
+ "coins": [
+  {
+   "item": {
+    "id": "pudgy-penguins",
+    "coin_id": 52622,
+    "name": "Pudgy Penguins",
+    "symbol": "PENGU",
+    "market_cap_rank": 119,
+    "slug": "pudgy-penguins",
+    "score": 0
+   }
+  },
+  {
+   "item": {
+    "id": "quack-ai",
+    "coin_id": 68793,
+    "name": "Quack AI",
+    "symbol": "Q",
+    "market_cap_rank": 75,
+    "slug": "quack-ai",
+    "score": 1
+   }
+  },
+  {
+   "item": {
+    "id": "pearl-2",
+    "coin_id": 102173580,
+    "name": "Pearl",
+    "symbol": "PEARL",
+    "market_cap_rank": 97,
+    "slug": "pearl-research",
+    "score": 2
+   }
+  },
+  {
+   "item": {
+    "id": "bitcoin",
+    "coin_id": 1,
+    "name": "Bitcoin",
+    "symbol": "BTC",
+    "market_cap_rank": 1,
+    "slug": "bitcoin",
+    "score": 3
+   }
+  }
+ ],
+ "nfts": [],
+ "categories": []
+}

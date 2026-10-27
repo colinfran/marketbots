@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/" xml:lang="en-US">
+  <id>tag:github.com,2008:https://github.com/bitcoin/bitcoin/releases</id>
+  <link type="text/html" rel="alternate" href="https://github.com/bitcoin/bitcoin/releases"/>
+  <link type="application/atom+xml" rel="self" href="https://github.com/bitcoin/bitcoin/releases.atom"/>
+  <title>Release notes from bitcoin</title>
+  <updated>2026-10-26T18:04:03Z</updated>
+  <entry>
+    <id>tag:github.com,2008:Repository/1181927/v32.1</id>
+    <updated>2026-10-26T18:04:03Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/bitcoin/bitcoin/releases/tag/v32.1"/>
+    <title>v32.1: Bitcoin Core 32.1 final</title>
+    <content type="html"><![CDATA[<p>Body trimmed for the fixture.</p>]]></content>
+    <author>
+      <name>fanquake</name>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/863730?s=60&amp;v=4"/>
+  </entry>
+<entry>
+    <id>tag:github.com,2008:Repository/1181927/v31.2</id>
+    <updated>2026-10-26T19:36:53Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/bitcoin/bitcoin/releases/tag/v31.2"/>
+    <title>v31.2: Bitcoin Core 31.2 final</title>
+    <content type="html"><![CDATA[<p>Body trimmed for the fixture.</p>]]></content>
+    <author>
+      <name>fanquake</name>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/863730?s=60&amp;v=4"/>
+  </entry>
+<entry>
+    <id>tag:github.com,2008:Repository/1181927/v30.4</id>
+    <updated>2026-10-26T20:59:30Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/bitcoin/bitcoin/releases/tag/v30.4"/>
+    <title>v30.4: Bitcoin Core 30.4 final</title>
+    <content type="html"><![CDATA[<p>Body trimmed for the fixture.</p>]]></content>
+    <author>
+      <name>fanquake</name>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/863730?s=60&amp;v=4"/>
+  </entry>
+<entry>
+    <id>tag:github.com,2008:Repository/1181927/v29.5</id>
+    <updated>2026-10-26T22:08:49Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/bitcoin/bitcoin/releases/tag/v29.5"/>
+    <title>v29.5: Bitcoin Core 29.5 final</title>
+    <content type="html"><![CDATA[<p>Body trimmed for the fixture.</p>]]></content>
+    <author>
+      <name>fanquake</name>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/863730?s=60&amp;v=4"/>
+  </entry>
+<entry>
+    <id>tag:github.com,2008:Repository/1181927/v32.0</id>
+    <updated>2026-10-21T13:27:27Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/bitcoin/bitcoin/releases/tag/v32.0"/>
+    <title>v32.0: Bitcoin Core 32.0 final</title>
+    <content type="html"><![CDATA[<p>Body trimmed for the fixture.</p>]]></content>
+    <author>
+      <name>sedited</name>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/8421793?s=60&amp;v=4"/>
+  </entry>
+<entry>
+    <id>tag:github.com,2008:Repository/1181927/v32.0rc4</id>
+    <updated>2026-10-12T04:05:19Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/bitcoin/bitcoin/releases/tag/v32.0rc4"/>
+    <title>v32.0rc4: Bitcoin Core 32.0 release candidate 4</title>
+    <content type="html"><![CDATA[<p>Body trimmed for the fixture.</p>]]></content>
+    <author>
+      <name>sedited</name>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/8421793?s=60&amp;v=4"/>
+  </entry>
+</feed>

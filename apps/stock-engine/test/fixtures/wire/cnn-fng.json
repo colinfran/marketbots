@@ -1,0 +1,55 @@
+{
+ "fear_and_greed": {
+  "score": 27.0788912579957,
+  "rating": "fear",
+  "timestamp": "2026-10-26T23:59:53+00:00",
+  "previous_close": 20.9809523809524,
+  "previous_1_week": 20.8043956043956,
+  "previous_1_month": 36.9428571428571,
+  "previous_1_year": 32.45714285714286
+ },
+ "fear_and_greed_historical": {
+  "timestamp": 1793059193000,
+  "score": 27.0788912579957,
+  "rating": "fear",
+  "data": [
+   {
+    "x": 1792713600000,
+    "y": 22.9808102345416,
+    "rating": "extreme fear"
+   },
+   {
+    "x": 1792972800000,
+    "y": 27.0788912579957,
+    "rating": "fear"
+   },
+   {
+    "x": 1793059193000,
+    "y": 27.0788912579957,
+    "rating": "fear"
+   }
+  ]
+ },
+ "put_call_options": {
+  "timestamp": 1793046547000,
+  "score": 22.8,
+  "rating": "extreme fear",
+  "data": [
+   {
+    "x": 1792713600000,
+    "y": 0.803209560605355,
+    "rating": "extreme fear"
+   },
+   {
+    "x": 1792972800000,
+    "y": 0.795398231282825,
+    "rating": "extreme fear"
+   },
+   {
+    "x": 1793046547000,
+    "y": 0.795398231282825,
+    "rating": "extreme fear"
+   }
+  ]
+ }
+}

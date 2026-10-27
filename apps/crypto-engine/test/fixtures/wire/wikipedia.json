@@ -1,0 +1,85 @@
+{
+ "items": [
+  {
+   "project": "en.wikipedia",
+   "article": "Bitcoin",
+   "granularity": "daily",
+   "timestamp": "2026101700",
+   "access": "all-access",
+   "agent": "user",
+   "views": 2011
+  },
+  {
+   "project": "en.wikipedia",
+   "article": "Bitcoin",
+   "granularity": "daily",
+   "timestamp": "2026101800",
+   "access": "all-access",
+   "agent": "user",
+   "views": 1983
+  },
+  {
+   "project": "en.wikipedia",
+   "article": "Bitcoin",
+   "granularity": "daily",
+   "timestamp": "2026101900",
+   "access": "all-access",
+   "agent": "user",
+   "views": 2071
+  },
+  {
+   "project": "en.wikipedia",
+   "article": "Bitcoin",
+   "granularity": "daily",
+   "timestamp": "2026102000",
+   "access": "all-access",
+   "agent": "user",
+   "views": 2305
+  },
+  {
+   "project": "en.wikipedia",
+   "article": "Bitcoin",
+   "granularity": "daily",
+   "timestamp": "2026102100",
+   "access": "all-access",
+   "agent": "user",
+   "views": 2252
+  },
+  {
+   "project": "en.wikipedia",
+   "article": "Bitcoin",
+   "granularity": "daily",
+   "timestamp": "2026102200",
+   "access": "all-access",
+   "agent": "user",
+   "views": 2235
+  },
+  {
+   "project": "en.wikipedia",
+   "article": "Bitcoin",
+   "granularity": "daily",
+   "timestamp": "2026102300",
+   "access": "all-access",
+   "agent": "user",
+   "views": 2875
+  },
+  {
+   "project": "en.wikipedia",
+   "article": "Bitcoin",
+   "granularity": "daily",
+   "timestamp": "2026102400",
+   "access": "all-access",
+   "agent": "user",
+   "views": 2012
+  },
+  {
+   "project": "en.wikipedia",
+   "article": "Bitcoin",
+   "granularity": "daily",
+   "timestamp": "2026102500",
+   "access": "all-access",
+   "agent": "user",
+   "views": 2044
+  }
+ ]
+}

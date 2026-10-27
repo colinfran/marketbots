@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	xmlns:media="http://search.yahoo.com/mrss/"
+>
+
+<channel>
+	<title>BeInCrypto</title>
+	<atom:link href="https://beincrypto.com/feed/" rel="self" type="application/rss+xml" />
+	<link>https://beincrypto.com/</link>
+	<description>Cryptocurrency News</description>
+	<lastBuildDate>Tue, 27 Oct 2026 02:04:56 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=6.6.10</generator>
+
+<image>
+	<url>https://assets.beincrypto.com/img/ULB28daJBFR3Nw9y1kUzR_AA--E=/32x32/smart/e3ad5fc1201d4ea8b2d44804964c6e9e</url>
+	<title>BeInCrypto</title>
+	<link>https://beincrypto.com/</link>
+	<width>32</width>
+	<height>32</height>
+</image> 
+	<item>
+		<title>Crypto Payments Have a Hidden Cost Businesses Rarely Calculate</title>
+		<link>https://beincrypto.com/hidden-costs-crypto-payment-gateway-businesses/</link>
+		
+		<dc:creator><![CDATA[Mohammad Shahid]]></dc:creator>
+		<pubDate>Tue, 27 Oct 2026 02:04:51 +0000</pubDate>
+				<category><![CDATA[Businesses]]></category>
+		<category><![CDATA[Cryptocurrency Market News]]></category>
+		<guid isPermaLink="false">https://beincrypto.com/?p=875483</guid>
+
+					<description><![CDATA[<p>Body trimmed for the fixture.</p>]]></description>
+										<content:encoded><![CDATA[<p>Body trimmed for the fixture.</p>]]></content:encoded>
+					
+		
+		
+		<media:content url="https://assets.beincrypto.com/img/fLaqkmZgNfg550l82ptnSebsqEU=/smart/6ab52b5cd0164abbbebbd0a658dcc158" medium="image" width="300" height="150" type="image/jpeg" />
+<media:thumbnail url="https://assets.beincrypto.com/img/fLaqkmZgNfg550l82ptnSebsqEU=/smart/6ab52b5cd0164abbbebbd0a658dcc158"/>
+
+	</item>
+<item>
+		<title>10,000 Bitcoin Simulations Say BTC&#039;s Median Path to $1M Comes in 2033</title>
+		<link>https://beincrypto.com/bitcoin-simulations-median-path-1m-2033/</link>
+		
+		<dc:creator><![CDATA[Darryn Pollock]]></dc:creator>
+		<pubDate>Tue, 27 Oct 2026 01:50:00 +0000</pubDate>
+				<category><![CDATA[Markets]]></category>
+		<category><![CDATA[Bitcoin (BTC) News]]></category>
+		<category><![CDATA[Bitcoin Price]]></category>
+		<category><![CDATA[Cryptocurrency Market News]]></category>
+		<guid isPermaLink="false">https://beincrypto.com/?p=875448</guid>
+
+					<description><![CDATA[<p>Body trimmed for the fixture.</p>]]></description>
+										<content:encoded><![CDATA[<p>Body trimmed for the fixture.</p>]]></content:encoded>
+					
+		
+		
+		<media:content url="https://assets.beincrypto.com/img/y72UzCAfDrZ7bJ1RApze_ds8wuY=/smart/04c64641085a4db5a3c6bcde0ab87e26" medium="image" width="300" height="150" type="image/jpeg" />
+<media:thumbnail url="https://assets.beincrypto.com/img/y72UzCAfDrZ7bJ1RApze_ds8wuY=/smart/04c64641085a4db5a3c6bcde0ab87e26"/>
+
+	</item>
+<item>
+		<title>Cramer Says Anthropic&#039;s IPO Makes This Wall Street Bank a Buy</title>
+		<link>https://beincrypto.com/cramer-buy-goldman-sachs-anthropic-ipo/</link>
+		
+		<dc:creator><![CDATA[Darryn Pollock]]></dc:creator>
+		<pubDate>Tue, 27 Oct 2026 01:21:42 +0000</pubDate>
+				<category><![CDATA[Stocks]]></category>
+		<category><![CDATA[AI Companies]]></category>
+		<category><![CDATA[AI News]]></category>
+		<category><![CDATA[IPO News]]></category>
+		<category><![CDATA[Stock Market News]]></category>
+		<guid isPermaLink="false">https://beincrypto.com/?p=875447</guid>
+
+					<description><![CDATA[<p>Body trimmed for the fixture.</p>]]></description>
+										<content:encoded><![CDATA[<p>Body trimmed for the fixture.</p>]]></content:encoded>
+					
+		
+		
+		<media:content url="https://assets.beincrypto.com/img/-dz8nkLT1Wl756y4hbfIKbnumi4=/smart/f1fe39cc68dd43d9b9b996ac002369a2" medium="image" width="300" height="150" type="image/jpeg" />
+<media:thumbnail url="https://assets.beincrypto.com/img/-dz8nkLT1Wl756y4hbfIKbnumi4=/smart/f1fe39cc68dd43d9b9b996ac002369a2"/>
+
+	</item>
+</channel>
+</rss>

@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+    <id>https://blockworks.com</id>
+    <title>Blockworks: Building trust in onchain capital markets.</title>
+    <updated>2026-10-27T00:50:31.724Z</updated>
+    <generator>Blockworks</generator>
+    <author>
+        <name>Blockworks</name>
+        <email>info@blockworks.co</email>
+        <uri>https://x.com/Blockworks_</uri>
+    </author>
+    <link rel="alternate" href="https://blockworks.com/"/>
+    <link rel="self" href="https://blockworks.com/feed"/>
+    <subtitle>Blockworks is a data and software platform for crypto markets. It offers investor relations software, a data API, and a market research platform to its users that span across crypto-native startups and traditional institutions. The company’s focus on consistent data models and repeatable analytical frameworks enables it to be the operating system for onchain businesses.</subtitle>
+    <logo>https://blockworks.com/images/share-image.jpg</logo>
+    <rights>2026, Blockworks</rights>
+    <category term="Markets"/>
+    <category term="Finance"/>
+    <category term="Policy"/>
+    <category term="DeFi"/>
+    <category term="Business"/>
+    <category term="Web3"/>
+    <category term="Forward Guidance Newsletter"/>
+    <category term="Opinion"/>
+    <category term="Empire Newsletter"/>
+    <category term="Lightspeed Newsletter"/>
+    <category term="0xResearch Newsletter"/>
+    <category term="People"/>
+    <category term="Analysis"/>
+    <category term="Sponsored"/>
+    <category term="The Drop"/>
+    <category term="Podcast"/>
+    <category term="The Breakdown"/>
+    <category term="Education"/>
+    <category term="Supply Shock"/>
+    <category term="Announcements"/>
+    <category term="Uncategorized"/>
+    <category term="Token Holder Report"/>
+    <entry>
+        <title type="html"><![CDATA[Venezuela’s sanctions are stablecoins’ proof of concept]]></title>
+        <id>https://blockworks.com/news/venezuelas-sanctions-stablecoins</id>
+        <link href="https://blockworks.com/news/venezuelas-sanctions-stablecoins"/>
+        <link rel="enclosure" href="https://blockworks-co.imgix.net/wp-content/uploads/2026/01/bw-maduro.png" type="image/png"/>
+        <updated>2026-01-07T14:00:00.000Z</updated>
+        <summary type="html"><![CDATA[Banned from the dollar system, the country uses digital dollars instead]]></summary>
+        <content type="html"><![CDATA[Banned from the dollar system, the country uses digital dollars instead]]></content>
+        <author>
+            <name>Byron Gilliam</name>
+            <uri>https://blockworks.com/byrongilliam</uri>
+        </author>
+        <category label="Policy" term="Policy"/>
+        <category label="The Breakdown" term="The Breakdown"/>
+        <published>2026-01-07T14:00:00.000Z</published>
+        <rights>2026, Blockworks</rights>
+    </entry>
+<entry>
+        <title type="html"><![CDATA[The Strategy playbook looks different in 2026]]></title>
+        <id>https://blockworks.com/news/strategy-playbook-2026</id>
+        <link href="https://blockworks.com/news/strategy-playbook-2026"/>
+        <link rel="enclosure" href="https://blockworks-co.imgix.net/wp-content/uploads/2026/01/bw-saylor-2026.png" type="image/png"/>
+        <updated>2026-01-06T17:36:33.000Z</updated>
+        <summary type="html"><![CDATA[The treasury company now holds 673,783 BTC, but flow is more likely to be episodic in this year’s financial climate]]></summary>
+        <content type="html"><![CDATA[The treasury company now holds 673,783 BTC, but flow is more likely to be episodic in this year’s financial climate]]></content>
+        <author>
+            <name>Shaunda Devens</name>
+            <uri>https://blockworks.com/shaunda-devens</uri>
+        </author>
+        <category label="0xResearch Newsletter" term="0xResearch Newsletter"/>
+        <category label="Business" term="Business"/>
+        <published>2026-01-06T17:36:33.000Z</published>
+        <rights>2026, Blockworks</rights>
+    </entry>
+<entry>
+        <title type="html"><![CDATA[Ranger’s ICO starts today, and MetaDAO eyes a reset]]></title>
+        <id>https://blockworks.com/news/rangers-ico-metadao</id>
+        <link href="https://blockworks.com/news/rangers-ico-metadao"/>
+        <link rel="enclosure" href="https://blockworks-co.imgix.net/wp-content/uploads/2026/01/bw-ranger.png" type="image/png"/>
+        <updated>2026-01-06T15:07:05.000Z</updated>
+        <summary type="html"><![CDATA[Ranger’s Jan 6–10 sale could re-accelerate MetaDAO volumes and revenue]]></summary>
+        <content type="html"><![CDATA[Ranger’s Jan 6–10 sale could re-accelerate MetaDAO volumes and revenue]]></content>
+        <author>
+            <name>Carlos</name>
+            <uri>https://blockworks.com/carlos-g-campos</uri>
+        </author>
+        <category label="0xResearch Newsletter" term="0xResearch Newsletter"/>
+        <category label="DeFi" term="DeFi"/>
+        <published>2026-01-06T15:07:05.000Z</published>
+        <rights>2026, Blockworks</rights>
+    </entry>
+</feed>

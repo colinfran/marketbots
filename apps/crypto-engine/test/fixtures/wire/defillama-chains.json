@@ -1,0 +1,47 @@
+[
+ {
+  "gecko_id": "moonbeam",
+  "gasTokenGeckoId": "moonbeam",
+  "tvl": 0,
+  "tokenSymbol": "GLMR",
+  "cmcId": "6836",
+  "name": "Moonbeam",
+  "chainId": 1284
+ },
+ {
+  "gecko_id": null,
+  "gasTokenGeckoId": "ethereum",
+  "tvl": 6034778991.257093,
+  "tokenSymbol": null,
+  "cmcId": null,
+  "name": "Base",
+  "chainId": 8453
+ },
+ {
+  "gecko_id": "ethereum",
+  "gasTokenGeckoId": "ethereum",
+  "tvl": 48331278857.142654,
+  "tokenSymbol": "ETH",
+  "cmcId": "1027",
+  "name": "Ethereum",
+  "chainId": 1
+ },
+ {
+  "gecko_id": "solana",
+  "gasTokenGeckoId": "solana",
+  "tvl": 5713801800.416853,
+  "tokenSymbol": "SOL",
+  "cmcId": "5426",
+  "name": "Solana",
+  "chainId": null
+ },
+ {
+  "gecko_id": "litecoin",
+  "gasTokenGeckoId": "litecoin",
+  "tvl": 926225.0401444954,
+  "tokenSymbol": "LTC",
+  "cmcId": "2",
+  "name": "Litecoin",
+  "chainId": null
+ }
+]

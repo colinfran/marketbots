@@ -1,0 +1,26 @@
+{
+ "markets": [
+  {
+   "ticker": "KXRECSSNBER-27",
+   "event_ticker": "KXRECSSNBER-27",
+   "title": "Will there be a recession in 2027?",
+   "status": "active",
+   "yes_bid_dollars": "0.1900",
+   "yes_ask_dollars": "0.2000",
+   "last_price_dollars": "0.1900",
+   "open_interest_fp": "367584.31",
+   "volume_24h_fp": "987.01"
+  },
+  {
+   "ticker": "KXRECSSNBER-26",
+   "event_ticker": "KXRECSSNBER-26",
+   "title": "Will there be a recession in 2026?",
+   "status": "active",
+   "yes_bid_dollars": "0.0200",
+   "yes_ask_dollars": "0.0300",
+   "last_price_dollars": "0.0200",
+   "open_interest_fp": "922405.76",
+   "volume_24h_fp": "46088.13"
+  }
+ ]
+}

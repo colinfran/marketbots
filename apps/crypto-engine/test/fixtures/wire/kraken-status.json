@@ -1,0 +1,525 @@
+{
+ "page": {
+  "id": "lfz25gyhcpjf",
+  "name": "Kraken",
+  "url": "https://status.kraken.com",
+  "time_zone": "Etc/UTC",
+  "updated_at": "2026-10-27T00:29:42.573Z"
+ },
+ "status": {
+  "indicator": "minor",
+  "description": "Partially Degraded Service"
+ },
+ "components": [],
+ "incidents": [
+  {
+   "id": "4m0rscfswypx",
+   "name": "SUI (SUI) Funding Delays",
+   "status": "identified",
+   "created_at": "2026-10-26T09:39:34.526Z",
+   "updated_at": "2026-10-26T14:21:51.733Z",
+   "monitoring_at": null,
+   "resolved_at": null,
+   "impact": "minor",
+   "shortlink": "https://stspg.io/xf73qsnz80w9",
+   "started_at": "2026-10-26T09:39:34.516Z",
+   "page_id": "lfz25gyhcpjf",
+   "incident_updates": [
+    {
+     "id": "h2rk5kzn91mf",
+     "status": "identified",
+     "body": "The issue has been identified and a fix is being implemented.",
+     "incident_id": "4m0rscfswypx",
+     "created_at": "2026-10-26T14:21:51.730Z",
+     "updated_at": "2026-10-26T14:21:51.730Z",
+     "display_at": "2026-10-26T14:21:51.730Z",
+     "affected_components": [
+      {
+       "code": "tqjg025q0gdg",
+       "name": "Digital Currency Funding - Sui (SUI)",
+       "old_status": "degraded_performance",
+       "new_status": "degraded_performance"
+      }
+     ],
+     "deliver_notifications": true,
+     "custom_tweet": null,
+     "tweet_id": null
+    },
+    {
+     "id": "fffr8cvwkjy5",
+     "status": "investigating",
+     "body": "We're investigating an issue with the SUI (SUI) funding gateway. Deposits and withdrawals may be delayed at this time. All other funding methods are operating normally. We are working diligently to resolve the issue and will keep you updated.",
+     "incident_id": "4m0rscfswypx",
+     "created_at": "2026-10-26T09:39:34.688Z",
+     "updated_at": "2026-10-26T09:39:34.688Z",
+     "display_at": "2026-10-26T09:39:34.688Z",
+     "affected_components": [
+      {
+       "code": "tqjg025q0gdg",
+       "name": "Digital Currency Funding - Sui (SUI)",
+       "old_status": "operational",
+       "new_status": "degraded_performance"
+      }
+     ],
+     "deliver_notifications": true,
+     "custom_tweet": null,
+     "tweet_id": null
+    }
+   ],
+   "components": [
+    {
+     "id": "tqjg025q0gdg",
+     "name": "Sui (SUI)",
+     "status": "degraded_performance",
+     "created_at": "2023-05-03T15:47:10.898Z",
+     "updated_at": "2026-10-26T09:39:34.580Z",
+     "position": 569,
+     "description": null,
+     "showcase": false,
+     "start_date": "2023-05-03",
+     "group_id": "8nh7rvvs6mjh",
+     "page_id": "lfz25gyhcpjf",
+     "group": false,
+     "only_show_if_degraded": false
+    }
+   ],
+   "reminder_intervals": null
+  },
+  {
+   "id": "7zcy2j4hhxqz",
+   "name": "Polkadot (DOT) Funding Delays",
+   "status": "investigating",
+   "created_at": "2026-10-26T09:55:01.183Z",
+   "updated_at": "2026-10-26T09:55:01.322Z",
+   "monitoring_at": null,
+   "resolved_at": null,
+   "impact": "minor",
+   "shortlink": "https://stspg.io/j50yvjychny4",
+   "started_at": "2026-10-26T09:55:01.171Z",
+   "page_id": "lfz25gyhcpjf",
+   "incident_updates": [
+    {
+     "id": "72vzvj1s2m5m",
+     "status": "investigating",
+     "body": "We're investigating an issue with the Polkadot (DOT) funding gateway. Deposits and withdrawals may be delayed at this time. All other funding methods are operating normally. We are working diligently to resolve the issue and will keep you updated.",
+     "incident_id": "7zcy2j4hhxqz",
+     "created_at": "2026-10-26T09:55:01.319Z",
+     "updated_at": "2026-10-26T09:55:01.319Z",
+     "display_at": "2026-10-26T09:55:01.319Z",
+     "affected_components": [
+      {
+       "code": "ff1hgs4pn418",
+       "name": "Digital Currency Funding - Polkadot (DOT)",
+       "old_status": "operational",
+       "new_status": "degraded_performance"
+      }
+     ],
+     "deliver_notifications": true,
+     "custom_tweet": null,
+     "tweet_id": null
+    }
+   ],
+   "components": [
+    {
+     "id": "ff1hgs4pn418",
+     "name": "Polkadot (DOT)",
+     "status": "degraded_performance",
+     "created_at": "2020-08-16T14:43:56.475Z",
+     "updated_at": "2026-10-26T09:55:01.236Z",
+     "position": 453,
+     "description": null,
+     "showcase": false,
+     "start_date": null,
+     "group_id": "8nh7rvvs6mjh",
+     "page_id": "lfz25gyhcpjf",
+     "group": false,
+     "only_show_if_degraded": false
+    }
+   ],
+   "reminder_intervals": null
+  },
+  {
+   "id": "by3j8r6q39ld",
+   "name": "Initia (INIT) Deposits and Withdrawals Temporarily Paused",
+   "status": "investigating",
+   "created_at": "2026-10-23T16:15:07.934Z",
+   "updated_at": "2026-10-23T16:20:16.686Z",
+   "monitoring_at": null,
+   "resolved_at": null,
+   "impact": "minor",
+   "shortlink": "https://stspg.io/fm0n8q11k450",
+   "started_at": "2026-10-23T16:15:07.922Z",
+   "page_id": "lfz25gyhcpjf",
+   "incident_updates": [
+    {
+     "id": "x6mx4j8v3s4w",
+     "status": "investigating",
+     "body": "Deposits and withdrawals for Initia (INIT) are temporarily paused due to an issue affecting the Initia network. All other funding methods are operational. We are closely monitoring the situation and will provide updates as more information becomes available. We appreciate your patience and understanding.",
+     "incident_id": "by3j8r6q39ld",
+     "created_at": "2026-10-23T16:15:08.046Z",
+     "updated_at": "2026-10-23T16:20:16.681Z",
+     "display_at": "2026-10-23T16:15:08.000Z",
+     "affected_components": [
+      {
+       "code": "437v7vlt6yqj",
+       "name": "Digital Currency Funding - Initia (INIT)",
+       "old_status": "operational",
+       "new_status": "degraded_performance"
+      }
+     ],
+     "deliver_notifications": true,
+     "custom_tweet": null,
+     "tweet_id": null
+    }
+   ],
+   "components": [
+    {
+     "id": "437v7vlt6yqj",
+     "name": "Initia (INIT)",
+     "status": "degraded_performance",
+     "created_at": "2025-04-23T07:38:49.890Z",
+     "updated_at": "2026-10-23T16:15:07.978Z",
+     "position": 298,
+     "description": null,
+     "showcase": false,
+     "start_date": "2025-04-23",
+     "group_id": "8nh7rvvs6mjh",
+     "page_id": "lfz25gyhcpjf",
+     "group": false,
+     "only_show_if_degraded": false
+    }
+   ],
+   "reminder_intervals": null
+  }
+ ],
+ "scheduled_maintenances": [
+  {
+   "id": "y0cswpkpwm33",
+   "name": "VANRY withdrawals on Ethereum blockchain halted.",
+   "status": "scheduled",
+   "created_at": "2026-09-24T14:21:38.415Z",
+   "updated_at": "2026-09-24T14:21:38.511Z",
+   "monitoring_at": null,
+   "resolved_at": null,
+   "impact": "maintenance",
+   "shortlink": "https://stspg.io/1qvwsz9mt2hm",
+   "started_at": "2026-09-24T14:21:38.404Z",
+   "page_id": "lfz25gyhcpjf",
+   "incident_updates": [
+    {
+     "id": "gw1hn7fw955z",
+     "status": "scheduled",
+     "body": "VANRY team has halted all on chain transfers for VANRY on Ethereum. As such, withdrawals of VANRY will remain unavailable on Kraken as long as on chain transfers are halted. Please see the following support article on the delisting: https://support.kraken.com/articles/asset-delistings-august-2026",
+     "incident_id": "y0cswpkpwm33",
+     "created_at": "2026-09-24T14:21:38.508Z",
+     "updated_at": "2026-09-24T14:21:38.508Z",
+     "display_at": "2026-09-24T14:21:38.508Z",
+     "affected_components": null,
+     "deliver_notifications": false,
+     "custom_tweet": null,
+     "tweet_id": null
+    }
+   ],
+   "components": [],
+   "scheduled_for": "2026-09-24T14:25:00.000Z",
+   "scheduled_until": "2026-12-10T15:05:00.000Z"
+  },
+  {
+   "id": "jdbk8wj1lvhz",
+   "name": "Order Entry System Maintenance",
+   "status": "scheduled",
+   "created_at": "2026-10-26T11:08:13.012Z",
+   "updated_at": "2026-10-26T11:08:13.174Z",
+   "monitoring_at": null,
+   "resolved_at": null,
+   "impact": "maintenance",
+   "shortlink": "https://stspg.io/680x6bls6zc5",
+   "started_at": "2026-10-26T11:08:12.913Z",
+   "page_id": "lfz25gyhcpjf",
+   "incident_updates": [
+    {
+     "id": "w8fpxxrfrb3p",
+     "status": "scheduled",
+     "body": "We will be performing scheduled maintenance to our order entry system on Tuesday, October 27th, starting at approximately 10:00 UTC. This maintenance is expected to take up to 60 minutes.\n\nDuring this maintenance window, clients may experience the following:\n\n- Kraken Pro web, mobile, and desktop clients may experience a very small number of rejected order submissions or order modifications.\n- WebSocket API clients may experience a small number of rejected order submissions or order modifications, along with increased latency.\n- FIX API clients may experience several seconds during which order submissions and modifications are rejected, along with increased latency.\n\nNo action is required on your end. We will post an update once the maintenance has been completed.",
+     "incident_id": "jdbk8wj1lvhz",
+     "created_at": "2026-10-26T11:08:13.170Z",
+     "updated_at": "2026-10-26T11:08:13.170Z",
+     "display_at": "2026-10-26T11:08:13.170Z",
+     "affected_components": [
+      {
+       "code": "mhcnmhlldpkh",
+       "name": "Website",
+       "old_status": "operational",
+       "new_status": "operational"
+      },
+      {
+       "code": "pwc5xxqb9057",
+       "name": "Kraken API - FIX",
+       "old_status": "operational",
+       "new_status": "operational"
+      },
+      {
+       "code": "vz83fx0396f0",
+       "name": "Kraken API - WebSocket",
+       "old_status": "operational",
+       "new_status": "operational"
+      },
+      {
+       "code": "lrx5gjxzw65q",
+       "name": "Kraken Pro App",
+       "old_status": "operational",
+       "new_status": "operational"
+      }
+     ],
+     "deliver_notifications": true,
+     "custom_tweet": null,
+     "tweet_id": null
+    }
+   ],
+   "components": [
+    {
+     "id": "mhcnmhlldpkh",
+     "name": "Website",
+     "status": "operational",
+     "created_at": "2016-02-10T19:21:13.853Z",
+     "updated_at": "2026-10-15T07:09:10.200Z",
+     "position": 1,
+     "description": null,
+     "showcase": false,
+     "start_date": null,
+     "group_id": null,
+     "page_id": "lfz25gyhcpjf",
+     "group": false,
+     "only_show_if_degraded": false
+    },
+    {
+     "id": "pwc5xxqb9057",
+     "name": "FIX",
+     "status": "operational",
+     "created_at": "2024-01-24T10:12:01.342Z",
+     "updated_at": "2026-10-22T04:22:45.042Z",
+     "position": 1,
+     "description": null,
+     "showcase": false,
+     "start_date": "2024-01-24",
+     "group_id": "qkyy5vkk5zpx",
+     "page_id": "lfz25gyhcpjf",
+     "group": false,
+     "only_show_if_degraded": false
+    },
+    {
+     "id": "vz83fx0396f0",
+     "name": "WebSocket",
+     "status": "operational",
+     "created_at": "2019-01-30T18:03:03.406Z",
+     "updated_at": "2026-10-22T04:22:45.087Z",
+     "position": 3,
+     "description": null,
+     "showcase": false,
+     "start_date": null,
+     "group_id": "qkyy5vkk5zpx",
+     "page_id": "lfz25gyhcpjf",
+     "group": false,
+     "only_show_if_degraded": false
+    },
+    {
+     "id": "lrx5gjxzw65q",
+     "name": "Kraken Pro App",
+     "status": "operational",
+     "created_at": "2022-10-27T18:48:50.272Z",
+     "updated_at": "2026-10-16T15:31:59.719Z",
+     "position": 3,
+     "description": null,
+     "showcase": false,
+     "start_date": "2022-10-27",
+     "group_id": null,
+     "page_id": "lfz25gyhcpjf",
+     "group": false,
+     "only_show_if_degraded": false
+    }
+   ],
+   "scheduled_for": "2026-10-27T10:00:00.000Z",
+   "scheduled_until": "2026-10-27T11:00:00.000Z"
+  },
+  {
+   "id": "69r6j3nhvf5b",
+   "name": "Hedera Funding Maintenance",
+   "status": "scheduled",
+   "created_at": "2026-10-23T09:06:28.008Z",
+   "updated_at": "2026-10-23T09:06:28.164Z",
+   "monitoring_at": null,
+   "resolved_at": null,
+   "impact": "maintenance",
+   "shortlink": "https://stspg.io/8dhty9dyp8qf",
+   "started_at": "2026-10-23T09:06:27.988Z",
+   "page_id": "lfz25gyhcpjf",
+   "incident_updates": [
+    {
+     "id": "5qg3py2bqhpc",
+     "status": "scheduled",
+     "body": "The Hedera funding gateway will be undergoing maintenance from 17:00 UTC on October 28th 2026 for approximately 40 minutes. Deposits and withdrawals will be unavailable - transfers made during this time will be processed shortly after the maintenance is complete. We will provide updates as necessary.",
+     "incident_id": "69r6j3nhvf5b",
+     "created_at": "2026-10-23T09:06:28.159Z",
+     "updated_at": "2026-10-23T09:06:28.159Z",
+     "display_at": "2026-10-23T09:06:28.159Z",
+     "affected_components": [
+      {
+       "code": "jtgcfftk3l73",
+       "name": "Digital Currency Funding - Bonzo Finance (BONZO) - Hedera",
+       "old_status": "operational",
+       "new_status": "operational"
+      },
+      {
+       "code": "lm0nhn55bcbd",
+       "name": "Digital Currency Funding - Dovu (DOVU) - Hedera",
+       "old_status": "operational",
+       "new_status": "operational"
+      },
+      {
+       "code": "bpjlxpfvzy6q",
+       "name": "Digital Currency Funding - Gib (GIB) - Hedera",
+       "old_status": "operational",
+       "new_status": "operational"
+      },
+      {
+       "code": "653h373x5rhg",
+       "name": "Digital Currency Funding - HashPack (PACK) - Hedera",
+       "old_status": "operational",
+       "new_status": "operational"
+      },
+      {
+       "code": "k2yvjv441w9r",
+       "name": "Digital Currency Funding - Hedera (HBAR)",
+       "old_status": "operational",
+       "new_status": "operational"
+      },
+      {
+       "code": "wq8b02b3dlfx",
+       "name": "Digital Currency Funding - SaucerSwap (SAUCE) - Hedera",
+       "old_status": "operational",
+       "new_status": "operational"
+      },
+      {
+       "code": "tgsmbyrzqzc3",
+       "name": "Digital Currency Funding - USDC (USDC) - Hedera",
+       "old_status": "operational",
+       "new_status": "operational"
+      }
+     ],
+     "deliver_notifications": true,
+     "custom_tweet": null,
+     "tweet_id": null
+    }
+   ],
+   "components": [
+    {
+     "id": "jtgcfftk3l73",
+     "name": "Bonzo Finance (BONZO) - Hedera",
+     "status": "operational",
+     "created_at": "2026-04-10T15:48:52.491Z",
+     "updated_at": "2026-08-04T09:00:01.137Z",
+     "position": 115,
+     "description": null,
+     "showcase": false,
+     "start_date": "2026-04-10",
+     "group_id": "8nh7rvvs6mjh",
+     "page_id": "lfz25gyhcpjf",
+     "group": false,
+     "only_show_if_degraded": false
+    },
+    {
+     "id": "lm0nhn55bcbd",
+     "name": "Dovu (DOVU) - Hedera",
+     "status": "operational",
+     "created_at": "2026-03-06T10:07:55.961Z",
+     "updated_at": "2026-08-12T10:17:49.555Z",
+     "position": 184,
+     "description": null,
+     "showcase": false,
+     "start_date": "2026-03-06",
+     "group_id": "8nh7rvvs6mjh",
+     "page_id": "lfz25gyhcpjf",
+     "group": false,
+     "only_show_if_degraded": false
+    },
+    {
+     "id": "bpjlxpfvzy6q",
+     "name": "Gib (GIB) - Hedera",
+     "status": "operational",
+     "created_at": "2026-04-07T09:51:10.587Z",
+     "updated_at": "2026-08-12T10:17:34.629Z",
+     "position": 259,
+     "description": null,
+     "showcase": false,
+     "start_date": "2026-04-07",
+     "group_id": "8nh7rvvs6mjh",
+     "page_id": "lfz25gyhcpjf",
+     "group": false,
+     "only_show_if_degraded": false
+    },
+    {
+     "id": "653h373x5rhg",
+     "name": "HashPack (PACK) - Hedera",
+     "status": "operational",
+     "created_at": "2026-03-17T10:06:34.888Z",
+     "updated_at": "2026-08-12T10:17:24.982Z",
+     "position": 277,
+     "description": null,
+     "showcase": false,
+     "start_date": "2026-03-17",
+     "group_id": "8nh7rvvs6mjh",
+     "page_id": "lfz25gyhcpjf",
+     "group": false,
+     "only_show_if_degraded": false
+    },
+    {
+     "id": "k2yvjv441w9r",
+     "name": "Hedera (HBAR)",
+     "status": "operational",
+     "created_at": "2025-07-11T12:22:46.393Z",
+     "updated_at": "2026-09-30T08:37:14.557Z",
+     "position": 278,
+     "description": null,
+     "showcase": false,
+     "start_date": "2025-07-11",
+     "group_id": "8nh7rvvs6mjh",
+     "page_id": "lfz25gyhcpjf",
+     "group": false,
+     "only_show_if_degraded": false
+    },
+    {
+     "id": "wq8b02b3dlfx",
+     "name": "SaucerSwap (SAUCE) - Hedera",
+     "status": "operational",
+     "created_at": "2026-03-19T15:43:10.712Z",
+     "updated_at": "2026-08-12T10:16:53.568Z",
+     "position": 512,
+     "description": null,
+     "showcase": false,
+     "start_date": "2026-03-19",
+     "group_id": "8nh7rvvs6mjh",
+     "page_id": "lfz25gyhcpjf",
+     "group": false,
+     "only_show_if_degraded": false
+    },
+    {
+     "id": "tgsmbyrzqzc3",
+     "name": "USDC (USDC) - Hedera",
+     "status": "operational",
+     "created_at": "2026-04-07T09:54:28.285Z",
+     "updated_at": "2026-08-12T10:16:27.140Z",
+     "position": 648,
+     "description": null,
+     "showcase": false,
+     "start_date": "2026-04-07",
+     "group_id": "8nh7rvvs6mjh",
+     "page_id": "lfz25gyhcpjf",
+     "group": false,
+     "only_show_if_degraded": false
+    }
+   ],
+   "scheduled_for": "2026-10-28T17:00:00.000Z",
+   "scheduled_until": "2026-10-28T17:40:00.000Z"
+  }
+ ]
+}

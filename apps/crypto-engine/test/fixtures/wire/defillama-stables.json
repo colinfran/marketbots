@@ -1,0 +1,58 @@
+{
+ "peggedAssets": [
+  {
+   "id": "1",
+   "name": "Tether",
+   "symbol": "USDT",
+   "gecko_id": "tether",
+   "pegType": "peggedUSD",
+   "priceSource": "defillama",
+   "pegMechanism": "fiat-backed",
+   "circulating": {
+    "peggedUSD": 181852590580.49893
+   },
+   "circulatingPrevDay": {
+    "peggedUSD": 182227737603.4081
+   },
+   "circulatingPrevWeek": {
+    "peggedUSD": 182909277529.08328
+   },
+   "circulatingPrevMonth": {
+    "peggedUSD": 183551044616.72476
+   },
+   "price": 0.9987099025061729,
+   "chains": [
+    "Tron",
+    "Ethereum",
+    "BSC"
+   ]
+  },
+  {
+   "id": "2",
+   "name": "USD Coin",
+   "symbol": "USDC",
+   "gecko_id": "usd-coin",
+   "pegType": "peggedUSD",
+   "priceSource": "defillama",
+   "pegMechanism": "fiat-backed",
+   "circulating": {
+    "peggedUSD": 71206923630.52644
+   },
+   "circulatingPrevDay": {
+    "peggedUSD": 71664500569.50716
+   },
+   "circulatingPrevWeek": {
+    "peggedUSD": 72214297264.74664
+   },
+   "circulatingPrevMonth": {
+    "peggedUSD": 75374611488.44914
+   },
+   "price": 0.9993382401064008,
+   "chains": [
+    "Ethereum",
+    "Hyperliquid L1",
+    "Solana"
+   ]
+  }
+ ]
+}

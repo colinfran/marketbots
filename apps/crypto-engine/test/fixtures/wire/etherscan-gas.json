@@ -1,0 +1,12 @@
+{
+ "status": "1",
+ "message": "OK",
+ "result": {
+  "LastBlock": "26281105",
+  "SafeGasPrice": "0.058184233",
+  "ProposeGasPrice": "0.058222993",
+  "FastGasPrice": "0.059184233",
+  "suggestBaseFee": "0.058184233",
+  "gasUsedRatio": "0.445816966666667,0.493221814208969,0.523340113839775,0.2356735,0.6611895"
+ }
+}

@@ -1,0 +1,35 @@
+[
+ {
+  "category": "crypto",
+  "datetime": 1793059601,
+  "headline": "Ripple wins final US approval for national trust bank",
+  "id": 8679057,
+  "image": "https://static2.finnhub.io/file/publicdatany/hmpimage/cointelegraph.webp",
+  "related": "",
+  "source": "Cointelegraph",
+  "summary": "The approval clears the way for Ripple to manage reserves backing its RLUSD stablecoin and provide digital asset custody.",
+  "url": "https://cointelegraph.com/news/ripple-wins-final-us-approval-for-national-trust-bank?utm_source=rss_feed&utm_medium=rss&utm_campaign=rss_partner_inbound"
+ },
+ {
+  "category": "crypto",
+  "datetime": 1793050710,
+  "headline": "US OCC calls on community banks to become payment stablecoin issuers",
+  "id": 8678535,
+  "image": "https://static2.finnhub.io/file/publicdatany/hmpimage/cointelegraph.webp",
+  "related": "",
+  "source": "Cointelegraph",
+  "summary": "The announcement followed the banking regulator finalizing its rules for the GENIUS Act, a stablecoin law to be implemented in January",
+  "url": "https://cointelegraph.com/news/occ-community-banks-stablecoin-issuers-genius-act?utm_source=rss_feed&utm_medium=rss&utm_campaign=rss_partner_inbound"
+ },
+ {
+  "category": "crypto",
+  "datetime": 1793049812,
+  "headline": "Injective launches onchain futures market tracking Nvidia GPU rental costs",
+  "id": 8678536,
+  "image": "https://static2.finnhub.io/file/publicdatany/hmpimage/cointelegraph.webp",
+  "related": "",
+  "source": "Cointelegraph",
+  "summary": "The new index tracks rental prices for five Nvidia GPUs, offering leveraged trading and potential hedging against fluctuations in AI computing costs.",
+  "url": "https://cointelegraph.com/news/injective-launches-onchain-futures-market-tracking-nvidia-gpu-rental-costs?utm_source=rss_feed&utm_medium=rss&utm_campaign=rss_partner_inbound"
+ }
+]

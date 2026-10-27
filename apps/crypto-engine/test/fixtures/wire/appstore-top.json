@@ -1,0 +1,51 @@
+{
+ "feed": {
+  "title": "Top Free Apps",
+  "id": "https://rss.marketingtools.apple.com/api/v2/us/apps/top-free/100/apps.json",
+  "author": {
+   "name": "Apple",
+   "url": "https://www.apple.com/"
+  },
+  "links": [
+   {
+    "self": "https://rss.marketingtools.apple.com/api/v2/us/apps/top-free/100/apps.json"
+   }
+  ],
+  "copyright": "Copyright © 2026 Apple Inc. All rights reserved.",
+  "country": "us",
+  "icon": "https://www.apple.com/favicon.ico",
+  "updated": "Tue, 27 Oct 2026 02:39:11 +0000",
+  "results": [
+   {
+    "artistName": "TikTok Ltd.",
+    "id": "6741796873",
+    "name": "TikTok Pro - Events",
+    "releaseDate": "2026-06-03",
+    "kind": "apps",
+    "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/ea/78/45/ea784534-39b0-b4cd-9105-f143cf0703bb/AppIcon_TikTok-0-0-1x_U007emarketing-0-8-0-85-220.png/100x100bb.png",
+    "genres": [],
+    "url": "https://apps.apple.com/us/app/tiktok-pro-events/id6741796873"
+   },
+   {
+    "artistName": "Vinted Limited",
+    "id": "632064380",
+    "name": "Vinted: Pre-loved marketplace",
+    "releaseDate": "2013-04-11",
+    "kind": "apps",
+    "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/81/0b/2a/810b2a07-fa9c-ea26-e916-b33572ade916/VintedAppIcon-0-0-1x_U007epad-0-1-85-220.png/100x100bb.png",
+    "genres": [],
+    "url": "https://apps.apple.com/us/app/vinted-pre-loved-marketplace/id632064380"
+   },
+   {
+    "artistName": "DAZN Limited",
+    "id": "1129523589",
+    "name": "DAZN: Stream Live Sports",
+    "releaseDate": "2018-09-11",
+    "kind": "apps",
+    "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/62/ee/ba/62eebada-e7e6-81d7-1a3a-9da6faa68026/AppIcon-0-0-1x_U007emarketing-0-8-0-0-85-220.png/100x100bb.png",
+    "genres": [],
+    "url": "https://apps.apple.com/us/app/dazn-stream-live-sports/id1129523589"
+   }
+  ]
+ }
+}

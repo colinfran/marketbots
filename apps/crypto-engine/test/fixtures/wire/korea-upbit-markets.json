@@ -1,0 +1,122 @@
+[
+ {
+  "market": "KRW-DOGE",
+  "korean_name": "도지코인",
+  "english_name": "Dogecoin",
+  "market_event": {
+   "warning": false,
+   "caution": {
+    "PRICE_FLUCTUATIONS": false,
+    "TRADING_VOLUME_SOARING": false,
+    "DEPOSIT_AMOUNT_SOARING": false,
+    "GLOBAL_PRICE_DIFFERENCES": false,
+    "CONCENTRATION_OF_SMALL_ACCOUNTS": false
+   }
+  }
+ },
+ {
+  "market": "KRW-ETH",
+  "korean_name": "이더리움",
+  "english_name": "Ethereum",
+  "market_event": {
+   "warning": false,
+   "caution": {
+    "PRICE_FLUCTUATIONS": false,
+    "TRADING_VOLUME_SOARING": false,
+    "DEPOSIT_AMOUNT_SOARING": false,
+    "GLOBAL_PRICE_DIFFERENCES": false,
+    "CONCENTRATION_OF_SMALL_ACCOUNTS": false
+   }
+  }
+ },
+ {
+  "market": "KRW-XRP",
+  "korean_name": "엑스알피(리플)",
+  "english_name": "XRP",
+  "market_event": {
+   "warning": false,
+   "caution": {
+    "PRICE_FLUCTUATIONS": false,
+    "TRADING_VOLUME_SOARING": false,
+    "DEPOSIT_AMOUNT_SOARING": false,
+    "GLOBAL_PRICE_DIFFERENCES": false,
+    "CONCENTRATION_OF_SMALL_ACCOUNTS": false
+   }
+  }
+ },
+ {
+  "market": "KRW-SOL",
+  "korean_name": "솔라나",
+  "english_name": "Solana",
+  "market_event": {
+   "warning": false,
+   "caution": {
+    "PRICE_FLUCTUATIONS": false,
+    "TRADING_VOLUME_SOARING": false,
+    "DEPOSIT_AMOUNT_SOARING": false,
+    "GLOBAL_PRICE_DIFFERENCES": false,
+    "CONCENTRATION_OF_SMALL_ACCOUNTS": false
+   }
+  }
+ },
+ {
+  "market": "KRW-BTC",
+  "korean_name": "비트코인",
+  "english_name": "Bitcoin",
+  "market_event": {
+   "warning": false,
+   "caution": {
+    "PRICE_FLUCTUATIONS": false,
+    "TRADING_VOLUME_SOARING": false,
+    "DEPOSIT_AMOUNT_SOARING": false,
+    "GLOBAL_PRICE_DIFFERENCES": false,
+    "CONCENTRATION_OF_SMALL_ACCOUNTS": false
+   }
+  }
+ },
+ {
+  "market": "KRW-FIL",
+  "korean_name": "파일코인",
+  "english_name": "Filecoin",
+  "market_event": {
+   "warning": false,
+   "caution": {
+    "PRICE_FLUCTUATIONS": false,
+    "TRADING_VOLUME_SOARING": false,
+    "DEPOSIT_AMOUNT_SOARING": true,
+    "GLOBAL_PRICE_DIFFERENCES": false,
+    "CONCENTRATION_OF_SMALL_ACCOUNTS": false
+   }
+  }
+ },
+ {
+  "market": "KRW-BEAM",
+  "korean_name": "빔",
+  "english_name": "Beam",
+  "market_event": {
+   "warning": false,
+   "caution": {
+    "PRICE_FLUCTUATIONS": false,
+    "TRADING_VOLUME_SOARING": true,
+    "DEPOSIT_AMOUNT_SOARING": true,
+    "GLOBAL_PRICE_DIFFERENCES": false,
+    "CONCENTRATION_OF_SMALL_ACCOUNTS": false
+   }
+  }
+ },
+ {
+  "market": "BTC-BERA",
+  "korean_name": "베라체인",
+  "english_name": "Berachain",
+  "market_event": {
+   "warning": false,
+   "caution": {
+    "PRICE_FLUCTUATIONS": false,
+    "TRADING_VOLUME_SOARING": false,
+    "DEPOSIT_AMOUNT_SOARING": false,
+    "GLOBAL_PRICE_DIFFERENCES": false,
+    "CONCENTRATION_OF_SMALL_ACCOUNTS": false
+   }
+  }
+ }
+]

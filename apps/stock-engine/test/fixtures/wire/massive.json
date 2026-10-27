@@ -1,0 +1,105 @@
+{
+ "results": [
+  {
+   "id": "53ad4b32a368f68feb4d934744aef540603e81f627a9633cec7a8a88cd963c61",
+   "publisher": {
+    "name": "GlobeNewswire Inc.",
+    "homepage_url": "https://www.globenewswire.com",
+    "logo_url": "https://s3.massive.com/public/assets/news/logos/globenewswire.svg",
+    "favicon_url": "https://s3.massive.com/public/assets/news/favicons/globenewswire.ico"
+   },
+   "title": "ROSEN, NATIONAL TRIAL COUNSEL, Encourages Fluence Energy, Inc. Investors to Secure Counsel Before Important Deadline in Securities Class Action – FLNC",
+   "author": "Rosen Law Firm",
+   "published_utc": "2026-10-27T01:00:00Z",
+   "article_url": "https://www.globenewswire.com/news-release/2026/10/27/3388660/673/en/rosen-national-trial-counsel-encourages-fluence-energy-inc-investors-to-secure-counsel-before-important-deadline-in-securities-class-action-flnc.html",
+   "tickers": [
+    "FLNC",
+    "DUOL",
+    "TYGO"
+   ],
+   "image_url": "https://ml.globenewswire.com/Resource/Download/745335af-3a3a-4fb5-84c0-fdedc9adf092",
+   "description": "Rosen Law Firm is soliciting investors who purchased securities of Fluence Energy, Duolingo, and Tigo Energy during specified periods to join class action lawsuits. The firm alleges that Fluence Energy made false statements about its ability to deliver backlog and revenue guidance due to manufacturing facility issues. Similar class actions have been filed against the other companies, with a November 30, 2026 deadline for lead plaintiff claims.",
+   "keywords": [
+    "securities class action",
+    "investor lawsuit",
+    "Fluence Energy",
+    "Duolingo",
+    "Tigo Energy",
+    "lead plaintiff deadline",
+    "false statements",
+    "manufacturing issues"
+   ],
+   "insights": [
+    {
+     "ticker": "FLNC",
+     "sentiment": "negative",
+     "sentiment_reasoning": "Company is subject to securities class action lawsuit alleging materially false and misleading statements regarding its ability to deliver backlog and revenue guidance, with claims that production problems at manufacturing facilities were not being remediated and persisted into new facilities."
+    },
+    {
+     "ticker": "DUOL",
+     "sentiment": "negative",
+     "sentiment_reasoning": "Company is subject to a securities class action lawsuit filed by Rosen Law Firm, indicating alleged investor harm and potential disclosure violations during the specified class period."
+    },
+    {
+     "ticker": "TYGO",
+     "sentiment": "negative",
+     "sentiment_reasoning": "Company is subject to a securities class action lawsuit that was first filed by Rosen Law Firm, suggesting alleged material misstatements or omissions that caused investor damages."
+    }
+   ]
+  },
+  {
+   "id": "4c65aa3f65796da9ec30c5536564b9fef470adc706e203f7b8e4762ae9e19f54",
+   "publisher": {
+    "name": "The Motley Fool",
+    "homepage_url": "https://www.fool.com/",
+    "logo_url": "https://s3.massive.com/public/assets/news/logos/themotleyfool.svg",
+    "favicon_url": "https://s3.massive.com/public/assets/news/favicons/themotleyfool.ico"
+   },
+   "title": "Alphabet Must Show This on Oct. 28 or the Stock Could Stall",
+   "author": "Micah Zimmerman",
+   "published_utc": "2026-10-27T01:00:00Z",
+   "article_url": "https://www.fool.com/investing/2026/10/26/alphabet-must-show-this-on-oct-28-or-the-stock-cou/?source=iedfolrf0000001",
+   "tickers": [
+    "GOOG",
+    "GOOGL",
+    "GOOGM",
+    "GOOGN"
+   ],
+   "image_url": "https://g.foolcdn.com/image/?url=https%3A%2F%2Fg.foolcdn.com%2Feditorial%2Fimages%2F892134%2Fdinosaur-skeleton-with-google-logo-handing-from-mouth_alphabet_google.jpg&w=1200&op=resize",
+   "description": "Alphabet's Oct. 28 earnings report will be critical for investors to assess whether Google Cloud's growing profits are translating into actual cash flow. The company posted negative free cash flow of $5.9 billion in Q2 despite strong cloud growth, and is now spending more on capex ($195-205B annually) than it generates in operating cash flow ($185.7B over trailing 12 months). Investors should focus on whether operating cash flow returns to the $45-50 billion range to confirm the AI investment is self-funding, or if the company continues relying on shareholder capital.",
+   "keywords": [
+    "Q3 earnings",
+    "operating cash flow",
+    "free cash flow",
+    "capital expenditure",
+    "Google Cloud",
+    "AI investment",
+    "working capital"
+   ],
+   "insights": [
+    {
+     "ticker": "GOOG",
+     "sentiment": "neutral",
+     "sentiment_reasoning": "While Google Cloud shows strong growth (82% revenue growth, operating margin expansion), the company faces a critical cash flow challenge. Q2 saw negative free cash flow despite rising operating income, and capex guidance now exceeds trailing 12-month operating cash flow. The article suggests existing shareholders have 'little reason to sell' but potential buyers should wait for Oct. 28 results. The outcome depends on whether Q3 operating cash flow recovers, making the near-term outlook uncertain."
+    },
+    {
+     "ticker": "GOOGL",
+     "sentiment": "neutral",
+     "sentiment_reasoning": "While Google Cloud shows strong growth (82% revenue growth, operating margin expansion), the company faces a critical cash flow challenge. Q2 saw negative free cash flow despite rising operating income, and capex guidance now exceeds trailing 12-month operating cash flow. The article suggests existing shareholders have 'little reason to sell' but potential buyers should wait for Oct. 28 results. The outcome depends on whether Q3 operating cash flow recovers, making the near-term outlook uncertain."
+    },
+    {
+     "ticker": "GOOGM",
+     "sentiment": "neutral",
+     "sentiment_reasoning": "While Google Cloud shows strong growth (82% revenue growth, operating margin expansion), the company faces a critical cash flow challenge. Q2 saw negative free cash flow despite rising operating income, and capex guidance now exceeds trailing 12-month operating cash flow. The article suggests existing shareholders have 'little reason to sell' but potential buyers should wait for Oct. 28 results. The outcome depends on whether Q3 operating cash flow recovers, making the near-term outlook uncertain."
+    },
+    {
+     "ticker": "GOOGN",
+     "sentiment": "neutral",
+     "sentiment_reasoning": "While Google Cloud shows strong growth (82% revenue growth, operating margin expansion), the company faces a critical cash flow challenge. Q2 saw negative free cash flow despite rising operating income, and capex guidance now exceeds trailing 12-month operating cash flow. The article suggests existing shareholders have 'little reason to sell' but potential buyers should wait for Oct. 28 results. The outcome depends on whether Q3 operating cash flow recovers, making the near-term outlook uncertain."
+    }
+   ]
+  }
+ ],
+ "status": "OK",
+ "count": 2
+}

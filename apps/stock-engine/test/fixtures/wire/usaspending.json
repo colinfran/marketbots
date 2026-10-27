@@ -1,0 +1,55 @@
+{
+ "spending_level": "awards",
+ "limit": 10,
+ "results": [
+  {
+   "internal_id": 363251285,
+   "Award ID": "36C10G27K0004",
+   "Recipient Name": "TRIWEST HEALTHCARE ALLIANCE CORP",
+   "Award Amount": 900485186.84,
+   "Awarding Agency": "Department of Veterans Affairs",
+   "Start Date": "2026-09-01",
+   "Base Obligation Date": "2026-10-07",
+   "Last Modified Date": "2026-10-07 13:22:37",
+   "Description": "EXPRESS REPORT: FY26 SEPTEMBER",
+   "generated_internal_id": "CONT_AWD_36C10G27K0004_3600_36C10G19D0038_3600",
+   "awarding_agency_id": 561,
+   "agency_slug": "department-of-veterans-affairs"
+  },
+  {
+   "internal_id": 363215882,
+   "Award ID": "36C10G26K0298",
+   "Recipient Name": "OPTUM PUBLIC SECTOR SOLUTIONS, INC.",
+   "Award Amount": 1085804852.71,
+   "Awarding Agency": "Department of Veterans Affairs",
+   "Start Date": "2026-07-01",
+   "Base Obligation Date": "2026-09-30",
+   "Last Modified Date": "2026-10-06 14:52:42",
+   "Description": "EXPRESS REPORT: R3 FY26 4TH QTR JULY",
+   "generated_internal_id": "CONT_AWD_36C10G26K0298_3600_36C79119D0006_3600",
+   "awarding_agency_id": 561,
+   "agency_slug": "department-of-veterans-affairs"
+  },
+  {
+   "internal_id": 363075161,
+   "Award ID": "70B01C26F00001119",
+   "Recipient Name": "GRUNLEY CONSTRUCTION CO., INC.",
+   "Award Amount": 137000000,
+   "Awarding Agency": "Department of Homeland Security",
+   "Start Date": "2026-09-29",
+   "Base Obligation Date": "2026-09-29",
+   "Last Modified Date": "2026-09-29 13:29:16",
+   "Description": "DESIGN-BUILD A BORDER PATROL STATION (BPS) LOCATED AT EAGLE PASS, TX.",
+   "generated_internal_id": "CONT_AWD_70B01C26F00001119_7014_70B01C26D00000023_7014",
+   "awarding_agency_id": 766,
+   "agency_slug": "department-of-homeland-security"
+  }
+ ],
+ "page_metadata": {
+  "page": 1,
+  "hasNext": true,
+  "last_record_unique_id": 363075157,
+  "last_record_sort_value": "1790640000000"
+ },
+ "messages": []
+}

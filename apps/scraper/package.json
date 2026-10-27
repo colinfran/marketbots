@@ -1,0 +1,13 @@
+{
+  "name": "@mb/scraper",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Headless Chromium sidecar that renders JavaScript pages for the engine's headless news sources",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "playwright-core": "1.64.1"
+  }
+}

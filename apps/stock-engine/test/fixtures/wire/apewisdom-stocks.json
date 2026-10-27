@@ -1,0 +1,34 @@
+{
+ "count": 684,
+ "pages": 7,
+ "current_page": 1,
+ "results": [
+  {
+   "rank": 1,
+   "ticker": "SPY",
+   "name": "SPDR S&amp;P 500 ETF Trust",
+   "mentions": 110,
+   "upvotes": 315,
+   "rank_24h_ago": 1,
+   "mentions_24h_ago": 51
+  },
+  {
+   "rank": 2,
+   "ticker": "NBIS",
+   "name": "Nebius Group",
+   "mentions": 90,
+   "upvotes": 405,
+   "rank_24h_ago": 12,
+   "mentions_24h_ago": 22
+  },
+  {
+   "rank": 3,
+   "ticker": "TSLA",
+   "name": "Tesla",
+   "mentions": 81,
+   "upvotes": 223,
+   "rank_24h_ago": 15,
+   "mentions_24h_ago": 12
+  }
+ ]
+}

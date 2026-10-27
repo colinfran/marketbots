@@ -1,0 +1,37 @@
+{
+ "markets": [
+  {
+   "ticker": "KXCPI-26NOV-T0.4",
+   "event_ticker": "KXCPI-26NOV",
+   "title": "Will CPI rise more than 0.4% in November 2026?",
+   "status": "active",
+   "yes_bid_dollars": "0.2000",
+   "yes_ask_dollars": "0.2200",
+   "last_price_dollars": "0.2200",
+   "open_interest_fp": "10965.91",
+   "volume_24h_fp": "1.00"
+  },
+  {
+   "ticker": "KXCPI-26DEC-T0.3",
+   "event_ticker": "KXCPI-26DEC",
+   "title": "Will CPI rise more than 0.3% in December 2026?",
+   "status": "active",
+   "yes_bid_dollars": "0.3400",
+   "yes_ask_dollars": "0.3500",
+   "last_price_dollars": "0.3700",
+   "open_interest_fp": "2655.95",
+   "volume_24h_fp": "0.00"
+  },
+  {
+   "ticker": "KXCPI-26OCT-T1.0",
+   "event_ticker": "KXCPI-26OCT",
+   "title": "Will CPI rise more than 1.0% in October 2026?",
+   "status": "active",
+   "yes_bid_dollars": "0.0000",
+   "yes_ask_dollars": "0.0100",
+   "last_price_dollars": "0.0100",
+   "open_interest_fp": "9045.11",
+   "volume_24h_fp": "139.34"
+  }
+ ]
+}

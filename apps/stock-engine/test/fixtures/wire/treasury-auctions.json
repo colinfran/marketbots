@@ -1,0 +1,50 @@
+[
+ {
+  "cusip": "91282CRU7",
+  "securityType": "Note",
+  "securityTerm": "2-Year",
+  "originalSecurityTerm": "2-Year",
+  "competitiveAuctionCloseDate": "2026-10-26T00:00:00",
+  "highYield": "4.708",
+  "bidToCoverRatio": "2.59",
+  "inflationProtected": "No",
+  "floatingRate": "No",
+  "offeringAmount": "69000000000",
+  "primaryDealersCompetitiveParAwarded": "8818075000",
+  "directBiddersCompetitiveParAwarded": "28027002700",
+  "indirectBiddersCompetitiveParAwarded": "30981323300",
+  "treasuryAuctionResultsPressReleaseFileName": "R_20261026_3.pdf"
+ },
+ {
+  "cusip": "912797VU8",
+  "securityType": "Bill",
+  "securityTerm": "13-Week",
+  "originalSecurityTerm": "26-Week",
+  "competitiveAuctionCloseDate": "2026-10-26T00:00:00",
+  "highYield": "",
+  "bidToCoverRatio": "3.07",
+  "inflationProtected": "",
+  "floatingRate": "",
+  "offeringAmount": "95000000000",
+  "primaryDealersCompetitiveParAwarded": "22309272500",
+  "directBiddersCompetitiveParAwarded": "6173439000",
+  "indirectBiddersCompetitiveParAwarded": "64107909400",
+  "treasuryAuctionResultsPressReleaseFileName": "R_20261026_1.pdf"
+ },
+ {
+  "cusip": "91282CRR4",
+  "securityType": "Note",
+  "securityTerm": "5-Year",
+  "originalSecurityTerm": "5-Year",
+  "competitiveAuctionCloseDate": "2026-10-22T00:00:00",
+  "highYield": "2.367",
+  "bidToCoverRatio": "2.41",
+  "inflationProtected": "Yes",
+  "floatingRate": "No",
+  "offeringAmount": "26000000000",
+  "primaryDealersCompetitiveParAwarded": "1419165000",
+  "directBiddersCompetitiveParAwarded": "8328422300",
+  "indirectBiddersCompetitiveParAwarded": "15929104000",
+  "treasuryAuctionResultsPressReleaseFileName": "R_20261022_4.pdf"
+ }
+]

@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:media="http://search.yahoo.com/mrss/" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:nyt="http://www.nytimes.com/namespaces/rss/2.0" version="2.0">
+  <channel>
+    <title>NYT &gt; Business</title>
+    <link>https://www.nytimes.com/section/business</link>
+    <atom:link href="https://rss.nytimes.com/services/xml/rss/nyt/Business.xml" rel="self" type="application/rss+xml"></atom:link>
+    <description></description>
+    <language>en-us</language>
+    <copyright>Copyright 2026 The New York Times Company</copyright>
+    <lastBuildDate>Tue, 27 Oct 2026 02:43:47 +0000</lastBuildDate>
+    <pubDate>Tue, 27 Oct 2026 02:37:36 +0000</pubDate>
+    <image>
+      <title>NYT &gt; Business</title>
+      <url>https://static01.nyt.com/images/misc/NYT_logo_rss_250x40.png</url>
+      <link>https://www.nytimes.com/section/business</link>
+    </image>
+    <item>
+      <title>California’s Potential Quartz Ban Pushes Contractors and Retailers to Alternatives</title>
+      <link>https://www.nytimes.com/2026/10/26/business/economy/california-quartz-countertop-ban-alternatives.html</link>
+      <guid isPermaLink="true">https://www.nytimes.com/2026/10/26/business/economy/california-quartz-countertop-ban-alternatives.html</guid>
+      <atom:link href="https://www.nytimes.com/2026/10/26/business/economy/california-quartz-countertop-ban-alternatives.html" rel="standout"></atom:link>
+      <description>Manufacturers and their customers are using materials made without the clouds of dust that have sickened workers in quartz-cutting shops.</description>
+      <dc:creator>Rebecca Davis O’Brien</dc:creator>
+      <pubDate>Mon, 26 Oct 2026 14:48:33 +0000</pubDate>
+      <category domain="http://www.nytimes.com/namespaces/keywords/des">Quartz</category>
+      <category domain="http://www.nytimes.com/namespaces/keywords/des">Rock and Stone</category>
+      <category domain="http://www.nytimes.com/namespaces/keywords/des">Silicosis</category>
+      <category domain="http://www.nytimes.com/namespaces/keywords/des">Kitchens</category>
+      <category domain="http://www.nytimes.com/namespaces/keywords/des">Suits and Litigation (Civil)</category>
+      <category domain="http://www.nytimes.com/namespaces/keywords/nyt_org">Cambria Co LLC</category>
+      <category domain="http://www.nytimes.com/namespaces/keywords/nyt_geo">California</category>
+      <media:content height="1801" medium="image" url="https://static01.nyt.com/images/2026/10/22/business/biz-counters/biz-counters-mediumSquareAt3X.jpg" width="1800"></media:content>
+      <media:credit>Brian van der Brug/Los Angeles Times, via Getty Images</media:credit>
+      <media:description>A fabrication shop in Sun Valley, Calif. The state is poised to ban the production and installation of quartz countertops.</media:description>
+    </item>
+<item>
+      <title>DraftKings Faces Growing Pressure Over How It Targets Customers</title>
+      <link>https://www.nytimes.com/2026/10/26/business/draftkings-new-york-louisiana-blumenthal.html</link>
+      <guid isPermaLink="true">https://www.nytimes.com/2026/10/26/business/draftkings-new-york-louisiana-blumenthal.html</guid>
+      <atom:link href="https://www.nytimes.com/2026/10/26/business/draftkings-new-york-louisiana-blumenthal.html" rel="standout"></atom:link>
+      <description>In Congress and in several states, officials have been questioning online gambling companies about their use of artificial intelligence.</description>
+      <dc:creator>Alex Klavens</dc:creator>
+      <pubDate>Mon, 26 Oct 2026 15:53:16 +0000</pubDate>
+      <category domain="http://www.nytimes.com/namespaces/keywords/des">Gambling</category>
+      <category domain="http://www.nytimes.com/namespaces/keywords/des">Artificial Intelligence</category>
+      <category domain="http://www.nytimes.com/namespaces/keywords/nyt_org">DraftKings Inc</category>
+      <category domain="http://www.nytimes.com/namespaces/keywords/nyt_per">Blumenthal, Richard</category>
+      <category domain="http://www.nytimes.com/namespaces/keywords/nyt_geo">New York State</category>
+      <category domain="http://www.nytimes.com/namespaces/keywords/nyt_geo">Louisiana</category>
+      <category domain="http://www.nytimes.com/namespaces/keywords/nyt_org">New York State Gaming Commission</category>
+      <category domain="http://www.nytimes.com/namespaces/keywords/nyt_org">New York Times</category>
+      <media:content height="1800" medium="image" url="https://static01.nyt.com/images/2026/10/26/multimedia/26biz-draftkings-pressure-02-mcgh/26biz-draftkings-pressure-02-mcgh-mediumSquareAt3X.jpg" width="1800"></media:content>
+      <media:credit>Tony Luong for The New York Times</media:credit>
+      <media:description>The DraftKings headquarters in Boston. The New York Times reported last month that the company had used A.I. to target customers.</media:description>
+    </item>
+<item>
+      <title>Brazilian Markets Convulse After Unexpected Election Result</title>
+      <link>https://www.nytimes.com/2026/10/26/business/brazil-stock-markets-election-lula.html</link>
+      <guid isPermaLink="true">https://www.nytimes.com/2026/10/26/business/brazil-stock-markets-election-lula.html</guid>
+      <atom:link href="https://www.nytimes.com/2026/10/26/business/brazil-stock-markets-election-lula.html" rel="standout"></atom:link>
+      <description>President Luiz Inácio Lula da Silva’s re-election victory prompted a sharp reversal in financial markets that had expected his opponent to win.</description>
+      <dc:creator>Joe Rennison</dc:creator>
+      <pubDate>Mon, 26 Oct 2026 20:07:18 +0000</pubDate>
+      <category domain="http://www.nytimes.com/namespaces/keywords/des">Stocks and Bonds</category>
+      <category domain="http://www.nytimes.com/namespaces/keywords/nyt_per">Da Silva, Luiz Inacio Lula</category>
+      <category domain="http://www.nytimes.com/namespaces/keywords/nyt_per">Bolsonaro, Flavio</category>
+      <category domain="http://www.nytimes.com/namespaces/keywords/nyt_geo">Brazil</category>
+      <category domain="http://www.nytimes.com/namespaces/keywords/des">Elections</category>
+      <category domain="http://www.nytimes.com/namespaces/keywords/nyt_per">Bolsonaro, Jair (1955- )</category>
+      <media:content height="1800" medium="image" url="https://static01.nyt.com/images/2026/10/26/multimedia/26Biz-Brazil-Markets-pvmt/26Biz-Brazil-Markets-pvmt-mediumSquareAt3X.jpg" width="1800"></media:content>
+      <media:credit>Amanda Perobelli/Reuters</media:credit>
+      <media:description>Brazil’s president, Luiz Inacio Lula da Silva, celebrating on Monday after his victory in the presidential runoff election.</media:description>
+    </item>
+</channel>
+</rss>

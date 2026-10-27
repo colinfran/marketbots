@@ -1,0 +1,52 @@
+{
+ "page": {
+  "id": "rm9mn997x8jd",
+  "name": "Solana",
+  "url": "https://status.solana.com",
+  "time_zone": "Etc/UTC",
+  "updated_at": "2026-10-27T00:29:37.396Z"
+ },
+ "components": [
+  {
+   "id": "qxs6x3yc9cxg",
+   "name": "Mainnet Beta - Cluster",
+   "status": "operational",
+   "created_at": "2021-03-22T22:46:32.540Z",
+   "updated_at": "2024-02-06T15:09:24.815Z",
+   "position": 1,
+   "description": "Status for the Mainnet-Beta cluster",
+   "showcase": true,
+   "start_date": "2021-03-17",
+   "group_id": null,
+   "page_id": "rm9mn997x8jd",
+   "group": false,
+   "only_show_if_degraded": false
+  },
+  {
+   "id": "b21c1qbg5g4n",
+   "name": "Mainnet Beta - RPC Nodes",
+   "status": "operational",
+   "created_at": "2021-02-12T19:28:12.426Z",
+   "updated_at": "2021-03-22T23:27:09.122Z",
+   "position": 2,
+   "description": "RPC Node Status for https://api.mainnet-beta.solana.com",
+   "showcase": false,
+   "start_date": null,
+   "group_id": null,
+   "page_id": "rm9mn997x8jd",
+   "group": true,
+   "only_show_if_degraded": false,
+   "components": [
+    "2crkrxks5bjn",
+    "bk51srwy3mdx",
+    "2gnd2zr0bz4t"
+   ]
+  }
+ ],
+ "incidents": [],
+ "scheduled_maintenances": [],
+ "status": {
+  "indicator": "none",
+  "description": "All Systems Operational"
+ }
+}

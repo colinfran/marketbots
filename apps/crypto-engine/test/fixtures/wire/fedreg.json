@@ -1,0 +1,61 @@
+{
+ "description": "Documents matching '\"digital asset\"'",
+ "count": 2,
+ "total_pages": 43,
+ "next_page_url": "https://www.federalregister.gov/api/v1/documents?conditions%5Bterm%5D=%22digital+asset%22&format=json&order=newest&page=2&per_page=10",
+ "results": [
+  {
+   "title": "Agency Information Collection Activities; Submission for OMB Review; Comment Request; U.S. Information Returns and Related Forms, Schedules, Attachments, and Published Guidance",
+   "type": "Notice",
+   "abstract": "The Department of the Treasury will submit the following information collection request to the Office of Management and Budget (OMB) for review and clearance in accordance with the Paperwork Reduction Act of 1995, on or after the date of publication of this notice. The public is invited to submit comments on this request.",
+   "document_number": "2026-21715",
+   "html_url": "https://www.federalregister.gov/documents/2026/10/23/2026-21715/agency-information-collection-activities-submission-for-omb-review-comment-request-us-information",
+   "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2026-10-23/pdf/2026-21715.pdf",
+   "public_inspection_pdf_url": "https://public-inspection.federalregister.gov/2026-21715.pdf?1792673117",
+   "publication_date": "2026-10-23",
+   "agencies": [
+    {
+     "raw_name": "DEPARTMENT OF THE TREASURY",
+     "name": "Treasury Department",
+     "id": 497,
+     "url": "https://www.federalregister.gov/agencies/treasury-department",
+     "json_url": "https://www.federalregister.gov/api/v1/agencies/497",
+     "parent_id": null,
+     "slug": "treasury-department"
+    }
+   ],
+   "excerpts": "Abandonment of Secured Property \n 1545-0877 \n \n \n 1099-B \n Proceeds From Broker and Barter Exchange Transactions \n 1545-"
+  },
+  {
+   "title": "Implementing the Guiding and Establishing National Innovation for U.S. Stablecoins Act for the Issuance of Stablecoins by Entities Subject to the Jurisdiction of the Office of the Comptroller of the Currency",
+   "type": "Rule",
+   "abstract": "The Office of the Comptroller of the Currency (OCC) is issuing regulations implementing the Guiding and Establishing National Innovation for U.S. Stablecoins Act regarding the issuance of payment stablecoins and certain related activities by entities subject to the OCC's jurisdiction.",
+   "document_number": "2026-21706",
+   "html_url": "https://www.federalregister.gov/documents/2026/10/23/2026-21706/implementing-the-guiding-and-establishing-national-innovation-for-us-stablecoins-act-for-the",
+   "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2026-10-23/pdf/2026-21706.pdf",
+   "public_inspection_pdf_url": "https://public-inspection.federalregister.gov/2026-21706.pdf?1792673117",
+   "publication_date": "2026-10-23",
+   "agencies": [
+    {
+     "raw_name": "DEPARTMENT OF THE TREASURY",
+     "name": "Treasury Department",
+     "id": 497,
+     "url": "https://www.federalregister.gov/agencies/treasury-department",
+     "json_url": "https://www.federalregister.gov/api/v1/agencies/497",
+     "parent_id": null,
+     "slug": "treasury-department"
+    },
+    {
+     "raw_name": "Office of the Comptroller of the Currency",
+     "name": "Comptroller of the Currency",
+     "id": 80,
+     "url": "https://www.federalregister.gov/agencies/comptroller-of-the-currency",
+     "json_url": "https://www.federalregister.gov/api/v1/agencies/80",
+     "parent_id": 497,
+     "slug": "comptroller-of-the-currency"
+    }
+   ],
+   "excerpts": "“insured depository institution” is defined separately (discussed below).\n \n \n <span class=\"match\">Digital asset</span>."
+  }
+ ]
+}

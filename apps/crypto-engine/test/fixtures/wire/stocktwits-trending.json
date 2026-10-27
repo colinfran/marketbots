@@ -1,0 +1,34 @@
+{
+ "response": {
+  "status": 200
+ },
+ "symbols": [
+  {
+   "id": 12613,
+   "symbol": "SOFI",
+   "title": "SoFi Technologies Inc",
+   "instrument_class": "Stock",
+   "trending": true,
+   "trending_score": 9.81681,
+   "watchlist_count": 157091
+  },
+  {
+   "id": 4760,
+   "symbol": "CLS",
+   "title": "Celestica, Inc.",
+   "instrument_class": "Stock",
+   "trending": true,
+   "trending_score": 7.69944,
+   "watchlist_count": 7965
+  },
+  {
+   "id": 7727,
+   "symbol": "WHR",
+   "title": "Whirlpool Corp.",
+   "instrument_class": "Stock",
+   "trending": true,
+   "trending_score": 7.12639,
+   "watchlist_count": 4695
+  }
+ ]
+}

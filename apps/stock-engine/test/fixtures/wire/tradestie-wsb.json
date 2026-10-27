@@ -1,0 +1,20 @@
+[
+ {
+  "ticker": "AI",
+  "sentiment": "Bullish",
+  "sentiment_score": 0.089,
+  "no_of_comments": 288
+ },
+ {
+  "ticker": "META",
+  "sentiment": "Bullish",
+  "sentiment_score": 0.177,
+  "no_of_comments": 33
+ },
+ {
+  "ticker": "SPY",
+  "sentiment": "Bullish",
+  "sentiment_score": 0.058,
+  "no_of_comments": 26
+ }
+]

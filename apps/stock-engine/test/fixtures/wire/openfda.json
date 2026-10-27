@@ -1,0 +1,365 @@
+{
+ "meta": {
+  "last_updated": "2026-10-26",
+  "results": {
+   "skip": 0,
+   "limit": 5,
+   "total": 211
+  }
+ },
+ "results": [
+  {
+   "submissions": [
+    {
+     "submission_type": "SUPPL",
+     "submission_number": "99",
+     "submission_status": "AP",
+     "submission_status_date": "20261015",
+     "review_priority": "STANDARD",
+     "submission_class_code": "LABELING",
+     "submission_class_code_description": "Labeling",
+     "application_docs": [
+      {
+       "id": "87464",
+       "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2026/125504s099lbl.pdf",
+       "date": "20261020",
+       "type": "Label"
+      },
+      {
+       "id": "87513",
+       "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2026/125504s099lbl.pdf#page=37",
+       "date": "20261022",
+       "type": "Medication Guide"
+      }
+     ]
+    }
+   ],
+   "application_number": "BLA125504",
+   "sponsor_name": "NOVARTIS PHARMS CORP",
+   "products": [
+    {
+     "product_number": "001",
+     "reference_drug": "TBD",
+     "brand_name": "COSENTYX",
+     "active_ingredients": [
+      {
+       "name": "SECUKINUMAB",
+       "strength": "150MG/ML"
+      }
+     ],
+     "dosage_form": "INJECTABLE",
+     "route": "INJECTION",
+     "marketing_status": "Prescription",
+     "te_code": "TBD"
+    }
+   ]
+  },
+  {
+   "submissions": [
+    {
+     "submission_type": "SUPPL",
+     "submission_number": "22",
+     "submission_status": "AP",
+     "submission_status_date": "20261006",
+     "review_priority": "STANDARD",
+     "submission_class_code": "LABELING",
+     "submission_class_code_description": "Labeling"
+    }
+   ],
+   "application_number": "ANDA204011",
+   "sponsor_name": "AMNEAL PHARMS",
+   "openfda": {
+    "application_number": [
+     "ANDA204011"
+    ],
+    "brand_name": [
+     "VALSARTAN"
+    ],
+    "generic_name": [
+     "VALSARTAN"
+    ],
+    "manufacturer_name": [
+     "Amneal Pharmaceuticals of New York LLC",
+     "AvKARE"
+    ],
+    "product_ndc": [
+     "53746-837",
+     "53746-838",
+     "53746-839",
+     "53746-840",
+     "42291-856",
+     "42291-857",
+     "42291-858",
+     "42291-859"
+    ],
+    "product_type": [
+     "HUMAN PRESCRIPTION DRUG"
+    ],
+    "route": [
+     "ORAL"
+    ],
+    "substance_name": [
+     "VALSARTAN"
+    ],
+    "rxcui": [
+     "349199",
+     "349200",
+     "349201",
+     "349483"
+    ],
+    "spl_id": [
+     "254b9473-bbcb-4780-a182-ba287b886a47",
+     "488420ae-b4b5-d0ab-e063-6394a90a89bf"
+    ],
+    "spl_set_id": [
+     "f13587f8-76cb-49ad-9291-5907249d6b8e",
+     "a8c61488-4219-dfcb-e053-2a95a90a98a4"
+    ],
+    "package_ndc": [
+     "53746-837-30",
+     "53746-837-60",
+     "53746-837-05",
+     "53746-838-90",
+     "53746-838-05",
+     "53746-838-10",
+     "53746-839-90",
+     "53746-839-05",
+     "53746-839-10",
+     "53746-840-90",
+     "53746-840-05",
+     "53746-840-10",
+     "42291-857-90",
+     "42291-856-30",
+     "42291-858-90",
+     "42291-859-90"
+    ],
+    "nui": [
+     "N0000000070",
+     "N0000175561"
+    ],
+    "pharm_class_moa": [
+     "Angiotensin 2 Receptor Antagonists [MoA]"
+    ],
+    "pharm_class_epc": [
+     "Angiotensin 2 Receptor Blocker [EPC]"
+    ],
+    "unii": [
+     "80M03YXJ7I"
+    ]
+   },
+   "products": [
+    {
+     "product_number": "003",
+     "reference_drug": "No",
+     "brand_name": "VALSARTAN",
+     "active_ingredients": [
+      {
+       "name": "VALSARTAN",
+       "strength": "160MG"
+      }
+     ],
+     "reference_standard": "No",
+     "dosage_form": "TABLET",
+     "route": "ORAL",
+     "marketing_status": "Prescription",
+     "te_code": "AB"
+    },
+    {
+     "product_number": "001",
+     "reference_drug": "No",
+     "brand_name": "VALSARTAN",
+     "active_ingredients": [
+      {
+       "name": "VALSARTAN",
+       "strength": "40MG"
+      }
+     ],
+     "reference_standard": "No",
+     "dosage_form": "TABLET",
+     "route": "ORAL",
+     "marketing_status": "Prescription",
+     "te_code": "AB"
+    },
+    {
+     "product_number": "004",
+     "reference_drug": "No",
+     "brand_name": "VALSARTAN",
+     "active_ingredients": [
+      {
+       "name": "VALSARTAN",
+       "strength": "320MG"
+      }
+     ],
+     "reference_standard": "No",
+     "dosage_form": "TABLET",
+     "route": "ORAL",
+     "marketing_status": "Prescription",
+     "te_code": "AB"
+    },
+    {
+     "product_number": "002",
+     "reference_drug": "No",
+     "brand_name": "VALSARTAN",
+     "active_ingredients": [
+      {
+       "name": "VALSARTAN",
+       "strength": "80MG"
+      }
+     ],
+     "reference_standard": "No",
+     "dosage_form": "TABLET",
+     "route": "ORAL",
+     "marketing_status": "Prescription",
+     "te_code": "AB"
+    }
+   ]
+  },
+  {
+   "submissions": [
+    {
+     "submission_type": "SUPPL",
+     "submission_number": "15",
+     "submission_status": "AP",
+     "submission_status_date": "20261015",
+     "review_priority": "STANDARD",
+     "submission_class_code": "EFFICACY",
+     "submission_class_code_description": "Efficacy",
+     "submission_property_type": [
+      {
+       "code": "Orphan"
+      }
+     ],
+     "application_docs": [
+      {
+       "id": "87448",
+       "url": "https://www.accessdata.fda.gov/drugsatfda_docs/appletter/2026/216834Orig1s015ltr.pdf",
+       "date": "20261019",
+       "type": "Letter"
+      },
+      {
+       "id": "87472",
+       "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2026/216834s015lbl.pdf",
+       "date": "20261020",
+       "type": "Label"
+      },
+      {
+       "id": "87511",
+       "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2026/216834s015lbl.pdf#page=21",
+       "date": "20261022",
+       "type": "Medication Guide"
+      }
+     ]
+    }
+   ],
+   "application_number": "NDA216834",
+   "sponsor_name": "UCB INC",
+   "openfda": {
+    "application_number": [
+     "NDA216834"
+    ],
+    "brand_name": [
+     "ZILBRYSQ"
+    ],
+    "generic_name": [
+     "ZILUCOPLAN"
+    ],
+    "manufacturer_name": [
+     "UCB, Inc."
+    ],
+    "product_ndc": [
+     "50474-990",
+     "50474-991",
+     "50474-992"
+    ],
+    "product_type": [
+     "HUMAN PRESCRIPTION DRUG"
+    ],
+    "route": [
+     "SUBCUTANEOUS"
+    ],
+    "substance_name": [
+     "ZILUCOPLAN"
+    ],
+    "rxcui": [
+     "2672496",
+     "2672502",
+     "2672504",
+     "2672505",
+     "2672506",
+     "2672507"
+    ],
+    "spl_id": [
+     "49eeeabf-4c62-63cb-e063-6394a90a8248"
+    ],
+    "spl_set_id": [
+     "9f1d53d6-e495-4a3a-8bb9-680a15d25034"
+    ],
+    "package_ndc": [
+     "50474-990-80",
+     "50474-991-80",
+     "50474-992-80"
+    ],
+    "nui": [
+     "N0000175575",
+     "N0000175974"
+    ],
+    "pharm_class_epc": [
+     "Complement Inhibitor [EPC]"
+    ],
+    "pharm_class_moa": [
+     "Complement Inhibitors [MoA]"
+    ],
+    "unii": [
+     "YG391PK0CC"
+    ]
+   },
+   "products": [
+    {
+     "product_number": "002",
+     "reference_drug": "Yes",
+     "brand_name": "ZILBRYSQ",
+     "active_ingredients": [
+      {
+       "name": "ZILUCOPLAN SODIUM",
+       "strength": "EQ 23MG BASE/0.574ML (EQ 23MG BASE/0.574ML)"
+      }
+     ],
+     "reference_standard": "Yes",
+     "dosage_form": "SOLUTION",
+     "route": "SUBCUTANEOUS",
+     "marketing_status": "Prescription"
+    },
+    {
+     "product_number": "003",
+     "reference_drug": "Yes",
+     "brand_name": "ZILBRYSQ",
+     "active_ingredients": [
+      {
+       "name": "ZILUCOPLAN SODIUM",
+       "strength": "EQ 32.4MG BASE/0.81ML (EQ 32.4 BASE/0.81ML)"
+      }
+     ],
+     "reference_standard": "Yes",
+     "dosage_form": "SOLUTION",
+     "route": "SUBCUTANEOUS",
+     "marketing_status": "Prescription"
+    },
+    {
+     "product_number": "001",
+     "reference_drug": "Yes",
+     "brand_name": "ZILBRYSQ",
+     "active_ingredients": [
+      {
+       "name": "ZILUCOPLAN SODIUM",
+       "strength": "EQ 16.6MG BASE/0.416ML (EQ 16.6MG BASE/0.416ML)"
+      }
+     ],
+     "reference_standard": "Yes",
+     "dosage_form": "SOLUTION",
+     "route": "SUBCUTANEOUS",
+     "marketing_status": "Prescription"
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,66 @@
+{
+ "feed": {
+  "entry": [
+   {
+    "im:name": {
+     "label": "Capital One Mobile"
+    },
+    "id": {
+     "label": "https://apps.apple.com/us/app/capital-one-mobile/id407558537?uo=2",
+     "attributes": {
+      "im:id": "407558537",
+      "im:bundleId": "com.capitalone.enterprisemobilebanking"
+     }
+    },
+    "category": {
+     "attributes": {
+      "im:id": "6015",
+      "term": "Finance",
+      "scheme": "https://apps.apple.com/us/genre/ios-finance/id6015?uo=2",
+      "label": "Finance"
+     }
+    }
+   },
+   {
+    "im:name": {
+     "label": "Trump Accounts: Official App"
+    },
+    "id": {
+     "label": "https://apps.apple.com/us/app/trump-accounts-official-app/id6767364919?uo=2",
+     "attributes": {
+      "im:id": "6767364919",
+      "im:bundleId": "gov.trumpaccounts.release.GoldenEagle"
+     }
+    },
+    "category": {
+     "attributes": {
+      "im:id": "6015",
+      "term": "Finance",
+      "scheme": "https://apps.apple.com/us/genre/ios-finance/id6015?uo=2",
+      "label": "Finance"
+     }
+    }
+   },
+   {
+    "im:name": {
+     "label": "Kalshi: Trade Sports & Events"
+    },
+    "id": {
+     "label": "https://apps.apple.com/us/app/kalshi-trade-sports-events/id1632713844?uo=2",
+     "attributes": {
+      "im:id": "1632713844",
+      "im:bundleId": "com.kalshi.mobile"
+     }
+    },
+    "category": {
+     "attributes": {
+      "im:id": "6015",
+      "term": "Finance",
+      "scheme": "https://apps.apple.com/us/genre/ios-finance/id6015?uo=2",
+      "label": "Finance"
+     }
+    }
+   }
+  ]
+ }
+}

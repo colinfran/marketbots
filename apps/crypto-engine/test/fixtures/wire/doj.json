@@ -1,0 +1,78 @@
+{
+ "results": [
+  {
+   "changed": "<time datetime=\"2026-10-23T08:59:59-04:00\">1792760399</time>\n",
+   "component": [
+    {
+     "uuid": "e14d3a2a-8182-4984-aed0-95e811946fc8",
+     "name": "USAO - Georgia, Southern"
+    }
+   ],
+   "created": "<time datetime=\"2026-10-23T08:56:05-04:00\">1792760165</time>\n",
+   "date": "1792756800",
+   "number": "105-26",
+   "teaser": "<p>Multiple defendants illegally inside the United States were sentenced in federal court and transferred to immigration authorities for immediate deportation.</p>",
+   "title": "Illegal aliens face immediate deportation for immigration violations",
+   "topic": [
+    {
+     "uuid": "99088e6f-b391-49fb-a07e-9ff953350ded",
+     "name": "Immigration"
+    }
+   ],
+   "url": "https://www.justice.gov/usao-sdga/pr/illegal-aliens-face-immediate-deportation-immigration-violations-2",
+   "uuid": "cbf8079c-fda7-4482-8570-520045b3eb99"
+  },
+  {
+   "changed": "<time datetime=\"2026-10-23T07:50:33-04:00\">1792756233</time>\n",
+   "component": [
+    {
+     "uuid": "4f03e6af-f2cb-40c6-89c8-6871fdd8aa47",
+     "name": "Drug Enforcement Administration (DEA)"
+    },
+    {
+     "uuid": "3601535d-4e8a-4029-a9aa-12d40fdbfa41",
+     "name": "USAO - Tennessee, Eastern"
+    }
+   ],
+   "created": "<time datetime=\"2026-10-23T07:36:42-04:00\">1792755402</time>\n",
+   "date": "1792756800",
+   "number": "",
+   "teaser": "",
+   "title": "DEA National Prescription Drug Take Back Day",
+   "topic": [
+    {
+     "uuid": "d13d6b86-209f-460e-878e-b4dd44f9435f",
+     "name": "Prescription Drugs"
+    }
+   ],
+   "url": "https://www.justice.gov/usao-edtn/pr/dea-national-prescription-drug-take-back-day-7",
+   "uuid": "2a085ef5-ec28-46d1-ac43-a65ca39bdb08"
+  },
+  {
+   "changed": "<time datetime=\"2026-10-23T12:14:56-04:00\">1792772096</time>\n",
+   "component": [
+    {
+     "uuid": "dca09ceb-4978-4466-9c30-ce9f5ada2f0a",
+     "name": "Federal Bureau of Investigation (FBI)"
+    },
+    {
+     "uuid": "74477cbc-f238-43ba-9479-f99f4788f858",
+     "name": "USAO - District of Columbia"
+    }
+   ],
+   "created": "<time datetime=\"2026-10-23T10:22:19-04:00\">1792765339</time>\n",
+   "date": "1792756800",
+   "number": "",
+   "teaser": "<p>Two former senior FBI officials, Nikki Cole Floris, 46, of Alexandria, Virginia, and Bradley Benavides, 56, of Aiken, South Carolina, surrendered today on arrest warrants issued after a criminal complaint charged them with lying to Congress about their involvement in the FBI’s investigations into Hunter Biden, announced U.S. Attorney Jeanine Ferris Pirro.</p>",
+   "title": "Two Former FBI Officials Charged in Lying to Congress about Hunter Biden Investigations ",
+   "topic": [
+    {
+     "uuid": "23bf1d74-9efa-4e5c-9deb-4b6b2e412cd0",
+     "name": "National Security"
+    }
+   ],
+   "url": "https://www.justice.gov/usao-dc/pr/two-former-fbi-officials-charged-lying-congress-about-hunter-biden-investigations",
+   "uuid": "b0734a4a-423e-46b7-a976-55a4d57b0041"
+  }
+ ]
+}

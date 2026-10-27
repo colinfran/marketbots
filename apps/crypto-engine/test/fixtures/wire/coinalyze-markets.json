@@ -1,0 +1,72 @@
+[
+ {
+  "symbol": "MNTUSDT.6",
+  "exchange": "6",
+  "symbol_on_exchange": "MNTUSDT",
+  "base_asset": "MNT",
+  "quote_asset": "USDT",
+  "expire_at": null,
+  "has_buy_sell_data": true,
+  "is_perpetual": true,
+  "margined": "STABLE",
+  "oi_lq_vol_denominated_in": "BASE_ASSET",
+  "has_long_short_ratio_data": true,
+  "has_ohlcv_data": true
+ },
+ {
+  "symbol": "BTCUSD_PERP.A",
+  "exchange": "A",
+  "symbol_on_exchange": "BTCUSD_PERP",
+  "base_asset": "BTC",
+  "quote_asset": "USD",
+  "expire_at": null,
+  "has_buy_sell_data": true,
+  "is_perpetual": true,
+  "margined": "COIN",
+  "oi_lq_vol_denominated_in": "QUOTE_ASSET",
+  "has_long_short_ratio_data": true,
+  "has_ohlcv_data": true
+ },
+ {
+  "symbol": "BTCUSDT.6",
+  "exchange": "6",
+  "symbol_on_exchange": "BTCUSDT",
+  "base_asset": "BTC",
+  "quote_asset": "USDT",
+  "expire_at": null,
+  "has_buy_sell_data": true,
+  "is_perpetual": true,
+  "margined": "STABLE",
+  "oi_lq_vol_denominated_in": "BASE_ASSET",
+  "has_long_short_ratio_data": true,
+  "has_ohlcv_data": true
+ },
+ {
+  "symbol": "BTCUSDT_PERP.A",
+  "exchange": "A",
+  "symbol_on_exchange": "BTCUSDT",
+  "base_asset": "BTC",
+  "quote_asset": "USDT",
+  "expire_at": null,
+  "has_buy_sell_data": true,
+  "is_perpetual": true,
+  "margined": "STABLE",
+  "oi_lq_vol_denominated_in": "BASE_ASSET",
+  "has_long_short_ratio_data": true,
+  "has_ohlcv_data": true
+ },
+ {
+  "symbol": "ETHUSDT_PERP.A",
+  "exchange": "A",
+  "symbol_on_exchange": "ETHUSDT",
+  "base_asset": "ETH",
+  "quote_asset": "USDT",
+  "expire_at": null,
+  "has_buy_sell_data": true,
+  "is_perpetual": true,
+  "margined": "STABLE",
+  "oi_lq_vol_denominated_in": "BASE_ASSET",
+  "has_long_short_ratio_data": true,
+  "has_ohlcv_data": true
+ }
+]

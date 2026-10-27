@@ -1,0 +1,59 @@
+{
+ "data": {
+  "priced": {
+   "asOf": null,
+   "headers": {
+    "proposedTickerSymbol": "Symbol",
+    "companyName": "Company Name",
+    "proposedExchange": "Exchange/ Market",
+    "proposedSharePrice": "Price",
+    "sharesOffered": "Shares",
+    "pricedDate": "Date",
+    "dollarValueOfSharesOffered": "Offer Amount",
+    "dealStatus": "Actions"
+   },
+   "rows": [
+    {
+     "dealID": "1112626-119575",
+     "proposedTickerSymbol": "LYCA",
+     "companyName": "Lycia Therapeutics, Inc.",
+     "proposedExchange": "NASDAQ Global Select",
+     "proposedSharePrice": "18.00",
+     "sharesOffered": "17,640,000",
+     "pricedDate": "10/23/2026",
+     "dollarValueOfSharesOffered": "$317,520,000",
+     "dealStatus": "Priced"
+    }
+   ]
+  },
+  "upcoming": {
+   "upcomingTable": {
+    "asOf": null,
+    "headers": {
+     "proposedTickerSymbol": "Symbol",
+     "companyName": "Company Name",
+     "proposedExchange": "Exchange/ Market",
+     "proposedSharePrice": "Price",
+     "sharesOffered": "Shares",
+     "expectedPriceDate": "Expected IPO Date",
+     "dollarValueOfSharesOffered": "Offer Amount"
+    },
+    "rows": [
+     {
+      "dealID": "1402228-119376",
+      "proposedTickerSymbol": "SCQCU",
+      "companyName": "SPACCircle Acquisition Corp.",
+      "proposedExchange": "NASDAQ Global",
+      "proposedSharePrice": "10.00",
+      "sharesOffered": "10,000,000",
+      "expectedPriceDate": "10/27/2026",
+      "dollarValueOfSharesOffered": "$115,000,000"
+     }
+    ]
+   },
+   "lastUpdatedTime": "LAST UPDATED: 10/26/2026* - Source: EDGAR® Online"
+  },
+  "month": 10,
+  "year": 2026
+ }
+}
