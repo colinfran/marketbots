@@ -9,7 +9,7 @@ import type { ResearchResult } from "../ai/runner"
 import { classifyRegime, featuresForPrompt, type Features } from "../market/features"
 import { correlationMatrix } from "../risk/correlation"
 import { boundedStop, candidateFeatures, type CryptoCandidate } from "../strategies/types"
-import { cycleStep, finishCycle, type EngineContext } from "./context"
+import { cycleStep, finishCycle, reasoningEvent, seedProgressEvent, type EngineContext } from "./context"
 import { loadFeatures, processDecision, summarize, type CycleResult, type SeedOutcome } from "./crypto-cycle"
 
 /**
@@ -169,6 +169,7 @@ export const runSeedCycle = async (ctx: EngineContext, { trigger, seed }: { trig
       onQuery: (query, tool) => ctx.bus.emit("research.query", { research_id: researchId, query, tool }, { summary: `Searching: ${query}`, cycle_id: cycleId, level: "debug" }),
       onSource: (s) => ctx.bus.emit("research.source", { research_id: researchId, ...s }, { summary: `Source: ${s.title}`, cycle_id: cycleId, level: "debug" }),
       onText: (chars, excerpt) => ctx.bus.emit("research.progress", { research_id: researchId, chars, excerpt }, { summary: `Writing research memo (${chars} chars)`, cycle_id: cycleId, level: "debug" }),
+      onReasoning: reasoningEvent(ctx, cycleId, "research"),
     },
   })
   await ctx.col.research.insertOne({
@@ -232,6 +233,7 @@ export const runSeedCycle = async (ctx: EngineContext, { trigger, seed }: { trig
       repair: repairSeedAllocation,
       timeoutMs: settings.ai.decision_timeout_seconds * 1000,
       signal: ctx.signal,
+      progress: { onPartial: seedProgressEvent(ctx, cycleId), onReasoning: reasoningEvent(ctx, cycleId, "decision") },
     })
     aiCost += result.cost_usd
     model = result.model

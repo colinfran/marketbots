@@ -19,7 +19,7 @@ import { screenCrypto } from "../strategies/registry"
 import { boundedStop, candidateFeatures, clampScore, type CryptoCandidate } from "../strategies/types"
 import { formatPrice, minimumViolation, roundPrice, roundQty } from "../venues/kraken/pairs"
 import { buildDossier, type Dossier } from "../wire/dossier"
-import { cycleStep, finishCycle, type EngineContext } from "./context"
+import { cycleStep, decisionProgressEvent, finishCycle, reasoningEvent, type EngineContext } from "./context"
 import { runSeedCycle } from "./seed"
 import { exitPosition } from "./trading"
 
@@ -383,6 +383,7 @@ export const runCryptoCycle = async (ctx: EngineContext, request: CycleRequest):
         onQuery: (query, tool) => ctx.bus.emit("research.query", { research_id: researchId, query, tool }, { summary: `Searching: ${query}`, cycle_id: cycleId, level: "debug" }),
         onSource: (s) => ctx.bus.emit("research.source", { research_id: researchId, ...s }, { summary: `Source: ${s.title}`, cycle_id: cycleId, level: "debug" }),
         onText: (chars, excerpt) => ctx.bus.emit("research.progress", { research_id: researchId, chars, excerpt }, { summary: `Writing research memo (${chars} chars)`, cycle_id: cycleId, level: "debug" }),
+        onReasoning: reasoningEvent(ctx, cycleId, "research"),
       },
     })
   }
@@ -504,6 +505,7 @@ export const runCryptoCycle = async (ctx: EngineContext, request: CycleRequest):
       repair: repairCryptoReport,
       timeoutMs: (isEvent ? settings.wire.event_decision_timeout_seconds : settings.ai.decision_timeout_seconds) * 1000,
       signal: ctx.signal,
+      progress: { onPartial: decisionProgressEvent(ctx, cycleId), onReasoning: reasoningEvent(ctx, cycleId, "decision") },
     })
     aiCost += result.cost_usd
     decisionMeta = { attempts: result.attempts, repaired: result.repaired, model: result.model }

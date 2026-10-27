@@ -15,6 +15,7 @@ import {
   ScanSearchIcon,
   SearchIcon,
   ShieldCheckIcon,
+  SparklesIcon,
   WalletIcon,
   ZapIcon,
 } from "lucide-react"
@@ -44,7 +45,9 @@ const ICONS: Partial<Record<string, LucideIcon>> = {
   "research.query": SearchIcon,
   "research.source": GlobeIcon,
   "research.completed": SearchIcon,
+  "ai.reasoning": SparklesIcon,
   "ai.decision.started": BrainIcon,
+  "ai.decision.progress": BrainIcon,
   "ai.decision.proposed": BrainIcon,
   "ai.decision.completed": BrainIcon,
   "ai.decision.failed": AlertTriangleIcon,
@@ -68,7 +71,7 @@ const ICONS: Partial<Record<string, LucideIcon>> = {
   "wire.dossier": NewspaperIcon,
 }
 
-/** Extra line under an event: the decision thesis, risk reasons, a source link. */
+/** Extra line under an event: the decision thesis, risk reasons, a source link, the memo and reasoning as they're written. */
 const detail = (e: EngineEvent): React.ReactNode => {
   const d = e.data as Record<string, unknown>
   if (e.type === "ai.decision.proposed") return String(d.thesis ?? "")
@@ -80,7 +83,7 @@ const detail = (e: EngineEvent): React.ReactNode => {
       </a>
     )
   }
-  if (e.type === "research.progress") return String(d.excerpt ?? "")
+  if (e.type === "research.progress" || e.type === "ai.reasoning") return String(d.excerpt ?? "")
   if ((e.type === "wire.item" || e.type === "wire.notable") && typeof d.url === "string") {
     return (
       <a href={d.url} target="_blank" rel="noopener noreferrer nofollow" className="hover:text-foreground underline underline-offset-2">
@@ -109,6 +112,9 @@ const summary = (e: EngineEvent): React.ReactNode => (
   </>
 )
 
+/** Current work: the reasoning line shows its latest words. */
+const workText = (e: EngineEvent) => (e.type === "ai.reasoning" ? `${e.summary}: …${String((e.data as { excerpt?: string }).excerpt ?? "").slice(-120)}` : e.summary)
+
 const links = (e: EngineEvent): React.ReactNode =>
   e.cycle_id && (e.type === "cycle.completed" || e.type === "ai.decision.completed") ? (
     <Link href={`/research/${e.cycle_id}`} className="text-muted-foreground hover:text-foreground text-xs underline underline-offset-2">
@@ -120,7 +126,9 @@ export const kit: BotKit<EngineEvent> = {
   name: "CryptoMarketBot",
   Mark: BotMark,
   stream: {
-    maxEvents: 300,
+    // As in stock: a streamed decision adds a progress (and reasoning) event every 1.5 s, which
+    // shouldn't push the running cycle's start out of the live buffer.
+    maxEvents: 500,
     mapTicker: (data) => {
       const d = data as EventDataMap["market.ticker"]
       return { symbol: d.symbol, bid: d.bid, ask: d.ask, last: d.last, change_pct: d.change_pct }
@@ -141,14 +149,16 @@ export const kit: BotKit<EngineEvent> = {
       system: (e) => /^(engine|venue|market|budget|command|alert|error|summary)/.test(e.type),
     },
     refreshOn: new Set(["order.filled", "position.opened", "position.closed", "position.updated", "cycle.completed", "cycle.skipped", "engine.status", "command.completed", "command.failed", "backtest.completed", "summary.periodic", "engine.reconciled"]),
-    feedDebug: new Set(["research.query", "research.source", "research.progress"]),
-    feedHidden: new Set(),
+    // Thinking-trail events that are worth showing even though they're logged at debug level.
+    feedDebug: new Set(["research.query", "research.source", "research.progress", "ai.reasoning", "ai.decision.progress"]),
+    // Decision progress shows in the current work and the live trail, not as feed lines.
+    feedHidden: new Set(["ai.decision.progress"]),
     summary,
     detail,
     links,
     work: {
-      events: new Set(["screen.candidates", "research.query", "research.source", "research.progress", "ai.decision.proposed", "risk.checked"]),
-      text: (e) => e.summary,
+      events: new Set(["screen.candidates", "research.query", "research.source", "research.progress", "ai.reasoning", "ai.decision.progress", "ai.decision.proposed", "risk.checked"]),
+      text: workText,
     },
   },
 }
