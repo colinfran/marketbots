@@ -1,0 +1,8 @@
+# LF everywhere, including Windows checkouts: the engine runs in a Linux container, and
+# Dockerfiles, YAML and env files must not pick up CRLF line endings.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff2 binary

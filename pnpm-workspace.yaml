@@ -1,0 +1,12 @@
+packages:
+  - apps/*
+  - packages/*
+  # The headless scraper sidecar has its own npm lockfile and Docker image.
+  - "!apps/scraper"
+
+onlyBuiltDependencies:
+  - esbuild
+  - unrs-resolver
+
+ignoredBuiltDependencies:
+  - mongodb-memory-server

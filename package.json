@@ -1,0 +1,19 @@
+{
+  "name": "marketbots",
+  "private": true,
+  "packageManager": "pnpm@10.12.1",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev:crypto-engine": "pnpm --filter @mb/crypto-engine dev",
+    "dev:crypto-web": "pnpm --filter @mb/crypto-web dev",
+    "dev:stock-engine": "pnpm --filter @mb/stock-engine dev",
+    "dev:stock-web": "pnpm --filter @mb/stock-web dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "backtest": "pnpm --filter @mb/crypto-engine backtest"
+  }
+}

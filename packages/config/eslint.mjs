@@ -1,0 +1,62 @@
+import { defineConfig, globalIgnores } from "eslint/config"
+import nextVitals from "eslint-config-next/core-web-vitals"
+import nextTs from "eslint-config-next/typescript"
+import tseslint from "typescript-eslint"
+
+/**
+ * Shared ESLint presets. Every package and app lints its imports against the dependency direction
+ * in MARKETBOTS_PLAN §2.6:
+ *
+ *   @mb/core ← @mb/crypto-core / @mb/stock-core
+ *   @mb/core ← @mb/engine-kit ← @mb/wire
+ *   @mb/core ← @mb/ui, @mb/web-kit
+ *   apps depend on packages; packages never import apps; crypto never imports stock, or the reverse.
+ */
+
+/** What each shared package may import (besides itself and @mb/config). */
+const SHARED = {
+  core: [],
+  "engine-kit": ["core"],
+  wire: ["core", "engine-kit"],
+  ui: ["core"],
+  "web-kit": ["core"],
+}
+
+const APPS = "@mb/(crypto|stock)-(engine|web)(/|$)"
+
+/**
+ * `no-restricted-imports` for one owner: "crypto" or "stock" (a bot's apps and core package), or
+ * a shared package name from SHARED.
+ */
+export const boundaries = (owner) => {
+  const patterns = [{ regex: `^${APPS}`, message: "Apps are never imported; move shared code into a package." }]
+  if (owner === "crypto" || owner === "stock") {
+    const other = owner === "crypto" ? "stock" : "crypto"
+    patterns.push({ regex: `^@mb/${other}-`, message: `A ${owner} package or app never imports ${other} code.` })
+  } else {
+    const allowed = [owner, "config", ...(SHARED[owner] ?? [])].join("|")
+    patterns.push({ regex: `^@mb/(?!(${allowed})(/|$))`, message: `@mb/${owner} may import only ${allowed.replaceAll("|", ", ")} (MARKETBOTS_PLAN §2.6).` })
+  }
+  return { "no-restricted-imports": ["error", { patterns }] }
+}
+
+/** Engines and plain TypeScript packages: the import boundaries only. */
+export const nodeConfig = (owner) =>
+  defineConfig([
+    globalIgnores(["dist/**", "coverage/**"]),
+    {
+      files: ["**/*.{ts,mts,mjs,js}"],
+      languageOptions: { parser: tseslint.parser },
+      rules: boundaries(owner),
+    },
+  ])
+
+/** Next.js dashboards: Next's core-web-vitals + TypeScript presets, plus the import boundaries. */
+export const nextConfig = (owner) =>
+  defineConfig([
+    ...nextVitals,
+    ...nextTs,
+    // Override default ignores of eslint-config-next.
+    globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts", "old/**", "coverage/**"]),
+    { rules: boundaries(owner) },
+  ])

@@ -1,0 +1,21 @@
+# The engine images need the workspace manifests, packages/* and their own apps/<bot>-engine.
+# The scraper image needs apps/scraper only.
+**/node_modules
+**/.next
+**/dist
+**/coverage
+**/*.tsbuildinfo
+.git
+.vercel
+# Real keys never enter a build context: compose passes them at runtime (env_file).
+*.env
+.env
+.env.*
+docs
+contracts
+data
+*.md
+apps/crypto-web/**
+!apps/crypto-web/package.json
+apps/stock-web/**
+!apps/stock-web/package.json
