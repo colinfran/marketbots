@@ -1,5 +1,7 @@
+import type { EngineEvent } from "@mb/crypto-core/events"
 import { normalizeSeedAllocation, seedAllocationSchema, type SeedAllocationReport } from "@mb/crypto-core/report"
 import { DEFAULT_SETTINGS, type Settings } from "@mb/crypto-core/settings"
+import type { StructuredProgress } from "@mb/engine-kit/ai/runner"
 import { silentLogger } from "@mb/engine-kit/log"
 import { describe, expect, it, vi } from "vitest"
 import type { AiBudget } from "../src/ai/budget"
@@ -66,7 +68,12 @@ describe("seed cycle", () => {
     const path = (n: number) => Array.from({ length: n }, (_, i) => 50_000 + (15_000 * i) / (n - 1))
     const candleCache = { get: async (_s: string, interval: number) => candles(path(250), interval * 60_000, Date.now() - 250 * interval * 60_000) } as unknown as CandleCache
     const settings: Settings = { ...DEFAULT_SETTINGS, universe: { kraken_symbols: ["BTC/USD"] } }
-    const structured = vi.fn(async () => ({ output, attempts: 1, repaired: false, model: "test/decision", cost_usd: 0.05, usage: { input: 1, output: 1, total: 2 } }))
+    // The fake model reports progress the way the streamed runner does.
+    const structured = vi.fn(async (o: { progress?: StructuredProgress }) => {
+      o.progress?.onReasoning?.(24, "BTC leads; keep it core.")
+      o.progress?.onPartial?.(95, { allocations: [{ symbol: "BTC/USD", weight_pct: 75 }] })
+      return { output, attempts: 1, repaired: false, model: "test/decision", cost_usd: 0.05, usage: { input: 1, output: 1, total: 2 } }
+    })
     const research = vi.fn(async () => ({ memo: "## Macro & flows\nCalm.", sources: [], queries: [], model: "test/research", x_search: true, duration_ms: 5, usage: { input: 1, output: 1, total: 2 }, cost_usd: 0.1, error: null }))
     const alerts = { send: vi.fn(async () => undefined), success: vi.fn(async () => undefined) }
     const ctx: EngineContext = {
@@ -109,6 +116,20 @@ describe("seed cycle", () => {
     expect(position!.stop_price).toBeLessThan(65_000)
     const cycle = await db.col.cycles.findOne({ _id: r.cycleId })
     expect(cycle).toMatchObject({ kind: "seed", status: "completed" })
+  })
+
+  it("streams the allocation as it's written, for live views only", async () => {
+    const { ctx } = await setup({ allocations: [allocation({ weight_pct: 75 })], rationale: "BTC only today." })
+    const events: EngineEvent[] = []
+    ctx.bus.subscribe((e) => events.push(e))
+    const r = await runCryptoCycle(ctx, { kind: "seed", trigger: "seed", seed: { id: "seed-2", amountUsd: 2_000 } })
+    expect(r.status).toBe("completed")
+    const live = events.filter((e) => e.type === "ai.reasoning" || e.type === "ai.decision.progress")
+    expect(live.map((e) => [e.type, e.summary, e.data])).toEqual([
+      ["ai.reasoning", "Reasoning (decision)", { cycle_id: r.cycleId, task: "decision", chars: 24, excerpt: "BTC leads; keep it core." }],
+      ["ai.decision.progress", "Writing the seed allocation (95 chars) · 1 pair so far", { cycle_id: r.cycleId, chars: 95, headline: null, decisions: 1 }],
+    ])
+    expect(live.every((e) => e.cycle_id === r.cycleId && e.seq === 0)).toBe(true)
   })
 
   it("buys nothing when entries are blocked, and nothing it can't afford", async () => {

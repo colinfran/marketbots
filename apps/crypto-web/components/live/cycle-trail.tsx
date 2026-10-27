@@ -14,9 +14,10 @@ import { ago, duration, num, time, titleCase, usd } from "@/lib/format"
 
 /**
  * The whole thinking process of one cycle, built from its events: the market scan and what it
- * flagged, every search query and source, the research memo as it's written, the AI decision,
- * then each decision with its risk check and what happened. Live on /live (follows the newest
- * cycle). Mirrors stockmarketbot's trail, with crypto's steps.
+ * flagged, every search query and source, the research memo as it's written, the model's
+ * reasoning summaries (when the provider returns them), the AI decision as it's written, then
+ * each decision with its risk check and what happened. Live on /live (follows the newest cycle).
+ * Mirrors stockmarketbot's trail, with crypto's steps.
  */
 
 type Data<T extends keyof EventDataMap> = EventDataMap[T]
@@ -40,10 +41,13 @@ type Trail = {
     queries: { query: string; tool: string; at: string }[]
     sources: { title: string; url: string; domain: string }[]
     progress?: Data<"research.progress">
+    reasoning?: Data<"ai.reasoning">
     completed?: Data<"research.completed">
   }
   decision: {
     started?: Data<"ai.decision.started">
+    progress?: Data<"ai.decision.progress">
+    reasoning?: Data<"ai.reasoning">
     completed?: Data<"ai.decision.completed">
     failed?: Data<"ai.decision.failed">
   }
@@ -54,7 +58,7 @@ type Trail = {
   finishedAt?: string
 }
 
-const buildTrail = (cycleId: string, events: EngineEvent[]): Trail => {
+export const buildTrail = (cycleId: string, events: EngineEvent[]): Trail => {
   const t: Trail = { cycleId, research: { queries: [], sources: [] }, decision: {}, decisions: [] }
   const ordered = [...events].sort((a, b) => (a.seq && b.seq ? a.seq - b.seq : a.ts.localeCompare(b.ts)))
   for (const e of ordered) {
@@ -89,8 +93,17 @@ const buildTrail = (cycleId: string, events: EngineEvent[]): Trail => {
       case "research.completed":
         t.research.completed = data<"research.completed">(e)
         break
+      case "ai.reasoning": {
+        const r = data<"ai.reasoning">(e)!
+        if (r.task === "research") t.research.reasoning = r
+        else t.decision.reasoning = r
+        break
+      }
       case "ai.decision.started":
         t.decision.started = data<"ai.decision.started">(e)
+        break
+      case "ai.decision.progress":
+        t.decision.progress = data<"ai.decision.progress">(e)
         break
       case "ai.decision.completed":
         t.decision.completed = data<"ai.decision.completed">(e)
@@ -258,6 +271,7 @@ export function CycleTrailView({ trail, live }: { trail: Trail; live: boolean })
                   </ul>
                 </div>
               )}
+              {running && !r.completed && r.reasoning && <Excerpt label={`Model reasoning (${r.reasoning.chars.toLocaleString("en-US")} chars)`} text={r.reasoning.excerpt} />}
               {running && !r.completed && r.progress && <Excerpt icon={SearchIcon} label={`Writing the research memo (${r.progress.chars.toLocaleString("en-US")} chars)`} text={r.progress.excerpt} />}
               {r.completed?.error && <p className="text-loss text-xs">Research failed: {r.completed.error}. The decision used market data only.</p>}
             </>
@@ -270,7 +284,18 @@ export function CycleTrailView({ trail, live }: { trail: Trail; live: boolean })
           status={decideStatus}
           aside={d.started ? `${d.started.model}${d.completed ? ` · ${plural(d.completed.decisions, "decision")}${d.completed.repaired ? " · repaired in code" : ""}` : ""}` : undefined}
         >
-          {d.started && !d.completed && !d.failed && running && <p className="text-muted-foreground text-xs">Weighing {d.started.items.join(", ")}</p>}
+          {d.started && !d.completed && !d.failed && running && (
+            <>
+              <p className="text-muted-foreground text-xs">Weighing {d.started.items.join(", ")}</p>
+              {d.reasoning && <Excerpt label={`Model reasoning (${d.reasoning.chars.toLocaleString("en-US")} chars)`} text={d.reasoning.excerpt} />}
+              {d.progress && (
+                <p className="text-muted-foreground text-xs">
+                  Writing the decision ({d.progress.chars.toLocaleString("en-US")} chars){d.progress.headline ? `: “${d.progress.headline}”` : ""}
+                  {d.progress.decisions ? ` · ${plural(d.progress.decisions, "decision")} so far` : ""}
+                </p>
+              )}
+            </>
+          )}
           {d.failed && <p className="text-loss text-xs">{d.failed.error}</p>}
           {d.completed && trail.completed?.summary && <p className="font-medium text-balance">{trail.completed.summary}</p>}
         </Step>

@@ -114,13 +114,20 @@ describe("prompts", () => {
 const gen = vi.mocked(generateText)
 const stream = vi.mocked(streamText)
 
-const budget = () => ({ record: vi.fn(async () => undefined), estimateByDuration: vi.fn(async () => 0.12) }) as never
+type BudgetMock = { record: ReturnType<typeof vi.fn<(call: Record<string, unknown>) => Promise<void>>>; estimateByDuration: ReturnType<typeof vi.fn> }
+const budgetMock = (): BudgetMock => ({ record: vi.fn(async (_call: Record<string, unknown>) => undefined), estimateByDuration: vi.fn(async () => 0.12) })
+const budget = () => budgetMock() as never
 
-const fakeStream = (parts: unknown[]) =>
+/** A stand-in for streamText's result: the parts on fullStream, plus the final output (read when awaited) and usage. */
+const fakeStream = (parts: unknown[], { output, usage = { inputTokens: 100, outputTokens: 50, totalTokens: 150 } }: { output?: unknown; usage?: unknown } = {}) =>
   ({
     fullStream: (async function* () {
       for (const p of parts) yield p
     })(),
+    get output() {
+      return output instanceof Error ? Promise.reject(output) : Promise.resolve(output)
+    },
+    totalUsage: Promise.resolve(usage),
   }) as never
 
 describe("AiRunner.research", () => {
@@ -159,6 +166,13 @@ describe("AiRunner.research", () => {
     expect(failed).toMatchObject({ memo: "", error: "gateway down" })
   })
 
+  it("keeps a research memo to 12,000 characters", async () => {
+    stream.mockReturnValueOnce(fakeStream([{ type: "text-delta", text: "x".repeat(20_000) }]))
+    const r = await new AiRunner(budget(), silentLogger, true).research({ cycleId: "c", model: "spacexai/grok-4.5", fallback: null, prompt: "p", xSearch: false, fromDate: "x", timeoutMs: 1_000 })
+    expect(r.memo).toHaveLength(12_000)
+    expect(r.memo.endsWith("…")).toBe(true)
+  })
+
   it("won't research with a model that has no live search", async () => {
     expect(hasLiveSearch("spacexai/grok-4.7")).toBe(true)
     expect(hasLiveSearch("openai/gpt-5.1")).toBe(false)
@@ -193,40 +207,81 @@ describe("AiRunner.structured", () => {
       finishReason: "stop",
     })
 
-  it("returns the validated output", async () => {
-    gen.mockResolvedValueOnce({ output: report([decision()]), totalUsage: { inputTokens: 100, outputTokens: 50, totalTokens: 150 }, providerMetadata: { gateway: { cost: 0.02 } } } as never)
-    const r = await new AiRunner(budget(), silentLogger, true).structured(opts())
-    expect(r).toMatchObject({ attempts: 1, repaired: false, cost_usd: 0.02 })
+  it("streams the decision: reasoning and the partial answer as they arrive, then the validated output", async () => {
+    const good = report([decision()])
+    const json = JSON.stringify(good)
+    const thought = "BTC is holding the breakout; funding is elevated."
+    stream.mockReturnValueOnce(
+      fakeStream(
+        [
+          { type: "reasoning-delta", text: thought },
+          { type: "text-delta", text: json.slice(0, 60) },
+          { type: "text-delta", text: json.slice(60) },
+          { type: "finish-step", providerMetadata: { gateway: { cost: 0.02 } } },
+        ],
+        { output: good },
+      ),
+    )
+    const progress = { onPartial: vi.fn(), onReasoning: vi.fn() }
+    const r = await new AiRunner(budget(), silentLogger, true).structured({ ...opts(), progress })
+    expect(r).toMatchObject({ output: good, attempts: 1, repaired: false, cost_usd: 0.02, usage: { input: 100, output: 50, total: 150 } })
+    expect(progress.onReasoning).toHaveBeenCalledWith(thought.length, thought)
+    expect(progress.onPartial).toHaveBeenCalledWith(60, expect.objectContaining({ market_read: expect.objectContaining({ regime: "risk_on_trend" }) }))
+    // One streamed call, with crypto's system prompt, prompt and first temperature; never the old non-streamed call.
+    expect(gen).not.toHaveBeenCalled()
+    expect(stream.mock.calls[0][0]).toMatchObject({ model: "spacexai/grok-4.7", instructions: "s", prompt: "p", temperature: 0.3 })
   })
 
   it("repairs in code when nothing is lost, else asks again with the error", async () => {
     const clean = JSON.stringify({ ...report([]), decisions: [{ ...decision(), conviction: "70" }] })
-    gen.mockRejectedValueOnce(noObject(clean))
-    expect((await new AiRunner(budget(), silentLogger, true).structured(opts())).repaired).toBe(true)
+    stream.mockReturnValueOnce(fakeStream([], { output: noObject(clean) }))
+    const repaired = await new AiRunner(budget(), silentLogger, true).structured(opts())
+    expect(repaired).toMatchObject({ attempts: 1, repaired: true })
+    expect((repaired.output as CryptoReport).decisions[0].conviction).toBe(70)
 
     const lossy = JSON.stringify({ ...report([]), decisions: [{ ...decision(), action: "short" }] })
-    gen.mockRejectedValueOnce(noObject(lossy)).mockResolvedValueOnce({ output: report([]), totalUsage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 } } as never)
+    stream.mockReturnValueOnce(fakeStream([], { output: noObject(lossy) })).mockReturnValueOnce(fakeStream([], { output: report([]) }))
     const r = await new AiRunner(budget(), silentLogger, true).structured(opts())
     expect(r).toMatchObject({ attempts: 2, repaired: false })
-    expect((gen.mock.calls.at(-1)![0] as { prompt: string }).prompt).toContain("your previous answer was rejected")
+    const second = stream.mock.calls.at(-1)![0] as { prompt: string; temperature: number }
+    expect(second.prompt).toContain("your previous answer was rejected")
+    expect(second.temperature).toBe(0.15)
+  })
+
+  it("charges each attempt the gateway's own cost, a rejected one included", async () => {
+    const lossy = JSON.stringify({ ...report([]), decisions: [{ ...decision(), action: "short" }] })
+    stream
+      .mockReturnValueOnce(fakeStream([{ type: "finish-step", providerMetadata: { gateway: { cost: "0.011" } } }], { output: noObject(lossy) }))
+      .mockReturnValueOnce(fakeStream([{ type: "finish-step", providerMetadata: { gateway: { cost: 0.02 } } }], { output: report([]) }))
+    const b = budgetMock()
+    const r = await new AiRunner(b as never, silentLogger, true).structured(opts())
+    expect(r.attempts).toBe(2)
+    expect(r.cost_usd).toBeCloseTo(0.031)
+    expect(b.record.mock.calls.map(([c]) => [c.cost_usd, c.cost_source, c.ok])).toEqual([
+      [0.011, "gateway", false],
+      [0.02, "gateway", true],
+    ])
   })
 
   it("switches to the fallback model on the last attempt after outages", async () => {
-    gen.mockRejectedValueOnce(new Error("503")).mockRejectedValueOnce(new Error("503")).mockResolvedValueOnce({ output: report([]), totalUsage: {} } as never)
+    stream
+      .mockReturnValueOnce(fakeStream([{ type: "error", error: new Error("503") }]))
+      .mockReturnValueOnce(fakeStream([{ type: "error", error: new Error("503") }]))
+      .mockReturnValueOnce(fakeStream([], { output: report([]) }))
     const r = await new AiRunner(budget(), silentLogger, true).structured(opts({ fallback: "openai/gpt-5.1" }))
     expect(r.model).toBe("openai/gpt-5.1")
-    expect((gen.mock.calls.at(-1)![0] as { model: string }).model).toBe("openai/gpt-5.1")
+    expect(stream.mock.calls.map(([o]) => (o as { model: string }).model)).toEqual(["spacexai/grok-4.7", "spacexai/grok-4.7", "openai/gpt-5.1"])
   })
 
   it("throws after three failures and refuses to run without a key", async () => {
-    gen.mockRejectedValue(new Error("boom"))
+    stream.mockImplementation(() => fakeStream([{ type: "error", error: new Error("boom") }]))
     await expect(new AiRunner(budget(), silentLogger, true).structured(opts())).rejects.toThrow(/failed after 3 attempts/)
     await expect(new AiRunner(budget(), silentLogger, false).structured(opts())).rejects.toThrow(/AI is disabled/)
   })
 
   it("charges a timed-out call by how long it ran, since it reports no usage", async () => {
-    gen.mockRejectedValue(new Error("The operation was aborted due to timeout"))
-    const b = budget() as { record: ReturnType<typeof vi.fn>; estimateByDuration: ReturnType<typeof vi.fn> }
+    stream.mockImplementation(() => fakeStream([{ type: "error", error: new Error("The operation was aborted due to timeout") }]))
+    const b = budgetMock()
     await expect(new AiRunner(b as never, silentLogger, true).structured(opts())).rejects.toThrow(/timeout/)
     expect(b.estimateByDuration).toHaveBeenCalledWith("decision", "spacexai/grok-4.7", expect.any(Number))
     expect(b.record).toHaveBeenCalledWith(expect.objectContaining({ task: "decision", input_tokens: 0, cost_usd: 0.12, cost_source: "estimate", ok: false }))

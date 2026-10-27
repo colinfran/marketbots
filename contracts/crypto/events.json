@@ -180,11 +180,29 @@
       ]
     },
     {
+      "type": "ai.reasoning",
+      "data_keys": [
+        "cycle_id",
+        "task",
+        "chars",
+        "excerpt"
+      ]
+    },
+    {
       "type": "ai.decision.started",
       "data_keys": [
         "cycle_id",
         "model",
         "items"
+      ]
+    },
+    {
+      "type": "ai.decision.progress",
+      "data_keys": [
+        "cycle_id",
+        "chars",
+        "headline",
+        "decisions"
       ]
     },
     {
@@ -466,7 +484,9 @@
   "ephemeral": [
     "market.ticker",
     "engine.heartbeat",
-    "research.progress"
+    "research.progress",
+    "ai.decision.progress",
+    "ai.reasoning"
   ],
   "envelope_schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",

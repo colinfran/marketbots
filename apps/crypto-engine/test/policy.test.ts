@@ -1,6 +1,8 @@
+import type { EngineEvent } from "@mb/crypto-core/events"
 import { normalizeCryptoReport } from "@mb/crypto-core/report"
 import { DEFAULT_SETTINGS, type Settings } from "@mb/crypto-core/settings"
 import type { EventFocus, WireItemDoc } from "@mb/crypto-core/wire"
+import type { ResearchProgress, StructuredProgress } from "@mb/engine-kit/ai/runner"
 import { silentLogger } from "@mb/engine-kit/log"
 import { describe, expect, it, vi } from "vitest"
 import { AiBudget } from "../src/ai/budget"
@@ -299,7 +301,7 @@ describe("research modes", () => {
 })
 
 describe("event cycle", () => {
-  it("turns a bullish focus into an event_driven candidate and reaches the risk engine", async () => {
+  const setup = async () => {
     const bus = await makeBus(db.col)
     const ledger = new Ledger(db.col, bus)
     await ledger.ensureAccount(10_000)
@@ -308,39 +310,47 @@ describe("event cycle", () => {
     const executor = new Executor(db.col, ledger, new PaperWalletExecution(wallet.cli(), hub), bus, silentLogger)
     const path = (n: number) => Array.from({ length: n }, (_, i) => 50_000 + (15_000 * i) / (n - 1))
     const candleCache = { get: async (_s: string, interval: number) => candles(path(250), interval * 60_000, Date.now() - 250 * interval * 60_000) } as unknown as CandleCache
-    const research = vi.fn(async () => ({ memo: "## X sentiment\nPositive.", sources: [], queries: [], model: "m", x_search: true, duration_ms: 1, usage: { input: 0, output: 0, total: 0 }, cost_usd: 0.02, error: null }))
-    const structured = vi.fn(async () => ({
-      output: {
-        market_read: { regime: "risk_on_trend" as const, summary: "Event checked.", confidence: 60 },
-        decisions: [
-          {
-            symbol: "BTC/USD",
-            action: "buy" as const,
-            conviction: 72,
-            uncertainty: "medium" as const,
-            p_target_first: 0.5,
-            stop_loss: 63_000,
-            take_profit: 70_000,
-            horizon_hours: 24,
-            size_pct_of_max: 50,
-            reduce_pct: null,
-            priced_in: "partially" as const,
-            thesis: "Confirmed catalyst.",
-            bull_evidence: [],
-            bear_evidence: [{ claim: "Could fade", kind: "speculation" as const, source_url: null, as_of: null }],
-            risks: [],
-            invalidation: "Back below 63k",
-          },
-        ],
-        data_gaps: [],
-        notification: "Buying BTC on the event",
-      },
-      attempts: 1,
-      repaired: false,
-      model: "m",
-      cost_usd: 0.03,
-      usage: { input: 0, output: 0, total: 0 },
-    }))
+    // The fake model reports progress the way the streamed runner does.
+    const research = vi.fn(async (o: { progress?: ResearchProgress }) => {
+      o.progress?.onReasoning?.(31, "Checking X for the ETF inflows.")
+      return { memo: "## X sentiment\nPositive.", sources: [], queries: [], model: "m", x_search: true, duration_ms: 1, usage: { input: 0, output: 0, total: 0 }, cost_usd: 0.02, error: null }
+    })
+    const structured = vi.fn(async (o: { progress?: StructuredProgress }) => {
+      o.progress?.onReasoning?.(40, "The inflows look real; funding is calm.")
+      o.progress?.onPartial?.(180, { market_read: { regime: "risk_on_trend", summary: "Event checked." }, decisions: [{ symbol: "BTC/USD", action: "bu" }] })
+      return {
+        output: {
+          market_read: { regime: "risk_on_trend" as const, summary: "Event checked.", confidence: 60 },
+          decisions: [
+            {
+              symbol: "BTC/USD",
+              action: "buy" as const,
+              conviction: 72,
+              uncertainty: "medium" as const,
+              p_target_first: 0.5,
+              stop_loss: 63_000,
+              take_profit: 70_000,
+              horizon_hours: 24,
+              size_pct_of_max: 50,
+              reduce_pct: null,
+              priced_in: "partially" as const,
+              thesis: "Confirmed catalyst.",
+              bull_evidence: [],
+              bear_evidence: [{ claim: "Could fade", kind: "speculation" as const, source_url: null, as_of: null }],
+              risks: [],
+              invalidation: "Back below 63k",
+            },
+          ],
+          data_gaps: [],
+          notification: "Buying BTC on the event",
+        },
+        attempts: 1,
+        repaired: false,
+        model: "m",
+        cost_usd: 0.03,
+        usage: { input: 0, output: 0, total: 0 },
+      }
+    })
     const ctx: EngineContext = {
       col: db.col,
       log: silentLogger,
@@ -360,6 +370,11 @@ describe("event cycle", () => {
       signal: new AbortController().signal,
     }
     const focus: EventFocus = { symbol: "BTC/USD", rule: "entry_event", action: "evaluate", severity: 78, polarity: 1, item_ids: ["item-1"], trigger_id: "trig-1", headline: "Spot ETF inflows hit a record" }
+    return { bus, ctx, research, structured, focus }
+  }
+
+  it("turns a bullish focus into an event_driven candidate and reaches the risk engine", async () => {
+    const { ctx, research, structured, focus } = await setup()
     expect(eventCandidates([focus, { ...focus, polarity: -1, symbol: "ETH/USD" }], [], new Set(), ctx.settings.current)).toEqual([])
     const r = await runCryptoCycle(ctx, { kind: "event", trigger: "event: entry event BTC/USD", events: [focus] })
     expect(r.status).toBe("completed")
@@ -369,5 +384,26 @@ describe("event cycle", () => {
     expect(decision).toMatchObject({ trigger_kind: "event", strategy_id: "event_driven", wire_item_ids: ["item-1"] })
     expect(decision!.risk?.checks.map((c) => c.name)).toContain("edge_after_costs")
     expect(await db.col.cycles.findOne({ _id: r.cycleId })).toMatchObject({ kind: "event", wire_trigger_id: "trig-1", wire_item_ids: ["item-1"] })
+  })
+
+  it("streams the model's reasoning and the decision as it's written, tagged with the cycle and never stored", async () => {
+    const { bus, ctx, focus } = await setup()
+    const events: EngineEvent[] = []
+    bus.subscribe((e) => events.push(e))
+    const r = await runCryptoCycle(ctx, { kind: "event", trigger: "event: entry event BTC/USD", events: [focus] })
+    expect(r.status).toBe("completed")
+    const types = events.map((e) => e.type).filter((t) => t.startsWith("research.") || t.startsWith("ai."))
+    expect(types.slice(0, 6)).toEqual(["research.started", "ai.reasoning", "research.completed", "ai.decision.started", "ai.reasoning", "ai.decision.progress"])
+    const live = events.filter((e) => e.type === "ai.reasoning" || e.type === "ai.decision.progress")
+    expect(live.map((e) => [e.type, e.summary, e.data])).toEqual([
+      ["ai.reasoning", "Reasoning (research)", { cycle_id: r.cycleId, task: "research", chars: 31, excerpt: "Checking X for the ETF inflows." }],
+      ["ai.reasoning", "Reasoning (decision)", { cycle_id: r.cycleId, task: "decision", chars: 40, excerpt: "The inflows look real; funding is calm." }],
+      ["ai.decision.progress", "Writing: “Event checked.” · 1 decision so far", { cycle_id: r.cycleId, chars: 180, headline: "Event checked.", decisions: 1 }],
+    ])
+    // Debug level, tagged with the cycle, and ephemeral: streamed to live views (seq 0), never written to `events`.
+    expect(live.every((e) => e.level === "debug" && e.cycle_id === r.cycleId && e.seq === 0)).toBe(true)
+    await bus.flush()
+    expect(await db.col.events.countDocuments({ type: { $in: ["ai.reasoning", "ai.decision.progress"] } })).toBe(0)
+    expect(await db.col.events.countDocuments({ type: "ai.decision.started", cycle_id: r.cycleId })).toBe(1)
   })
 })

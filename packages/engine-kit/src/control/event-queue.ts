@@ -11,9 +11,10 @@ import type { Logger } from "../log"
  * drains the queue again after its current cycle ends.
  *
  * What differs between the bots is injected:
- *   - `expireAfterMs`: how long a trigger may wait before it is dropped unrun (stock: 30 minutes),
- *     or null to keep it until it can run (crypto, until MARKETBOTS_PLAN 9.1).
- *   - `gate`: an extra condition for running one now (stock: the session's event window).
+ *   - `expireAfterMs`: how long a trigger may wait before it is dropped unrun (both bots: 30
+ *     minutes), or null to keep it until it can run.
+ *   - `gate`: an extra condition for running one now (stock: the session's event window; crypto,
+ *     trading around the clock, has none).
  */
 
 const MIN = 60_000

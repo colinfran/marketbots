@@ -6,11 +6,12 @@ export { hasLiveSearch, type ResearchResult } from "@mb/engine-kit/ai/runner"
 
 /**
  * The AI runner (@mb/engine-kit/ai/runner) as crypto runs it: research memos are kept to 12,000
- * characters, and the structured decision is one non-streamed generateText call per attempt
- * (streaming it is MARKETBOTS_PLAN 9.2).
+ * characters, and the structured decision streams, as in stock (MARKETBOTS_PLAN 9.2): the partial
+ * answer and the reasoning summaries are reported as they arrive, and each attempt is charged the
+ * gateway's own cost from its finished steps. The answer is parsed and validated as before.
  */
 export class AiRunner extends AiRunnerOf {
   constructor(budget: AiBudget, log: Logger, enabled: boolean) {
-    super(budget, log, enabled, { stream: false, memoMaxChars: 12_000 })
+    super(budget, log, enabled, { stream: true, memoMaxChars: 12_000 })
   }
 }

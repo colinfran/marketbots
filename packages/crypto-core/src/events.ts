@@ -15,7 +15,8 @@ export type { ClientFrame, EventLevel, EventVisibility } from "@mb/core/events"
  * Crypto's events for the live activity stream (engine → dashboard) and the persisted `events`
  * collection: the envelope, the stream protocol and the events both bots share come from
  * @mb/core/events; the rest are crypto's own. The engine is the source of truth; the dashboard
- * only renders. Raw model reasoning is never streamed.
+ * only renders. Model reasoning reaches the stream only as the provider sends it (its reasoning
+ * summaries, when it returns any), as short excerpts that are never stored.
  */
 
 export type EngineRunStatus = "starting" | "reconciling" | "running" | "paused" | "halted" | "stopping"
@@ -73,7 +74,11 @@ export type EventDataMap = {
   "research.source": Shared["research.source"]
   "research.progress": Shared["research.progress"]
   "research.completed": Shared["research.completed"]
+  /** The latest ~240 characters of the model's reasoning, at most every 1.5 s while it streams. */
+  "ai.reasoning": { cycle_id: string; task: "research" | "decision"; chars: number; excerpt: string }
   "ai.decision.started": { cycle_id: string; model: string; items: string[] }
+  /** The decision as it's written: the market read so far (the seed: null) and how many decisions it holds. */
+  "ai.decision.progress": { cycle_id: string; chars: number; headline: string | null; decisions: number }
   "ai.decision.proposed": {
     decision_id: string
     instrument: string
@@ -167,7 +172,7 @@ export const OWNER_ONLY_EVENTS: ReadonlySet<EventType> = new Set<EventType>([
 ])
 
 /** High-frequency events that are streamed but not stored. */
-export const EPHEMERAL_EVENTS: ReadonlySet<EventType> = new Set<EventType>(["market.ticker", "engine.heartbeat", "research.progress"])
+export const EPHEMERAL_EVENTS: ReadonlySet<EventType> = new Set<EventType>(["market.ticker", "engine.heartbeat", "research.progress", "ai.decision.progress", "ai.reasoning"])
 
 /**
  * Whether a viewer may see an event. Everything is paper money, so public viewers see amounts
