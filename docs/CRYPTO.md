@@ -157,6 +157,8 @@ scheduled ──(due, engine running)──▶ running ──▶ done | failed
 
 Trend following, mean reversion, relative strength, event-driven shocks, plus on-demand evaluation (owner asks the AI about a pair). Each states its economic rationale and how it's evaluated (`packages/core/src/strategies.ts`, shown on the Strategies page). Strategies only *propose*; the AI decides; the risk engine disposes. Each can be enabled/disabled and capped per strategy.
 
+Not every setup a screen finds is worth paying the AI for. A scheduled cycle drops a setup whose own stop and target can't pass the risk engine (reward:risk under `min_reward_risk`, or a target too close to beat the estimated round trip by `min_edge_bps` even at the highest probability the engine allows), and one the AI ruled on recently: a day for daily-trend setups, which only change with a new daily candle, and 2 hours for the others. The idle summary names what was passed over and why. The owner's evaluation requests and event cycles skip both filters.
+
 ## Risk model
 
 Deterministic and pure (`apps/engine/src/risk/engine.ts`), every check recorded on the decision:

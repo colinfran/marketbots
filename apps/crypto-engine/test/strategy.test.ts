@@ -3,11 +3,13 @@ import { DEFAULT_SETTINGS } from "@mb/crypto-core/settings"
 import { describe, expect, it } from "vitest"
 import { aggregate, simulate } from "../src/backtest/simulate"
 import { classifyRegime, computeFeatures } from "../src/market/features"
-import { reviewsDue } from "../src/orchestrator/crypto-cycle"
+import { recentlyJudged, reviewsDue, viableSetup } from "../src/orchestrator/crypto-cycle"
 import { firstTouch, scoreDecision } from "../src/orchestrator/outcomes"
 import { correlatedWith, correlationMatrix } from "../src/risk/correlation"
 import { dailyTrendStrategy } from "../src/strategies/daily-trend"
+import { meanReversionStrategy } from "../src/strategies/mean-reversion"
 import { screenCrypto } from "../src/strategies/registry"
+import { useTestDb } from "./helpers/db"
 import { candles, quote } from "./helpers/fakes"
 
 const HOUR = 3_600_000
@@ -124,6 +126,43 @@ describe("long-term trend", () => {
     expect(screen(daily({ price: 94 }))).toEqual([]) // more than 1.5 ATR under the 50-day
     expect(screen(daily({ price: 103, rsi14_1d: 75 }))).toEqual([])
     expect(screen(daily({ price: 98 }), { label: "risk_off_trend" })).toEqual([])
+  })
+})
+
+describe("setups the AI is asked about", () => {
+  const db = useTestDb()
+  const base = featureSet(uptrend(24 * 45))!
+  const range = { label: "range" as const, btc_trend: "up" as const, btc_vol_pct: 30, breadth_pct: 40, notes: [] }
+  const oversold = (ema20: number) => ({ ...base, price: 100, rsi14_1h: 22, bb_pct_b_1h: 0, trend_1d: "up" as const, move_zscore_24h: -2.5, ema20_1h: ema20, atr_pct_4h: 0.6 })
+  const screen = (f: typeof base) => meanReversionStrategy.screen({ regime: range, features: [f], held: new Set(), settings: DEFAULT_SETTINGS })
+  const k = DEFAULT_SETTINGS.kraken
+
+  it("drops setups whose own levels can't pass reward:risk or beat the round-trip cost", () => {
+    // The mean 0.5% away: the 1% minimum stop leaves the screen's 1.2R floor as the target, under the 1.3 minimum.
+    const [near] = screen(oversold(100.5))
+    expect(near.target_hint).toBeCloseTo(101.2)
+    expect(viableSetup(near, 100, 87, k)).toBe(false)
+    const [far] = screen(oversold(102))
+    expect(far.target_hint).toBeCloseTo(102)
+    expect(viableSetup(far, 100, 87, k)).toBe(true)
+    // 1.5R either way; only the round trip decides whether a 1.5% target leaves the 25 bps minimum edge.
+    expect(viableSetup({ stop_hint: 99, target_hint: 101.5 }, 100, 130, k)).toBe(false)
+    expect(viableSetup({ stop_hint: 99, target_hint: 101.5 }, 100, 100, k)).toBe(true)
+    expect(viableSetup({ stop_hint: 95, target_hint: 115 }, 100, 87, k)).toBe(true) // a daily-trend 3R setup
+  })
+
+  it("doesn't re-ask about a setup the AI ruled on: daily-trend for a day, the others for 2 hours", async () => {
+    const now = Date.UTC(2026, 9, 27, 12)
+    const decision = (symbol: string, strategy_id: DecisionDoc["strategy_id"], minutesAgo: number) =>
+      ({ _id: `${symbol}-${strategy_id}`, symbol, strategy_id, created_at: new Date(now - minutesAgo * 60_000) }) as unknown as DecisionDoc
+    await db.col.decisions.insertMany([
+      decision("TRX/USD", "mean_reversion", 90),
+      decision("SOL/USD", "mean_reversion", 150),
+      decision("BTC/USD", "daily_trend", 20 * 60),
+      decision("ETH/USD", "daily_trend", 25 * 60),
+      decision("XRP/USD", "discretionary", 10), // the owner's requests are always asked
+    ])
+    expect([...(await recentlyJudged(db.col, now))].sort()).toEqual(["BTC/USD daily_trend", "TRX/USD mean_reversion"])
   })
 })
 

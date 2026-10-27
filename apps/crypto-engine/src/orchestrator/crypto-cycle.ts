@@ -15,7 +15,7 @@ import { classifyRegime, computeFeatures, featuresForPrompt, type Features } fro
 import { correlatedWith, correlationMatrix } from "../risk/correlation"
 import { evaluateCryptoEntry, evaluateExit, type RiskResult } from "../risk/engine"
 import { cryptoEdge, cryptoSize, roundTripCostBps, slippageBps, walkBook } from "../risk/sizing"
-import { screenCrypto } from "../strategies/registry"
+import { CRYPTO_STRATEGIES, screenCrypto } from "../strategies/registry"
 import { boundedStop, candidateFeatures, clampScore, type CryptoCandidate } from "../strategies/types"
 import { formatPrice, minimumViolation, roundPrice, roundQty } from "../venues/kraken/pairs"
 import { buildDossier, type Dossier } from "../wire/dossier"
@@ -37,6 +37,8 @@ import { exitPosition } from "./trading"
 const HOUR = 3_600_000
 /** Long-term trend holds are reviewed at most daily, and on daily-ATR moves, not hourly ones. */
 const DAILY_REVIEW_MINUTES = 1_440
+/** A setup on hourly or 4h candles that the AI has ruled on isn't asked about again for this long. */
+const SETUP_REASK_MINUTES = 120
 
 export type SeedOutcome = { allocations: SeedAllocation[]; orders: SeedOrder[]; notes: string[]; rationale: string | null; executed: number }
 
@@ -129,6 +131,31 @@ export const eventCandidates = (events: EventFocus[], fresh: Features[], held: R
       },
     ]
   })
+}
+
+/**
+ * Whether a screen setup's own levels could pass the risk engine: reward:risk at the minimum, and an
+ * edge after the round-trip cost even at the highest probability the engine allows. Setups that
+ * can't are dropped before the AI is paid to look at them.
+ */
+export const viableSetup = (c: Pick<CryptoCandidate, "stop_hint" | "target_hint">, price: number, roundTripBps: number, k: Settings["kraken"]) => {
+  const best = cryptoEdge({ price, stop: c.stop_hint, target: c.target_hint, pAi: 1, shrink: 1, roundTripBps })
+  return !!best && best.rewardRisk >= k.min_reward_risk && best.netEdgeBps >= k.min_edge_bps
+}
+
+/**
+ * The screen setups ("SYMBOL strategy") the AI ruled on too recently to ask about again: daily-trend
+ * setups only change with a new daily candle (a day), the others within a few hourly ones (2 h).
+ */
+export const recentlyJudged = async (col: Pick<EngineContext["col"], "decisions">, now: number) => {
+  const docs = await col.decisions
+    .find(
+      { strategy_id: { $in: CRYPTO_STRATEGIES.map((s) => s.id) }, created_at: { $gte: new Date(now - DAILY_REVIEW_MINUTES * 60_000) } },
+      { projection: { symbol: 1, strategy_id: 1, created_at: 1 } },
+    )
+    .toArray()
+  const window = (s: StrategyId | null) => (s === "daily_trend" ? DAILY_REVIEW_MINUTES : SETUP_REASK_MINUTES) * 60_000
+  return new Set(docs.filter((d) => now - d.created_at.getTime() <= window(d.strategy_id)).map((d) => `${d.symbol} ${d.strategy_id}`))
 }
 
 export type ResearchPlan = { kind: "full" | "gap" | "none"; reason: string }
@@ -250,18 +277,23 @@ export const runCryptoCycle = async (ctx: EngineContext, request: CycleRequest):
   const gate = ctx.gate()
   const riskState = await ctx.ledger.riskState()
   const canEnter = gate.runStatus === "running" && !gate.killSwitch && gate.venueOnline && gate.reconciled && positions.length < settings.kraken.max_concurrent_positions
-  // Daily-trend setups only change with a new daily candle: once the AI has ruled on one, don't pay to ask again for a day.
-  const judged =
-    canEnter && !isEvent
-      ? new Set(await ctx.col.decisions.distinct("symbol", { strategy_id: "daily_trend", created_at: { $gte: new Date(Date.now() - DAILY_REVIEW_MINUTES * 60_000) } }))
-      : new Set<string>()
-  // Event cycles look only at what the news engine flagged: no screens, no daily-trend filter.
+  // Once the AI has ruled on a setup, don't pay to ask again until it can have changed.
+  const judged = canEnter && !isEvent ? await recentlyJudged(ctx.col, Date.now()) : new Set<string>()
+  const takerBps = ctx.feeBps()
+  const estRoundTrip = (f: Features) => Math.round(roundTripCostBps({ takerFeeBps: takerBps, spreadBps: f.spread_bps, entrySlippageBps: 3, exitSlippageBps: 3 }))
+  const passedOver: string[] = []
+  // Event cycles look only at what the news engine flagged: no screens, no re-ask filter.
   const candidates = !canEnter
     ? []
     : isEvent
       ? eventCandidates(events, fresh, held, settings)
       : screenCrypto({ regime, features: fresh, held, settings })
-          .filter((c) => !(c.strategy === "daily_trend" && judged.has(c.symbol)))
+          .filter((c) => {
+            const f = byFeature.get(c.symbol)!
+            const why = judged.has(`${c.symbol} ${c.strategy}`) ? "ruled on recently" : viableSetup(c, f.price, estRoundTrip(f), settings.kraken) ? null : "levels can't pass reward:risk or costs"
+            if (why) passedOver.push(`${c.symbol} ${c.strategy} (${why})`)
+            return !why
+          })
           .slice(0, settings.ai.max_candidates_per_cycle)
   // Owner-requested evaluations join as "discretionary" candidates (same research, decision and risk path).
   if (canEnter && !isEvent && settings.strategies.discretionary.enabled) {
@@ -311,7 +343,7 @@ export const runCryptoCycle = async (ctx: EngineContext, request: CycleRequest):
     const why = isEvent
       ? `idle: event (${events.map((e) => `${e.rule} ${e.symbol ?? "market"}`).join(", ")}) left nothing to decide`
       : canEnter
-        ? `idle: no setups in a ${regime.label} market`
+        ? `idle: no setups in a ${regime.label} market${passedOver.length ? `; passed over ${passedOver.slice(0, 5).join(", ")}${passedOver.length > 5 ? ` and ${passedOver.length - 5} more` : ""}` : ""}`
         : "idle: entries blocked and no positions due for review"
     return finish("completed", why, { regime })
   }
@@ -413,10 +445,8 @@ export const runCryptoCycle = async (ctx: EngineContext, request: CycleRequest):
   // 5. Structured decision.
   ctx.setCycleState("evaluating", "AI decision")
   ctx.bus.emit("ai.decision.started", { cycle_id: cycleId, model: settings.ai.models.decision, items: subjects.map((s) => s.symbol) }, { summary: `Deciding on ${subjects.length} items`, cycle_id: cycleId })
-  const takerBps = ctx.feeBps()
   const equity = riskState?.equityUsd ?? 0
   const positionWeights = new Map(positions.map((p) => [p.symbol, equity > 0 ? ((p.qty * (p.mark_price ?? p.avg_price)) / equity) * 100 : 0]))
-  const estRoundTrip = (f: Features) => Math.round(roundTripCostBps({ takerFeeBps: takerBps, spreadBps: f.spread_bps, entrySlippageBps: 3, exitSlippageBps: 3 }))
   const recent = await ctx.col.decisions
     .find({ symbol: { $in: subjects.map((s) => s.symbol) }, created_at: { $gte: new Date(Date.now() - 48 * HOUR) } }, { projection: { symbol: 1, created_at: 1, action: 1, "execution.status": 1, "ai.conviction": 1 } })
     .sort({ created_at: -1 })
