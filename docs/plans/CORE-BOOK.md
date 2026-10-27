@@ -1,6 +1,13 @@
 # Plan: a long-term core book
 
-Status: **approved on 2026-10-27**, with every recommendation in §12 taken. Being built in the steps of §11. Stock bot first, crypto second (phase 2).
+Status: **approved on 2026-10-27**, with every recommendation in §12 taken. Steps 1–5 of §11 are built and deployed to the stock engine (2026-10-27); step 6 (switching it on) is the owner's, and crypto (step 7) follows two weeks of stock results. The design as built is in [STOCK.md](../STOCK.md#core-book-long-term-holdings); where it refined this plan:
+
+- The score divides by volatility floored at 15% (§5), and the ranking uses completed sessions only.
+- A buy is clamped to its caps (per holding, the book's room to target, the theme's room, the cash) rather than rejected, and rejected under 2% of equity; a buy's own stop must be at least 3% below the price; there are no buys when the review's research failed.
+- `core.review` takes `dry_run`: the research and decision run and the trades are recorded as planned, without orders; it works while the book is off, so the first review can be previewed on the live account.
+- Core trades are also `decisions` documents (`trigger_kind: "core"`), and core orders carry the `smb-core-` client id prefix, which is how fills know their book.
+
+Stock bot first, crypto second (phase 2).
 
 ## 1. Goal
 

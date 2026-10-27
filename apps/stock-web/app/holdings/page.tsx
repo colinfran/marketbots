@@ -58,7 +58,7 @@ export default async function HoldingsPage() {
     <div className="space-y-8">
       <PageHeader
         title="Holdings"
-        description="Everything the bot owns right now, marked to the broker's latest prices. Each position keeps the thesis, stop and target the AI opened it with. Stock exits are bracket orders held by the broker; options exits are checked by the engine."
+        description="Everything the bot owns right now, marked to the broker's latest prices. Each position keeps the thesis, stop and target the AI opened it with. Stock exits rest at the broker (bracket orders for trades, a plain stop for each core holding); options exits are checked by the engine."
         action={<PaperBadge className="text-sm" />}
       />
       {!live ? (
@@ -96,8 +96,8 @@ export default async function HoldingsPage() {
                   <Why
                     key={p.symbol}
                     title={<SymbolLink symbol={p.symbol} />}
-                    badges={p.plan ? [setupName(p.plan.setup), titleCase(p.plan.horizon)] : []}
-                    meta={`${p.plan ? `Opened ${formatDateTime(p.plan.opened_at)} · ` : ""}stop ${price(p.plan?.stop_loss)} · target ${price(p.plan?.take_profit)}`}
+                    badges={p.plan?.book === "core" ? ["Core book", ...(p.plan.theme ? [p.plan.theme] : [])] : p.plan ? [setupName(p.plan.setup), titleCase(p.plan.horizon)] : []}
+                    meta={p.plan?.book === "core" ? `Opened ${formatDateTime(p.plan.opened_at)} · stop ${price(p.plan.stop_loss)}, no target · reviewed weekly` : `${p.plan ? `Opened ${formatDateTime(p.plan.opened_at)} · ` : ""}stop ${price(p.plan?.stop_loss)} · target ${price(p.plan?.take_profit)}`}
                     weight={share(p.marketValue)}
                     thesis={p.plan?.thesis ?? ""}
                     invalidation={p.plan?.invalidation ?? null}

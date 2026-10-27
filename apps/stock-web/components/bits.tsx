@@ -9,8 +9,8 @@ import { titleCase } from "@/lib/format"
 
 export { ActionBadge, Delta, Empty, KV, PageHeader, SectionTitle, Stat } from "@mb/ui/bits"
 
-/** Stock's colors where they differ from the shared map: a skipped decision or cycle is a warning. */
-export const STATUS_STYLES: Record<string, string> = { skipped: TONE.warn }
+/** Stock's colors where they differ from the shared map: a skipped decision or cycle is a warning; a dry run's planned trade is pending. */
+export const STATUS_STYLES: Record<string, string> = { skipped: TONE.warn, planned: TONE.busy }
 
 export function StatusBadge({ status, label }: { status: string; label?: string }) {
   return <SharedStatusBadge status={status} label={label} styles={STATUS_STYLES} />

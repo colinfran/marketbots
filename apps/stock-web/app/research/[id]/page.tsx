@@ -28,7 +28,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
   const [data, viewer] = await Promise.all([getReport(id), getViewer()])
   if (!data) {
     // A core book review's trades and cycle carry the review's id where a report's would be.
-    if (await isCoreReview(id)) redirect(`/core#review-${id}`)
+    if (await isCoreReview(id)) redirect(`/core/reviews/${id}`)
     notFound()
   }
   const [events, wire] = await Promise.all([getCycleEvents(data.report.cycle_id, viewer), getWireForCycle(data.cycle).catch(() => null)])

@@ -18,6 +18,7 @@ const BOOK_TEXT = {
   day: "Setups on the 5-minute chart (VWAP, opening range, intraday trend), flat by the close.",
   swing: "Setups on the daily chart (trend, 20/50-day levels, multi-day catalysts), held for days or weeks while the thesis holds.",
   options: "Defined-risk long calls and puts (and debit spreads when enabled): the most a position can lose is what was paid.",
+  core: "Long-term holdings with written theses, reviewed weekly against SPY; a stop at the broker and no profit target.",
 } as const
 
 export default async function StrategiesPage() {
@@ -26,11 +27,11 @@ export default async function StrategiesPage() {
     <div className="space-y-8">
       <PageHeader
         title="Strategies"
-        description="The AI runs three books and labels every new trade with one setup from a fixed list; the risk engine has the final word on each order. Each setup states why it should make money, so its results here can confirm or refute that."
+        description="The AI runs three trading books, labeling every new trade with one setup from a fixed list, beside a long-term core book; the risk engine has the final word on each order. Each setup states why it should make money, so its results here can confirm or refute that."
       />
       <section>
         <SectionTitle>Books</SectionTitle>
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
           {books.map((b) => (
             <Stat
               key={b.key}
@@ -44,6 +45,7 @@ export default async function StrategiesPage() {
                   <p className="text-muted-foreground text-xs">
                     {BOOK_TEXT[b.key]}
                     {b.key === "options" && !settings.options.enabled && " Currently turned off in settings."}
+                    {b.key === "core" && !settings.core.enabled && " Currently turned off in settings."}
                   </p>
                 </div>
               }

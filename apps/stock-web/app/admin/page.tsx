@@ -187,6 +187,11 @@ export default async function AdminPage() {
                     <TableRow key={p.symbol}>
                       <TableCell>
                         <SymbolLink symbol={p.symbol} />
+                        {p.plan?.book === "core" && (
+                          <Badge variant="secondary" className="ml-1.5">
+                            Core
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">{p.qty}</TableCell>
                       <TableCell className="text-right tabular-nums">{usd(p.marketValue)}</TableCell>

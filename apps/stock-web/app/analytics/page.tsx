@@ -8,7 +8,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Delta, Empty, PageHeader, SectionTitle, Stat, SymbolLink } from "@/components/bits"
 import { CumulativePnlChart, DailyPnlChart, EquityChart } from "@/components/charts"
 import { num, pct, titleCase, usd } from "@/lib/format"
-import { cumulativePnl, getAiCosts, getEquitySeries, getLiveAccount, getSettings, getSetupStats, getWireAnalytics, listDailyStats, listTrades, summarizeBySymbol } from "@/lib/queries"
+import { cumulativePnl, getAiCosts, getBookDays, getEquitySeries, getLiveAccount, getSettings, getSetupStats, getWireAnalytics, listDailyStats, listTrades, summarizeBySymbol } from "@/lib/queries"
+import { compound } from "@/lib/returns"
 import { pageMetadata } from "@/lib/site"
 
 export const metadata: Metadata = pageMetadata({
@@ -17,11 +18,8 @@ export const metadata: Metadata = pageMetadata({
   path: "/analytics",
 })
 
-/** Compounds daily % changes into one % return. */
-const compound = (pcts: number[]) => (pcts.length ? (pcts.reduce((acc, p) => acc * (1 + p / 100), 1) - 1) * 100 : null)
-
 export default async function AnalyticsPage() {
-  const [live, stats, series, trades, costs, { setups }, settings, w] = await Promise.all([
+  const [live, stats, series, trades, costs, { setups }, settings, w, bookDays] = await Promise.all([
     getLiveAccount(),
     listDailyStats(),
     getEquitySeries(),
@@ -30,7 +28,14 @@ export default async function AnalyticsPage() {
     getSetupStats(),
     getSettings(),
     getWireAnalytics(),
+    getBookDays(),
   ])
+  // Per book, since the core book started (oldest first).
+  const coreDays = bookDays.filter((d) => d.books!.core.pnl_pct !== null && d.spy_pct != null)
+  const coreReturn = compound(coreDays.map((d) => d.books!.core.pnl_pct!))
+  const coreSpy = compound(coreDays.map((d) => d.spy_pct!))
+  const coreLatest = bookDays.at(-1)?.books?.core
+  const sum = (values: number[]) => values.reduce((a, b) => a + b, 0)
   const start = settings.account.starting_capital
   const closed = trades.filter((t) => t.realized_pnl !== null)
   const grossWin = closed.reduce((s, t) => s + Math.max(0, t.realized_pnl ?? 0), 0)
@@ -137,6 +142,63 @@ export default async function AnalyticsPage() {
           />
         </div>
       </section>
+
+      {bookDays.length > 0 && (
+        <section className="space-y-4">
+          <SectionTitle>By book, since the core book started</SectionTitle>
+          <p className="text-muted-foreground max-w-3xl text-sm">
+            The{" "}
+            <Link href="/core" className="text-foreground underline underline-offset-2">
+              core book
+            </Link>{" "}
+            holds long-term positions reviewed weekly; the trading book is everything else (day trades, swing holds, options, and the cash they use). Each core day is its holdings&apos; P&L as a share
+            of the book&apos;s value the day before, compounded and set against SPY on the same days.
+          </p>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <Stat label="Core book, compounded" value={<Delta percent={coreReturn} className="text-2xl" />} sub={<span className="text-muted-foreground">{usd(coreLatest?.value)} now</span>} />
+            <Stat label="SPY, same days" value={<Delta percent={coreSpy} className="text-2xl" />} sub={<span className="text-muted-foreground">{coreDays.length} days</span>} />
+            <Stat label="Core book P&L" value={<Delta value={sum(bookDays.map((d) => d.books!.core.pnl))} className="text-2xl" />} sub={<span className="text-muted-foreground">realized {usd(sum(bookDays.map((d) => d.books!.core.realized)))}</span>} />
+            <Stat label="Trading book P&L" value={<Delta value={sum(bookDays.map((d) => d.books!.trading.pnl))} className="text-2xl" />} sub={<span className="text-muted-foreground">realized {usd(sum(bookDays.map((d) => d.books!.trading.realized)))}</span>} />
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Day</TableHead>
+                <TableHead className="text-right">Core book</TableHead>
+                <TableHead className="text-right">SPY</TableHead>
+                <TableHead className="text-right">Core P&L</TableHead>
+                <TableHead className="text-right">Trading P&L</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {[...bookDays]
+                .reverse()
+                .slice(0, 20)
+                .map((d) => (
+                  <TableRow key={d.trading_day}>
+                    <TableCell>
+                      <Link href={`/journal/${d.trading_day}`} className="hover:underline">
+                        {d.trading_day}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Delta percent={d.books!.core.pnl_pct} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Delta percent={d.spy_pct ?? null} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Delta value={d.books!.core.pnl} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Delta value={d.books!.trading.pnl} />
+                    </TableCell>
+                  </TableRow>
+                ))}
+            </TableBody>
+          </Table>
+        </section>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section>

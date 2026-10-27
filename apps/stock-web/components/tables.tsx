@@ -3,6 +3,7 @@ import { daysToExpiry, describeContract, isOptionSymbol, STRATEGY_LABEL } from "
 import { formatDateTime, formatTime, marketDay } from "@mb/stock-core/time"
 import { ZapIcon } from "lucide-react"
 import Link from "next/link"
+import { Badge } from "@mb/ui/components/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mb/ui/components/table"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@mb/ui/components/tooltip"
 import { price, qty, titleCase, usd } from "@/lib/format"
@@ -44,6 +45,11 @@ export function PositionsTable({ positions }: { positions: LiveAccount["position
                 ) : (
                   <SymbolLink symbol={p.symbol} />
                 )}
+                {p.plan?.book === "core" && (
+                  <Badge variant="secondary" className="ml-1.5">
+                    Core
+                  </Badge>
+                )}
               </TableCell>
               <TableCell className="text-right tabular-nums">{qty(p.qty)}</TableCell>
               <TableCell className="text-right tabular-nums">{price(p.avgEntry)}</TableCell>
@@ -55,7 +61,7 @@ export function PositionsTable({ positions }: { positions: LiveAccount["position
               <TableCell className="text-muted-foreground text-right tabular-nums">
                 {price(p.plan?.stop_loss)} / {price(p.plan?.take_profit)}
               </TableCell>
-              <TableCell className="text-muted-foreground">{p.plan ? titleCase(p.plan.horizon) : "—"}</TableCell>
+              <TableCell className="text-muted-foreground">{p.plan?.book === "core" ? "Core: reviewed weekly" : p.plan ? titleCase(p.plan.horizon) : "—"}</TableCell>
             </TableRow>
           ))}
         </TableBody>

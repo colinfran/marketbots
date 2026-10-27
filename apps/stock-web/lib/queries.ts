@@ -128,6 +128,23 @@ export const isCoreReview = async (id: string) => {
   return !!(await (await collections()).coreReviews.findOne({ _id: id }, { projection: { _id: 1 } }))
 }
 
+/** Recent core reviews, newest first, without their heavy parts (what they were shown, the research, Grok's raw answer). */
+export const listCoreReviews = async (limit = 12) => {
+  await connection()
+  return (await collections()).coreReviews.find({}, { projection: { context: 0, research: 0, output: 0 } }).sort({ created_at: -1 }).limit(limit).toArray()
+}
+
+export const getCoreReview = async (id: string) => {
+  await connection()
+  return (await collections()).coreReviews.findOne({ _id: id })
+}
+
+/** The days the core book held or traded something, oldest first, with each book's day and SPY's. */
+export const getBookDays = async () => {
+  await connection()
+  return (await collections()).dailyStats.find({ books: { $exists: true } }).sort({ trading_day: 1 }).toArray()
+}
+
 /** The core book's latest daily ranking (built every trading morning, whether the book is on or not). */
 export const getCoreRanking = async () => {
   await connection()
@@ -418,6 +435,7 @@ export const BOOKS = [
   { key: "day", label: "Day trades" },
   { key: "swing", label: "Swing holds" },
   { key: "options", label: "Options" },
+  { key: "core", label: "Core book" },
 ] as const
 
 export type Book = (typeof BOOKS)[number]["key"]
@@ -470,14 +488,15 @@ export const getSetupStats = async () => {
   const db = await collections()
   const [fills, decisions, structures] = await Promise.all([
     loadFills(),
-    db.decisions.find({}, { projection: { action: 1, status: 1, instrument: 1, "request.setup": 1, "request.horizon": 1 } }).toArray(),
+    db.decisions.find({}, { projection: { action: 1, status: 1, instrument: 1, trigger_kind: 1, "request.setup": 1, "request.horizon": 1 } }).toArray(),
     db.optionPositions.find({}, { projection: { decision_id: 1 } }).toArray(),
   ])
   const bySetup = new Map<Setup, SetupTally>(SETUPS.map((s) => [s, emptyTally()]))
   const byBook = new Map<Book, SetupTally>(BOOKS.map((b) => [b.key, emptyTally()]))
   const setupOf = (d: Pick<DecisionDoc, "request">) => bySetup.get(d.request?.setup) ?? bySetup.get("other")!
   const bookOf = (d: Pick<DecisionDoc, "instrument" | "request">) => byBook.get(d.instrument === "option" ? "options" : d.request?.horizon === "intraday" ? "day" : "swing")!
-  tally({ fills, decisions, structures }, (d) => [setupOf(d), bookOf(d)])
+  // The core book's trades carry no trading setup: they count toward the core book alone.
+  tally({ fills, decisions, structures }, (d) => (d.trigger_kind === "core" ? [byBook.get("core")!] : [setupOf(d), bookOf(d)]))
   return { setups: [...bySetup].map(([key, t]) => ({ key, ...t })), books: BOOKS.map((b) => ({ ...b, ...byBook.get(b.key)! })) }
 }
 

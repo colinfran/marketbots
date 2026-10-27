@@ -12,6 +12,7 @@ import {
   BrainIcon,
   DatabaseIcon,
   GlobeIcon,
+  LandmarkIcon,
   LayersIcon,
   type LucideIcon,
   NewspaperIcon,
@@ -78,6 +79,8 @@ const ICONS: Partial<Record<string, LucideIcon>> = {
   "wire.notable": NewspaperIcon,
   "wire.trigger": ZapIcon,
   "wire.dossier": NewspaperIcon,
+  "core.review.started": LandmarkIcon,
+  "core.review.completed": LandmarkIcon,
 }
 
 const NOTABLE_WHY: Record<string, string> = { triggered: "it started a review", held: "it names a holding", focus: "it's on the radar", market: "market-wide", cited: "cited by the AI" }
@@ -104,6 +107,7 @@ const detail = (e: EngineEvent): React.ReactNode => {
       </a>
     )
   }
+  if (e.type === "core.review.completed") return String(d.summary ?? d.error ?? "")
   if (e.type === "wire.notable") return `Now notable: ${NOTABLE_WHY[String(d.reason)] ?? String(d.reason)} · severity ${String(d.severity)}`
   if (e.type === "wire.trigger") return `${String(d.action ?? "").replace(/_/g, " ")}: ${String(d.reason ?? "")}`
   if (e.type === "position.closed" && typeof d.realized_pnl_usd === "number") {
@@ -116,9 +120,9 @@ const detail = (e: EngineEvent): React.ReactNode => {
   return null
 }
 
-/** Under an event: its symbol and, for a finished cycle, its report. */
+/** Under an event: its symbol and, for a finished cycle or core review, its report. */
 const links = (e: EngineEvent): React.ReactNode => {
-  const reportId = e.type === "cycle.completed" ? String((e.data as { report_id?: string }).report_id ?? "") : ""
+  const reportId = e.type === "cycle.completed" ? String((e.data as { report_id?: string }).report_id ?? "") : e.type === "core.review.completed" ? String((e.data as { review_id?: string }).review_id ?? "") : ""
   if (!e.instrument && !reportId) return null
   return (
     <p className="mt-0.5 flex gap-3 text-xs">
@@ -164,7 +168,7 @@ export const kit: BotKit<EngineEvent> = {
     stateLabels: STATE_LABEL,
     icons: ICONS,
     filters: {
-      ai: (e) => /^(research|ai|cycle|context|options|decision)\b/.test(e.type) || e.type === "wire.dossier",
+      ai: (e) => /^(research|ai|cycle|context|options|decision|core)\b/.test(e.type) || e.type === "wire.dossier",
       news: (e) => e.type === "wire.item" || e.type === "wire.notable" || e.type === "wire.trigger",
       trades: (e) => /^(order|position|protection|risk|decision)\./.test(e.type),
       system: (e) => /^(engine|broker|market|budget|command|alert|error|summary|daily)/.test(e.type),
@@ -177,6 +181,7 @@ export const kit: BotKit<EngineEvent> = {
       "cycle.completed",
       "cycle.failed",
       "cycle.skipped",
+      "core.review.completed",
       "engine.status",
       "command.completed",
       "command.failed",
