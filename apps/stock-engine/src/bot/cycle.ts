@@ -85,6 +85,24 @@ export const researchPlan = async (
   return { kind: "none", reason: `no unexplained moves or unconfirmed items, and X was read ${Math.round((now.getTime() - lastX.created_at.getTime()) / 60_000)} min ago` }
 }
 
+/** How old a failed attempt's research may be for the scheduler's retry of the phase to reuse it. */
+const RESEARCH_REUSE_MINUTES = 20
+
+/**
+ * The research a scheduled cycle can reuse instead of paying for it again: the previous scheduled
+ * attempt of the same phase failed after its research (so no report holds it), with the same mode,
+ * at most RESEARCH_REUSE_MINUTES ago.
+ */
+const reusableResearch = async (
+  ctx: Pick<EngineContext, "col">,
+  { cycleId, day, phase, mode, now = new Date() }: { cycleId: string; day: string; phase: Phase; mode: ResearchResult["mode"]; now?: Date },
+) => {
+  const last = await ctx.col.cycles.findOne({ _id: { $ne: cycleId }, trading_day: day, phase, kind: "scheduled" }, { sort: { started_at: -1 }, projection: { status: 1, research: 1 } })
+  const research = last?.status === "failed" ? last.research : undefined
+  if (!last || !research || research.mode !== mode || now.getTime() - research.at.getTime() > RESEARCH_REUSE_MINUTES * 60_000) return null
+  return { cycleId: last._id, research }
+}
+
 /** "10:03 ET": wire times in stock prompts. */
 const etTime = (d: Date) => formatTime(d)
 
@@ -146,6 +164,9 @@ export const runCycle = async (
   }
 
   let aiCost = 0
+  // The scheduler retries its own phases when they fail: their research is kept for the retry.
+  const retriable = kind === "scheduled"
+  let keptResearch: CycleDoc["research"] | null = null
   const finish = async (status: CycleStatus, fields: Partial<CycleDoc> = {}) => {
     await col.cycles.updateOne({ _id: cycleId }, { $set: { status, finished_at: new Date(), duration_ms: Date.now() - started, ai_cost_usd: roundTo(aiCost, 4), ...fields } })
     ctx.setCycleState("idle")
@@ -234,7 +255,10 @@ export const runCycle = async (
     // ─── Research ───────────────────────────────────────────────────────
     const researchId = randomUUID()
     const focus = [...new Set([...requested, ...context.positions.map((p) => p.symbol), ...context.options.positions.map((p) => p.underlying)])]
-    if (plan.kind !== "none") {
+    const mode = plan.kind === "full" ? "full" : plan.kind === "gap" ? "gap_fill" : "skipped"
+    const reuse = retriable && plan.kind !== "none" ? await reusableResearch(ctx, { cycleId, day: session.day, phase, mode }) : null
+    const researching = plan.kind !== "none" && !reuse
+    if (researching) {
       state("researching", focus.length ? focus.join(", ") : "the market")
       bus.emit("research.started", { cycle_id: cycleId, research_id: researchId, phase, model: settings.ai.models.research, focus }, { summary: plan.kind === "gap" ? "Checking X and gaps our feeds left" : `Researching the ${label(phase).toLowerCase()} with web + X search`, ...meta })
     }
@@ -242,9 +266,11 @@ export const runCycle = async (
     const research = await step(
       "research",
       async () =>
-        plan.kind === "none"
-          ? skipped
-          : ctx.ai.research({
+        reuse
+          ? { ...reuse.research, cost_usd: 0 }
+          : plan.kind === "none"
+            ? skipped
+            : ctx.ai.research({
           cycleId,
           model: settings.ai.models.research,
           fallback: settings.ai.models.fallback,
@@ -263,15 +289,17 @@ export const runCycle = async (
           },
         }),
       (r) =>
-        plan.kind === "none"
-          ? `skipped: ${plan.reason}`
-          : r.error
-            ? `failed: ${r.error}`
-            : `${plan.kind === "gap" ? "gap-fill, " : ""}${r.sources.length} sources, ${r.queries.length} searches${r.x_search ? "" : " (web only)"}, ${Math.round(r.duration_ms / 1000)}s`,
+        reuse
+          ? `reused from the failed attempt at ${etTime(reuse.research.at)}, ${r.sources.length} sources`
+          : plan.kind === "none"
+            ? `skipped: ${plan.reason}`
+            : r.error
+              ? `failed: ${r.error}`
+              : `${plan.kind === "gap" ? "gap-fill, " : ""}${r.sources.length} sources, ${r.queries.length} searches${r.x_search ? "" : " (web only)"}, ${Math.round(r.duration_ms / 1000)}s`,
     )
     aiCost += research.cost_usd ?? 0
     if (plan.kind === "none") await col.cycles.updateOne({ _id: cycleId }, { $set: { research_skip_reason: plan.reason } })
-    else {
+    else if (researching) {
       bus.emit(
         "research.completed",
         { research_id: researchId, sources: research.sources.length, queries: research.queries.length, duration_ms: research.duration_ms, cost_usd: roundTo(research.cost_usd ?? 0, 4), error: research.error },
@@ -281,6 +309,21 @@ export const runCycle = async (
     if (research.error) {
       await alerts.send("warning", `Research failed (${phase}), continuing with broker data only`, research.error, { fields: { Model: research.model, Cycle: cycleId }, path: `/journal/${session.day}` })
     }
+    const researchDoc: ResearchResult = {
+      memo: research.memo,
+      sources: research.sources,
+      queries: research.queries,
+      model: research.model,
+      x_search: research.x_search,
+      duration_ms: research.duration_ms,
+      error: research.error,
+      usage: research.usage,
+      cost_usd: roundTo(research.cost_usd ?? 0, 4),
+      mode,
+      ...(reuse ? { reused_from: reuse.cycleId } : {}),
+      ...(dossier ? { dossier: dossier.rows } : {}),
+    }
+    if (retriable && research.memo && !research.error) keptResearch = { ...researchDoc, at: reuse?.research.at ?? new Date() }
 
     // ─── Decision ───────────────────────────────────────────────────────
     state("deciding", settings.ai.models.decision)
@@ -371,19 +414,6 @@ export const runCycle = async (
       await writeAccountSnapshot(ctx).catch((e) => log.warn("account snapshot failed", { error: errorMessage(e) }))
     }
 
-    const researchDoc: ResearchResult = {
-      memo: research.memo,
-      sources: research.sources,
-      queries: research.queries,
-      model: research.model,
-      x_search: research.x_search,
-      duration_ms: research.duration_ms,
-      error: research.error,
-      usage: research.usage,
-      cost_usd: roundTo(research.cost_usd ?? 0, 4),
-      mode: plan.kind === "full" ? "full" : plan.kind === "gap" ? "gap_fill" : "skipped",
-      ...(dossier ? { dossier: dossier.rows } : {}),
-    }
     await col.reports.insertOne({
       _id: reportId,
       cycle_id: cycleId,
@@ -426,7 +456,7 @@ export const runCycle = async (
     // Never leave intraday trades open overnight just because the AI step failed.
     const notes = await closeFallback()
     if (notes.length) message += ` | fallback: ${notes.join("; ")}`
-    await finish("failed", { error: message.slice(0, 1000) })
+    await finish("failed", { error: message.slice(0, 1000), ...(keptResearch ? { research: keptResearch } : {}) })
     bus.emit("cycle.failed", { cycle_id: cycleId, phase, error: message.slice(0, 500) }, { summary: `${label(phase)} cycle failed: ${message.slice(0, 200)}`, level: "error", ...meta })
     await alerts.send("error", `${phase} cycle failed`, message, { fields: { Day: session.day, Cycle: cycleId, Duration: `${Math.round((Date.now() - started) / 1000)}s` }, path: `/journal/${session.day}` })
     return { cycleId, phase, status: "failed", headline: null, seed: seedOutcome ? { ...seedOutcome, notes: [...seedOutcome.notes, message.slice(0, 300)] } : undefined }

@@ -236,6 +236,40 @@ describe("a cycle", () => {
   })
 })
 
+describe("retries", () => {
+  it("reuses the failed attempt's research when the scheduler retries the phase, instead of paying for it again", async () => {
+    fakeAi({ decisionError: new Error("decision failed after 3 attempts: timeout") })
+    const failed = await run("intraday", { kind: "scheduled" })
+    expect(failed.status).toBe("failed")
+    expect(await cycleOf(failed.cycleId)).toMatchObject({ research: { memo: expect.stringContaining("SPY +0.3%"), mode: "full", cost_usd: 0.05, at: expect.any(Date) } })
+
+    vi.setSystemTime(NOW.getTime() + 4 * 60_000)
+    const { research, structured } = fakeAi()
+    const retry = await run("intraday", { kind: "scheduled" })
+    expect(retry.status).toBe("succeeded")
+    expect(research).not.toHaveBeenCalled()
+    expect(structured.mock.calls[0][0].prompt).toContain("SPY +0.3%")
+    const cycle = await cycleOf(retry.cycleId)
+    expect(cycle.ai_cost_usd).toBe(0.02)
+    expect(cycle.steps.find((s) => s.name === "research")!.detail).toMatch(/^reused from the failed attempt at \d{1,2}:\d{2}.* ET, 1 sources$/)
+    expect(await db.col.reports.findOne({ cycle_id: retry.cycleId })).toMatchObject({ research: { memo: expect.stringContaining("SPY +0.3%"), reused_from: failed.cycleId, cost_usd: 0 }, cost_usd: 0.02 })
+  })
+
+  it("researches afresh outside a scheduled retry, or when the failed attempt's research is stale", async () => {
+    fakeAi({ decisionError: new Error("model overloaded") })
+    await run("intraday", { kind: "scheduled" })
+
+    const manual = fakeAi()
+    await run("intraday", { kind: "manual" })
+    expect(manual.research).toHaveBeenCalledTimes(1)
+
+    vi.setSystemTime(NOW.getTime() + 21 * 60_000)
+    const late = fakeAi()
+    await run("intraday", { kind: "scheduled" })
+    expect(late.research).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe("skipped cycles", () => {
   it("skips the AI when it's disabled, but still enforces the closing rules", async () => {
     broker.setPosition("AAPL", 10, 100)

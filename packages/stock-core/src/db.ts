@@ -123,6 +123,8 @@ export type CycleDoc = CycleDocBase<CycleStatus> & {
   phase: Phase
   trading_day: string
   report_id: string | null
+  /** A failed cycle's research (no report holds it), and when it was done: the scheduler's retry of the phase reuses it while it's fresh. */
+  research?: ResearchResult & { at: Date }
 }
 
 export type ResearchSource = { title: string | null; url: string; domain?: string }
@@ -139,6 +141,8 @@ export type ResearchResult = {
   cost_usd?: number
   /** full = the usual research; gap_fill = only what the wire dossier lacks; skipped = the wire covered it (absent on older docs). */
   mode?: "full" | "gap_fill" | "skipped"
+  /** The failed attempt (cycle id) whose research this retry reused; it was paid for there. */
+  reused_from?: string
   /** The wire items the AI was given alongside the research (top rows). */
   dossier?: DossierRow[]
 }

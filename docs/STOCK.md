@@ -56,6 +56,8 @@ Fills arrive instantly over Alpaca's `trade_updates` stream (binary JSON frames 
 
 The daily AI budget is checked before each cycle; when it's spent, cycles are skipped (and the closing rules still run in code).
 
+When a scheduled phase fails (usually its decision), the scheduler retries it (intraday after 4 minutes, up to twice; the other phases right away, up to `schedule.max_phase_attempts` attempts). The failed cycle keeps its research, and the retry reuses it when it's under 20 minutes old and of the same mode instead of paying for it again; the report names the attempt it came from (`research.reused_from`).
+
 ## News engine (the wire)
 
 The engine reads about 80 free news, filing and market-data sources itself, so Grok doesn't have to find everything by searching, and so the bot can react to news between scheduled cycles.
