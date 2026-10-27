@@ -13,6 +13,20 @@
       }
     ]
   },
+  "wire.summaries.pause_hours across midnight": {
+    "ok": true,
+    "equals_input": true
+  },
+  "wire.summaries.pause_hours range starts where it ends": {
+    "ok": false,
+    "issues": [
+      {
+        "path": "wire.summaries.pause_hours.0",
+        "code": "custom",
+        "message": "an hour range can't start and end at the same hour"
+      }
+    ]
+  },
   "risk.min_stop_pct >= max_stop_pct": {
     "ok": false,
     "issues": [

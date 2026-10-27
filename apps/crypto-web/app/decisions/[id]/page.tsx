@@ -71,7 +71,7 @@ export default async function DecisionPage({ params }: Props) {
           <CardContent>
             <ol className="divide-y">
               {triggeredBy.map((i) => (
-                <WireItemRow key={i.id} item={i} />
+                <WireItemRow key={i.id} item={i} summary="open" />
               ))}
             </ol>
           </CardContent>

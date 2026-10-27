@@ -99,6 +99,17 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     ],
   },
   {
+    title: "Article summaries (local model, Research page only)",
+    fields: [
+      { path: "wire.summaries.enabled", label: "Summarize important articles", kind: "boolean" },
+      { path: "wire.summaries.model", label: "Model (Ollama tag)", kind: "text" },
+      { path: "wire.summaries.min_severity", label: "Min severity (notable items always)", kind: "number" },
+      { path: "wire.summaries.max_per_hour", label: "Max articles per hour", kind: "number" },
+      { path: "wire.summaries.skip_domains", label: "Never fetch (domains, comma-separated)", kind: "idlist" },
+      { path: "wire.summaries.pause_hours", label: "Pause hours (UTC ranges, e.g. 22-6)", kind: "idlist" },
+    ],
+  },
+  {
     title: "Universe & paper wallet",
     fields: [
       { path: "universe.kraken_symbols", label: "Pairs (comma-separated, e.g. BTC/USD)", kind: "list" },

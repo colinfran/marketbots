@@ -95,7 +95,7 @@ export function ReportView({ doc, decisions, cycle, events, wire }: { doc: Repor
             {triggeredBy.items.length > 0 && (
               <ol className="divide-y">
                 {triggeredBy.items.map((i) => (
-                  <WireItemRow key={i.id} item={i} />
+                  <WireItemRow key={i.id} item={i} summary="open" />
                 ))}
               </ol>
             )}

@@ -35,7 +35,12 @@ export type WireRowView = {
   notable: boolean
   notable_reasons: NotableReason[]
   price_at_seen: Record<string, number>
+  /** The local model's summary of the article, when it passed every check (@mb/wire/enrich). */
+  article: ArticleView | null
 }
+
+/** A machine summary for display (same shape as @mb/ui/wire's ArticleView). */
+export type ArticleView = { summary: string; key_points: string[]; model: string; at: string }
 
 /** A trigger for display (same shape as @mb/ui/wire's TriggerView). */
 export type TriggerView = {
@@ -53,8 +58,16 @@ export type TriggerView = {
 
 export type WireFilter = { symbol?: string; category?: string; minSeverity?: number; source?: string; hours?: number; limit?: number }
 
-/** Summaries never leave the database: Benzinga items (stock's alpaca_news) may show only headline, source and link. */
+/**
+ * Feed summaries never leave the database: Benzinga items (stock's alpaca_news) may show only
+ * headline, source and link. The local model's article summary (`article`) does: it is ours, made
+ * from the publisher's page, and never from Benzinga's (enrich/select.ts skips benzinga.com).
+ */
 export const ITEM_PROJECTION = { summary: 0, severity_parts: 0, meta: 0, confirmations: 0 } as const
+
+/** Only a summary that passed every check is shown; skipped, failed and rejected ones stay in the database. */
+const toArticleView = (a: WireItemDoc<string>["article"]): ArticleView | null =>
+  a?.status === "ok" && a.summary ? { summary: a.summary, key_points: a.key_points ?? [], model: a.model, at: a.at.toISOString() } : null
 
 export const toRowView = (i: WireItemDoc<string>): WireRowView => ({
   id: i._id,
@@ -71,6 +84,7 @@ export const toRowView = (i: WireItemDoc<string>): WireRowView => ({
   notable: i.notable,
   notable_reasons: i.notable_reasons,
   price_at_seen: i.price_at_seen,
+  article: toArticleView(i.article),
 })
 
 /** The collections the shared queries read. Each bot passes its own map; the bot-specific document types are read off it. */

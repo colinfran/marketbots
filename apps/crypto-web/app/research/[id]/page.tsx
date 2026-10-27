@@ -54,7 +54,7 @@ export default async function CyclePage({ params }: Props) {
           <CardContent>
             <ol className="divide-y">
               {wire.items.map((i) => (
-                <WireItemRow key={i.id} item={i} />
+                <WireItemRow key={i.id} item={i} summary="open" />
               ))}
             </ol>
           </CardContent>

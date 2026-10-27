@@ -168,6 +168,7 @@ export const wireSettingsSchema = z.object({
   scan_max_symbols: int(100, 5_000),
   /** 20-day average dollar volume a stock needs to enter the scan universe. */
   scan_min_dollar_volume: z.number().min(0).max(10_000_000_000),
+  summaries: wireBase.summaries,
 })
 
 export const settingsSchema = z
@@ -298,6 +299,15 @@ export const DEFAULT_SETTINGS: Settings = {
     odds_swing_pts: 15,
     scan_max_symbols: 1_500,
     scan_min_dollar_volume: 20_000_000,
+    summaries: {
+      enabled: true,
+      // The 10.1 spike's pick (docs/plans/PHASE10_SPIKE.md).
+      model: "llama3.2:3b",
+      min_severity: 55,
+      max_per_hour: 60,
+      skip_domains: ["wsj.com", "ft.com", "bloomberg.com", "nytimes.com", "economist.com", "barrons.com", "seekingalpha.com"],
+      pause_hours: [],
+    },
   },
 }
 

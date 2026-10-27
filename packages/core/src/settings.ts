@@ -37,10 +37,43 @@ export const aiSettingsBase = z.object({
 })
 export type AiSettingsBase = z.infer<typeof aiSettingsBase>
 
+/** An Ollama model tag, e.g. "llama3.2:3b" or "qwen3:4b-instruct". */
+export const OLLAMA_MODEL_PATTERN = /^[a-z0-9][a-z0-9._-]*(?::[a-z0-9][a-z0-9._-]*)?$/
+/** A bare lowercase domain, e.g. "wsj.com". */
+export const DOMAIN_PATTERN = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/
+/** A range of UTC hours, start-end with the end excluded: "22-6" is 22:00 to 06:00 UTC, "0-24" all day. */
+export const HOUR_RANGE_PATTERN = /^([01]?\d|2[0-3])-([01]?\d|2[0-4])$/
+
+const hourRange = z
+  .string()
+  .regex(HOUR_RANGE_PATTERN, "Expected a UTC hour range like 22-6")
+  .refine((r) => r.split("-")[0] !== r.split("-")[1], "an hour range can't start and end at the same hour")
+
+/**
+ * Local article summaries (MARKETBOTS_PLAN §3.9, @mb/wire/enrich): the article behind an important
+ * item, summarized by a small model on the server's GPU, for the Research page. Never on the trigger
+ * path, and (until the owner approves 10.5) never in a prompt.
+ */
+export const wireSummariesSettings = z.object({
+  enabled: z.boolean(),
+  /** The Ollama model tag. */
+  model: z.string().regex(OLLAMA_MODEL_PATTERN, "Expected an Ollama model tag like llama3.2:3b"),
+  /** Cluster roots at or above this severity get a summary; notable items always qualify. */
+  min_severity: int(0, 100),
+  /** Articles each engine may summarize per hour. */
+  max_per_hour: int(1, 600),
+  /** Domains (and their subdomains) never fetched for a summary. The scraper refuses its own paywall list as well. */
+  skip_domains: z.array(z.string().regex(DOMAIN_PATTERN, "Expected a lowercase domain like wsj.com")).max(200),
+  /** UTC hour ranges with no summaries, e.g. "22-6". */
+  pause_hours: z.array(hourRange).max(24),
+})
+export type WireSummariesSettings = z.infer<typeof wireSummariesSettings>
+
 /**
  * The news engine ("wire") settings both bots have. It ships live: `SettingsStore.load` fills this
- * section from the defaults on the first boot after deploy. Setting `mode` to "off" (or "shadow":
- * log triggers, act on none) returns trading to scheduled cycles with full Grok research at once.
+ * section (and any field added to it later, like `summaries`) from the defaults on the first boot
+ * after deploy. Setting `mode` to "off" (or "shadow": log triggers, act on none) returns trading to
+ * scheduled cycles with full Grok research at once.
  */
 export const wireSettingsBase = z.object({
   mode: z.enum(["off", "shadow", "live"]),
@@ -75,6 +108,7 @@ export const wireSettingsBase = z.object({
   retention_days: int(7, 730),
   /** Prediction-market move (percentage points within an hour) that counts as an odds swing. */
   odds_swing_pts: z.number().min(1).max(100),
+  summaries: wireSummariesSettings,
 })
 export type WireSettingsBase = z.infer<typeof wireSettingsBase>
 

@@ -34,6 +34,8 @@ const settingsValidation = () => {
   const cases: Record<string, unknown> = {
     defaults: S,
     "wire.thresholds not ascending": { ...S, wire: { ...S.wire, thresholds: { annotate: 30, review: 80, evaluate: 70, critical: 85 } } },
+    "wire.summaries.pause_hours across midnight": { ...S, wire: { ...S.wire, summaries: { ...S.wire.summaries, pause_hours: ["22-6", "12-13"] } } },
+    "wire.summaries.pause_hours range starts where it ends": { ...S, wire: { ...S.wire, summaries: { ...S.wire.summaries, pause_hours: ["6-6"] } } },
     "risk.min_stop_pct >= max_stop_pct": { ...S, risk: { ...S.risk, min_stop_pct: 2, max_stop_pct: 2 } },
     "risk.default_stop_pct outside the stop bounds": { ...S, risk: { ...S.risk, default_stop_pct: 9 } },
     "risk.max_daily_loss_pct >= flatten_loss_pct": { ...S, risk: { ...S.risk, max_daily_loss_pct: 4 } },

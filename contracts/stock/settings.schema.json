@@ -561,6 +561,52 @@
             "type": "number",
             "minimum": 0,
             "maximum": 10000000000
+          },
+          "summaries": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "model": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9._-]*(?::[a-z0-9][a-z0-9._-]*)?$"
+              },
+              "min_severity": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "max_per_hour": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 600
+              },
+              "skip_domains": {
+                "maxItems": 200,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9-]+(\\.[a-z0-9-]+)+$"
+                }
+              },
+              "pause_hours": {
+                "maxItems": 24,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^([01]?\\d|2[0-3])-([01]?\\d|2[0-4])$"
+                }
+              }
+            },
+            "required": [
+              "enabled",
+              "model",
+              "min_severity",
+              "max_per_hour",
+              "skip_domains",
+              "pause_hours"
+            ]
           }
         },
         "required": [
@@ -583,7 +629,8 @@
           "retention_days",
           "odds_swing_pts",
           "scan_max_symbols",
-          "scan_min_dollar_volume"
+          "scan_min_dollar_volume",
+          "summaries"
         ]
       }
     },
@@ -1168,6 +1215,53 @@
             "type": "number",
             "minimum": 0,
             "maximum": 10000000000
+          },
+          "summaries": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "model": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9._-]*(?::[a-z0-9][a-z0-9._-]*)?$"
+              },
+              "min_severity": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "max_per_hour": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 600
+              },
+              "skip_domains": {
+                "maxItems": 200,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9-]+(\\.[a-z0-9-]+)+$"
+                }
+              },
+              "pause_hours": {
+                "maxItems": 24,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^([01]?\\d|2[0-3])-([01]?\\d|2[0-4])$"
+                }
+              }
+            },
+            "required": [
+              "enabled",
+              "model",
+              "min_severity",
+              "max_per_hour",
+              "skip_domains",
+              "pause_hours"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -1190,7 +1284,8 @@
           "retention_days",
           "odds_swing_pts",
           "scan_max_symbols",
-          "scan_min_dollar_volume"
+          "scan_min_dollar_volume",
+          "summaries"
         ],
         "additionalProperties": false
       }

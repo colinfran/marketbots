@@ -179,4 +179,14 @@ describe("stock wire pipeline", () => {
     const store = await loadSettings(db.col, { GROK_RESEARCH_MODEL: null, GROK_DECISION_MODEL: null } as never, silentLogger)
     expect(store.current.wire).toEqual(DEFAULT_SETTINGS.wire)
   })
+
+  it("adds the article summaries' defaults to a stored wire section, keeping the owner's values", async () => {
+    const { summaries: _summaries, ...wire } = { ...DEFAULT_SETTINGS.wire, mode: "shadow" as const, scan_max_symbols: 800 }
+    await db.col.settings.insertOne({ _id: "current", settings: { ...DEFAULT_SETTINGS, wire } as Settings, version: 12, updated_at: NOW, updated_by: "owner" })
+    const store = await loadSettings(db.col, { GROK_RESEARCH_MODEL: null, GROK_DECISION_MODEL: null } as never, silentLogger)
+    expect(store.current.wire).toEqual({ ...wire, summaries: DEFAULT_SETTINGS.wire.summaries })
+    expect(store.version).toBe(13)
+    const doc = await db.col.settings.findOne({ _id: "current" })
+    expect(doc).toMatchObject({ version: 13, updated_by: "engine:migration", settings: { wire: { mode: "shadow", scan_max_symbols: 800, summaries: { enabled: true, model: "llama3.2:3b", min_severity: 55, max_per_hour: 60, pause_hours: [] } } } })
+  })
 })

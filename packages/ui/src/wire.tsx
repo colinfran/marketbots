@@ -16,8 +16,10 @@ import { type AnyEvent, useStream } from "./stream"
 /**
  * The news engine ("wire") on the dashboard: items our feeds saw, why an item matters, the
  * triggers it fired and how each source is doing. Everything shown is plain text from sanitized,
- * length-capped fields; links open the source in a new tab. Rows carry no summaries: Benzinga
+ * length-capped fields; links open the source in a new tab. Rows carry no feed summaries: Benzinga
  * items (via Alpaca) may show only their headline, source and link, and that holds for all rows.
+ * What a row may carry is our local model's summary of the article (never Benzinga's), on the
+ * Research page and an item's detail, labelled as a machine summary that may contain errors.
  * Who published an item, symbol links and times come from the bot's kit.
  */
 
@@ -39,7 +41,11 @@ export type WireRowView = {
   notable: boolean
   notable_reasons: NotableReason[]
   price_at_seen: Record<string, number>
+  /** The local model's summary of the article, when it passed every check. */
+  article: ArticleView | null
 }
+
+export type ArticleView = { summary: string; key_points: string[]; model: string; at: string }
 
 export type TriggerView = {
   id: string
@@ -111,7 +117,34 @@ function ItemTitle({ title, url }: { title: string; url: string | null }) {
   )
 }
 
-export function WireItemRow({ item, showWhy = false }: { item: WireRowView; showWhy?: boolean }) {
+const MODEL_LABEL: Record<string, string> = { "llama3.2:3b": "Llama 3.2 3B" }
+
+/** The local model's summary of an item's article, always labelled as a machine summary, with the article's link. */
+export function ArticleSummary({ article, url, open = false }: { article: ArticleView; url: string | null; open?: boolean }) {
+  return (
+    <details className="text-xs" open={open}>
+      <summary className="text-muted-foreground hover:text-foreground cursor-pointer">Machine summary ({MODEL_LABEL[article.model] ?? article.model}, may contain errors)</summary>
+      <div className="mt-1 space-y-1 border-l-2 pl-2">
+        <p className="leading-snug">{article.summary}</p>
+        {article.key_points.length > 0 && (
+          <ul className="text-muted-foreground list-disc space-y-0.5 pl-4">
+            {article.key_points.map((p, i) => (
+              <li key={i}>{p}</li>
+            ))}
+          </ul>
+        )}
+        {url && (
+          <a href={url} target="_blank" rel="noopener noreferrer nofollow" className="text-muted-foreground hover:text-foreground inline-block underline underline-offset-2">
+            Read the article
+          </a>
+        )}
+      </div>
+    </details>
+  )
+}
+
+/** One item. `summary` shows its article's machine summary, if it has one: folded in the Research page's list, open on an item's detail. */
+export function WireItemRow({ item, showWhy = false, summary }: { item: WireRowView; showWhy?: boolean; summary?: "folded" | "open" }) {
   const { format, sourceLabel, symbolHref } = useKit()
   const now = useNow(30_000)
   return (
@@ -137,6 +170,7 @@ export function WireItemRow({ item, showWhy = false }: { item: WireRowView; show
           {item.symbols.length === 1 && <MoveSince symbol={item.symbols[0]} then={item.price_at_seen[item.symbols[0]]} />}
         </p>
         {showWhy && <WhyChips reasons={item.notable_reasons} symbols={item.symbols} />}
+        {summary && item.article && <ArticleSummary article={item.article} url={item.url} open={summary === "open"} />}
       </div>
     </li>
   )
@@ -169,7 +203,7 @@ export function DossierRows({ rows, showTime = false }: { rows: DossierRow<strin
 const fromEvent = (e: AnyEvent): WireRowView | null => {
   if (e.type !== "wire.item") return null
   const d = e.data as WireEvent["wire.item"]
-  return { id: d.id, title: d.title, url: d.url, source: d.source, domain: null, tier: d.tier, category: d.category, kind: d.kind, symbols: d.symbols, severity: d.severity, first_seen_at: d.first_seen_at, notable: d.notable, notable_reasons: d.notable_reasons, price_at_seen: {} }
+  return { id: d.id, title: d.title, url: d.url, source: d.source, domain: null, tier: d.tier, category: d.category, kind: d.kind, symbols: d.symbols, severity: d.severity, first_seen_at: d.first_seen_at, notable: d.notable, notable_reasons: d.notable_reasons, price_at_seen: {}, article: null }
 }
 
 /** Server-rendered items plus everything the stream adds; `notableOnly` is the Live page's rule. */
@@ -184,7 +218,7 @@ function useWireItems(initial: WireRowView[], { notableOnly, filter }: { notable
         const d = e.data as WireEvent["wire.notable"]
         const known = byId.get(d.id)
         if (known) byId.set(d.id, { ...known, notable: true, notable_reasons: d.notable_reasons })
-        else byId.set(d.id, { id: d.id, title: d.title, url: null, source: "", domain: null, tier: 2, category: "general", kind: "news", symbols: d.symbols, severity: d.severity, first_seen_at: e.ts, notable: true, notable_reasons: d.notable_reasons, price_at_seen: {} })
+        else byId.set(d.id, { id: d.id, title: d.title, url: null, source: "", domain: null, tier: 2, category: "general", kind: "news", symbols: d.symbols, severity: d.severity, first_seen_at: e.ts, notable: true, notable_reasons: d.notable_reasons, price_at_seen: {}, article: null })
       }
     }
     return [...byId.values()].filter((i) => (!notableOnly || i.notable) && (!filter || filter(i))).sort((a, b) => b.first_seen_at.localeCompare(a.first_seen_at))
@@ -193,7 +227,7 @@ function useWireItems(initial: WireRowView[], { notableOnly, filter }: { notable
 
 export type WireListFilter = { symbol?: string; category?: string; source?: string; minSeverity?: number }
 
-/** The Research page's "Our research" list: everything stored, live, with the page's filters applied to new items too. */
+/** The Research page's "Our research" list: everything stored, live, with the page's filters applied to new items too, and machine summaries folded under their items. */
 export function LiveWireList({ initial, limit = 100, filter = {} }: { initial: WireRowView[]; limit?: number; filter?: WireListFilter }) {
   const { symbol, category, source, minSeverity } = filter
   const predicate = useMemo(
@@ -205,7 +239,7 @@ export function LiveWireList({ initial, limit = 100, filter = {} }: { initial: W
   return (
     <ol className="divide-y" aria-live="polite">
       {items.map((i) => (
-        <WireItemRow key={i.id} item={i} showWhy={i.notable} />
+        <WireItemRow key={i.id} item={i} showWhy={i.notable} summary="folded" />
       ))}
     </ol>
   )

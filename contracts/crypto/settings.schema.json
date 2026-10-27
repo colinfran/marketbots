@@ -581,6 +581,52 @@
             "type": "number",
             "minimum": 0.05,
             "maximum": 5
+          },
+          "summaries": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "model": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9._-]*(?::[a-z0-9][a-z0-9._-]*)?$"
+              },
+              "min_severity": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "max_per_hour": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 600
+              },
+              "skip_domains": {
+                "maxItems": 200,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9-]+(\\.[a-z0-9-]+)+$"
+                }
+              },
+              "pause_hours": {
+                "maxItems": 24,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^([01]?\\d|2[0-3])-([01]?\\d|2[0-4])$"
+                }
+              }
+            },
+            "required": [
+              "enabled",
+              "model",
+              "min_severity",
+              "max_per_hour",
+              "skip_domains",
+              "pause_hours"
+            ]
           }
         },
         "required": [
@@ -605,7 +651,8 @@
           "tvl_drop_pct",
           "odds_swing_pts",
           "funding_extreme_annual_pct",
-          "coinbase_premium_pct"
+          "coinbase_premium_pct",
+          "summaries"
         ]
       }
     },
@@ -1218,6 +1265,53 @@
             "type": "number",
             "minimum": 0.05,
             "maximum": 5
+          },
+          "summaries": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "model": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9._-]*(?::[a-z0-9][a-z0-9._-]*)?$"
+              },
+              "min_severity": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "max_per_hour": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 600
+              },
+              "skip_domains": {
+                "maxItems": 200,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9-]+(\\.[a-z0-9-]+)+$"
+                }
+              },
+              "pause_hours": {
+                "maxItems": 24,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^([01]?\\d|2[0-3])-([01]?\\d|2[0-4])$"
+                }
+              }
+            },
+            "required": [
+              "enabled",
+              "model",
+              "min_severity",
+              "max_per_hour",
+              "skip_domains",
+              "pause_hours"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -1242,7 +1336,8 @@
           "tvl_drop_pct",
           "odds_swing_pts",
           "funding_extreme_annual_pct",
-          "coinbase_premium_pct"
+          "coinbase_premium_pct",
+          "summaries"
         ],
         "additionalProperties": false
       }

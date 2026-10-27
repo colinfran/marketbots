@@ -135,6 +135,7 @@ export const wireSettingsSchema = z.object({
   funding_extreme_annual_pct: z.number().min(5).max(2_000),
   /** Coinbase BTC/ETH price off Kraken's by at least this % for 5 minutes counts as a Coinbase premium (or discount). */
   coinbase_premium_pct: z.number().min(0.05).max(5),
+  summaries: wireBase.summaries,
 })
 
 const strategiesShape = Object.fromEntries(STRATEGY_IDS.map((id) => [id, strategySettingsSchema])) as Record<
@@ -261,6 +262,15 @@ export const DEFAULT_SETTINGS: Settings = {
     odds_swing_pts: 15,
     funding_extreme_annual_pct: 100,
     coinbase_premium_pct: 0.3,
+    summaries: {
+      enabled: true,
+      // The 10.1 spike's pick (docs/plans/PHASE10_SPIKE.md).
+      model: "llama3.2:3b",
+      min_severity: 55,
+      max_per_hour: 60,
+      skip_domains: ["wsj.com", "ft.com", "bloomberg.com", "nytimes.com", "economist.com", "barrons.com", "seekingalpha.com"],
+      pause_hours: [],
+    },
   },
 }
 

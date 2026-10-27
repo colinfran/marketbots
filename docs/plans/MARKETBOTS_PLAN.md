@@ -471,9 +471,9 @@ Tags: **[C]** crypto, **[S]** stock, **[both]**, **[stack]** Docker/infra, **[ow
       - Label each summary as a machine summary.
     - **Until the owner confirms, 10.5 waits:** summaries can be stored and shown (10.3–10.4) but don't go into decision prompts.
 - [x] 10.2 [stack] Scraper `POST /extract` (§3.8) with robots.txt and skip-domain checks; tests against saved article fixtures.
-- [ ] 10.3 [both] `@mb/wire/enrich`: queue, selection, extract → summarize → store, the GPU-only guard, hourly cap, `enrich:summaries` health. Never on the trigger path.
-- [ ] 10.4 [both] `wire.summaries` settings section (defaults: enabled, the 10.1 model, `min_severity` 55, 60/h, skip list), shipped live like the `wire` section was.
-- [ ] 10.5 [both] Dossier rows gain the summary (fenced, capped); bump `PROMPT_VERSION`. Research page and item detail show it.
+- [x] 10.3 [both] `@mb/wire/enrich`: queue, selection, extract → summarize → store, the GPU-only guard, hourly cap, `enrich:summaries` health. Never on the trigger path.
+- [x] 10.4 [both] `wire.summaries` settings section (defaults: enabled, the 10.1 model, `min_severity` 55, 60/h, skip list), shipped live like the `wire` section was.
+- [ ] 10.5 [both] Dossier rows gain the summary (fenced, capped); bump `PROMPT_VERSION`. Research page and item detail show it. *(Display half done 2026-10-27; the prompt half waits for the owner to confirm the 10.1 model.)*
 - [ ] 10.6 Watch for 2 days: GPU memory over time, summaries per hour, failures by reason, effect on Grok research spend.
 
 ### Phase 11: Later and optional
@@ -588,3 +588,17 @@ Answered by the owner on 2026-10-26, 23:15 PT:
 | 2026-10-27 02:30 PT | Phase 8 (8.1–8.4; 8.5 screenshots taken, owner review and deploy pending) | `@mb/ui`: 14 primitives in use (5 unused removed), crypto's token superset, components.json, the shared shell and components driven by each app's `components/kit.tsx`. `@mb/web-kit`: auth factory (IP salts `cmb-ip.`/`smb-ip.` pinned by a test), db, commands and route factories, shared queries, metadata, alerts and instrumentation (crypto gains Discord error reports). `format` and `auth-client` live in `@mb/ui` because client components need them. Screenshots: `C:\Users\colin\Documents\GitHub\marketbots-screenshots\phase8\index.md` (216 PNGs). Every public page is pixel-identical except the listed changes (crypto's trail news rows; stock's error page). Not captured: `/admin`. Already wider than the screen at phone width before this phase: crypto `/strategies`, stock `/analytics`. Built on branch `phase8`, merged after the combined gate (1,011 tests). |
 | 2026-10-27 03:35 PT | Phase 7 (7.1–7.3; 7.4 at deploy) | `@mb/wire`: the 23 mirrored files plus `macro-calendar.json` and `macro-actuals`, generic over the bot's categories and settings. Each engine injects `CATEGORY_BASE`, `requestText` and its types through thin modules at the old paths. Shared helpers: `common`, `odds`, attention blocks, `sharedCatalog()`, `makeLexicon()`. Stock adopted all of them. Crypto adopted all except `odds` and the App Store item builder, because adopting those would change `parsed/polymarket-fed`/`kalshi-fed` and the stored App Store items; both are listed for 9.5. Crypto's `num` now also strips `$ , %` (no snapshot change). The macro-calendar alert now points at `packages/wire/src/macro-calendar.json`. Snapshots unchanged; catalogs still 80 / 96. Tests 1038 → 1034 (6 duplicates removed, 2 new). No mirrored code remains. |
 | 2026-10-27 03:35 PT | Phase 9 (built, awaiting owner approval; not merged) | Branch `phase9-crypto`: 9.1 `d849ae3` (crypto news triggers expire after 30 min in the queue, like stock's; no gate since crypto trades 24/7) and 9.2 `8b38465` (crypto streams decisions; new ephemeral events `ai.reasoning` / `ai.decision.progress`, the only snapshot change being `events.json`; the live page shows decision progress and reasoning, also to logged-out viewers as on stock; same AI spend, exact per-attempt cost). Branch `phase9-charts`: 9.3 `59c488e` (shared `PriceChart`/`EquityChart`/`PnlChart`/`DrawdownChart`/`CumulativePnlChart` on lightweight-charts 5.2.1 in `@mb/ui`; crypto pixel-identical; stock's recharts removed, about 48 KB less gzipped JS per page; screenshots in `C:\Users\colin\Documents\GitHub\marketbots-screenshots\phase9-charts\index.md`). 9.4 is owner-optional and not started. 9.5 held: crypto odds and App Store builder (see Phase 7). |
+| 2026-10-27 04:30 PT | 10.3, 10.4, the display half of 10.5 (deploy pending) | `@mb/wire/enrich`, inside the shared Wire and never on the trigger path:
+- **Selection:** news/macro cluster roots with severity ≥ 55, or notable items. Excluded: social, odds, halts, filings, video, Google News, paywalls and Benzinga.
+- **Queue:** 50 items, most severe first.
+- **GPU check before and after** each call (Ollama is shared by both engines).
+- **Pipeline:** `/extract` (12,000 chars, 60 s timeout), a 150-word floor and an English check, then llama3.2:3b with the stricter spike prompt, the article fenced as untrusted.
+- **Number check:** any number not found in the article rejects the whole summary.
+- **Storage:** `article` is stored on the wire item, never the text.
+- **Limits and health:** 60 per hour per engine, `pause_hours` in UTC, and health shown as `enrich:summaries` (appended after the catalog, so heartbeat source counts become catalog + 1).
+
+Settings: `wire.summaries` reaches existing documents through the load-time migration (defaults merged in, version +1, `engine:migration`).
+- Old dashboards were checked: their schema strips the unknown key, and their saves send only a patch, so the section survives.
+- Only the six settings snapshots changed, as intended.
+
+Display: dashboards show "Machine summary (Llama 3.2 3B, may contain errors)". Summaries are NOT in prompts or dossiers, and `PROMPT_VERSION` is unchanged; that waits for the owner (10.5). Tests 1034 → 1057. |

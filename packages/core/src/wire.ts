@@ -54,6 +54,34 @@ export type WireItemDoc<Category extends string> = {
   notable: boolean
   notable_reasons: NotableReason[]
   expires_at: Date
+  /** A machine summary of the article behind the item (@mb/wire/enrich), once one was tried. */
+  article?: WireArticle
+}
+
+/**
+ * ok: summarized, and every number in it occurs in the article. skipped: not an article we
+ * summarize (paywall, robots.txt, too short, not English). failed: the page or the model's answer
+ * was unusable. rejected: the summary named a number the article doesn't have, or ran too long.
+ */
+export type WireArticleStatus = "ok" | "skipped" | "failed" | "rejected"
+
+/**
+ * The outcome of summarizing an item's article with the local model (MARKETBOTS_PLAN §3.9). Only
+ * the summary is stored, never the article text. A machine summary can still put a number the
+ * article does contain on the wrong thing, so it is always shown as one, with the article's link.
+ */
+export type WireArticle = {
+  status: WireArticleStatus
+  reason?: string
+  summary?: string
+  key_points?: string[]
+  /** The whole article's length, as the scraper counted it. */
+  words?: number
+  /** The Ollama model tag that wrote it (or would have). */
+  model: string
+  /** Time spent on the item: extraction plus summary. */
+  ms: number
+  at: Date
 }
 
 export type WireTriggerAction = "review" | "evaluate" | "gap_fill" | "market_review" | "emergency" | "alert_only"

@@ -26,6 +26,8 @@ const settingsValidation = () => {
   const cases: Record<string, unknown> = {
     defaults: DEFAULT_SETTINGS,
     "wire.thresholds not ascending": { ...DEFAULT_SETTINGS, wire: { ...DEFAULT_SETTINGS.wire, thresholds: { annotate: 30, review: 80, evaluate: 70, critical: 85 } } },
+    "wire.summaries.pause_hours across midnight": { ...DEFAULT_SETTINGS, wire: { ...DEFAULT_SETTINGS.wire, summaries: { ...DEFAULT_SETTINGS.wire.summaries, pause_hours: ["22-6", "12-13"] } } },
+    "wire.summaries.pause_hours range starts where it ends": { ...DEFAULT_SETTINGS, wire: { ...DEFAULT_SETTINGS.wire, summaries: { ...DEFAULT_SETTINGS.wire.summaries, pause_hours: ["6-6"] } } },
     "kraken.min_stop_pct >= max_stop_pct": { ...DEFAULT_SETTINGS, kraken: { ...DEFAULT_SETTINGS.kraken, min_stop_pct: 12, max_stop_pct: 12 } },
     "kraken.max_position_pct > max_asset_exposure_pct": { ...DEFAULT_SETTINGS, kraken: { ...DEFAULT_SETTINGS.kraken, max_position_pct: 31 } },
     "duplicate universe symbols": { ...DEFAULT_SETTINGS, universe: { kraken_symbols: ["BTC/USD", "BTC/USD"] } },

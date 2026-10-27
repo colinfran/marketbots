@@ -65,6 +65,8 @@ export const envFields = ({ dbName, streamPort }: { dbName: string; streamPort: 
   BLS_API_KEY: optional,
   /** The headless scraper sidecar (Phase 7), e.g. http://scraper:8790 inside docker compose. Unset: headless sources stay off. */
   SCRAPER_URL: optional,
+  /** The local LLM for article summaries (MARKETBOTS_PLAN Phase 10), e.g. http://llm:11434 inside docker compose. Unset: no summaries. */
+  LLM_URL: optional,
 })
 
 /** The shared variables, parsed. */

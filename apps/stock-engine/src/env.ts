@@ -51,11 +51,12 @@ const envSchema = z.object({
   MASSIVE_API_KEY: optional,
   EIA_API_KEY: optional,
   SCRAPER_URL: base.SCRAPER_URL,
+  LLM_URL: base.LLM_URL,
 })
 
 export type Env = z.infer<typeof envSchema>
 
-const WIRE_KEYS = ["SEC_USER_AGENT", "FINNHUB_API_KEY", "FRED_API_KEY", "BLS_API_KEY", "OPENFDA_API_KEY", "MASSIVE_API_KEY", "EIA_API_KEY", "SCRAPER_URL"] as const
+const WIRE_KEYS = ["SEC_USER_AGENT", "FINNHUB_API_KEY", "FRED_API_KEY", "BLS_API_KEY", "OPENFDA_API_KEY", "MASSIVE_API_KEY", "EIA_API_KEY", "SCRAPER_URL", "LLM_URL"] as const
 
 /** The keys the news engine's sources may read. */
 export const wireEnv = (env: Env): Record<string, string | undefined> => Object.fromEntries(WIRE_KEYS.map((k) => [k, env[k] ?? undefined]))

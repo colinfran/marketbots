@@ -7,11 +7,14 @@ export type WireSettings = Settings["wire"]
 
 export type ItemEvent = ItemEventOf<WireCategory>
 
-export type WireDeps = Omit<WireDepsOf<WireCategory, WireSettings>, "categoryBase" | "request">
+export type WireDeps = Omit<WireDepsOf<WireCategory, WireSettings>, "categoryBase" | "request" | "enrich">
 
-/** The news engine (@mb/wire/wire) with stock's categories and their severity bases, fetching through stock's HTTP client. */
+/**
+ * The news engine (@mb/wire/wire) with stock's categories and their severity bases, fetching
+ * through stock's HTTP client, and asking the scraper for article text as its "stock" caller.
+ */
 export class Wire extends WireOf<WireCategory, WireSettings> {
   constructor(d: WireDeps) {
-    super({ ...d, categoryBase: CATEGORY_BASE, request: requestText })
+    super({ ...d, categoryBase: CATEGORY_BASE, request: requestText, enrich: { client: "stock" } })
   }
 }

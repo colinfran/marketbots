@@ -3,6 +3,7 @@ import type { NotableReason, WireItemDoc, WireSourceHealth, WireSourceState, Wir
 import { errorMessage, type Logger } from "@mb/engine-kit/log"
 import type { Collection, UpdateFilter } from "mongodb"
 import { ClusterIndex } from "./cluster"
+import { ENRICH_SOURCE_ID, Enricher, type EnricherTimeouts } from "./enrich/enricher"
 import { WireFetch, type RequestText } from "./fetch"
 import { buildSource } from "./kinds/index"
 import type { StatuspageCategory } from "./kinds/statuspage"
@@ -17,6 +18,7 @@ import type { Lexicon, RawItem, SourceContext, SourceSpec, SymbolSets, WireEvent
  *
  *   normalize → dedupe → tag symbols → classify → relevance filter → cluster (confirmations)
  *   → severity → notable flag → store (wire_items) → wire.item event → item handlers (the policy)
+ *   → article summary queue (enrich/, after the handlers: never on the trigger path)
  *
  * and reports per-source health for the heartbeat. It never throws into the engine: a broken
  * source, a bad payload or a database hiccup costs at most that batch of items, and trading goes
@@ -49,6 +51,11 @@ export type WireDeps<C extends string, W extends WireSettingsBase> = {
   request: RequestText
   now?: () => Date
   fetch?: WireFetch
+  /**
+   * Article summaries (enrich/enricher.ts). `client` is the name the scraper sidecar knows the
+   * engine by (`X-Client`), for its share of the render queue. Without it nothing is summarized.
+   */
+  enrich?: { client: string; timeouts?: Partial<EnricherTimeouts> }
 }
 
 const DAY_MS = 86_400_000
@@ -76,6 +83,7 @@ export class Wire<C extends string, W extends WireSettingsBase> {
   private readonly anomalies = new Map<string, { at: number; kind: "price" | "volume" }[]>()
   private readonly handlers: ((e: ItemEvent<C>) => void | Promise<void>)[] = []
   private readonly fetcher: WireFetch
+  private readonly enricher: Enricher | null
   private readonly now: () => Date
   private abort = new AbortController()
   private running = false
@@ -84,6 +92,19 @@ export class Wire<C extends string, W extends WireSettingsBase> {
     this.now = d.now ?? (() => new Date())
     this.fetcher = d.fetch ?? new WireFetch(new DomainLimiter(), d.userAgent, d.request)
     for (const spec of d.catalog) this.specs.set(spec.id, spec)
+    this.enricher = d.enrich
+      ? new Enricher({
+          store: (id, article) => d.col.wireItems.updateOne({ _id: id }, { $set: { article } }),
+          log: d.log,
+          settings: d.settings,
+          env: d.env,
+          client: d.enrich.client,
+          request: d.request,
+          now: this.now,
+          onState: (state, error) => this.onSourceState(ENRICH_SOURCE_ID, state, error),
+          timeouts: d.enrich.timeouts,
+        })
+      : null
   }
 
   /** Called for every stored item, and again when a later copy confirms one. */
@@ -105,6 +126,7 @@ export class Wire<C extends string, W extends WireSettingsBase> {
     if (this.running) return
     this.running = true
     this.abort = new AbortController()
+    this.enricher?.start()
     await this.rebuildMemory().catch((e) => this.d.log.warn("wire memory rebuild failed", { error: errorMessage(e) }))
     this.reconcile()
   }
@@ -114,6 +136,7 @@ export class Wire<C extends string, W extends WireSettingsBase> {
     this.abort.abort()
     for (const s of this.sources.values()) s.stop()
     this.sources.clear()
+    this.enricher?.stop()
   }
 
   /** Starts and stops sources to match the settings (mode, disabled sources). Safe to call any time. */
@@ -317,6 +340,7 @@ export class Wire<C extends string, W extends WireSettingsBase> {
         result.stored.push(doc)
         if (severity >= s.thresholds.annotate) this.emitItem(doc)
         await this.notify({ item: doc, backfill, confirmation: false })
+        this.enricher?.offer(doc)
       } catch (error) {
         this.d.log.warn("wire item failed", { source, error: errorMessage(error) })
       }
@@ -370,6 +394,8 @@ export class Wire<C extends string, W extends WireSettingsBase> {
     await this.d.col.wireItems.updateOne({ _id: rootId }, { $set: { severity, severity_parts: parts, notable: item.notable, notable_reasons: reasons } })
     if (item.notable && !updated.notable) this.emitNotable(item, reasons[0])
     await this.notify({ item, backfill, confirmation: true })
+    // A confirmation can lift a root over the summaries' minimum severity, or make it notable.
+    this.enricher?.offer(item)
   }
 
   private emitNotable(item: WireItemDoc<C>, reason: NotableReason) {
@@ -393,6 +419,7 @@ export class Wire<C extends string, W extends WireSettingsBase> {
         if (!res.modifiedCount) continue
         marked.push(id)
         this.emitNotable({ ...doc, notable: true, notable_reasons: reasons }, reason)
+        this.enricher?.offer({ ...doc, notable: true })
       } catch (error) {
         this.d.log.warn("marking a wire item notable failed", { id, error: errorMessage(error) })
       }
@@ -400,7 +427,7 @@ export class Wire<C extends string, W extends WireSettingsBase> {
     return marked
   }
 
-  /** Health for the heartbeat. `extra` comes from the policy and the engine's event queue. */
+  /** Health for the heartbeat: every catalog source, then the article summaries. `extra` comes from the policy and the engine's event queue. */
   health(extra: { triggers_today?: number; event_queue?: string[] } = {}): WireStatus {
     const now = this.now().getTime()
     const s = this.d.settings()
@@ -411,6 +438,7 @@ export class Wire<C extends string, W extends WireSettingsBase> {
       const base: WireSourceHealth = running?.health() ?? { id: spec.id, state: "disabled", last_item_at: null, last_ok_at: null, last_error: this.disabledReason(spec, s), items_24h: 0, dropped_24h: 0, lag_s: null }
       return { ...base, items_24h: c ? within(c.items, DAY_MS) : 0, dropped_24h: c ? within(c.dropped, DAY_MS) : 0, lag_s: c?.lastLagS ?? null }
     })
+    if (this.enricher) sources.push(this.enricher.health())
     const itemsLastHour = [...this.counters.values()].reduce((n, c) => n + within(c.items, 3_600_000), 0)
     return { mode: s.mode, sources, items_last_hour: itemsLastHour, triggers_today: extra.triggers_today ?? 0, event_queue: extra.event_queue ?? [] }
   }

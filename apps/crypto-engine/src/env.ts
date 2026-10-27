@@ -56,9 +56,10 @@ const envSchema = z.object({
   ETHERSCAN_API_KEY: optional,
   COINALYZE_API_KEY: optional,
   SCRAPER_URL: base.SCRAPER_URL,
+  LLM_URL: base.LLM_URL,
 })
 
-const WIRE_KEYS = ["SEC_USER_AGENT", "FINNHUB_API_KEY", "FRED_API_KEY", "BLS_API_KEY", "COINGECKO_API_KEY", "ETHERSCAN_API_KEY", "COINALYZE_API_KEY", "SCRAPER_URL"] as const
+const WIRE_KEYS = ["SEC_USER_AGENT", "FINNHUB_API_KEY", "FRED_API_KEY", "BLS_API_KEY", "COINGECKO_API_KEY", "ETHERSCAN_API_KEY", "COINALYZE_API_KEY", "SCRAPER_URL", "LLM_URL"] as const
 
 /** The keys the news engine's sources may read. */
 export const wireEnv = (env: Env): Record<string, string | undefined> => Object.fromEntries(WIRE_KEYS.map((k) => [k, env[k] ?? undefined]))
