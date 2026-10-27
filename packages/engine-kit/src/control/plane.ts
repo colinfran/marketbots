@@ -1,0 +1,150 @@
+import type { BaseCommand } from "@mb/core/commands"
+import type { EngineStateDoc, SeedRunDoc } from "@mb/core/db"
+import type { BaseEventDataMap } from "@mb/core/events"
+import type { Collection } from "mongodb"
+import type { AlertLevel, AlertOptions } from "../alerts"
+import type { EmitMeta } from "../bus"
+import * as seeds from "../state/seed-runs"
+
+/**
+ * The owner's controls, the same in both bots: pause and resume, the kill switch, settings
+ * changes, the one-time seed's lifecycle and news replays. It owns the engine's run status and
+ * emits `engine.status` whenever the owner (or the engine's own safety halt) changes it.
+ *
+ * The engine dispatches the shared commands to `handle` and runs its own (a cycle, closing a
+ * position…) itself. What differs between the bots is injected: how a liquidating kill switch
+ * closes positions, and the wording of a few results.
+ */
+
+/** The run statuses every bot has; a bot may add its own (crypto: "reconciling"). */
+export type BaseRunStatus = "starting" | "running" | "paused" | "halted" | "stopping"
+
+type ControlEvents<S extends string> = Pick<BaseEventDataMap<string, S, string>, "engine.status" | "seed.completed">
+
+/** The part of the event bus the control plane uses. */
+export type ControlEventSink<S extends string> = { emit<T extends keyof ControlEvents<S>>(type: T, data: ControlEvents<S>[T], meta: EmitMeta): unknown }
+
+/** The bot's own words in results and alerts. */
+export type ControlWording = {
+  /** The pause result: what keeps running while paused. */
+  paused: string
+  /** The kill switch's result when it doesn't liquidate. */
+  halted: string
+  /** A seed amount, e.g. "$2,000". */
+  usd: (amount: number) => string
+  /** Added to the seed.schedule result (stock: when in the day it runs). */
+  seedScheduled: string
+  /** What the owner should check after a restart interrupted a seed run, e.g. "check Holdings". */
+  seedInterrupted: string
+  /** The dashboard page a failed seed's alert links to. */
+  seedFailedPath: (cycleId: string | null) => string
+}
+
+export type ControlPlaneDeps<S extends string, Item extends { title: string; severity: number }> = {
+  col: { seedRuns: Collection<SeedRunDoc>; wireItems: { findOne(filter: { _id: string }): Promise<Item | null> } }
+  bus: ControlEventSink<S | BaseRunStatus>
+  state: { readonly state: EngineStateDoc; update(fields: Partial<Omit<EngineStateDoc, "_id">>, by: string, action: string, details?: Record<string, unknown>): Promise<void> }
+  settings: { readonly version: number; apply(patch: Record<string, unknown>, by: string, expectedVersion: number | null): Promise<{ ok: true; changes: number } | { ok: false; error: string }> }
+  alerts: { send(level: AlertLevel, title: string, message: string, opts?: AlertOptions): Promise<void> }
+  /** The news engine's trigger policy, for `wire.replay`. */
+  policy: { replay(item: Item): Promise<string> }
+  /** Closes every position for a liquidating kill switch; returns what it did, one note per position. */
+  liquidate: () => Promise<string[]>
+  wording: ControlWording
+}
+
+export class ControlPlane<S extends string, Item extends { title: string; severity: number }> {
+  status: S | BaseRunStatus = "starting"
+
+  constructor(private readonly d: ControlPlaneDeps<S, Item>) {}
+
+  /** Started up and controllable (the stream's /readyz). */
+  get ready() {
+    return this.status === "running" || this.status === "paused" || this.status === "halted"
+  }
+
+  /** Takes the run status from the stored engine state and announces it. */
+  emitStatus(reason?: string) {
+    const s = this.d.state.state
+    this.status = s.kill_switch.engaged ? "halted" : s.status
+    this.d.bus.emit("engine.status", { status: this.status, kill_switch: s.kill_switch.engaged, reason }, { summary: `Engine ${this.status}${reason ? `: ${reason}` : ""}` })
+  }
+
+  /** Halts new orders (the owner, or the engine's own drawdown halt), closing every position if asked. Returns the liquidation notes. */
+  async engageKillSwitch(reason: string, by: string, liquidate: boolean) {
+    await this.d.state.update({ status: "halted", kill_switch: { engaged: true, reason, at: new Date(), by, liquidate } }, by, "kill_switch.engage", { reason })
+    this.emitStatus(reason)
+    const notes = liquidate ? await this.d.liquidate() : []
+    await this.d.alerts.send("critical", "Kill switch engaged", `${reason}${notes.length ? `\nLiquidation: ${notes.join("; ")}` : ""}`)
+    return notes
+  }
+
+  /** Runs a command both bots share. Returns the result for the dashboard; throws to fail the command. */
+  async handle(command: BaseCommand, by: string): Promise<string> {
+    const { state, settings, col, wording } = this.d
+    switch (command.type) {
+      case "pause":
+        await state.update({ status: "paused", pause_reason: command.reason ?? null }, by, "pause")
+        this.emitStatus(command.reason ?? "paused from the dashboard")
+        return wording.paused
+      case "resume":
+        if (state.state.kill_switch.engaged) throw new Error("the kill switch is engaged; release it first")
+        await state.update({ status: "running", pause_reason: null }, by, "resume")
+        this.emitStatus("resumed from the dashboard")
+        return "running"
+      case "kill_switch.engage": {
+        const notes = await this.engageKillSwitch(command.reason, by, command.liquidate)
+        return command.liquidate ? `halted and liquidated: ${notes.join("; ") || "no positions"}` : wording.halted
+      }
+      case "kill_switch.release":
+        // Releasing never resumes trading by itself: the owner resumes explicitly.
+        await state.update({ status: "paused", kill_switch: { engaged: false, reason: null, at: null, by: null, liquidate: false } }, by, "kill_switch.release")
+        this.emitStatus("kill switch released; paused until resumed")
+        return "kill switch released; engine paused until you resume"
+      case "settings.update": {
+        const res = await settings.apply(command.patch, by, command.expected_version)
+        if (!res.ok) throw new Error(res.error)
+        return res.changes ? `${res.changes} setting${res.changes > 1 ? "s" : ""} updated (v${settings.version})` : "no changes"
+      }
+      case "seed.schedule": {
+        const run = await seeds.scheduleSeed(col, command, by)
+        return `one-time seed of ${wording.usd(run.amount_usd)} scheduled for ${run.at.toISOString()}${run.force ? " (forced)" : ""}${wording.seedScheduled}`
+      }
+      case "seed.cancel": {
+        const run = await seeds.cancelSeed(col)
+        return `seed scheduled for ${run.at.toISOString()} canceled`
+      }
+      case "wire.replay": {
+        const item = await col.wireItems.findOne({ _id: command.item_id })
+        if (!item) throw new Error("no wire item with that id")
+        return `${item.title.slice(0, 120)} (severity ${item.severity}): ${await this.d.policy.replay(item)}`
+      }
+    }
+  }
+
+  /** At startup: a seed run left `running` by the previous process is failed (never resumed) and alerted. */
+  async failInterruptedSeed() {
+    if (await seeds.failInterruptedSeeds(this.d.col)) {
+      await this.d.alerts.send("error", "Seed buy interrupted", `The engine restarted while the one-time seed was running. It is not retried; ${this.d.wording.seedInterrupted}, then schedule it again from Admin if needed.`, { path: "/admin" })
+    }
+  }
+
+  /** Scheduled seeds that can no longer start by the bot's `deadline` are failed and alerted, never run late. */
+  async failMissedSeeds(deadline: (run: SeedRunDoc) => Date, now?: Date) {
+    for (const run of await seeds.failMissedSeeds(this.d.col, deadline, now)) {
+      await this.d.alerts.send("error", "Seed buy missed", `${run.error}. Nothing was bought; schedule it again from Admin if you still want it.`, { path: "/admin" })
+      this.d.bus.emit("seed.completed", { seed_id: run._id, cycle_id: null, status: "failed", allocations: [], executed: 0, error: run.error }, { summary: "One-time seed missed", level: "warn" })
+    }
+  }
+
+  /** A seed run that bought nothing: recorded as failed, announced and alerted. A run is a single attempt; it is never retried. */
+  async failSeed(run: SeedRunDoc, error: string, cycleId: string | null, result: SeedRunDoc["result"] = null) {
+    await seeds.finishSeed(this.d.col, run._id, { status: "failed", cycle_id: cycleId, result, error })
+    this.d.bus.emit(
+      "seed.completed",
+      { seed_id: run._id, cycle_id: cycleId, status: "failed", allocations: result?.allocations.map(({ thesis: _t, ...a }) => a) ?? [], executed: 0, error },
+      { summary: `One-time seed failed: ${error}`, level: "warn" },
+    )
+    await this.d.alerts.send("error", "Seed buy failed", `${error}. It is not retried; schedule it again from Admin if you still want it.`, { path: this.d.wording.seedFailedPath(cycleId) })
+  }
+}

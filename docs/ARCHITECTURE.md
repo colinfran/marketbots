@@ -93,7 +93,7 @@ Until those move into shared packages, a change to one copy is made to the other
 | Package | Phase | Holds | Used by |
 | --- | --- | --- | --- |
 | `@mb/core` | 5 ✓ | Pure shared schemas and helpers, no I/O: `math`, `stream-token` (prefix as a parameter), settings base pieces and helpers, the shared command schemas, the event envelope and the events both bots define identically, base collections, indexes and document types, wire types, `metrics`, `indicators`, generic `time` | every app and package |
-| `@mb/engine-kit` | 6 ✓ (6.5 in progress) | Engine runtime, generic over each bot's settings, events and commands: log, lease, heartbeat, bus, stream server, command processor, Mongo connect, state stores, alerts, AI budget/repair/runner/prompt parts, `ControlPlane`, `StatusReporter`, `EventCycleQueue`, bootstrap, env base, test helpers | both engines |
+| `@mb/engine-kit` | 6 ✓ | Engine runtime, generic over each bot's settings, events and commands: log, lease, heartbeat, bus, stream server, command processor, Mongo connect, state stores, alerts, AI budget/repair/runner/prompt parts, `ControlPlane`, `StatusReporter`, `EventCycleQueue`, bootstrap, env base, test helpers | both engines |
 | `@mb/wire` | 7 | The news engine: the mirrored files, shared source helpers, `sharedCatalog()`, a `makeLexicon()` skeleton, and (Phase 10) `enrich/` for article summaries | both engines |
 | `@mb/ui` | 8 | Client-safe React: the shadcn primitives, design tokens (`styles.css`), app-shell components, the live-UI shell driven by a per-bot event catalog, shared page sections | both dashboards |
 | `@mb/web-kit` | 8 | Server-only dashboard helpers: auth factory, database, command routes, shared queries, formatting, metadata, error reporting | both dashboards |

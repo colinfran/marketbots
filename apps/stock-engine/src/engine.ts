@@ -1,7 +1,9 @@
 import type { AiRunner } from "@mb/engine-kit/ai/runner"
-import { ResourceSampler } from "@mb/engine-kit/heartbeat"
+import { EventCycleQueue, type QueuedEvent } from "@mb/engine-kit/control/event-queue"
+import { ControlPlane, type ControlWording } from "@mb/engine-kit/control/plane"
+import { StatusReporter } from "@mb/engine-kit/control/status"
 import { errorMessage, type Logger } from "@mb/engine-kit/log"
-import { cancelSeed, claimDueSeed, failInterruptedSeeds, failMissedSeeds, finishSeed, scheduleSeed } from "@mb/engine-kit/state/seed-runs"
+import { claimDueSeed, finishSeed } from "@mb/engine-kit/state/seed-runs"
 import { every, withTimeout } from "@mb/engine-kit/util/async"
 import type { TradeUpdate } from "@mb/stock-core/alpaca"
 import type { Command } from "@mb/stock-core/commands"
@@ -9,8 +11,8 @@ import type { CommandDoc, CycleKind, EngineStatusDoc, HistoryRangeKey, MarketSes
 import type { CycleState, EngineRunStatus } from "@mb/stock-core/events"
 import { roundTo } from "@mb/stock-core/math"
 import { STRATEGY_LABEL } from "@mb/stock-core/options"
-import type { Phase, SettingsPatch } from "@mb/stock-core/settings"
-import type { EventFocus } from "@mb/stock-core/wire"
+import type { Phase } from "@mb/stock-core/settings"
+import type { EventFocus, WireItemDoc } from "@mb/stock-core/wire"
 import { marketDay, minutesBetween } from "@mb/stock-core/time"
 import type { AiBudget } from "./ai/budget"
 import type { Alerts } from "./alerts"
@@ -57,6 +59,16 @@ export const seedDeadline = (session: Session, closeWindowMinutes: number) => (r
 
 const usdText = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
 
+/** Stock's words in the shared control results and seed alerts (@mb/engine-kit/control/plane). */
+const WORDING: ControlWording = {
+  paused: "paused: no new cycles or entries; stops, targets and options exits stay active",
+  halted: "halted: no new orders; stops, targets and options exits stay active",
+  usd: usdText,
+  seedScheduled: "; it runs in the regular session, after the opening buffer",
+  seedInterrupted: "check the positions in Alpaca",
+  seedFailedPath: () => "/admin",
+}
+
 export type EngineDeps = {
   env: Env
   log: Logger
@@ -95,19 +107,23 @@ const EVENT_QUEUE_MAX_MS = 30 * MIN
  * Fills arrive instantly over Alpaca's trade_updates stream. Stocks keep their stops at the broker
  * (bracket/OCO orders), so they stay protected even if the engine is down; options exits need the
  * engine, and the most an options position can lose is what was paid.
+ *
+ * The parts both bots share come from @mb/engine-kit/control: the owner's controls and the run
+ * status (`control`), the heartbeat (`reporter`) and the news engine's event-cycle queue
+ * (`eventQueue`: triggers expire after 30 minutes and run only inside the event window).
  */
 export class Engine {
-  status: EngineRunStatus = "starting"
   cycleState: CycleState = "idle"
   currentTask: string | null = null
   currentPhase: Phase | null = null
   readonly ctx: EngineContext
+  readonly control: ControlPlane<EngineRunStatus, WireItemDoc>
+  readonly policy: WirePolicy
 
-  private readonly startedAt = new Date()
   private readonly abort = new AbortController()
-  private readonly sampler = new ResourceSampler()
   private stops: (() => void)[] = []
   private commands: CommandProcessor
+  private readonly reporter: StatusReporter<EngineStatusDoc>
   private cycle: Promise<unknown> | null = null
   private lastCycleAt = 0
   private lastCycle: EngineStatusDoc["last_cycle"] = null
@@ -135,11 +151,7 @@ export class Engine {
   private lastSummaryAt = 0
   private accountRefresh: NodeJS.Timeout | null = null
   /** News-engine event cycles waiting to run, merged by symbol ("MARKET" for market-wide), highest severity kept. */
-  private readonly eventQueue = new Map<string, EventFocus & { queued_at: number }>()
-  private lastEventCycleAt = 0
-  private eventTimer: NodeJS.Timeout | null = null
-  private triggersToday = 0
-  readonly policy: WirePolicy
+  private readonly eventQueue: EventCycleQueue
 
   constructor(private readonly d: EngineDeps) {
     this.ctx = {
@@ -161,6 +173,18 @@ export class Engine {
       wire: d.wire,
     }
     this.commands = new CommandProcessor(d.db.col, d.bus, d.log.child({ component: "commands" }), (c, doc) => this.handleCommand(c, doc))
+    this.eventQueue = new EventCycleQueue({
+      col: d.db.col,
+      log: d.log,
+      state: d.state,
+      settings: d.settings,
+      busy: () => !!this.cycle,
+      // The gate only opens inside a session, so there is one.
+      start: (events, trigger) => this.startCycle("intraday", this.session!, trigger, { kind: "event", events, requested: events.map((e) => e.symbol).filter((s): s is string => !!s) }),
+      expireAfterMs: EVENT_QUEUE_MAX_MS,
+      // Off-hours, the queue simply waits (and expires): the next phase's dossier carries the items anyway.
+      gate: () => this.eventWindow().open,
+    })
     this.policy = new WirePolicy({
       col: d.db.col,
       bus: d.bus,
@@ -177,11 +201,67 @@ export class Engine {
       emergency: (symbol) => this.emergencyAction(symbol),
       alert: (title, message) => d.alerts.send("warning", title, message, { path: "/research?tab=ours" }),
     })
+    this.control = new ControlPlane<EngineRunStatus, WireItemDoc>({
+      col: d.db.col,
+      bus: d.bus,
+      state: d.state,
+      settings: d.settings,
+      alerts: d.alerts,
+      policy: this.policy,
+      liquidate: async () => [...(await liquidateOptions(this.ctx, "kill_switch")), ...(await flattenStocks(this.ctx, " (kill switch)"))],
+      wording: WORDING,
+    })
+    this.reporter = new StatusReporter<EngineStatusDoc>({
+      col: d.db.col,
+      bus: d.bus,
+      budget: d.budget,
+      settings: d.settings,
+      ai: d.ai,
+      state: d.state,
+      stream: d.stream,
+      wire: d.wire,
+      policy: this.policy,
+      instance: d.env.ENGINE_INSTANCE,
+      version: ENGINE_VERSION,
+      run: () => ({ status: this.status, cycle_state: this.cycleState, current_task: this.currentTask }),
+      eventQueue: () => this.eventQueue.keys(),
+      doc: (p) => {
+        const { tradeStream, marketStream, prices } = this.d
+        const now = Date.now()
+        return {
+          ...p.run,
+          current_phase: this.currentPhase,
+          ...p.live,
+          broker: {
+            rest: this.rest.state,
+            last_ok_at: this.rest.last_ok_at,
+            last_error: this.rest.last_error,
+            options_level: this.optionsLevel,
+            trade_stream: tradeStream.health,
+            data_stream: { ...marketStream.health, symbols: marketStream.symbols },
+          },
+          market: this.marketInfo(),
+          schedule: this.plan,
+          quotes: prices
+            .all()
+            .map((q) => ({ symbol: q.symbol, price: q.price, change_pct: q.change_pct, age_s: Math.round((now - q.at) / 1000) }))
+            .sort((a, b) => a.symbol.localeCompare(b.symbol)),
+          ...p.usage,
+          last_cycle: this.lastCycle,
+          ...p.health,
+        }
+      },
+    })
     d.wire.onItem((e) => this.policy.onItem(e))
   }
 
+  /** The run status (owned by the control plane). */
+  get status() {
+    return this.control.status
+  }
+
   get ready() {
-    return this.status === "running" || this.status === "paused" || this.status === "halted"
+    return this.control.ready
   }
 
   /** Symbol sets the news engine tags and ranks items against. Held includes option underlyings. */
@@ -232,12 +312,6 @@ export class Engine {
       .catch((error) => this.d.log.warn("trade update failed", { error: errorMessage(error) }))
   }
 
-  private emitStatus(reason?: string) {
-    const s = this.d.state.state
-    this.status = s.kill_switch.engaged ? "halted" : s.status
-    this.d.bus.emit("engine.status", { status: this.status, kill_switch: s.kill_switch.engaged, reason }, { summary: `Engine ${this.status}${reason ? `: ${reason}` : ""}` })
-  }
-
   /** Why new entries are blocked right now, or null. Checked again just before every order. */
   private entriesBlocked = () => {
     const s = this.d.state.state
@@ -252,22 +326,20 @@ export class Engine {
     // A cycle left "running" belonged to a previous process that stopped mid-way.
     const stale = await db.col.cycles.updateMany({ status: "running" }, { $set: { status: "timed_out", finished_at: new Date(), error: "the engine restarted during this cycle" } })
     if (stale.modifiedCount) log.warn("marked interrupted cycles as timed out", { count: stale.modifiedCount })
-    if (await failInterruptedSeeds(db.col)) {
-      await alerts.send("error", "Seed buy interrupted", "The engine restarted while the one-time seed was running. It is not retried; check the positions in Alpaca, then schedule it again from Admin if needed.", { path: "/admin" })
-    }
+    await this.control.failInterruptedSeed()
 
     await this.refreshSession().catch((e) => log.warn("market calendar unavailable", { error: errorMessage(e) }))
     await syncOrders(db.col, this.d.alpaca).catch((e) => log.warn("initial order sync failed", { error: errorMessage(e) }))
     await this.refreshAccount().catch((e) => log.warn("initial account refresh failed", { error: errorMessage(e) }))
     void this.refreshSiteData(true).catch((e) => log.warn("initial site data refresh failed", { error: errorMessage(e) }))
-    this.emitStatus("startup complete")
+    this.control.emitStatus("startup complete")
     if (!this.d.ai.available) await alerts.send("warning", "AI disabled", "AI_GATEWAY_API_KEY is not set: the engine will monitor and protect positions but make no new decisions.")
     if (this.optionsLevel !== null && this.optionsLevel < 3 && this.d.settings.current.options.allow_spreads) {
       await alerts.send("warning", "Options spreads need level 3", `The Alpaca account's options level is ${this.optionsLevel}; debit spreads will be rejected. Raise it in the Alpaca dashboard or turn spreads off in Admin → Settings.`)
     }
 
     const onError = (job: string) => (error: unknown) => log.warn(`${job} failed`, { error: errorMessage(error) })
-    this.stops.push(every(5_000, () => this.writeHeartbeat(), onError("heartbeat"), { immediate: true }))
+    this.stops.push(every(5_000, () => this.reporter.write(), onError("heartbeat"), { immediate: true }))
     this.stops.push(every(15_000, () => this.refreshAccount(), onError("account refresh")))
     this.stops.push(every(30_000, () => this.schedule(), onError("scheduler"), { immediate: true }))
     this.stops.push(every(15_000, () => this.periodicMaintenance(), onError("maintenance")))
@@ -379,10 +451,7 @@ export class Engine {
     const settings = this.d.settings.current
     this.plan = await planPhase(this.d.db.col, settings, session, now)
     if (this.cycle) return
-    for (const run of await failMissedSeeds(this.d.db.col, seedDeadline(session, settings.schedule.close_window_minutes), now)) {
-      await this.d.alerts.send("error", "Seed buy missed", `${run.error}. Nothing was bought; schedule it again from Admin if you still want it.`, { path: "/admin" })
-      this.d.bus.emit("seed.completed", { seed_id: run._id, cycle_id: null, status: "failed", allocations: [], executed: 0, error: run.error }, { summary: "One-time seed missed", level: "warn" })
-    }
+    await this.control.failMissedSeeds(seedDeadline(session, settings.schedule.close_window_minutes), now)
     const st = this.d.state.state
     if (st.status !== "running" || st.kill_switch.engaged) return
     // The one-time seed runs only in the regular session, after the opening buffer and before the closing window.
@@ -392,7 +461,7 @@ export class Engine {
       if (seed) return this.startCycle("intraday", session, "seed", { kind: "seed", seed })
     }
     // News events go before scheduled intraday cycles (the planner's other phases still come first).
-    if ((!this.plan.phase || this.plan.phase === "intraday") && this.drainEvents()) return
+    if ((!this.plan.phase || this.plan.phase === "intraday") && this.eventQueue.drain()) return
     if (this.plan.phase) return this.startCycle(this.plan.phase, session, "schedule", { kind: "scheduled" })
 
     // Between scheduled intraday cycles, a held stock or option underlying moving sharply triggers an early one.
@@ -424,7 +493,7 @@ export class Engine {
     phase: Phase,
     session: Session,
     trigger: string,
-    { kind, requested = [], seed, events = [] }: { kind: CycleKind; requested?: string[]; seed?: SeedRunDoc; events?: (EventFocus & { queued_at: number })[] },
+    { kind, requested = [], seed, events = [] }: { kind: CycleKind; requested?: string[]; seed?: SeedRunDoc; events?: QueuedEvent[] },
   ) {
     const startedAt = Date.now()
     this.lastCycleAt = startedAt
@@ -452,22 +521,19 @@ export class Engine {
       .then(async (r) => {
         this.lastCycle = { id: r.cycleId, phase: r.phase, at: new Date(), status: r.status, headline: r.headline }
         if (seed) await this.recordSeed(seed, r)
-        // Event-cycle latency: how long each trigger waited, and which cycle served it.
-        for (const e of events) {
-          await this.d.db.col.wireTriggers.updateOne({ _id: e.trigger_id }, { $set: { cycle_id: r.cycleId, queue_wait_ms: startedAt - e.queued_at } }).catch(() => undefined)
-        }
+        await this.eventQueue.served(events, r.cycleId, startedAt)
       })
       .catch(async (error) => {
         this.d.log.error("cycle crashed", { error: errorMessage(error) })
         await this.d.alerts.send("error", "Cycle crashed", errorMessage(error))
-        if (seed) await this.failSeed(seed, `crashed: ${errorMessage(error)}`, null).catch(() => undefined)
+        if (seed) await this.control.failSeed(seed, `crashed: ${errorMessage(error)}`, null).catch(() => undefined)
       })
       .finally(() => {
         this.cycle = null
         this.currentPhase = null
         this.ctx.setCycleState("idle")
         // Triggers that arrived meanwhile run now.
-        this.drainEvents()
+        this.eventQueue.drain()
       })
   }
 
@@ -486,52 +552,12 @@ export class Engine {
    * by symbol (highest severity kept), and runs the moment the current cycle ends.
    */
   requestEventCycle(focus: EventFocus): "fired" | "queued" {
-    const key = focus.symbol ?? "MARKET"
-    const prev = this.eventQueue.get(key)
-    if (!prev || focus.severity >= prev.severity) {
-      this.eventQueue.set(key, { ...focus, item_ids: [...new Set([...(prev?.item_ids ?? []), ...focus.item_ids])], queued_at: prev?.queued_at ?? Date.now() })
-    } else {
-      prev.item_ids = [...new Set([...prev.item_ids, ...focus.item_ids])]
-    }
-    return this.drainEvents() ? "fired" : "queued"
+    return this.eventQueue.request(focus)
   }
 
-  /** Starts the queued event cycle if it can run now. Returns whether one started. */
-  private drainEvents(): boolean {
-    this.expireEvents()
-    if (this.cycle || !this.eventQueue.size || !this.session) return false
-    const st = this.d.state.state
-    if (st.status !== "running" || st.kill_switch.engaged) return false
-    // Off-hours, the queue simply waits (and expires): the next phase's dossier carries the items anyway.
-    if (!this.eventWindow().open) return false
-    const wait = this.lastEventCycleAt + this.d.settings.current.wire.event_min_gap_seconds * 1000 - Date.now()
-    if (wait > 0) {
-      if (!this.eventTimer) {
-        this.eventTimer = setTimeout(() => {
-          this.eventTimer = null
-          this.drainEvents()
-        }, wait)
-        this.eventTimer.unref()
-      }
-      return false
-    }
-    const events = [...this.eventQueue.values()]
-    this.eventQueue.clear()
-    this.lastEventCycleAt = Date.now()
-    const label = events.map((e) => `${e.rule.replace(/_/g, " ")} ${e.symbol ?? "market"}`).join(", ")
-    this.startCycle("intraday", this.session, `event: ${label}`, { kind: "event", events, requested: events.map((e) => e.symbol).filter((s): s is string => !!s) })
-    return true
-  }
-
-  /** Drops triggers that waited too long (say, queued just before the bell): stale news never starts a cycle. */
+  /** Drops triggers that waited too long (the queue does this on every drain; tests call it with a later clock). */
   private expireEvents(now = Date.now()) {
-    for (const [key, e] of this.eventQueue) {
-      if (now - e.queued_at <= EVENT_QUEUE_MAX_MS) continue
-      this.eventQueue.delete(key)
-      const reason = `expired: waited ${Math.round((now - e.queued_at) / MIN)} min in the queue`
-      void this.d.db.col.wireTriggers.updateOne({ _id: e.trigger_id }, { $set: { status: "suppressed", reason } }).catch(() => undefined)
-      this.d.log.info("event trigger expired", { symbol: e.symbol, rule: e.rule, reason })
-    }
+    this.eventQueue.expire(now)
   }
 
   /** The owner's emergency action for a held stock hit by critical, confirmed bad news: sell it at market. */
@@ -558,7 +584,7 @@ export class Engine {
     if (r.status !== "succeeded" || seed.executed === 0) {
       const reasons = seed.orders.map((o) => `${o.symbol}: ${o.reason ?? o.status}`)
       const why = r.status === "succeeded" ? `no buy went through (${reasons.join("; ") || "nothing allocated"})` : `the seed cycle ${r.status}${seed.notes.length ? `: ${seed.notes.at(-1)}` : ""}`
-      return this.failSeed(run, why, r.cycleId, result)
+      return this.control.failSeed(run, why, r.cycleId, result)
     }
     await finishSeed(this.d.db.col, run._id, { status: "done", cycle_id: r.cycleId, result, error: null })
     this.d.bus.emit(
@@ -568,12 +594,6 @@ export class Engine {
     )
     const fields = Object.fromEntries(seed.orders.map((o) => [o.symbol, `${o.status}${o.qty ? ` · ${o.qty} shares` : ""}${o.notional_usd ? ` · ${usdText(o.notional_usd)}` : ""}${o.status === "executed" || !o.reason ? "" : ` (${o.reason})`}`]))
     await this.d.alerts.success("One-time seed done", (seed.rationale ?? "").slice(0, 1_500), { path: "/admin", key: `seed|${run._id}`, fields: { Amount: usdText(run.amount_usd), ...fields } })
-  }
-
-  private async failSeed(run: SeedRunDoc, error: string, cycleId: string | null, result: SeedRunDoc["result"] = null) {
-    await finishSeed(this.d.db.col, run._id, { status: "failed", cycle_id: cycleId, result, error })
-    this.d.bus.emit("seed.completed", { seed_id: run._id, cycle_id: cycleId, status: "failed", allocations: result?.allocations.map(({ thesis: _t, ...a }) => a) ?? [], executed: 0, error }, { summary: `One-time seed failed: ${error}`, level: "warn" })
-    await this.d.alerts.send("error", "Seed buy failed", `${error}. It is not retried; schedule it again from Admin if you still want it.`, { path: "/admin" })
   }
 
   // ─── Maintenance, options, site data ─────────────────────────────────────
@@ -632,104 +652,13 @@ export class Engine {
     }
   }
 
-  // ─── Heartbeat ───────────────────────────────────────────────────────────
-
-  private async writeHeartbeat() {
-    const { db, bus, budget, settings, env, stream, tradeStream, marketStream, prices } = this.d
-    const status = await budget.status().catch(() => null)
-    const lastAi = await db.col.aiCalls.findOne({}, { sort: { at: -1 } }).catch(() => null)
-    const errors = await db.col.events.countDocuments({ level: "error", ts: { $gte: new Date(Date.now() - 3_600_000).toISOString() } }).catch(() => 0)
-    this.triggersToday = await this.policy.triggersToday().catch(() => this.triggersToday)
-    const s = settings.current
-    const now = Date.now()
-    const doc: EngineStatusDoc = {
-      _id: "engine",
-      at: new Date(),
-      instance: env.ENGINE_INSTANCE,
-      version: ENGINE_VERSION,
-      started_at: this.startedAt,
-      status: this.status,
-      cycle_state: this.cycleState,
-      current_task: this.currentTask,
-      current_phase: this.currentPhase,
-      kill_switch: this.d.state.state.kill_switch.engaged,
-      ws_clients: stream.clientCount,
-      event_seq: bus.lastSeq,
-      broker: {
-        rest: this.rest.state,
-        last_ok_at: this.rest.last_ok_at,
-        last_error: this.rest.last_error,
-        options_level: this.optionsLevel,
-        trade_stream: tradeStream.health,
-        data_stream: { ...marketStream.health, symbols: marketStream.symbols },
-      },
-      market: this.marketInfo(),
-      schedule: this.plan,
-      quotes: prices
-        .all()
-        .map((p) => ({ symbol: p.symbol, price: p.price, change_pct: p.change_pct, age_s: Math.round((now - p.at) / 1000) }))
-        .sort((a, b) => a.symbol.localeCompare(b.symbol)),
-      ai: {
-        models: s.ai.models,
-        spend_today_usd: roundTo(status?.spent_usd ?? 0, 4),
-        budget_usd: s.ai.daily_budget_usd,
-        calls_today: status?.calls ?? 0,
-        last_call_at: lastAi?.at ?? null,
-        last_error: lastAi && !lastAi.ok ? lastAi.error : null,
-        enabled: this.d.ai.available,
-      },
-      system: this.sampler.sample(),
-      last_cycle: this.lastCycle,
-      errors_last_hour: errors,
-      wire: this.d.wire.health({ triggers_today: this.triggersToday, event_queue: [...this.eventQueue.keys()] }),
-    }
-    await db.col.engineStatus.replaceOne({ _id: "engine" }, doc, { upsert: true })
-    if (Math.floor(Date.now() / 5_000) % 3 === 0) {
-      bus.emit(
-        "engine.heartbeat",
-        { status: this.status, cycle_state: this.cycleState, ws_clients: stream.clientCount, uptime_s: doc.system.uptime_s, ai_spend_today_usd: doc.ai.spend_today_usd, ai_budget_usd: doc.ai.budget_usd },
-        { summary: `Engine ${this.status}, ${this.cycleState}`, level: "debug" },
-      )
-    }
-  }
-
   // ─── Commands ────────────────────────────────────────────────────────────
 
-  private async engageKillSwitch(reason: string, by: string, liquidate: boolean) {
-    await this.d.state.update({ status: "halted", kill_switch: { engaged: true, reason, at: new Date(), by, liquidate } }, by, "kill_switch.engage", { reason })
-    this.emitStatus(reason)
-    const notes = liquidate ? [...(await liquidateOptions(this.ctx, "kill_switch")), ...(await flattenStocks(this.ctx, " (kill switch)"))] : []
-    await this.d.alerts.send("critical", "Kill switch engaged", `${reason}${notes.length ? `\nLiquidation: ${notes.join("; ")}` : ""}`)
-    return notes
-  }
-
+  /** Stock's own commands; the shared ones (pause, kill switch, settings, seed, replay) go to the control plane. */
   private async handleCommand(command: Command, doc: CommandDoc): Promise<string> {
-    const { state, settings, alpaca, db } = this.d
+    const { state, alpaca, db } = this.d
     const by = doc.created_by
     switch (command.type) {
-      case "pause":
-        await state.update({ status: "paused", pause_reason: command.reason ?? null }, by, "pause")
-        this.emitStatus(command.reason ?? "paused from the dashboard")
-        return "paused: no new cycles or entries; stops, targets and options exits stay active"
-      case "resume":
-        if (state.state.kill_switch.engaged) throw new Error("the kill switch is engaged; release it first")
-        await state.update({ status: "running", pause_reason: null }, by, "resume")
-        this.emitStatus("resumed from the dashboard")
-        return "running"
-      case "kill_switch.engage": {
-        const notes = await this.engageKillSwitch(command.reason, by, command.liquidate)
-        return command.liquidate ? `halted and liquidated: ${notes.join("; ") || "no positions"}` : "halted: no new orders; stops, targets and options exits stay active"
-      }
-      case "kill_switch.release":
-        // Releasing never resumes trading by itself: the owner resumes explicitly.
-        await state.update({ status: "paused", kill_switch: { engaged: false, reason: null, at: null, by: null, liquidate: false } }, by, "kill_switch.release")
-        this.emitStatus("kill switch released; paused until resumed")
-        return "kill switch released; engine paused until you resume"
-      case "settings.update": {
-        const res = await settings.apply(command.patch as SettingsPatch, by, command.expected_version)
-        if (!res.ok) throw new Error(res.error)
-        return res.changes ? `${res.changes} setting${res.changes > 1 ? "s" : ""} updated (v${settings.version})` : "no changes"
-      }
       case "cycle.run_now": {
         if (this.cycle) throw new Error("a cycle is already running")
         if (state.state.status !== "running" || state.state.kill_switch.engaged) throw new Error(`engine is ${this.status}`)
@@ -769,26 +698,15 @@ export class Engine {
         await this.refreshSiteData(true).catch((e) => notes.push(`website data refresh failed: ${errorMessage(e)}`))
         return `synced: ${fills} fills on record, ${snapshot.positions.length} positions${notes.length ? `; ${notes.join("; ")}` : ""}`
       }
-      case "seed.schedule": {
-        const run = await scheduleSeed(db.col, command, by)
-        return `one-time seed of ${usdText(run.amount_usd)} scheduled for ${run.at.toISOString()}${run.force ? " (forced)" : ""}; it runs in the regular session, after the opening buffer`
-      }
-      case "wire.replay": {
-        const item = await db.col.wireItems.findOne({ _id: command.item_id })
-        if (!item) throw new Error("no wire item with that id")
-        return `${item.title.slice(0, 120)} (severity ${item.severity}): ${await this.policy.replay(item)}`
-      }
-      case "seed.cancel": {
-        const run = await cancelSeed(db.col)
-        return `seed scheduled for ${run.at.toISOString()} canceled`
-      }
+      default:
+        return this.control.handle(command, by)
     }
   }
 
   async shutdown(reason: string) {
     const { bus, log } = this.d
-    if (this.status === "stopping") return
-    this.status = "stopping"
+    if (this.control.status === "stopping") return
+    this.control.status = "stopping"
     log.info("engine shutting down", { reason })
     bus.emit("engine.stopping", { reason }, { summary: `Engine stopping (${reason})`, level: "warn" })
     this.commands.shutdown()
@@ -796,11 +714,11 @@ export class Engine {
     this.d.tradeStream.stop()
     this.d.marketStream.stop()
     this.d.wire.stop()
-    if (this.eventTimer) clearTimeout(this.eventTimer)
+    this.eventQueue.stop()
     if (this.accountRefresh) clearTimeout(this.accountRefresh)
     // Abort in-flight AI calls; an order already sent to the broker still completes.
     this.abort.abort()
     if (this.cycle) await withTimeout(this.cycle, 20_000, "cycle shutdown").catch(() => undefined)
-    await this.writeHeartbeat().catch(() => undefined)
+    await this.reporter.write().catch(() => undefined)
   }
 }

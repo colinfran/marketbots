@@ -159,4 +159,57 @@ describe("Engine", () => {
   it("re-syncs with Alpaca on request", async () => {
     expect(await command({ type: "broker.sync" })).toMatchObject({ status: "done", result: "synced: 0 fills on record, 1 positions; website data refresh failed: history unavailable" })
   })
+
+  it("keeps the field order of its status document", async () => {
+    await until(async () => (await db.col.engineStatus.findOne({ _id: "engine" })) !== null)
+    expect(Object.keys((await db.col.engineStatus.findOne({ _id: "engine" }))!)).toEqual([
+      "_id",
+      "at",
+      "instance",
+      "version",
+      "started_at",
+      "status",
+      "cycle_state",
+      "current_task",
+      "current_phase",
+      "kill_switch",
+      "ws_clients",
+      "event_seq",
+      "broker",
+      "market",
+      "schedule",
+      "quotes",
+      "ai",
+      "system",
+      "last_cycle",
+      "errors_last_hour",
+      "wire",
+    ])
+  })
+
+  it("words its control results for stocks and options", async () => {
+    expect(await command({ type: "pause" })).toMatchObject({ status: "done", result: "paused: no new cycles or entries; stops, targets and options exits stay active" })
+    expect(await command({ type: "kill_switch.engage", reason: "test", liquidate: false })).toMatchObject({ status: "done", result: "halted: no new orders; stops, targets and options exits stay active" })
+    expect(await command({ type: "kill_switch.release", confirm: "RELEASE" })).toMatchObject({ status: "done", result: "kill switch released; engine paused until you resume" })
+    expect(events.filter((e) => e.type === "engine.status").map((e) => e.summary)).toEqual([
+      "Engine running: startup complete",
+      "Engine paused: paused from the dashboard",
+      "Engine halted: test",
+      "Engine paused: kill switch released; paused until resumed",
+    ])
+    expect(await db.col.audit.find({ action: { $in: ["pause", "kill_switch.engage", "kill_switch.release"] } }).sort({ at: 1 }).toArray()).toMatchObject([
+      { actor: "owner", action: "pause", target: "engine", details: { status: "paused", pause_reason: null } },
+      { actor: "owner", action: "kill_switch.engage", target: "engine", details: { reason: "test", status: "halted" } },
+      { actor: "owner", action: "kill_switch.release", target: "engine", details: { status: "paused" } },
+    ])
+  })
+
+  it("schedules and cancels the one-time seed, and replays news items only if they exist", async () => {
+    const at = new Date(Date.now() + 3_600_000).toISOString()
+    expect(await command({ type: "seed.schedule", amount_usd: 1_234.5678, at })).toMatchObject({ status: "done", result: `one-time seed of $1,234.57 scheduled for ${at}; it runs in the regular session, after the opening buffer` })
+    expect(await command({ type: "seed.schedule", amount_usd: 500, at })).toMatchObject({ status: "failed", error: expect.stringContaining("already scheduled") })
+    expect(await command({ type: "seed.cancel" })).toMatchObject({ status: "done", result: `seed scheduled for ${at} canceled` })
+    expect(await command({ type: "seed.cancel" })).toMatchObject({ status: "failed", error: "no scheduled seed to cancel" })
+    expect(await command({ type: "wire.replay", item_id: "missing-item" })).toMatchObject({ status: "failed", error: "no wire item with that id" })
+  })
 })
