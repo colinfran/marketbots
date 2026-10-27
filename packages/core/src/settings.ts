@@ -51,8 +51,8 @@ const hourRange = z
 
 /**
  * Local article summaries (@mb/wire/enrich): the article behind an important
- * item, summarized by a small model on the server's GPU, for the Research page. Never on the trigger
- * path, and (until the owner approves 10.5) never in a prompt.
+ * item, summarized by a small model on the server's GPU, for the Research page and the AI's wire
+ * dossier (its 8 best-ranked items, labelled as machine summaries). Never on the trigger path.
  */
 export const wireSummariesSettings = z.object({
   enabled: z.boolean(),
