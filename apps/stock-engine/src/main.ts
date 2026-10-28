@@ -1,5 +1,6 @@
 import { AiRunner } from "@mb/engine-kit/ai/runner"
 import { bootstrap } from "@mb/engine-kit/bootstrap"
+import { HistoryStore } from "@mb/history/store"
 import { AiBudget } from "./ai/budget"
 import { Alerts } from "./alerts"
 import { createAlpaca } from "./alpaca/client"
@@ -24,7 +25,7 @@ import { Wire } from "./wire/wire"
 /**
  * Engine entry point: the shared boot order and graceful shutdown (@mb/engine-kit/bootstrap) with
  * stock's own wiring. After the stream server is up: Alpaca (REST, trade updates, market data),
- * the news engine's price layers, AI and the news engine. The price layers start right before the
+ * the news engine's price layers, AI, the news engine and the history store. The price layers start right before the
  * engine and stop right after it has shut down.
  */
 
@@ -47,6 +48,11 @@ void bootstrap({
       connected
         ? bus.emit("broker.connected", { channel }, { summary: `Alpaca ${channel === "trade_updates" ? "trade updates" : "market data"} connected`, level: "debug" })
         : bus.emit("broker.disconnected", { channel, reason }, { summary: `Alpaca ${channel === "trade_updates" ? "trade updates" : "market data"} disconnected (${reason})`, level: "warn" })
+    // The history store (docs/plans/LOCAL-AI.md §6): the closed 1-minute bars of the symbols the price
+    // board tracks (the scan universe, holdings and watchlist; the stream sends every symbol), and the
+    // news archive.
+    const history = env.HISTORY_URL ? new HistoryStore({ url: env.HISTORY_URL, log: log.child({ component: "history" }), col: db.col }) : null
+    let historySymbols = new Set<string>(["SPY"])
     const tradeStream = new TradeStream(creds, log.child({ component: "trade-stream" }), { onUpdate: (u) => engine?.onTradeUpdate(u), onState: brokerState("trade_updates") })
     // Our own market data as a news source: 1-minute bars for the scan universe and what we hold and
     // watch, merged from the free price layers, judged against SPY.
@@ -58,7 +64,10 @@ void bootstrap({
       },
       onQuote: (s, b, a, t) => prices.onQuote(s, b, a, t),
       onState: brokerState("market_data"),
-      onBar: (bar) => coverage.board.bar("B", bar.symbol, bar.t, bar.close, bar.volume),
+      onBar: (bar) => {
+        coverage.board.bar("B", bar.symbol, bar.t, bar.close, bar.volume)
+        if (history && historySymbols.has(bar.symbol)) history.bars.add({ ...bar, source: creds.feed })
+      },
     })
     const universe = new ScanUniverseStore(db.col, alpaca, () => settings.current, log.child({ component: "scan-universe" }))
     const coverage = new PriceCoverage({
@@ -70,7 +79,10 @@ void bootstrap({
       finnhubKey: env.FINNHUB_API_KEY ?? undefined,
       sessionOpen: () => engine?.marketOpen() ?? false,
       onBars: (t, bars) => marketSignals.onBars(t, bars),
-      onTracked: (symbols) => marketSignals.setTracked(symbols),
+      onTracked: (symbols) => {
+        marketSignals.setTracked(symbols)
+        historySymbols = new Set(["SPY", ...symbols])
+      },
     })
     const budget = new AiBudget(db.col, () => settings.current.ai.daily_budget_usd)
     const ai = new AiRunner(budget, log.child({ component: "ai" }), !!env.AI_GATEWAY_API_KEY)
@@ -89,7 +101,15 @@ void bootstrap({
       userAgent: env.SEC_USER_AGENT ?? DEFAULT_USER_AGENT,
     })
 
-    engine = new Engine({ env, log, db, bus, settings, state, alpaca, prices, tradeStream, marketStream, ai, budget, alerts, stream, wire, coverage })
-    return { engine, start: () => coverage.start(), stop: () => coverage.stop() }
+    history?.start()
+    engine = new Engine({ env, log, db, bus, settings, state, alpaca, prices, tradeStream, marketStream, ai, budget, alerts, stream, wire, coverage, history })
+    return {
+      engine,
+      start: () => coverage.start(),
+      stop: () => {
+        coverage.stop()
+        void history?.stop()
+      },
+    }
   },
 })

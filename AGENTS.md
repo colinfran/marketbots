@@ -12,9 +12,9 @@ Conventions for anyone, human or AI agent, changing this repo. Read [docs/ARCHIT
 
    `compose.smoke.yml` does all three.
 3. **Live settings change only from the dashboard's Admin page** (an audited `settings.update` command). Don't write settings to a live database from scripts. Editing `DEFAULT_SETTINGS` is not a settings change: it doesn't reach a running bot. Staging databases are throwaway, so scripts may lower their AI budget.
-4. **Never commit env files** (`.env.crypto`, `.env.stock`, `.env.<bot>.local`); only the `.env.<bot>.example` files are committed. Never print, log or copy secret values: that includes `docker compose config` without `--quiet` and the env section of `docker inspect`. A new variable goes into the right section (SHARED, ENGINE or DASHBOARD) of the bot's `.env.<bot>.example`, and a SHARED or DASHBOARD one also into the Vercel table in [docs/SERVER.md §3.4](docs/SERVER.md#34-what-goes-into-each-vercel-project).
+4. **Never commit env files** (`.env.crypto`, `.env.stock`, `.env.history`, `.env.<bot>.local`); only the `.example` files are committed, and they never hold a real value. Never print, log or copy secret values: that includes `docker compose config` without `--quiet` and the env section of `docker inspect`. A new variable goes into the right section (SHARED, ENGINE or DASHBOARD) of the bot's `.env.<bot>.example`, and a SHARED or DASHBOARD one also into the Vercel table in [docs/SERVER.md §3.4](docs/SERVER.md#34-what-goes-into-each-vercel-project).
 5. **LF line endings** everywhere (`.gitattributes`: `* text=auto eol=lf`; run `git config core.autocrlf false` in your clone). The engines run in Linux containers, and Dockerfiles, YAML and env files break with CRLF. To copy files from the old repos, `git archive HEAD` the whole tree; never copy from a working tree or archive a `HEAD:<path>` subtree (that skips the root `.gitattributes` and writes CRLF on Windows).
-6. **Never touch the paper wallet volume** `cryptomarketbot_kraken-paper`: no `down -v`, no `docker volume rm`, and it stays `external` in `compose.yml` ([docs/SERVER.md §6](docs/SERVER.md#6-the-paper-wallet-volume)).
+6. **Never touch the paper wallet volume** `cryptomarketbot_kraken-paper`: no `down -v`, no `docker volume rm`, and it stays `external` in `compose.yml` ([docs/SERVER.md §6](docs/SERVER.md#6-the-paper-wallet-volume)). The same goes for `marketbots_history-data`: its news archive is the only copy of news older than 30 days ([§6.4](docs/SERVER.md#64-the-history-stores-volume-and-backups)). Never `docker volume prune`: other stacks share this Docker.
 7. **One bot's change never redeploys the other bot.** Deploy engines by name (`docker compose up -d --build <bot>-engine`).
 
 ## Package boundaries
@@ -23,7 +23,7 @@ Dependency direction:
 
 ```
 @mb/core ◀── @mb/crypto-core, @mb/stock-core
-@mb/core ◀── @mb/engine-kit ◀── @mb/wire
+@mb/core ◀── @mb/engine-kit ◀── @mb/wire, @mb/history
 @mb/core ◀── @mb/ui, @mb/web-kit
 ```
 
@@ -32,7 +32,7 @@ Dependency direction:
 ESLint enforces this with `no-restricted-imports`, built by `boundaries(owner)` in [packages/config/eslint.mjs](packages/config/eslint.mjs). Each package's `eslint.config.mjs` names its owner:
 
 - `nodeConfig("crypto")` / `nodeConfig("stock")` for engines and bot core packages, `nextConfig("crypto")` / `nextConfig("stock")` for dashboards. Bot code may not import an app, or any `@mb/<other bot>-*` package.
-- `nodeConfig("<name>")` for a shared package (`core`, `engine-kit`, `wire`, `ui`, `web-kit`). It may import only itself, `@mb/config` and its entry in the `SHARED` map in `eslint.mjs`.
+- `nodeConfig("<name>")` for a shared package (`core`, `engine-kit`, `wire`, `history`, `ui`, `web-kit`). It may import only itself, `@mb/config` and its entry in the `SHARED` map in `eslint.mjs`.
 
 Beyond what the rule checks:
 
@@ -42,9 +42,9 @@ Beyond what the rule checks:
 
 ## Adding shared code
 
-The shared packages are `packages/config`, `packages/core`, `packages/engine-kit`, `packages/wire`, `packages/ui` and `packages/web-kit` ([docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#shared-code)).
+The shared packages are `packages/config`, `packages/core`, `packages/engine-kit`, `packages/wire`, `packages/history`, `packages/ui` and `packages/web-kit` ([docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#shared-code)).
 
-1. **Pick the package**: `core` (pure, no I/O), `engine-kit` (engine runtime), `wire` (news engine), `ui` (client-safe React), `web-kit` (server-only dashboard helpers).
+1. **Pick the package**: `core` (pure, no I/O), `engine-kit` (engine runtime), `wire` (news engine), `history` (the history store), `ui` (client-safe React), `web-kit` (server-only dashboard helpers).
 2. **Share only what both bots mean the same thing by.** If sharing would need a flag that switches between two behaviors, keep the code per bot. Pass what genuinely differs (a constant, an HMAC prefix, a time zone, a Discord username) in as a parameter; no `if (bot === "crypto")` in shared code, and no bot-specific constants.
 3. **A new package** `packages/<name>/` (copy `packages/crypto-core` as the template):
    - `package.json`: `"name": "@mb/<name>"`, `"private": true`, `"type": "module"`, `"exports": { "./*": "./src/*.ts" }`, `test` / `typecheck` / `lint` scripts, and `"@mb/config": "workspace:*"` in devDependencies.

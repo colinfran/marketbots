@@ -4,13 +4,14 @@ import type { CommandDoc, EngineStatusDoc, PaperWalletHealth, SeedRunDoc } from 
 import type { CycleState, EngineRunStatus } from "@mb/crypto-core/events"
 import { roundTo } from "@mb/crypto-core/math"
 import type { SettingsPatch } from "@mb/crypto-core/settings"
-import type { EventFocus, WireItemDoc } from "@mb/crypto-core/wire"
+import type { EventFocus, WireCategory, WireItemDoc } from "@mb/crypto-core/wire"
 import { EventCycleQueue, type QueuedEvent } from "@mb/engine-kit/control/event-queue"
 import { ControlPlane, type ControlWording } from "@mb/engine-kit/control/plane"
 import { StatusReporter } from "@mb/engine-kit/control/status"
 import { errorMessage, type Logger } from "@mb/engine-kit/log"
 import { claimDueSeed, finishSeed } from "@mb/engine-kit/state/seed-runs"
 import { every, withTimeout } from "@mb/engine-kit/util/async"
+import type { HistoryStore } from "@mb/history/store"
 import { coverageGaps } from "@mb/wire/calendar"
 import type { AiBudget } from "./ai/budget"
 import type { AiRunner } from "./ai/runner"
@@ -81,6 +82,8 @@ export type EngineDeps = {
   alerts: Alerts
   stream: StreamServer
   wire: Wire
+  /** The history store; absent or null while HISTORY_URL is unset. */
+  history?: HistoryStore<WireCategory> | null
 }
 
 /**
@@ -219,6 +222,7 @@ export class Engine {
         next_cycle_at: this.lastCycleStartedAt ? new Date(this.lastCycleStartedAt + d.settings.current.schedule.crypto_scan_minutes * 60_000) : new Date(),
         reconciliation: this.reconciliation ? { ok: this.reconciliation.ok, at: this.reconciliation.at, issues: this.reconciliation.issues.slice(0, 20) } : null,
         ...p.health,
+        ...(d.history ? { history: d.history.status() } : {}),
       }),
     })
     d.wire.onItem((e) => this.policy.onItem(e))

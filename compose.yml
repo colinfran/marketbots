@@ -1,5 +1,5 @@
-# The marketbots stack on the trading server: both engines, one shared scraper and the local LLM.
-# The dashboards run on Vercel; MongoDB is hosted on Atlas, so there is no database here.
+# The marketbots stack on the trading server: both engines, one shared scraper, the local LLM and
+# the history store. The dashboards run on Vercel; their MongoDB is hosted on Atlas.
 #
 #   docker compose up -d --build                         build and start (restarts after reboots)
 #   docker compose up -d --build stock-engine            redeploy one engine; the other is untouched
@@ -7,7 +7,7 @@
 #   docker compose --profile llm up -d llm               start the local LLM
 #
 # The two engines share nothing at runtime: separate images, containers, ports, env files,
-# databases and leases. See docs/SERVER.md.
+# databases (one history database each, too) and leases. See docs/SERVER.md.
 
 name: marketbots
 
@@ -45,6 +45,7 @@ services:
     ports:
       # Loopback only: Caddy on the host forwards wss://engine.cryptomarketbot.app here.
       - "127.0.0.1:8787:8787"
+    networks: [default, ai]
     volumes:
       # The Kraken CLI paper wallet (balances + trade journal). Losing it means a paper reset.
       - kraken-paper:/data/kraken
@@ -74,6 +75,7 @@ services:
     ports:
       # Loopback only: Caddy on the host forwards wss://engine.stockmarketbot.app here.
       - "127.0.0.1:8788:8788"
+    networks: [default, ai]
     volumes:
       # The log history (see crypto-engine).
       - ./logs/stock-engine:/logs
@@ -127,6 +129,78 @@ services:
     mem_limit: 64m
     logging: *logging
 
+  # The history store (docs/plans/LOCAL-AI.md §6): Postgres with TimescaleDB and pgvector, one
+  # database and role per bot (crypto_history, stock_history; created on the first start by
+  # packages/history/docker/initdb.sh), the tables from the engines' migrations. No host port and
+  # no internet: only the engines reach it, over the `ai` network. Its data lives in the
+  # history-data volume, inside Docker's disk on C:. If it's down, only history stops.
+  history:
+    image: timescale/timescaledb:2.31.0-pg17@sha256:b56a3f51991df1f79d0c1a0841cad5c5fa8058fdd6a3ee6886394a6d4c174538
+    container_name: marketbots-history
+    restart: unless-stopped
+    env_file: .env.history
+    environment:
+      HISTORY_DATABASES: crypto_history stock_history
+      # timescaledb-tune sizes shared_buffers and workers for this, not for the whole VM.
+      TS_TUNE_MEMORY: 2GB
+      TS_TUNE_NUM_CPUS: 2
+      TIMESCALEDB_TELEMETRY: "off"
+    volumes:
+      - history-data:/var/lib/postgresql/data
+      - ./packages/history/docker/initdb.sh:/docker-entrypoint-initdb.d/10-history.sh:ro
+    networks: [ai]
+    security_opt:
+      - no-new-privileges:true
+    shm_size: 256m
+    stop_grace_period: 60s
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    mem_limit: 2g
+    logging: *logging
+
+  # Nightly copy of the news archive (the one part of the history store nothing can fetch again)
+  # to backups/history/ on the host disk, which survives a Docker or WSL reset. Once at start, then
+  # daily at 10:30 UTC; the newest 7 per database kept. Bars aren't backed up: the backfills
+  # rebuild them. Restore: docs/SERVER.md §6.4.
+  history-backup:
+    image: timescale/timescaledb:2.31.0-pg17@sha256:b56a3f51991df1f79d0c1a0841cad5c5fa8058fdd6a3ee6886394a6d4c174538
+    container_name: marketbots-history-backup
+    restart: unless-stopped
+    user: "70:70"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    env_file: .env.history
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        set -o pipefail
+        export PGPASSWORD="$$POSTGRES_PASSWORD"
+        until pg_isready -q -h history -U postgres; do sleep 10; done
+        while true; do
+          for db in crypto_history stock_history; do
+            f=/backups/$$db-$$(date -u +%Y%m%dT%H%M%SZ).sql.gz
+            if pg_dump -h history -U postgres -d "$$db" -t news_items -t news_triggers --data-only --column-inserts --rows-per-insert=200 --on-conflict-do-nothing | gzip > "$$f.part"; then
+              mv "$$f.part" "$$f" && echo "backed up $$f ($$(du -h "$$f" | cut -f1))"
+            else
+              rm -f "$$f.part"; echo "backup of $$db failed (no news archive yet?)"
+            fi
+            ls -1t /backups/$$db-*.sql.gz 2>/dev/null | tail -n +8 | xargs -r rm -f
+          done
+          now=$$(date -u +%s); next=$$(( now / 86400 * 86400 + 37800 )); [ "$$next" -le "$$now" ] && next=$$(( next + 86400 ))
+          sleep $$(( next - now ))
+        done
+    volumes:
+      - ./backups/history:/backups
+    networks: [ai]
+    mem_limit: 256m
+    logging: *logging
+
   # Local article summaries. Off unless started with --profile llm.
   # GPU only: ~3 GB of VRAM while a model is loaded, released after 5 idle minutes.
   llm:
@@ -161,3 +235,13 @@ volumes:
     external: true
     name: cryptomarketbot_kraken-paper
   ollama-models:
+  # The history store's data (docs/plans/LOCAL-AI.md §6). The news archive in it is backed up
+  # nightly (history-backup); everything else the backfills can fetch again.
+  history-data:
+
+networks:
+  default:
+  # The AI side (docs/plans/LOCAL-AI.md §4): no internet. The history store sits only here; the
+  # engines join it beside the default network.
+  ai:
+    internal: true

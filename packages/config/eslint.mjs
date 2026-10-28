@@ -17,6 +17,7 @@ import tseslint from "typescript-eslint"
 const SHARED = {
   core: [],
   "engine-kit": ["core"],
+  history: ["core", "engine-kit"],
   wire: ["core", "engine-kit"],
   ui: ["core"],
   "web-kit": ["core"],

@@ -1,4 +1,4 @@
-import { envFields, optional, parseEnv } from "@mb/engine-kit/env"
+import { envFields, optional, parseEnv, urlPassword } from "@mb/engine-kit/env"
 import { z } from "zod"
 
 /**
@@ -53,6 +53,7 @@ const envSchema = z.object({
   EIA_API_KEY: optional,
   SCRAPER_URL: base.SCRAPER_URL,
   LLM_URL: base.LLM_URL,
+  HISTORY_URL: base.HISTORY_URL,
 })
 
 export type Env = z.infer<typeof envSchema>
@@ -72,6 +73,8 @@ export const secretValues = (env: Env): string[] =>
     env.AI_GATEWAY_API_KEY,
     env.DISCORD_WEBHOOK_URL,
     env.MONGODB_URI,
+    env.HISTORY_URL,
+    urlPassword(env.HISTORY_URL),
     env.ALPACA_API_KEY,
     env.ALPACA_SECRET_KEY,
     env.FINNHUB_API_KEY,

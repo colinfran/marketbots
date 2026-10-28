@@ -69,7 +69,19 @@ export const envFields = ({ dbName, streamPort }: { dbName: string; streamPort: 
   SCRAPER_URL: optional,
   /** The local LLM for article summaries, e.g. http://llm:11434 inside docker compose. Unset: no summaries. */
   LLM_URL: optional,
+  /** The bot's own history database (postgres://…@history:5432/<bot>_history), a secret. Unset: no history is kept. */
+  HISTORY_URL: optional,
 })
+
+/** A connection URL's password, so the logger can scrub it even where the URL appears in pieces. */
+export const urlPassword = (url: string | null | undefined): string | undefined => {
+  if (!url) return undefined
+  try {
+    return decodeURIComponent(new URL(url).password) || undefined
+  } catch {
+    return undefined
+  }
+}
 
 /** The shared variables, parsed. */
 export type BaseEnv = z.infer<z.ZodObject<ReturnType<typeof envFields>>>

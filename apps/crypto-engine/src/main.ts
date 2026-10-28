@@ -1,4 +1,5 @@
 import { bootstrap } from "@mb/engine-kit/bootstrap"
+import { HistoryStore } from "@mb/history/store"
 import { AiBudget } from "./ai/budget"
 import { AiRunner } from "./ai/runner"
 import { Alerts } from "./alerts"
@@ -25,8 +26,8 @@ import { Wire } from "./wire/wire"
 /**
  * Engine entry point: the shared boot order and graceful shutdown (@mb/engine-kit/bootstrap) with
  * crypto's own wiring. After the stream server is up: Kraken market data, the paper wallet, the
- * books, AI and the news engine; the engine then reconciles with the paper wallet before the
- * trading loops start. Market data stops right after the engine has shut down.
+ * books, AI, the news engine and the history store; the engine then reconciles with the paper
+ * wallet before the trading loops start. Market data stops right after the engine has shut down.
  */
 
 void bootstrap({
@@ -76,7 +77,20 @@ void bootstrap({
       userAgent: env.SEC_USER_AGENT ?? DEFAULT_USER_AGENT,
     })
 
-    engine = new Engine({ env, log, db, bus, settings, state, hub, rest, candles, cli, ledger, executor, ai, budget, alerts, stream, wire })
-    return { engine, stop: () => hub.stop() }
+    // The history store (docs/plans/LOCAL-AI.md §6): every closed 1-minute bar, and the news archive.
+    const history = env.HISTORY_URL ? new HistoryStore({ url: env.HISTORY_URL, log: log.child({ component: "history" }), col: db.col }) : null
+    if (history) {
+      hub.onBar((bar) => history.bars.add({ ...bar, source: "kraken" }))
+      history.start()
+    }
+
+    engine = new Engine({ env, log, db, bus, settings, state, hub, rest, candles, cli, ledger, executor, ai, budget, alerts, stream, wire, history })
+    return {
+      engine,
+      stop: () => {
+        hub.stop()
+        void history?.stop()
+      },
+    }
   },
 })

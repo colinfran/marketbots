@@ -1,4 +1,4 @@
-import { envFields, optional, parseEnv } from "@mb/engine-kit/env"
+import { envFields, optional, parseEnv, urlPassword } from "@mb/engine-kit/env"
 import { z } from "zod"
 
 /**
@@ -58,6 +58,7 @@ const envSchema = z.object({
   COINALYZE_API_KEY: optional,
   SCRAPER_URL: base.SCRAPER_URL,
   LLM_URL: base.LLM_URL,
+  HISTORY_URL: base.HISTORY_URL,
 })
 
 const WIRE_KEYS = ["SEC_USER_AGENT", "FINNHUB_API_KEY", "FRED_API_KEY", "BLS_API_KEY", "COINGECKO_API_KEY", "ETHERSCAN_API_KEY", "COINALYZE_API_KEY", "SCRAPER_URL", "LLM_URL"] as const
@@ -77,6 +78,8 @@ export const secretValues = (env: Env): string[] =>
     env.AI_GATEWAY_API_KEY,
     env.DISCORD_WEBHOOK_URL,
     env.MONGODB_URI,
+    env.HISTORY_URL,
+    urlPassword(env.HISTORY_URL),
     env.FINNHUB_API_KEY,
     env.FRED_API_KEY,
     env.BLS_API_KEY,

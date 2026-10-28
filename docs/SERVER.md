@@ -8,13 +8,13 @@ What runs where:
 
 | Where | What | Config |
 | --- | --- | --- |
-| Windows server, Docker stack `marketbots` | `crypto-engine` on 127.0.0.1:8787 (with the Kraken CLI paper wallet), `stock-engine` on 127.0.0.1:8788, `scraper` (no host port), `llm` (Ollama on the GPU, no host port, `--profile llm`) | `compose.yml`, `.env.crypto`, `.env.stock` at the repo root |
+| Windows server, Docker stack `marketbots` | `crypto-engine` on 127.0.0.1:8787 (with the Kraken CLI paper wallet), `stock-engine` on 127.0.0.1:8788, `scraper` (no host port), `llm` (Ollama on the GPU, no host port, `--profile llm`), `history` (Postgres with TimescaleDB and pgvector, no host port) and `history-backup` | `compose.yml`, `.env.crypto`, `.env.stock`, `.env.history` at the repo root |
 | Caddy on the Windows host | `engine.cryptomarketbot.app` → 127.0.0.1:8787, `engine.stockmarketbot.app` → 127.0.0.1:8788 (WebSocket) | `C:\Caddy\Caddyfile` |
 | Vercel | two projects: `apps/crypto-web` at cryptomarketbot.app, `apps/stock-web` at stockmarketbot.app | each project's environment variables |
 | MongoDB Atlas | one cluster, databases `cryptomarketbot` and `stockmarketbot` | `MONGODB_URI` |
 | Alpaca | the stock bot's paper account | `.env.stock` (engine only) |
 
-The two engines are independent: separate images, containers, ports, env files, databases, leases and stream secrets. Deploying, restarting or crashing one never touches the other. At runtime they share only the scraper, the LLM and the server's IP address.
+The two engines are independent: separate images, containers, ports, env files, databases, leases and stream secrets. Deploying, restarting or crashing one never touches the other. At runtime they share only the scraper, the LLM, the history service (each with its own database and role on it) and the server's IP address.
 
 ---
 
@@ -45,9 +45,9 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 ## 2. Server prerequisites (once)
 
-The server is a shared Windows 11 Pro home PC (i5-11400, 24 GB RAM, RTX 3070 8 GB) that also runs Jellyfin, a torrent stack, useSend and other containers. Every service in this stack has a memory cap (§5.5).
+The server is a shared Windows 11 Pro home PC (i5-11400, 32 GB RAM, an RTX 3070 8 GB and an RTX 2080 SUPER 8 GB) that also runs Jellyfin, a torrent stack, useSend and other containers. Every service in this stack has a memory cap (§5.5).
 
-**Docker Desktop** with the WSL2 backend; the engines are Linux containers. In *Settings → General*, enable *Start Docker Desktop when you sign in*, and make sure the machine signs in after a reboot, or Docker won't start. The Docker VM has 11.6 GiB (no `.wslconfig`), which is enough.
+**Docker Desktop** with the WSL2 backend; the engines are Linux containers. In *Settings → General*, enable *Start Docker Desktop when you sign in*, and make sure the machine signs in after a reboot, or Docker won't start. The Docker VM has 15.5 GiB (half the host's RAM, no `.wslconfig`), which is enough. Docker's disk, and with it every named volume, is on C: (`%LOCALAPPDATA%\Docker\wsl\disk`).
 
 ```powershell
 docker version          # "Server: ... OS/Arch: linux/amd64" (not windows/amd64)
@@ -81,8 +81,10 @@ cd marketbots
 git config core.autocrlf false        # the repo is LF only (.gitattributes)
 Copy-Item .env.crypto.example .env.crypto
 Copy-Item .env.stock.example .env.stock
+Copy-Item .env.history.example .env.history
 notepad .env.crypto
 notepad .env.stock
+notepad .env.history
 ```
 
 **The wallet volume**: on this server `cryptomarketbot_kraken-paper` already exists and holds the live paper wallet (§6). Only on a brand-new server, create it once with `docker volume create cryptomarketbot_kraken-paper`; the engine creates the workspace on first boot.
@@ -116,11 +118,13 @@ Don't put these in the env files. `compose.yml` sets them, and its values win ov
 | `SCRAPER_URL` | `http://scraper:8790` | `http://scraper:8790` |
 | `LLM_URL` | `http://llm:11434` | `http://llm:11434` |
 
+`HISTORY_URL` is not among them: it carries the bot's history password, so it lives in the bot's env file (§3.6).
+
 ### 3.3 Rules
 
 - One value per line, no quotes, no trailing spaces. The engine trims stray `\r`.
 - **A value containing `$`** (a Mongo password, say) goes in single quotes: `MONGODB_URI='mongodb+srv://user:pa$word@…'`. Compose expands `$` in unquoted values; single quotes keep it literal for both compose and Node's `--env-file` (local dev). The old `$$` escape doesn't work here: Node reads it as two dollar signs. On Vercel, paste the value without the quotes.
-- **Both files must exist** for any compose command, even one that touches a single engine: compose reads every `env_file` when it loads the project.
+- **All three files must exist** (`.env.crypto`, `.env.stock`, `.env.history`) for any compose command, even one that touches a single engine: compose reads every `env_file` when it loads the project.
 - **After editing** a file, run `docker compose up -d <bot>-engine`. That recreates the container with the new values; `restart` keeps the old ones.
 - Never commit them or paste their contents anywhere. `docker compose config` without `--quiet` prints every value; don't share its output.
 
@@ -164,20 +168,44 @@ Nothing from the ENGINE sections goes to Vercel: the dashboards hold no broker o
 # .env.crypto.local
 MONGODB_DB_NAME=cryptomarketbot_dev
 DISCORD_WEBHOOK_URL=
+HISTORY_URL=
 ```
 
 ```ini
 # .env.stock.local
 MONGODB_DB_NAME=stockmarketbot_dev
 DISCORD_WEBHOOK_URL=
+HISTORY_URL=
 ALPACA_API_KEY=fake-key
 ALPACA_SECRET_KEY=fake-secret
 ```
 
 - On the live database a local engine would wait for the live engine's lease, and take over trading as soon as the live one stopped.
+- A local engine can't reach the `history` service (no host port), and shouldn't write to it anyway: leave `HISTORY_URL=` empty in the `.local` file.
 - A local stock engine with the live keys would knock out the live engine's market data (one connection per account). With fake keys it boots and logs Alpaca auth errors.
 - A local crypto engine needs the Kraken CLI on `PATH` (or `KRAKEN_CLI_PATH`) and uses that machine's own CLI workspace, never the server's volume.
 - A local dashboard on the live database writes real commands that the live engine executes.
+
+### 3.6 The history service's file
+
+`.env.history` (git-ignored; template `.env.history.example`) holds the history service's three passwords. compose loads it into `history` and `history-backup` only; the engines never see it.
+
+| Variable | What |
+| --- | --- |
+| `POSTGRES_PASSWORD` | the Postgres superuser: creates the databases on the first start, and runs the nightly backup |
+| `CRYPTO_HISTORY_PASSWORD` | the `crypto_history` role, which owns the `crypto_history` database and nothing else |
+| `STOCK_HISTORY_PASSWORD` | the `stock_history` role, likewise |
+
+Each bot's env file carries its own password in `HISTORY_URL` (ENGINE section), so an engine can reach only its own database:
+
+```ini
+# .env.crypto
+HISTORY_URL=postgres://crypto_history:<CRYPTO_HISTORY_PASSWORD>@history:5432/crypto_history
+```
+
+- The passwords take effect when the `history-data` volume is created (the first start, by `packages/history/docker/initdb.sh`). Changing one in the file afterwards changes nothing: change it in Postgres too (`docker compose exec history psql -U postgres -c "alter role crypto_history password '…'"`), then in the bot's `HISTORY_URL`, then run `docker compose up -d <bot>-engine`.
+- Generate them like the other secrets (§1). Hex values need no quoting in a URL.
+- Without `HISTORY_URL` an engine keeps no history, and nothing else changes.
 
 ---
 
@@ -185,9 +213,9 @@ ALPACA_SECRET_KEY=fake-secret
 
 ```powershell
 docker volume inspect cryptomarketbot_kraken-paper   # must exist: the paper wallet (§6)
-docker compose config --quiet                       # checks compose.yml and both env files; silent when fine
+docker compose config --quiet                       # checks compose.yml and the three env files; silent when fine
 docker compose build                                # several minutes the first time
-docker compose up -d                                # crypto-engine, stock-engine, scraper (not llm)
+docker compose up -d                                # the engines, scraper, history, the backups (not llm)
 docker compose ps                                   # engines "healthy" within ~90 s (crypto) / ~60 s (stock)
 ```
 
@@ -215,6 +243,7 @@ git pull
 docker compose up -d --build stock-engine      # rebuilds and recreates only the stock engine
 docker compose up -d --build crypto-engine     # only the crypto engine
 docker compose up -d --build scraper           # both bots' headless sources pause for a few seconds
+docker compose up -d history history-backup    # the history store (engines buffer bars and retry meanwhile)
 docker compose up -d --build                   # everything whose image or config changed
 ```
 
@@ -222,6 +251,7 @@ docker compose up -d --build                   # everything whose image or confi
 - **Stock**: any time, market hours included; pick a moment with no cycle or seed run in progress. Stops rest at Alpaca; options exits wait for the engine, which is back in about a minute.
 - **Crypto**: pick a moment with no cycle or seed run in progress. Stops are watched only by the engine; it is back in about a minute.
 - A stop is graceful (30 s grace period): the engine releases its lease, so the new container takes over at once.
+- **History**: any time. While it's down the engines keep up to 50,000 bars each in memory and copy the news they missed when it's back; trading never waits for it.
 - Dashboards deploy by pushing to `main` (Vercel, §8).
 
 ### 5.2 Status, logs, restart
@@ -274,7 +304,7 @@ The detailed view (every dependency, data freshness, AI spend) is each dashboard
 
 ### 5.5 Memory caps
 
-The Docker VM has 11.6 GiB and other containers already use ~4.6 GiB of it. Every service here is capped:
+The Docker VM has 15.5 GiB and the other stacks use ~3.5 GiB of it. Every service here is capped:
 
 | Service | Limit | Expected |
 | --- | --- | --- |
@@ -282,6 +312,8 @@ The Docker VM has 11.6 GiB and other containers already use ~4.6 GiB of it. Ever
 | `stock-engine` | 1 GB (was 768 MB: headroom at the open with ~1,500 tracked symbols) | 0.3–0.5 GB |
 | `scraper` | 1 GB | 0.15 GB idle, up to 0.5 GB while rendering |
 | `llm` | 2 GB RAM, 2 CPUs; ~3 GB GPU memory only while a model is loaded | ~0.1 GB idle; 1.6–2 GB while a model is loaded (mostly reclaimable cache); ~2.4 GB GPU memory loaded, none when idle |
+| `history` | 2 GB (`shared_buffers` 512 MB, tuned for that) | 0.6–1.2 GB, mostly cache |
+| `history-backup` | 256 MB | a few MB; more for a minute at 10:30 UTC |
 
 Check with `docker stats --no-stream` (§5.2).
 
@@ -348,7 +380,7 @@ docker compose up -d crypto-engine
 
 ### 6.3 Boot-testing new images against a copy
 
-`compose.smoke.yml` (project `marketbots-smoke`) boots the new engine images beside the live stack: a throwaway local MongoDB, loopback ports 18787 and 18788, a **copy** of the wallet volume, fake Alpaca keys, and no AI, Discord, email or news keys. Use it before deploying a change to engine startup, a Dockerfile or `compose.yml`. Its header has the commands:
+`compose.smoke.yml` (project `marketbots-smoke`) boots the new engine images beside the live stack: a throwaway local MongoDB, its own history store in memory (databases `crypto_staging` and `stock_staging`), loopback ports 18787 and 18788, a **copy** of the wallet volume, fake Alpaca keys, and no AI, Discord, email or news keys. Use it before deploying a change to engine startup, a Dockerfile or `compose.yml`. Its header has the commands:
 
 ```powershell
 docker compose build                                   # builds the images; running containers are not touched
@@ -359,6 +391,32 @@ docker volume rm marketbots-smoke_wallet
 ```
 
 Never `down -v` there: that file also declares the live wallet volume (as `external`, but there is no reason to rely on that).
+
+### 6.4 The history store's volume and backups
+
+The history store (docs/plans/LOCAL-AI.md §6) keeps its data in the `marketbots_history-data` volume, inside Docker's disk on C:. A Docker or WSL reset loses it, and `down -v` would delete it, like the wallet.
+
+- **What can be lost safely:** the 1-minute bars. The backfills fetch them again.
+- **What can't:** the news archive (`news_items`, `news_triggers`). MongoDB deletes wire items after `wire.retention_days` (30), so the archive is the only copy of older news. `history-backup` dumps those two tables from both databases into `backups\history\<db>-<UTC timestamp>.sql.gz` in the repo folder (git-ignored, on the Windows disk): once when it starts, then daily at 10:30 UTC. The newest 7 per database are kept. Check it with `docker logs marketbots-history-backup`; an extra backup now: `docker compose restart history-backup`.
+
+Look inside:
+
+```powershell
+docker compose exec history psql -U postgres -d crypto_history -c "select count(*), min(first_seen_at), max(first_seen_at) from news_items"
+docker compose exec history psql -U postgres -d stock_history -c "select symbol, count(*), max(t) from bars_1m group by 1 order by 2 desc limit 10"
+```
+
+Restore the news archive into a fresh volume (the engines recreate everything else; stop the bot's engine first, so its first copy doesn't run while you restore):
+
+```powershell
+docker compose stop crypto-engine
+docker compose up -d history                       # a new volume runs the init script: empty databases
+docker compose exec history psql -U crypto_history -d crypto_history -c "select 1"   # wait until it answers
+docker compose up -d crypto-engine                 # migrates (creates the tables), then copies what MongoDB still has
+Get-Content backups\history\crypto_history-<stamp>.sql.gz -AsByteStream -Raw | docker compose exec -T history sh -c "gunzip | psql -U postgres -d crypto_history -v ON_ERROR_STOP=0"
+```
+
+The dumps hold only the rows, as `INSERT … ON CONFLICT DO NOTHING`: the tables must exist (the engine's migrations create them), rows the engine has already copied are skipped, and the older ones go in. Restoring a dump never touches the bars.
 
 ---
 
@@ -536,3 +594,7 @@ docker compose --profile llm stop llm
 | Vercel build can't resolve `@mb/...` | *Include files outside the root directory* is off (§8.1). |
 | `llm` won't start: `could not select device driver "nvidia"` | Docker can't see the GPU: update the NVIDIA driver and Docker Desktop, and check the WSL2 backend is on. |
 | `ollama ps` shows a CPU share | Not enough free GPU memory for the model. Summaries pause; free the GPU or use a smaller model. |
+| `env file ...\.env.history not found` | Create it from `.env.history.example` (§3.6). |
+| Admin → System: *History store: unreachable*, log `history store unavailable; retrying in a minute` | `docker compose ps history`: not running, or still starting. A `password authentication failed` means the bot's `HISTORY_URL` doesn't match the role's password (§3.6). The engine keeps trading and retries every minute. |
+| *History store* shows bars *dropped* | It was down long enough for an engine's 50,000-bar buffer to fill. The backfills can fetch those minutes again. |
+| `history-backup` logs `backup of … failed (no news archive yet?)` | Normal until the engine has migrated its database; otherwise check `docker compose logs history`. |

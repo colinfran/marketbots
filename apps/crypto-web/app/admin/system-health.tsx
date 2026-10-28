@@ -1,7 +1,7 @@
 import type { EngineEvent } from "@mb/crypto-core/events"
 import { Card, CardContent, CardHeader, CardTitle } from "@mb/ui/components/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mb/ui/components/table"
-import { AiHealthCard, EngineHealthCard, HealthDot, ProblemsSection, ServerHealthCard, StreamHealthCard, WireSourcesSummary } from "@mb/ui/system-health"
+import { AiHealthCard, EngineHealthCard, HealthDot, HistoryHealthCard, ProblemsSection, ServerHealthCard, StreamHealthCard, WireSourcesSummary } from "@mb/ui/system-health"
 import { Empty, KV, SectionTitle } from "@/components/bits"
 import type { EngineSummary } from "@/lib/data"
 import { ago, dateTime, num, price, titleCase } from "@/lib/format"
@@ -67,6 +67,7 @@ export function SystemHealth({ engine, problems }: { engine: EngineSummary; prob
             </Card>
             <AiHealthCard ai={s.ai} />
             <ServerHealthCard system={s.system} />
+            {s.history && <HistoryHealthCard history={s.history} />}
             <StreamHealthCard status={s}>
               <KV label="Next scheduled scan">{dateTime(s.next_cycle_at)}</KV>
             </StreamHealthCard>

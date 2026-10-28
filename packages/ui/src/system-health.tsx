@@ -99,6 +99,35 @@ export function ServerHealthCard({ system }: { system: Status["system"] }) {
   )
 }
 
+/** The history store card: the bot's own Postgres database with its 1-minute bars and news archive. */
+export function HistoryHealthCard({ history }: { history: NonNullable<Status["history"]> }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <HealthDot ok={history.ok} /> History store
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <KV label="State">{history.ok ? "ok" : history.ready ? "errors" : "unreachable"}</KV>
+        <KV label="Bars written">
+          {num(history.bars.written, 0)}
+          {history.bars.buffered > 0 ? ` · ${num(history.bars.buffered, 0)} waiting` : ""}
+          {history.bars.dropped > 0 ? ` · ${num(history.bars.dropped, 0)} dropped` : ""}
+        </KV>
+        <KV label="Last bar">{ago(history.bars.last_at)}</KV>
+        <KV label="News archive">
+          {num(history.news.items, 0)} items · {num(history.news.triggers, 0)} triggers
+        </KV>
+        <KV label="Last copy / sync">
+          {ago(history.news.last_append_at)} / {ago(history.news.last_sync_at)}
+        </KV>
+        {history.last_error && <p className="text-loss mt-2 text-xs">{history.last_error}</p>}
+      </CardContent>
+    </Card>
+  )
+}
+
 /** The live stream card; `children` are the bot's extra rows. */
 export function StreamHealthCard({ status, children }: { status: Pick<Status, "ws_clients" | "event_seq">; children?: React.ReactNode }) {
   return (

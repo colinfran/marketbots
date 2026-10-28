@@ -115,6 +115,22 @@ export type EngineStatusBase<RunStatus extends string, CycleState extends string
   errors_last_hour: number
   /** The news engine (absent before it shipped, and possibly while it is off). */
   wire?: WireStatus
+  /** The history store (absent while HISTORY_URL is unset). */
+  history?: HistoryStatus
+}
+
+/** The history store's health in the heartbeat (docs/plans/LOCAL-AI.md §6). */
+export type HistoryStatus = {
+  /** Reachable, migrated, and the last bar write and news copy worked. */
+  ok: boolean
+  /** Connected and migrated at least once since the engine started. */
+  ready: boolean
+  last_error: string | null
+  checked_at: Date
+  /** Closed 1-minute bars written since the engine started, dropped (the store was down too long) and waiting. */
+  bars: { written: number; dropped: number; buffered: number; last_at: Date | null }
+  /** The news archive: items and triggers kept, and the last copies from MongoDB. */
+  news: { items: number; triggers: number; last_append_at: Date | null; last_sync_at: Date | null }
 }
 
 export type LeaseDoc = { _id: "engine"; holder: string; acquired_at: Date; expires_at: Date }

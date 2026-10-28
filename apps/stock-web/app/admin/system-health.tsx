@@ -2,7 +2,7 @@ import type { EngineEvent } from "@mb/stock-core/events"
 import { formatDateTime } from "@mb/stock-core/time"
 import { Card, CardContent, CardHeader, CardTitle } from "@mb/ui/components/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mb/ui/components/table"
-import { AiHealthCard, EngineHealthCard, HealthDot, ProblemsSection, ServerHealthCard, StreamHealthCard, WireSourcesSummary } from "@mb/ui/system-health"
+import { AiHealthCard, EngineHealthCard, HealthDot, HistoryHealthCard, ProblemsSection, ServerHealthCard, StreamHealthCard, WireSourcesSummary } from "@mb/ui/system-health"
 import { Empty, KV, SectionTitle } from "@/components/bits"
 import { ago, pct, price, titleCase } from "@/lib/format"
 import type { EngineSummary } from "@/lib/queries"
@@ -65,6 +65,7 @@ export function SystemHealth({ engine, problems }: { engine: EngineSummary; prob
               </CardContent>
             </Card>
             <ServerHealthCard system={s.system} />
+            {s.history && <HistoryHealthCard history={s.history} />}
             <StreamHealthCard status={s} />
           </div>
 

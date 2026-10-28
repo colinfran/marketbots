@@ -12,8 +12,9 @@ import type { CycleState, EngineRunStatus } from "@mb/stock-core/events"
 import { roundTo } from "@mb/stock-core/math"
 import { STRATEGY_LABEL } from "@mb/stock-core/options"
 import type { Phase } from "@mb/stock-core/settings"
-import type { EventFocus, WireItemDoc } from "@mb/stock-core/wire"
+import type { EventFocus, WireCategory, WireItemDoc } from "@mb/stock-core/wire"
 import { marketDay, minutesBetween } from "@mb/stock-core/time"
+import type { HistoryStore } from "@mb/history/store"
 import { coverageGaps } from "@mb/wire/calendar"
 import { eventSection } from "./ai/prompts"
 import type { AiBudget } from "./ai/budget"
@@ -92,6 +93,8 @@ export type EngineDeps = {
   wire: Wire
   /** The news engine's price layers (scan universe, Yahoo, Finnhub…): told what we hold and watch. */
   coverage: Pick<PriceCoverage, "setSymbols">
+  /** The history store; absent or null while HISTORY_URL is unset. */
+  history?: HistoryStore<WireCategory> | null
 }
 
 const MIN = 60_000
@@ -271,6 +274,7 @@ export class Engine {
           ...p.usage,
           last_cycle: this.lastCycle,
           ...p.health,
+          ...(d.history ? { history: d.history.status() } : {}),
         }
       },
     })

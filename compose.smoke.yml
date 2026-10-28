@@ -9,7 +9,7 @@
 # shouldn't remove it, but there is no reason to rely on that.)
 #
 # Safe beside the live engines by construction: its own project name, a throwaway local MongoDB
-# (nothing touches Atlas), loopback ports 18787/18788, a COPY of the paper wallet, fake Alpaca
+# (nothing touches Atlas) and history store (crypto_staging, stock_staging, in memory), loopback ports 18787/18788, a COPY of the paper wallet, fake Alpaca
 # keys (the live ones would knock out the live engine's market-data stream: one connection per
 # account), and no AI, Discord, email or news API keys.
 #
@@ -60,6 +60,7 @@ services:
       KRAKEN_WORKSPACE: cryptomarketbot
       SCRAPER_URL: http://scraper:8790
       LLM_URL: http://llm:11434
+      HISTORY_URL: postgres://crypto_staging:smoke-crypto-history@history:5432/crypto_staging
       ENGINE_INSTANCE: smoke
       # The log files go to tmpfs here, never to the live stack's logs/ folder.
       LOG_DIR: /tmp/logs
@@ -86,10 +87,29 @@ services:
       STREAM_PORT: 8788
       SCRAPER_URL: http://scraper:8790
       LLM_URL: http://llm:11434
+      HISTORY_URL: postgres://stock_staging:smoke-stock-history@history:5432/stock_staging
       ENGINE_INSTANCE: smoke
       LOG_DIR: /tmp/logs
     ports:
       - "127.0.0.1:18788:8788"
+
+  # Its own history store, in memory: the staging databases, never the live ones.
+  history:
+    image: timescale/timescaledb:2.31.0-pg17@sha256:b56a3f51991df1f79d0c1a0841cad5c5fa8058fdd6a3ee6886394a6d4c174538
+    environment:
+      POSTGRES_PASSWORD: smoke-history-superuser
+      HISTORY_DATABASES: crypto_staging stock_staging
+      CRYPTO_STAGING_PASSWORD: smoke-crypto-history
+      STOCK_STAGING_PASSWORD: smoke-stock-history
+      TS_TUNE_MEMORY: 1GB
+      TS_TUNE_NUM_CPUS: 2
+      TIMESCALEDB_TELEMETRY: "off"
+    tmpfs:
+      - /var/lib/postgresql/data
+    volumes:
+      - ./packages/history/docker/initdb.sh:/docker-entrypoint-initdb.d/10-history.sh:ro
+    shm_size: 256m
+    mem_limit: 1g
 
   scraper:
     image: marketbots-scraper:${MB_TAG:-latest}

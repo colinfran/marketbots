@@ -1,0 +1,30 @@
+{
+  "name": "@mb/history",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@mb/core": "workspace:*",
+    "@mb/engine-kit": "workspace:*",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.9",
+    "@mb/config": "workspace:*",
+    "@types/node": "^22",
+    "@types/pg": "8.23.1",
+    "eslint": "^9",
+    "mongodb": "^7.7.0",
+    "mongodb-memory-server": "^11.3.0",
+    "typescript": "^5",
+    "vitest": "^4.1.12"
+  }
+}

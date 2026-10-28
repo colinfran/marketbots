@@ -18,6 +18,7 @@
     "@mb/core": "workspace:*",
     "@mb/crypto-core": "workspace:*",
     "@mb/engine-kit": "workspace:*",
+    "@mb/history": "workspace:*",
     "@mb/wire": "workspace:*",
     "ai": "^7.0.153",
     "cheerio": "1.2.0",
