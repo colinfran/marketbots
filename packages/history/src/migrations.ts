@@ -114,6 +114,18 @@ export const MIGRATIONS: Migration[] = [
       create index news_moves_symbol on news_moves (symbol, first_seen_at desc);
     `,
   },
+  {
+    id: 4,
+    name: "compress bars hourly",
+    // Backfills write millions of old bars an hour; the default 12-hour schedule would let tens of
+    // GB pile up uncompressed in Docker's disk (which doesn't shrink) before compressing them.
+    sql: "select 1",
+    timescale: `
+      select alter_job(job_id, schedule_interval => interval '1 hour')
+      from timescaledb_information.jobs
+      where proc_name = 'policy_compression' and hypertable_name = 'bars_1m';
+    `,
+  },
 ]
 
 /** Any fixed number: the advisory lock that keeps two engines (an old and a new container during a deploy) from migrating at once. */
