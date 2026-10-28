@@ -9,7 +9,7 @@ How StockMarketBot is built and why: the deployment boundaries, the live stream,
 | **Engine + dashboard split** | The bot used to run inside Vercel functions triggered by an external cron, with a 300-second limit per run. An always-on engine has no time limit, keeps WebSocket connections to Alpaca, watches options exits every few seconds, and streams its work to the dashboard as it happens. |
 | **Alpaca paper only** | Trading always goes to `paper-api.alpaca.markets`; there is no live-trading code path. Only the engine holds the keys. |
 | **Defined-risk options only** | Long calls, long puts, call/put debit spreads. The most any position can lose is what was paid, so there are no margin calls, a spread's short leg is always covered by its long leg, and engine downtime can't turn into an unbounded loss. |
-| **Grok via Vercel AI Gateway** | The `ai` SDK with plain `provider/model` ids and xAI's server-side `web_search` / `x_search` tools for research. Models are settings. |
+| **Grok via Vercel AI Gateway** | The `ai` SDK with plain `provider/model` ids and xAI's server-side `web_search` / `x_search` tools for research. Models are settings; a decision model can also be the local one, `local/qwen3.6-35b-a3b-q2` ([SERVER.md §9](SERVER.md#9-the-local-model-server-llm)), which no setting uses yet. |
 | **MongoDB Atlas** | One database shared by the engine (the only writer of trading state) and the Vercel dashboard. |
 | **Monorepo (pnpm workspaces)** | `packages/core` holds what both apps must agree on: settings, events, commands, document types, the report schema, options helpers, FIFO P&L. |
 

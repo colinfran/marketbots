@@ -53,7 +53,7 @@ void bootstrap({
     const ledger = new Ledger(db.col, bus)
     const executor = new Executor(db.col, ledger, new PaperWalletExecution(cli, hub), bus, log.child({ component: "executor" }))
     const budget = new AiBudget(db.col, () => settings.current.ai.daily_budget_usd)
-    const ai = new AiRunner(budget, log.child({ component: "ai" }), !!env.AI_GATEWAY_API_KEY)
+    const ai = new AiRunner(budget, log.child({ component: "ai" }), !!env.AI_GATEWAY_API_KEY, { localUrl: env.LLM_URL })
 
     // Our own market data as a news source: price/volume anomalies and stablecoin depegs.
     const marketSignals = new KrakenMarketSignals(hub, () => settings.current, log.child({ component: "anomaly" }), (symbol, kind) => wire.recordAnomaly(symbol, kind))

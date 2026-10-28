@@ -301,7 +301,9 @@ services:
               count: all
               capabilities: [gpu]
     mem_limit: 6g
-    cpus: 4
+    # llama.cpp runs 6 threads, which spin while they wait: capped at 4 CPUs they were throttled
+    # (36–40 tokens/s against 45–46 at 6). Idle, it uses next to none.
+    cpus: 6
     logging: *logging
 
 volumes:

@@ -1,6 +1,7 @@
+import { createOpenAICompatible, type OpenAICompatibleProvider } from "@ai-sdk/openai-compatible"
 import { xai } from "@ai-sdk/xai"
 import type { AiTask, TokenUsage } from "@mb/core/db"
-import { generateText, NoObjectGeneratedError, Output, parsePartialJson, streamText, type LanguageModelUsage } from "ai"
+import { generateText, NoObjectGeneratedError, Output, parsePartialJson, streamText, type LanguageModel, type LanguageModelUsage } from "ai"
 import type { z } from "zod"
 import { errorMessage, type Logger } from "../log"
 import { cleanLine, cleanText, cleanUrl, domainOf } from "../util/text"
@@ -10,6 +11,10 @@ import { estimateCost, gatewayCost, type AiBudget } from "./budget"
  * Model calls go through Vercel AI Gateway (AI_GATEWAY_API_KEY) with plain "provider/model" ids.
  * Web and X search are xAI's server-side tools, so Grok runs the searches itself; other gateway
  * models can be configured for decisions, but research needs a model with live search tools.
+ *
+ * "local/<alias>" ids run on the local model server instead (LLM_URL: llama.cpp's OpenAI-compatible
+ * API, docs/SERVER.md §9), with the model's own thinking defaults. They cost nothing, so their calls
+ * are recorded at $0 ("local"), with their tokens and time. They can decide, not research.
  *
  * Research streams its search queries, sources and the memo as it's written, so the dashboard can
  * show the work as it happens. The structured decision streams too (headline, then each decision,
@@ -29,6 +34,11 @@ const ZERO: TokenUsage = { input: 0, output: 0, total: 0 }
 
 /** Models whose provider offers xAI's server-side web_search / x_search tools. */
 export const hasLiveSearch = (model: string) => /^(xai|spacexai)\//.test(model)
+
+const LOCAL_PREFIX = "local/"
+
+/** Models on the local model server: "local/<its alias>", e.g. local/qwen3.6-35b-a3b-q2. */
+export const isLocalModel = (model: string) => model.startsWith(LOCAL_PREFIX)
 
 /** How often streaming progress is reported (the feed doesn't need every token). */
 const PROGRESS_MS = 1_500
@@ -66,6 +76,8 @@ export type AiRunnerOptions = {
   stream?: boolean
   /** Longest research memo kept, in characters. Default 16,000. */
   memoMaxChars?: number
+  /** The local model server (LLM_URL), for "local/…" models. Unset: they are refused. */
+  localUrl?: string | null
 }
 
 const queryOf = (input: unknown): string | null => {
@@ -101,27 +113,41 @@ const reasoningReporter = (report?: (chars: number, excerpt: string) => void) =>
 export class AiRunner {
   private readonly stream: boolean
   private readonly memoMaxChars: number
+  private readonly local: OpenAICompatibleProvider | null
 
   constructor(
     private readonly budget: Pick<AiBudget, "record" | "estimateByDuration">,
     private readonly log: Logger,
     private readonly enabled: boolean,
-    { stream = true, memoMaxChars = 16_000 }: AiRunnerOptions = {},
+    { stream = true, memoMaxChars = 16_000, localUrl = null }: AiRunnerOptions = {},
   ) {
     this.stream = stream
     this.memoMaxChars = memoMaxChars
+    this.local = localUrl ? createOpenAICompatible({ name: "local", baseURL: `${localUrl.replace(/\/+$/, "")}/v1`, includeUsage: true, supportsStructuredOutputs: true }) : null
   }
 
   get available() {
     return this.enabled
   }
 
+  /** Why a model can't be used here, or null when it can. */
+  private refusal(model: string): string | null {
+    if (isLocalModel(model)) return this.local ? null : `${model} needs the local model server (LLM_URL not set)`
+    return this.enabled ? null : "AI is disabled (AI_GATEWAY_API_KEY not set)"
+  }
+
+  /** The gateway takes the id as it is; a local model goes to the server under its alias. */
+  private languageModel(model: string): LanguageModel {
+    return isLocalModel(model) && this.local ? this.local.chatModel(model.slice(LOCAL_PREFIX.length)) : model
+  }
+
   /** Records the call against the daily budget and returns the cost it was charged. `searches` is null for calls without tools. */
   private async record(task: AiTask, model: string, cycleId: string | null, usage: TokenUsage, cost: number | null, searches: number | null, started: number, error: string | null) {
     const durationMs = Date.now() - started
+    const local = isLocalModel(model)
     // A call cut off by a timeout or abort reports no usage, but the provider still bills what it generated.
     const unreported = cost === null && usage.total === 0 && error !== null
-    const costUsd = cost ?? (unreported ? await this.budget.estimateByDuration(task, model, durationMs).catch(() => 0) : estimateCost(usage.input, usage.output, searches ?? 0))
+    const costUsd = local ? 0 : (cost ?? (unreported ? await this.budget.estimateByDuration(task, model, durationMs).catch(() => 0) : estimateCost(usage.input, usage.output, searches ?? 0)))
     await this.budget
       .record({
         task,
@@ -131,7 +157,7 @@ export class AiRunner {
         output_tokens: usage.output,
         ...(searches !== null ? { searches } : {}),
         cost_usd: costUsd,
-        cost_source: cost !== null ? "gateway" : "estimate",
+        cost_source: local ? "local" : cost !== null ? "gateway" : "estimate",
         duration_ms: durationMs,
         ok: error === null,
         error,
@@ -296,7 +322,10 @@ export class AiRunner {
     /** Streamed calls only. */
     progress?: StructuredProgress
   }): Promise<{ output: T; attempts: number; repaired: boolean; model: string; cost_usd: number; usage: TokenUsage }> {
-    if (!this.enabled) throw new Error("AI is disabled (AI_GATEWAY_API_KEY not set)")
+    const refused = this.refusal(opts.model)
+    if (refused) throw new Error(refused)
+    // A fallback this runner can't use is no fallback.
+    const fallback = opts.fallback && !this.refusal(opts.fallback) ? opts.fallback : null
     const temperatures = [0.3, 0.15, 0]
     let feedback = ""
     let lastError: unknown = null
@@ -308,14 +337,14 @@ export class AiRunner {
     for (let attempt = 1; attempt <= temperatures.length; attempt++) {
       if (opts.signal?.aborted) throw new Error("aborted")
       const isLast = attempt === temperatures.length
-      if (isLast && opts.fallback && schemaFailures === 0 && lastError) model = opts.fallback
+      if (isLast && fallback && schemaFailures === 0 && lastError) model = fallback
       const started = Date.now()
       const reasoning = reasoningReporter(opts.progress?.onReasoning)
       // The gateway cost reported so far: per finished step when streamed. A failed non-streamed call reports none.
       let cost: number | null = null
       try {
         const call = {
-          model,
+          model: this.languageModel(model),
           instructions: opts.system,
           prompt: opts.prompt + feedback,
           output: Output.object({ schema: opts.schema, name: opts.name, description: opts.description }),
@@ -377,7 +406,7 @@ export class AiRunner {
         this.log.warn("structured attempt failed", { task: opts.task, attempt, model, error: message })
         // The SDK words a timeout several ways (its own, or an abort during its retry back-off), so a
         // failure at the time limit is what counts.
-        if (opts.fallback && !NoObjectGeneratedError.isInstance(error) && Date.now() - started >= opts.timeoutMs - TIMEOUT_SLACK_MS) model = opts.fallback
+        if (fallback && !NoObjectGeneratedError.isInstance(error) && Date.now() - started >= opts.timeoutMs - TIMEOUT_SLACK_MS) model = fallback
         feedback = `\n\nIMPORTANT: your previous answer was rejected: ${message}\nReturn ONLY one JSON object that matches the schema exactly (every field present, correct types, numbers as numbers, enums spelled exactly as listed).`
       }
     }

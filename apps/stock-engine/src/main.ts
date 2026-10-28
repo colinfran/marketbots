@@ -88,7 +88,7 @@ void bootstrap({
       },
     })
     const budget = new AiBudget(db.col, () => settings.current.ai.daily_budget_usd)
-    const ai = new AiRunner(budget, log.child({ component: "ai" }), !!env.AI_GATEWAY_API_KEY)
+    const ai = new AiRunner(budget, log.child({ component: "ai" }), !!env.AI_GATEWAY_API_KEY, { localUrl: env.LLM_URL })
 
     const wire = new Wire({
       col: db.col,

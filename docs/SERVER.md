@@ -324,7 +324,7 @@ The Docker VM has 15.5 GiB and the other stacks use ~3.5 GiB of it. Every servic
 | `crypto-engine` | 1 GB | ~0.35 GB |
 | `stock-engine` | 1 GB (was 768 MB: headroom at the open with ~1,500 tracked symbols) | 0.3–0.5 GB |
 | `scraper` | 1 GB | 0.15 GB idle, up to 0.5 GB while rendering |
-| `llm` | 6 GB RAM, 4 CPUs | ~2 GB; ~6.8 GB of GPU memory on each card, always (§9) |
+| `llm` | 6 GB RAM, 6 CPUs | ~2.5 GB; ~6.8 GB of GPU memory on each card, always (§9) |
 | `llm-model` | 256 MB | runs for a moment at each start of `llm` (a few minutes when it downloads) |
 | `history` | 2 GB (`shared_buffers` 512 MB, tuned for that) | 0.6–1.2 GB, mostly cache |
 | `history-backup` | 256 MB | a few MB; more for a minute at 10:30 UTC |
@@ -587,7 +587,7 @@ Vercel's instant rollback (*Deployments* → a previous deployment → *Instant 
 `llm` is llama.cpp's server running **Qwen 3.6 35B-A3B at 2-bit**: Unsloth's `UD-Q2_K_XL`, 12.3 GB. It is split across both GPUs and loaded at all times. [LOCAL-AI.md §5.1](plans/LOCAL-AI.md#51-step-0-results-2026-102728) has the measurements behind the choice.
 
 - **Access:** both engines reach it at `LLM_URL=http://llm:8080`, an OpenAI-compatible API, over the `ai` network. It has no host port and no internet.
-- **Work:** it writes the article summaries.
+- **Work:** it writes the article summaries. Decisions can run on it too: an AI model setting (Admin) of `local/qwen3.6-35b-a3b-q2` sends that call here instead of to the AI Gateway. No setting does yet.
 - **When it's down:** the engines keep trading. Only the summaries stop, and the source `enrich:summaries` turns degraded on the dashboard.
 
 **The model file:** `llm-model` is a one-shot container that runs before `llm` starts:
@@ -623,9 +623,15 @@ nvidia-smi                                                  # ~6.8 GB used on ea
 - **Cold starts:** the first start compiles the CUDA kernels (2–3 minutes) and keeps them in the `llm-cache` volume. Later starts take ~1 minute.
 
 **Caps:**
-- **Container:** `mem_limit: 6g` (it holds ~2 GB), `cpus: 4`.
+- **Container:** `mem_limit: 6g` (it holds ~2.5 GB), `cpus: 6`. llama.cpp's 6 threads spin while they wait, so a 4-CPU cap throttled them: 36–40 tokens/s against 45–46 at 6. Idle, it uses next to no CPU.
 - **GPU:** ~6.8 GB on each card.
 - **Power:** the 2080 SUPER is capped at 180 W (§2).
+
+**Local decisions** (`local/<alias>` model settings, `AiRunner` in `@mb/engine-kit`):
+- **Cost:** none. Their calls are in `ai_calls` with `cost_usd: 0` and `cost_source: "local"`, with their tokens and time.
+- **Thinking:** the model's default, and Qwen 3.6 thinks. A crypto decision took ~3 minutes in step 0 (up to 4¼), against default timeouts of 240 s for decisions and 90 s for event decisions. Raise them in Admin (300 s at most) before pointing a decision model here.
+- **Research:** no. It needs Grok's live web and X search, so `models.research` stays a gateway model.
+- **Without LLM_URL:** a `local/…` model is refused, and never becomes a fallback.
 
 **The speed guard:** llama.cpp doesn't report where its tensors sit, so the engines judge by speed. A summary written slower than 20 tokens/s pauses summaries for 30 minutes. Normal is 40–50 tokens/s, less per request while other slots run. A model spilled into system RAM writes 15–20.
 

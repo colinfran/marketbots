@@ -198,7 +198,7 @@ export type AiCallDoc = {
   /** Research calls: the web and X tool calls Grok made, each billed (absent on decisions and older docs). */
   searches?: number
   cost_usd: number
-  cost_source: "gateway" | "estimate"
+  cost_source: "gateway" | "estimate" | "local"
   duration_ms: number
   ok: boolean
   error: string | null

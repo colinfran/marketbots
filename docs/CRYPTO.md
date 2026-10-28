@@ -8,7 +8,7 @@ This document explains how CryptoMarketBot is built and why: the deployment boun
 | --- | --- |
 | **Kraken spot, paper only** | Orders execute in a Kraken CLI paper workspace at live Kraken prices. Kraken has no self-service *spot* sandbox (Spot UAT is on request via an account manager; the self-service demo is Futures only), and the official CLI's paper wallet is the closest thing to a Kraken-hosted paper account. The engine has no live-trading code path and holds no exchange keys. |
 | **No Polymarket** | Polymarket US has no paper/demo environment, so prediction markets were removed from scope. |
-| **Grok via Vercel AI Gateway** | Same pattern as stockmarketbot: the `ai` SDK with plain `provider/model` ids and `AI_GATEWAY_API_KEY`; xAI's server-side `web_search` / `x_search` tools for research. Models are settings, so other gateway models can be configured for decisions (research needs a model with live search tools). |
+| **Grok via Vercel AI Gateway** | Same pattern as stockmarketbot: the `ai` SDK with plain `provider/model` ids and `AI_GATEWAY_API_KEY`; xAI's server-side `web_search` / `x_search` tools for research. Models are settings, so other gateway models can be configured for decisions (research needs a model with live search tools), and so can the local model, as `local/qwen3.6-35b-a3b-q2` ([SERVER.md §9](SERVER.md#9-the-local-model-server-llm)): no setting uses it yet. |
 | **Hosted MongoDB (Atlas)** | One cluster shared by the engine and the Vercel dashboard. No database container on the server. |
 | **Monorepo (pnpm workspaces)** | `packages/core` holds everything both apps must agree on: settings schema, event schema, commands, DB types, metrics. |
 
