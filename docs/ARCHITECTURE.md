@@ -30,6 +30,7 @@ Browser ──https──▶ Vercel: cryptomarketbot.app, stockmarketbot.app ─
                                              ├─▶ 127.0.0.1:8787  crypto-engine ───┤
                                              └─▶ 127.0.0.1:8788  stock-engine  ───┘
                      marketbots stack:  crypto-engine, stock-engine ──▶ scraper (Playwright), no host port
+                                                                    ──▶ search (SearXNG, local research), no host port
                                                                     ──▶ llm (llama.cpp, Qwen 3.6, both GPUs),
                                                                     ──▶ history (Postgres + TimescaleDB + pgvector),
                                                                         both on network `ai`: no host port, no internet
@@ -46,6 +47,7 @@ External: Kraken (CLI wallet in its volume), Alpaca, Vercel AI Gateway (Grok), ~
 | --- | --- |
 | Scraper | One container, `http://scraper:8790` on the compose network. Three renders at a time; each caller (the `X-Client` header, else the engine container's address) may hold at most 8 of the 16 queue places, so one bot can't starve the other. If it dies, only the headless news sources go down. |
 | Local model | One llama.cpp server on both GPUs (`llm`, Qwen 3.6 35B-A3B at 2-bit) on the internal `ai` network, `http://llm:8080` (OpenAI-compatible), with a slot per bot and one for news. It summarizes news articles for both engines. If it is down, only the summaries stop ([SERVER.md §9](SERVER.md#9-the-local-model-server-llm)). |
+| Search service | One SearXNG container, `http://search:8080` on the compose network, that runs the web searches of local research (`@mb/wire/research`) for both engines. If it is down, only local research fails. |
 | History store | One Postgres container (TimescaleDB, pgvector) on the internal `ai` network, with a database and a role per bot (`crypto_history`, `stock_history`): each engine's `HISTORY_URL` holds only its own password. Each engine writes its closed 1-minute bars and archives its news there (`@mb/history`, [plans/LOCAL-AI.md §6](plans/LOCAL-AI.md#6-the-history-store-history)). If it is down, only history stops. |
 | Atlas cluster | One cluster, a separate database per bot. |
 | The server's IP | Outbound rate limits (SEC, GDELT, ForexFactory…) apply to both bots together. |
@@ -91,7 +93,7 @@ Both bots were moved in from their old repos unchanged and then refactored onto 
 | --- | --- | --- |
 | `@mb/core` | Pure shared schemas and helpers, no I/O: `math`, `stream-token` (prefix as a parameter), settings base pieces and helpers, the shared command schemas, the event envelope and the events both bots define identically, base collections, indexes and document types, wire types, `metrics`, `indicators`, generic `time` | every app and package |
 | `@mb/engine-kit` | Engine runtime, generic over each bot's settings, events and commands: log, lease, heartbeat, bus, stream server, command processor, Mongo connect, state stores, alerts, AI budget/repair/runner (the gateway, and `local/*` models on the local model server)/prompt parts, `ControlPlane`, `StatusReporter`, `EventCycleQueue`, bootstrap, env base, test helpers | both engines |
-| `@mb/wire` | The news engine: the formerly mirrored files, shared source helpers, `sharedCatalog()`, a `makeLexicon()` skeleton, and `enrich/` for article summaries | both engines |
+| `@mb/wire` | The news engine: the formerly mirrored files, shared source helpers, `sharedCatalog()`, a `makeLexicon()` skeleton, `enrich/` for article summaries, and `research/` for local research (web search, then the local model) | both engines |
 | `@mb/history` | The history store ([plans/LOCAL-AI.md §6](plans/LOCAL-AI.md#6-the-history-store-history)): the Postgres client (node-postgres; PGlite in tests), the migrations, the 1-minute bar writer, the news archive (wire items and triggers copied from MongoDB before their TTL), the moves after each news item, the job runner the backfills use, `HistoryStore`. `docker/initdb.sh` creates each bot's database and role | both engines |
 | `@mb/ui` | Client-safe React: the shadcn primitives, design tokens (`styles.css`), app-shell components (including the navigation, below), the live-UI shell driven by a per-bot event catalog, shared page sections, the charts (`@mb/ui/charts`) | both dashboards |
 | `@mb/web-kit` | Server-only dashboard helpers: auth factory, database, command routes, shared queries, formatting, metadata, error reporting | both dashboards |

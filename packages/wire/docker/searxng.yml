@@ -1,0 +1,16 @@
+# SearXNG for local research (compose `search`; docs/SERVER.md §9): its default engines, plus
+# JSON answers for the engines, no bot limiter (only the engines reach it) and no image proxy.
+# The secret key comes from SEARXNG_SECRET, random at every start: the service keeps no sessions.
+use_default_settings: true
+server:
+  limiter: false
+  image_proxy: false
+search:
+  formats: [html, json]
+  safe_search: 0
+# Tor-only engines: they can't load without a Tor proxy.
+engines:
+  - name: ahmia
+    inactive: true
+  - name: torch
+    inactive: true

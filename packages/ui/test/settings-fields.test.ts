@@ -5,8 +5,8 @@ import { AI_MODEL_FIELDS, AI_MODELS, parseField, selectChoices, type SettingsFie
 const field = (path: string) => AI_MODEL_FIELDS.find((f) => f.path === path)!
 
 describe("the model dropdowns", () => {
-  it("offer only Grok for research, every model for decisions, and None as a fallback", () => {
-    expect(selectChoices(field("ai.models.research"), "spacexai/grok-4.3").map((c) => c.value)).toEqual(["spacexai/grok-4.7", "spacexai/grok-4.5", "spacexai/grok-4.3"])
+  it("offer every model for research and decisions, and None as a fallback", () => {
+    expect(selectChoices(field("ai.models.research"), "spacexai/grok-4.3").map((c) => c.value)).toEqual(["local/qwen3.6-35b-a3b-q2", "spacexai/grok-4.7", "spacexai/grok-4.5", "spacexai/grok-4.3"])
     expect(selectChoices(field("ai.models.decision"), "spacexai/grok-4.7").map((c) => c.label)).toEqual(["Qwen 3.6 35B-A3B (local, free)", "Grok 4.7", "Grok 4.5", "Grok 4.3"])
     expect(selectChoices(field("ai.models.fallback"), null)[0]).toEqual({ value: "", label: "None" })
   })

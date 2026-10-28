@@ -2,6 +2,8 @@ import { AiRunner } from "@mb/engine-kit/ai/runner"
 import { bootstrap } from "@mb/engine-kit/bootstrap"
 import { newsMovesJob } from "@mb/history/moves"
 import { HistoryStore } from "@mb/history/store"
+import { httpClient } from "@mb/engine-kit/util/http"
+import { localResearcher } from "@mb/wire/research/local"
 import { CORE_INDEX_ETFS } from "@mb/stock-core/settings"
 import { stockBackfillJobs } from "./history/backfill"
 import { AiBudget } from "./ai/budget"
@@ -87,8 +89,17 @@ void bootstrap({
         historySymbols = new Set(["SPY", ...symbols])
       },
     })
-    const budget = new AiBudget(db.col, () => settings.current.ai.daily_budget_usd, { decisionModel: () => settings.current.ai.models.decision })
-    const ai = new AiRunner(budget, log.child({ component: "ai" }), !!env.AI_GATEWAY_API_KEY, { localUrl: env.LLM_URL })
+    const budget = new AiBudget(db.col, () => settings.current.ai.daily_budget_usd, { models: () => settings.current.ai.models })
+    const ai = new AiRunner(budget, log.child({ component: "ai" }), !!env.AI_GATEWAY_API_KEY, {
+      localUrl: env.LLM_URL,
+      // Research for local/… models: our search service and scraper, read by the local model.
+      localResearch: localResearcher({
+        request: httpClient(env.SEC_USER_AGENT ?? DEFAULT_USER_AGENT).requestText,
+        env: { LLM_URL: env.LLM_URL, SEARCH_URL: env.SEARCH_URL, SCRAPER_URL: env.SCRAPER_URL },
+        client: "stock",
+        log: log.child({ component: "research" }),
+      }),
+    })
 
     const wire = new Wire({
       col: db.col,

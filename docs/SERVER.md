@@ -8,7 +8,7 @@ What runs where:
 
 | Where | What | Config |
 | --- | --- | --- |
-| Windows server, Docker stack `marketbots` | `crypto-engine` on 127.0.0.1:8787 (with the Kraken CLI paper wallet), `stock-engine` on 127.0.0.1:8788, `scraper` (no host port), `llm` and `llm-model` (llama.cpp with the local model on both GPUs, no host port), `history` (Postgres with TimescaleDB and pgvector, no host port) and `history-backup` | `compose.yml`, `.env.crypto`, `.env.stock`, `.env.history` at the repo root |
+| Windows server, Docker stack `marketbots` | `crypto-engine` on 127.0.0.1:8787 (with the Kraken CLI paper wallet), `stock-engine` on 127.0.0.1:8788, `scraper` (no host port), `llm` and `llm-model` (llama.cpp with the local model on both GPUs, no host port), `search` (SearXNG for local research, no host port), `history` (Postgres with TimescaleDB and pgvector, no host port) and `history-backup` | `compose.yml`, `.env.crypto`, `.env.stock`, `.env.history` at the repo root |
 | Caddy on the Windows host | `engine.cryptomarketbot.app` → 127.0.0.1:8787, `engine.stockmarketbot.app` → 127.0.0.1:8788 (WebSocket) | `C:\Caddy\Caddyfile` |
 | Vercel | two projects: `apps/crypto-web` at cryptomarketbot.app, `apps/stock-web` at stockmarketbot.app | each project's environment variables |
 | MongoDB Atlas | one cluster, databases `cryptomarketbot` and `stockmarketbot` | `MONGODB_URI` |
@@ -129,6 +129,7 @@ Don't put these in the env files. `compose.yml` sets them, and its values win ov
 | `STREAM_PORT` | `8787` | `8788` |
 | `SCRAPER_URL` | `http://scraper:8790` | `http://scraper:8790` |
 | `LLM_URL` | `http://llm:8080` | `http://llm:8080` |
+| `SEARCH_URL` | `http://search:8080` | `http://search:8080` |
 
 Crypto also gets `KRAKEN_OHLCVT_DIR=/data/ohlcvt`, the read-only mount of Kraken's history files (§6.5). `HISTORY_URL` is not among them: it carries the bot's history password, so it lives in the bot's env file (§3.6).
 
@@ -257,6 +258,7 @@ docker compose up -d --build crypto-engine     # only the crypto engine
 docker compose up -d --build scraper           # both bots' headless sources pause for a few seconds
 docker compose up -d history history-backup    # the history store (engines buffer bars and retry meanwhile)
 docker compose up -d llm                       # the local model server, after a change to its service (summaries pause ~1 min)
+docker compose up -d search                    # the search service for local research (a few seconds)
 docker compose up -d --build                   # everything whose image or config changed
 ```
 
@@ -326,6 +328,7 @@ The Docker VM has 15.5 GiB and the other stacks use ~3.5 GiB of it. Every servic
 | `scraper` | 1 GB | 0.15 GB idle, up to 0.5 GB while rendering |
 | `llm` | 6 GB RAM, 6 CPUs | ~2.5 GB; ~6.8 GB of GPU memory on each card, always (§9) |
 | `llm-model` | 256 MB | runs for a moment at each start of `llm` (a few minutes when it downloads) |
+| `search` | 512 MB | ~0.2 GB |
 | `history` | 2 GB (`shared_buffers` 512 MB, tuned for that) | 0.6–1.2 GB, mostly cache |
 | `history-backup` | 256 MB | a few MB; more for a minute at 10:30 UTC |
 
@@ -630,9 +633,25 @@ nvidia-smi                                                  # ~6.8 GB used on ea
 **Local decisions** (`local/<alias>` model settings, `AiRunner` in `@mb/engine-kit`):
 - **Cost:** none. Their calls are in `ai_calls` with `cost_usd: 0` and `cost_source: "local"`, with their tokens and time. The daily AI budget expects a local decision to cost nothing. A cycle whose Grok research the budget can't pay for drops the research and decides from our feeds, as long as the news engine is up.
 - **Thinking:** on, and capped by the call's timeout. The engine keeps ~120 s for reading the prompt and writing the answer (up to ~4,500 tokens), and lets the model think for the rest at 40 tokens/s, between 256 and 4,096 tokens. That gives 4,096 at the 240 s decision timeout and 2,400 at 180 s. At the 90 s event-decision default it gets almost no thinking, and a long answer alone can outrun 90 s, so raise *Event decision timeout* to 240 s when decisions go local.
-- **Research:** no. It needs Grok's live web and X search, so `models.research` stays a gateway model.
+- **Research:** see *Local research* below.
 - **Without LLM_URL:** a `local/…` model is refused, and never becomes a fallback.
 - **Switching:** in Admin, pick *Qwen 3.6 35B-A3B (local, free)* as *Decision model* and set *Event decision timeout* to 240. Pick *None* as *Fallback model* for no Grok at all, or a Grok model to have it take over when a local call times out or fails.
+
+**Local research** (a *Research model* of `local/…`; `@mb/wire/research/local`): the model can't browse, so the engine does the browsing for it, and the bot's research prompt stays as it is:
+1. The model reads the request and writes up to 6 web searches (no thinking).
+2. The `search` service runs them, two at a time, for news and web results from the last day (gap fills and event checks) or week (full research).
+3. The model picks up to 5 results to read in full, and the scraper fetches them (paywalled sites are refused, as for summaries).
+4. The model writes the memo from the results and articles alone (1,024 tokens of thinking), citing their URLs.
+
+A run takes about a minute, and costs nothing (`ai_calls`: `cost_source: "local"`, the searches counted). The differences from Grok:
+- **No X.** The memo says no X sentiment was searched, rather than guessing it.
+- **No paywalled articles.** Their search snippets can still be cited.
+- **A search that finds nothing** is reported in the memo, and the cycle decides from our feeds. Only an unreachable search service or model fails the research.
+
+**The search service (`search`):** SearXNG, pinned by digest, on the default network (it needs the internet), with no host port. The engines reach it at `SEARCH_URL=http://search:8080`. Its settings are `packages/wire/docker/searxng.yml`: SearXNG's default engines, JSON answers, no rate limiter (only the engines call it). Its secret key is random at every start, since it keeps no sessions.
+- **Search engines throttle it:** Google, Bing News and DuckDuckGo answer most queries, but Brave and DuckDuckGo sometimes rate-limit or ask for a CAPTCHA. SearXNG suspends a failing engine for a while and asks the rest, so research gets fewer results, not none.
+- **Check it:** `docker compose ps search`, and `docker logs marketbots-search` for engines that fail.
+- **Switching:** in Admin, pick *Qwen 3.6 35B-A3B (local, free)* as *Research model*. *Grok research* (auto) and *Event research* (x_verify) keep their meaning: when to research, now with web search instead of X.
 
 **The speed guard:** llama.cpp doesn't report where its tensors sit, so the engines judge by speed. A summary written slower than 20 tokens/s pauses summaries for 30 minutes. Normal is 40–50 tokens/s, less per request while other slots run. A model spilled into system RAM writes 15–20.
 

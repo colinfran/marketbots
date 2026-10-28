@@ -135,8 +135,34 @@ describe("local models", () => {
     expect(b.record.mock.calls.map(([call]) => (call as { cost_source: string }).cost_source)).toEqual(["estimate", "estimate", "local"])
   })
 
-  it("can't research: they have no live search", async () => {
-    const r = await new AiRunner(budget(), silentLogger, true, { localUrl: LLM_URL }).research({ cycleId: "c", model: MODEL, fallback: null, prompt: "p", xSearch: true, fromDate: "2026-10-27", timeoutMs: 60_000 })
-    expect(r).toMatchObject({ memo: "", error: "research model local/qwen3.6-35b-a3b-q2 has no live search tools" })
+  const researchOpts = { cycleId: "c", model: MODEL, fallback: null, prompt: "p", xSearch: true, fromDate: "2026-10-27", timeoutMs: 60_000 }
+
+  it("research through the engine's local research, without the gateway, at no cost", async () => {
+    const localResearch = vi.fn(async () => ({
+      memo: "- [FACT] HYPE unlock (2026-10-28, https://www.coindesk.com/x)",
+      sources: [{ title: "HYPE unlock", url: "https://www.coindesk.com/x", domain: "coindesk.com" }],
+      queries: ["HYPE token unlock", "Hyperliquid news"],
+      usage: { input: 8_000, output: 1_100, total: 9_100 },
+      error: null,
+    }))
+    const b = budget()
+    const onQuery = vi.fn()
+    const r = await new AiRunner(b, silentLogger, false, { localUrl: LLM_URL, localResearch }).research({ ...researchOpts, task: "research_gap", progress: { onQuery } })
+    expect(r).toMatchObject({ error: null, model: MODEL, x_search: false, cost_usd: 0, queries: ["HYPE token unlock", "Hyperliquid news"], sources: [{ domain: "coindesk.com" }], usage: { total: 9_100 } })
+    expect(localResearch).toHaveBeenCalledWith(expect.objectContaining({ model: MODEL, prompt: "p", fromDate: "2026-10-27", timeoutMs: 60_000, progress: { onQuery } }))
+    expect(b.record).toHaveBeenCalledWith(expect.objectContaining({ task: "research_gap", model: MODEL, searches: 2, cost_usd: 0, cost_source: "local", ok: true }))
+  })
+
+  it("record a failed local research at no cost", async () => {
+    const localResearch = vi.fn(async () => ({ memo: "", sources: [], queries: ["q"], usage: { input: 10, output: 0, total: 10 }, error: "the search service is unreachable" }))
+    const b = budget()
+    const r = await new AiRunner(b, silentLogger, false, { localUrl: LLM_URL, localResearch }).research(researchOpts)
+    expect(r).toMatchObject({ memo: "", error: "the search service is unreachable" })
+    expect(b.record).toHaveBeenCalledWith(expect.objectContaining({ model: MODEL, ok: false, error: "the search service is unreachable", cost_usd: 0 }))
+  })
+
+  it("can't research without the engine's local research", async () => {
+    const r = await new AiRunner(budget(), silentLogger, true, { localUrl: LLM_URL }).research(researchOpts)
+    expect(r).toMatchObject({ memo: "", error: "local/qwen3.6-35b-a3b-q2 can't research here: no local research (LLM_URL or SEARCH_URL not set)" })
   })
 })

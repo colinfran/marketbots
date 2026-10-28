@@ -45,20 +45,20 @@ export const selectChoices = (f: SettingsField, current: unknown): SelectOption[
 }
 
 /**
- * The AI models Admin offers; the engine still validates whatever is picked. Research needs live
- * web and X search, which only Grok has. The local model runs on the server's GPUs (docs/SERVER.md
- * §9) and costs nothing.
+ * The AI models Admin offers; the engine still validates whatever is picked. The local model runs
+ * on the server's GPUs and costs nothing; it researches through our own search service, without X
+ * (docs/SERVER.md §9). Grok researches with live web and X search.
  */
-export const AI_MODELS: (SelectOption & { research: boolean })[] = [
-  { value: "local/qwen3.6-35b-a3b-q2", label: "Qwen 3.6 35B-A3B (local, free)", research: false },
-  { value: "spacexai/grok-4.7", label: "Grok 4.7", research: true },
-  { value: "spacexai/grok-4.5", label: "Grok 4.5", research: true },
-  { value: "spacexai/grok-4.3", label: "Grok 4.3", research: true },
+export const AI_MODELS: SelectOption[] = [
+  { value: "local/qwen3.6-35b-a3b-q2", label: "Qwen 3.6 35B-A3B (local, free)" },
+  { value: "spacexai/grok-4.7", label: "Grok 4.7" },
+  { value: "spacexai/grok-4.5", label: "Grok 4.5" },
+  { value: "spacexai/grok-4.3", label: "Grok 4.3" },
 ]
 
 /** The three model settings, as both bots' Admin pages show them. */
 export const AI_MODEL_FIELDS: SettingsField[] = [
-  { path: "ai.models.research", label: "Research model (needs live web and X search: Grok)", kind: "select", options: AI_MODELS.filter((m) => m.research) },
+  { path: "ai.models.research", label: "Research model (Qwen: web search, free; Grok: web and X search)", kind: "select", options: AI_MODELS },
   { path: "ai.models.decision", label: "Decision model", kind: "select", options: AI_MODELS },
   { path: "ai.models.fallback", label: "Fallback model (takes over when a decision call fails or times out)", kind: "select", options: AI_MODELS, none: "None" },
 ]

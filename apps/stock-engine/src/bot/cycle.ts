@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto"
 import { affordCycle, type ResearchPlan } from "@mb/engine-kit/ai/budget"
+import { isLocalModel } from "@mb/engine-kit/ai/models"
 import { errorMessage } from "@mb/engine-kit/log"
 import type { CycleDoc, CycleKind, CycleStatus, ResearchResult } from "@mb/stock-core/db"
 import type { CycleState } from "@mb/stock-core/events"
@@ -56,6 +57,13 @@ export type CycleOptions = {
 }
 
 export type { ResearchPlan }
+
+/** What the Live page says while research runs: the local model searches the web through our search service, Grok also searches X. */
+const researchSummary = (kind: ResearchPlan["kind"], phase: Parameters<typeof label>[0], model: string) => {
+  const local = isLocalModel(model)
+  if (kind === "gap") return local ? "Searching the web for gaps our feeds left" : "Checking X and gaps our feeds left"
+  return `Researching the ${label(phase).toLowerCase()} with ${local ? "web search" : "web + X search"}`
+}
 
 /**
  * Which Grok research a cycle runs. Full whenever the wire is off or
@@ -253,7 +261,7 @@ export const runCycle = async (
     const researching = plan.kind !== "none" && !reuse
     if (researching) {
       state("researching", focus.length ? focus.join(", ") : "the market")
-      bus.emit("research.started", { cycle_id: cycleId, research_id: researchId, phase, model: settings.ai.models.research, focus }, { summary: plan.kind === "gap" ? "Checking X and gaps our feeds left" : `Researching the ${label(phase).toLowerCase()} with web + X search`, ...meta })
+      bus.emit("research.started", { cycle_id: cycleId, research_id: researchId, phase, model: settings.ai.models.research, focus }, { summary: researchSummary(plan.kind, phase, settings.ai.models.research), ...meta })
     }
     const skipped: ResearchResult = { memo: "", sources: [], queries: [], model: settings.ai.models.research, x_search: false, duration_ms: 0, error: null, usage: { input: 0, output: 0, total: 0 }, cost_usd: 0 }
     const research = await step(

@@ -60,6 +60,7 @@ const envSchema = z.object({
   COINALYZE_API_KEY: optional,
   SCRAPER_URL: base.SCRAPER_URL,
   LLM_URL: base.LLM_URL,
+  SEARCH_URL: base.SEARCH_URL,
   HISTORY_URL: base.HISTORY_URL,
 })
 

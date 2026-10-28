@@ -1,6 +1,8 @@
 import { bootstrap } from "@mb/engine-kit/bootstrap"
 import { newsMovesJob } from "@mb/history/moves"
 import { HistoryStore } from "@mb/history/store"
+import { httpClient } from "@mb/engine-kit/util/http"
+import { localResearcher } from "@mb/wire/research/local"
 import { krakenDailyJob, krakenFilesJob, krakenGapJob } from "./history/backfill"
 import { AiBudget } from "./ai/budget"
 import { AiRunner } from "./ai/runner"
@@ -52,8 +54,17 @@ void bootstrap({
     const cli = new KrakenCli(env.KRAKEN_CLI_PATH, env.KRAKEN_WORKSPACE, env.KRAKEN_CLI_TIMEOUT_MS, log.child({ component: "kraken-cli" }))
     const ledger = new Ledger(db.col, bus)
     const executor = new Executor(db.col, ledger, new PaperWalletExecution(cli, hub), bus, log.child({ component: "executor" }))
-    const budget = new AiBudget(db.col, () => settings.current.ai.daily_budget_usd, { decisionModel: () => settings.current.ai.models.decision })
-    const ai = new AiRunner(budget, log.child({ component: "ai" }), !!env.AI_GATEWAY_API_KEY, { localUrl: env.LLM_URL })
+    const budget = new AiBudget(db.col, () => settings.current.ai.daily_budget_usd, { models: () => settings.current.ai.models })
+    const ai = new AiRunner(budget, log.child({ component: "ai" }), !!env.AI_GATEWAY_API_KEY, {
+      localUrl: env.LLM_URL,
+      // Research for local/… models: our search service and scraper, read by the local model.
+      localResearch: localResearcher({
+        request: httpClient(env.SEC_USER_AGENT ?? DEFAULT_USER_AGENT).requestText,
+        env: { LLM_URL: env.LLM_URL, SEARCH_URL: env.SEARCH_URL, SCRAPER_URL: env.SCRAPER_URL },
+        client: "crypto",
+        log: log.child({ component: "research" }),
+      }),
+    })
 
     // Our own market data as a news source: price/volume anomalies and stablecoin depegs.
     const marketSignals = new KrakenMarketSignals(hub, () => settings.current, log.child({ component: "anomaly" }), (symbol, kind) => wire.recordAnomaly(symbol, kind))

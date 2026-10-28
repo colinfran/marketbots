@@ -35,14 +35,19 @@ describe("AiBudget.estimate", () => {
   /** The last successful calls, as the budget reads them (every task alike here). */
   const calls = (costs: number[]) =>
     ({ find: () => ({ sort: () => ({ limit: () => ({ toArray: async () => costs.map((cost_usd) => ({ cost_usd })) }) }) }) }) as unknown as Collection<AiCallDoc>
-  const budget = (decisionModel: string) =>
-    new AiBudget({ aiCalls: calls([0.05, 0.06, 0.07]) }, () => 5, { day: () => "2026-10-28", defaultEstimates: { research: 0.2, decision: 0.06, research_gap: 0.08 } }, undefined, () => decisionModel)
+  const budget = (decision: string, research = "spacexai/grok-4.3") =>
+    new AiBudget({ aiCalls: calls([0.05, 0.06, 0.07]) }, () => 5, { day: () => "2026-10-28", defaultEstimates: { research: 0.2, decision: 0.06, research_gap: 0.08 } }, undefined, () => ({ research, decision }))
 
   it("expects a decision on the local model to cost nothing, whatever Grok decisions cost before", async () => {
     const local = budget("local/qwen3.6-35b-a3b-q2")
     expect(await local.estimate("decision")).toBe(0)
     // Research still runs on Grok, at its usual cost.
     expect(await local.estimate("research")).toBeCloseTo(0.06)
+  })
+
+  it("expects research on the local model to cost nothing, gap-fills included", async () => {
+    const local = budget("local/qwen3.6-35b-a3b-q2", "local/qwen3.6-35b-a3b-q2")
+    expect([await local.estimate("research"), await local.estimate("research_gap"), await local.estimate("decision")]).toEqual([0, 0, 0])
   })
 
   it("expects a gateway decision to cost what recent ones did", async () => {

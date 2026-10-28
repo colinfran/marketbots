@@ -89,7 +89,22 @@ export type AiRunnerOptions = {
   memoMaxChars?: number
   /** The local model server (LLM_URL), for "local/…" models. Unset: they are refused. */
   localUrl?: string | null
+  /** Research for "local/…" models (the engine supplies it, @mb/wire/research/local). Unset: they can't research. */
+  localResearch?: LocalResearch | null
 }
+
+/**
+ * Research on the local model server. The model can't browse, so the searching and reading are
+ * done for it; it gets the bot's research prompt as is. Never throws: failures come back as `error`.
+ */
+export type LocalResearch = (job: {
+  model: string
+  prompt: string
+  fromDate: string
+  timeoutMs: number
+  signal?: AbortSignal
+  progress?: ResearchProgress
+}) => Promise<{ memo: string; sources: ResearchSource[]; queries: string[]; usage: TokenUsage; error: string | null }>
 
 const queryOf = (input: unknown): string | null => {
   const i = input as { query?: unknown; queries?: unknown; search_query?: unknown } | null
@@ -125,16 +140,18 @@ export class AiRunner {
   private readonly stream: boolean
   private readonly memoMaxChars: number
   private readonly local: OpenAICompatibleProvider | null
+  private readonly localResearch: LocalResearch | null
 
   constructor(
     private readonly budget: Pick<AiBudget, "record" | "estimateByDuration">,
     private readonly log: Logger,
     private readonly enabled: boolean,
-    { stream = true, memoMaxChars = 16_000, localUrl = null }: AiRunnerOptions = {},
+    { stream = true, memoMaxChars = 16_000, localUrl = null, localResearch = null }: AiRunnerOptions = {},
   ) {
     this.stream = stream
     this.memoMaxChars = memoMaxChars
     this.local = localUrl ? createOpenAICompatible({ name: "local", baseURL: `${localUrl.replace(/\/+$/, "")}/v1`, includeUsage: true, supportsStructuredOutputs: true }) : null
+    this.localResearch = localResearch
   }
 
   get available() {
@@ -203,15 +220,19 @@ export class AiRunner {
       cost_usd: cost,
       error,
     })
-    if (!this.enabled) return empty(opts.model, "AI is disabled (AI_GATEWAY_API_KEY not set)", false)
+    const usable = (model: string) => (isLocalModel(model) ? this.localResearch !== null : this.enabled && hasLiveSearch(model))
+    if (isLocalModel(opts.model) && !this.localResearch) return empty(opts.model, `${opts.model} can't research here: no local research (LLM_URL or SEARCH_URL not set)`, false)
+    if (!isLocalModel(opts.model) && !this.enabled) return empty(opts.model, "AI is disabled (AI_GATEWAY_API_KEY not set)", false)
 
-    // Attempt 1: web + X. Attempt 2: web only (X search is the flakiest part). Attempt 3: fallback model.
+    // Grok: attempt 1 web + X, attempt 2 web only (X search is the flakiest part). A local model: one
+    // attempt. Then the fallback model, if this runner can use it.
     const plan: { model: string; withX: boolean }[] = []
-    if (hasLiveSearch(opts.model)) {
+    if (isLocalModel(opts.model)) plan.push({ model: opts.model, withX: false })
+    else if (hasLiveSearch(opts.model)) {
       if (opts.xSearch) plan.push({ model: opts.model, withX: true })
       plan.push({ model: opts.model, withX: false })
     }
-    if (opts.fallback && opts.fallback !== opts.model && hasLiveSearch(opts.fallback)) plan.push({ model: opts.fallback, withX: false })
+    if (opts.fallback && opts.fallback !== opts.model && usable(opts.fallback)) plan.push({ model: opts.fallback, withX: false })
     if (!plan.length) return empty(opts.model, `research model ${opts.model} has no live search tools`, false)
 
     let lastError = "no attempt made"
@@ -220,6 +241,20 @@ export class AiRunner {
     for (const [i, step] of plan.entries()) {
       if (opts.signal?.aborted) break
       const attemptStarted = Date.now()
+      if (isLocalModel(step.model)) {
+        const r = await this.localResearch!({ model: step.model, prompt: opts.prompt, fromDate: opts.fromDate, timeoutMs: opts.timeoutMs, signal: opts.signal, progress: opts.progress })
+        const memo = cleanText(r.memo, this.memoMaxChars)
+        const error = r.error ?? (memo ? null : "local research returned an empty memo")
+        totalCost += await this.record(opts.task ?? "research", step.model, opts.cycleId, r.usage, null, r.queries.length, attemptStarted, error)
+        totalUsage = addUsage(totalUsage, r.usage)
+        if (!error) {
+          const queries = [...new Set(r.queries)].slice(0, 60)
+          return { memo, sources: r.sources.slice(0, 40), queries, model: step.model, x_search: false, duration_ms: Date.now() - started, usage: totalUsage, cost_usd: totalCost, error: null }
+        }
+        lastError = error.slice(0, 600)
+        this.log.warn("research attempt failed", { attempt: i + 1, model: step.model, x_search: false, error: lastError })
+        continue
+      }
       const sources = new Map<string, ResearchSource>()
       const queries: string[] = []
       // xAI's search tools declare no input fields, so the SDK hands each call's input back as {}: the

@@ -41,6 +41,7 @@ services:
       STREAM_PORT: 8787
       SCRAPER_URL: http://scraper:8790
       LLM_URL: http://llm:8080
+      SEARCH_URL: http://search:8080
       LOG_DIR: /logs
       KRAKEN_OHLCVT_DIR: /data/ohlcvt
     ports:
@@ -75,6 +76,7 @@ services:
       STREAM_PORT: 8788
       SCRAPER_URL: http://scraper:8790
       LLM_URL: http://llm:8080
+      SEARCH_URL: http://search:8080
       LOG_DIR: /logs
     ports:
       # Loopback only: Caddy on the host forwards wss://engine.stockmarketbot.app here.
@@ -203,6 +205,30 @@ services:
       - ./backups/history:/backups
     networks: [ai]
     mem_limit: 256m
+    logging: *logging
+
+  # The search service for local research (docs/SERVER.md §9): SearXNG asks Google, Bing News,
+  # DuckDuckGo and other search engines, and answers the engines in JSON. On the default network
+  # (it needs the internet), with no host port. Its secret is random at every start.
+  search:
+    <<: *hardened
+    image: searxng/searxng:2026.10.13-22c64b8d3@sha256:9b61996edcc679fb6665290f95fda15389a14eda6060e41a25c63ab2758f2436
+    container_name: marketbots-search
+    user: "977:977"
+    tmpfs:
+      - /tmp
+      - /var/cache/searxng:uid=977,gid=977
+    entrypoint: ["sh", "-c"]
+    command:
+      - export SEARXNG_SECRET="$$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')" && exec /usr/local/searxng/entrypoint.sh
+    volumes:
+      - ./packages/wire/docker/searxng.yml:/etc/searxng/settings.yml:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "--header", "X-Real-IP: 127.0.0.1", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    mem_limit: 512m
     logging: *logging
 
   # Puts the local model's file into the models volume before llm starts: downloaded from Hugging

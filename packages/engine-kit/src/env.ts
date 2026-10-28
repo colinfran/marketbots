@@ -69,6 +69,8 @@ export const envFields = ({ dbName, streamPort }: { dbName: string; streamPort: 
   SCRAPER_URL: optional,
   /** The local model server (llama.cpp, OpenAI-compatible), e.g. http://llm:8080 inside docker compose. Unset: no summaries and no local/* models. */
   LLM_URL: optional,
+  /** The search service (SearXNG) for local research, e.g. http://search:8080 inside docker compose. Unset: local models can't research. */
+  SEARCH_URL: optional,
   /** The bot's own history database (postgres://…@history:5432/<bot>_history), a secret. Unset: no history is kept. */
   HISTORY_URL: optional,
 })
