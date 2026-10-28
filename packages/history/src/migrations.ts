@@ -76,6 +76,23 @@ export const MIGRATIONS: Migration[] = [
       select add_compression_policy('bars_1m', interval '7 days');
     `,
   },
+  {
+    id: 2,
+    name: "daily bars",
+    sql: `
+      create table bars_1d (
+        symbol text not null,
+        day date not null,
+        open double precision not null,
+        high double precision not null,
+        low double precision not null,
+        close double precision not null,
+        volume double precision not null,
+        source text not null,
+        primary key (symbol, day)
+      );
+    `,
+  },
 ]
 
 /** Any fixed number: the advisory lock that keeps two engines (an old and a new container during a deploy) from migrating at once. */

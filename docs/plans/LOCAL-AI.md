@@ -1,6 +1,6 @@
 # Plan: a local AI agent for both bots
 
-Status: **decisions taken on 2026-10-27**: every recommendation in §15, and no Grok at all once the agent takes over (decision 1). Step 0 of §14, the measurement spike, is running. Step 1 (the history store and the news archive) was built beside it on 2026-10-27, since it doesn't depend on the model: `@mb/history`, the `history` and `history-backup` services ([SERVER.md §3.6, §6.4](../SERVER.md#64-the-history-stores-volume-and-backups)). Nothing that trades has changed.
+Status: **decisions taken on 2026-10-27**: every recommendation in §15, and no Grok at all once the agent takes over (decision 1). Step 0 of §14, the measurement spike, is running. Step 1 (the history store and the news archive) was built beside it on 2026-10-27, since it doesn't depend on the model: `@mb/history`, the `history` and `history-backup` services ([SERVER.md §3.6, §6.4](../SERVER.md#64-the-history-stores-volume-and-backups)). Step 2 has begun with crypto's bars: Kraken's files, the gap since them rebuilt from trades, and a daily refresh ([SERVER.md §6.5](../SERVER.md#65-krakens-history-files-crypto-backfill)). Nothing that trades has changed.
 
 Both bots, crypto first. Paper trading only, as always.
 

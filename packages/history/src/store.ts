@@ -5,7 +5,7 @@ import type { Collection } from "mongodb"
 import pg from "pg"
 import { NewsArchive } from "./archive"
 import { BarWriter } from "./bars"
-import { loadJob, saveJob } from "./jobs"
+import { JobRunner, loadJob, saveJob, type HistoryJob } from "./jobs"
 import { migrate } from "./migrations"
 import type { Sql } from "./sql"
 
@@ -17,6 +17,7 @@ import type { Sql } from "./sql"
  *   every 5 s   bars buffered since the last flush
  *   every 60 s  wire items and triggers first seen since the last append
  *   daily       the last 7 days of items and triggers again (they change after they're first seen)
+ *   every 30 s  the bot's jobs (backfills), one step at a time, while any is due
  *
  * The first successful start copies everything MongoDB still has. Nothing here can stop trading:
  * every failure is logged, shown in the heartbeat, and retried on the next tick.
@@ -24,6 +25,7 @@ import type { Sql } from "./sql"
 
 const BAR_FLUSH_MS = 5_000
 const APPEND_MS = 60_000
+const JOBS_MS = 30_000
 const CONNECT_RETRY_MS = 60_000
 const SYNC_DAYS = 7
 /** The daily sync runs in the first tick after this hour (UTC): late night in the US. */
@@ -47,6 +49,7 @@ export type HistoryStoreOptions<C extends string> = {
 export class HistoryStore<C extends string> {
   readonly bars: BarWriter
   private readonly archive: NewsArchive<C>
+  private readonly jobs = new JobRunner()
   private pool: pg.Pool | null = null
   private sql: Sql | null = null
   private ready = false
@@ -69,12 +72,23 @@ export class HistoryStore<C extends string> {
     this.timers.push(
       setInterval(() => void this.bars.flush(), BAR_FLUSH_MS),
       setInterval(() => void this.tick(), APPEND_MS),
+      setInterval(() => void this.runJobs(), JOBS_MS),
     )
+  }
+
+  /** A backfill or another long-running job; it starts once the store is ready. */
+  addJob(job: HistoryJob) {
+    this.jobs.add(job)
+  }
+
+  private async runJobs() {
+    if (this.ready && this.sql) await this.jobs.pass(this.sql)
   }
 
   async stop() {
     for (const t of this.timers) clearInterval(t)
     this.timers = []
+    this.jobs.stop()
     await this.bars.flush()
     await this.pool?.end().catch(() => undefined)
   }
@@ -89,6 +103,7 @@ export class HistoryStore<C extends string> {
       checked_at: this.checkedAt,
       bars: { written: bars.written, dropped: bars.dropped, buffered: bars.buffered, last_at: bars.last_at },
       news: { items: news.items, triggers: news.triggers, last_append_at: news.last_append_at, last_sync_at: news.last_sync_at ?? this.lastSyncAt },
+      ...(this.jobs.status().length ? { jobs: this.jobs.status() } : {}),
     }
   }
 

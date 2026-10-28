@@ -122,6 +122,17 @@ export function HistoryHealthCard({ history }: { history: NonNullable<Status["hi
         <KV label="Last copy / sync">
           {ago(history.news.last_append_at)} / {ago(history.news.last_sync_at)}
         </KV>
+        {history.jobs && history.jobs.length > 0 && (
+          <ul className="text-muted-foreground mt-2 space-y-0.5 text-xs">
+            {history.jobs.map((j) => (
+              <li key={j.name}>
+                <span className="font-mono">{j.name}</span> {j.state}
+                {j.progress ? `: ${j.progress}` : ""}
+                {j.error && <span className="text-loss"> ({j.error})</span>}
+              </li>
+            ))}
+          </ul>
+        )}
         {history.last_error && <p className="text-loss mt-2 text-xs">{history.last_error}</p>}
       </CardContent>
     </Card>

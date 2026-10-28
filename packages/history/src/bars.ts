@@ -4,9 +4,41 @@ import type { Sql } from "./sql"
 /** A closed 1-minute bar; `t` is the minute's start in ms, `source` the feed it came from (kraken, iex…). */
 export type Bar = { symbol: string; t: number; open: number; high: number; low: number; close: number; volume: number; source: string }
 
+/** A daily bar; `day` is the session's date, YYYY-MM-DD (UTC for crypto, New York for stocks). */
+export type DailyBar = { symbol: string; day: string; open: number; high: number; low: number; close: number; volume: number; source: string }
+
 export type BarWriterStatus = { written: number; dropped: number; buffered: number; last_at: Date | null; last_error: string | null }
 
-const finite = (b: Bar) => [b.t, b.open, b.high, b.low, b.close, b.volume].every(Number.isFinite) && b.close > 0
+const finite = (b: { open: number; high: number; low: number; close: number; volume: number }) => [b.open, b.high, b.low, b.close, b.volume].every(Number.isFinite) && b.close > 0
+
+/** Writes 1-minute bars; a bar already stored for the same symbol and minute is replaced. Returns how many rows were sent. */
+export const upsertBars = async (sql: Sql, bars: readonly Bar[]) => {
+  // One statement can't update the same row twice: the last copy of a minute wins.
+  const rows = [...new Map(bars.filter((b) => Number.isFinite(b.t) && finite(b)).map((b) => [`${b.symbol} ${b.t}`, b])).values()]
+  if (!rows.length) return 0
+  await sql.query(
+    `insert into bars_1m (symbol, t, open, high, low, close, volume, source)
+     select symbol, to_timestamp(t / 1000.0), open, high, low, close, volume, source
+     from jsonb_to_recordset($1::jsonb) as x(symbol text, t double precision, open double precision, high double precision, low double precision, close double precision, volume double precision, source text)
+     on conflict (symbol, t) do update set open = excluded.open, high = excluded.high, low = excluded.low, close = excluded.close, volume = excluded.volume, source = excluded.source`,
+    [JSON.stringify(rows)],
+  )
+  return rows.length
+}
+
+/** Writes daily bars; a bar already stored for the same symbol and day is replaced. Returns how many rows were sent. */
+export const upsertDailyBars = async (sql: Sql, bars: readonly DailyBar[]) => {
+  const rows = [...new Map(bars.filter((b) => /^\d{4}-\d{2}-\d{2}$/.test(b.day) && finite(b)).map((b) => [`${b.symbol} ${b.day}`, b])).values()]
+  if (!rows.length) return 0
+  await sql.query(
+    `insert into bars_1d (symbol, day, open, high, low, close, volume, source)
+     select symbol, day, open, high, low, close, volume, source
+     from jsonb_to_recordset($1::jsonb) as x(symbol text, day date, open double precision, high double precision, low double precision, close double precision, volume double precision, source text)
+     on conflict (symbol, day) do update set open = excluded.open, high = excluded.high, low = excluded.low, close = excluded.close, volume = excluded.volume, source = excluded.source`,
+    [JSON.stringify(rows)],
+  )
+  return rows.length
+}
 
 /**
  * Closed 1-minute bars on their way to `bars_1m`: buffered, then written in batches. A bar written
@@ -28,7 +60,7 @@ export class BarWriter {
   ) {}
 
   add(bar: Bar) {
-    if (!finite(bar)) return
+    if (!Number.isFinite(bar.t) || !finite(bar)) return
     this.buffer.push(bar)
     this.trim()
   }
@@ -50,23 +82,13 @@ export class BarWriter {
     try {
       while (this.buffer.length) {
         const batch = this.buffer.splice(0, this.opts.batch ?? 1_000)
-        // One statement can't update the same row twice: the last copy of a minute wins.
-        const rows = [...new Map(batch.map((b) => [`${b.symbol} ${b.t}`, b])).values()]
-        await sql
-          .query(
-          `insert into bars_1m (symbol, t, open, high, low, close, volume, source)
-           select symbol, to_timestamp(t / 1000.0), open, high, low, close, volume, source
-           from jsonb_to_recordset($1::jsonb) as x(symbol text, t double precision, open double precision, high double precision, low double precision, close double precision, volume double precision, source text)
-           on conflict (symbol, t) do update set open = excluded.open, high = excluded.high, low = excluded.low, close = excluded.close, volume = excluded.volume, source = excluded.source`,
-          [JSON.stringify(rows)],
-          )
-          .catch((error: unknown) => {
-            // Back to the front, in order, for the next flush.
-            this.buffer.unshift(...batch)
-            this.trim()
-            throw error
-          })
-        this.written += rows.length
+        const n = await upsertBars(sql, batch).catch((error: unknown) => {
+          // Back to the front, in order, for the next flush.
+          this.buffer.unshift(...batch)
+          this.trim()
+          throw error
+        })
+        this.written += n
         this.lastAt = new Date()
         this.lastError = null
       }

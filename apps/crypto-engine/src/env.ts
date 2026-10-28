@@ -40,6 +40,8 @@ const envSchema = z.object({
   KRAKEN_CLI_TIMEOUT_MS: z.coerce.number().int().min(2_000).max(120_000).default(20_000),
   /** Optional folder of Kraken OHLCVT CSV files for longer backtests (e.g. XBTUSD_60.csv). */
   BACKTEST_DATA_DIR: optional,
+  /** Kraken's OHLCVT history, extracted per archive into subfolders (full/, 2026Q3/…), for the history backfill. */
+  KRAKEN_OHLCVT_DIR: optional,
 
   DISCORD_WEBHOOK_URL: base.DISCORD_WEBHOOK_URL,
   DASHBOARD_URL: base.DASHBOARD_URL,

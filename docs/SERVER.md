@@ -118,7 +118,7 @@ Don't put these in the env files. `compose.yml` sets them, and its values win ov
 | `SCRAPER_URL` | `http://scraper:8790` | `http://scraper:8790` |
 | `LLM_URL` | `http://llm:11434` | `http://llm:11434` |
 
-`HISTORY_URL` is not among them: it carries the bot's history password, so it lives in the bot's env file (§3.6).
+Crypto also gets `KRAKEN_OHLCVT_DIR=/data/ohlcvt`, the read-only mount of Kraken's history files (§6.5). `HISTORY_URL` is not among them: it carries the bot's history password, so it lives in the bot's env file (§3.6).
 
 ### 3.3 Rules
 
@@ -417,6 +417,32 @@ Get-Content backups\history\crypto_history-<stamp>.sql.gz -AsByteStream -Raw | d
 ```
 
 The dumps hold only the rows, as `INSERT … ON CONFLICT DO NOTHING`: the tables must exist (the engine's migrations create them), rows the engine has already copied are skipped, and the older ones go in. Restoring a dump never touches the bars.
+
+### 6.5 Kraken's history files (crypto backfill)
+
+The crypto engine fills its history store from Kraken's downloadable OHLCVT history ([support article](https://support.kraken.com/hc/en-us/articles/360047124832)): every universe pair's 1-minute and daily bars since its first trade. They sit in `data\kraken-ohlcvt\` in the repo folder (git-ignored, on C:):
+
+| Path | What |
+| --- | --- |
+| `Kraken_OHLCVT_Full.zip` | the full history, 9.5 GB, checked against Kraken's SHA-256 (the cut of 2026-10-06 runs to 2026-09-30) |
+| `Kraken_OHLCVT_<year>Q<n>.zip` | a quarter's update |
+| `altnames.txt` | the universe pairs' Kraken names (`XBTUSD`…), one per line |
+| `csv\full\`, `csv\<year>Q<n>\` | each archive's `<altname>_1.csv` and `<altname>_1440.csv` for those pairs (2.4 GB), mounted read-only at `/data/ohlcvt` |
+
+The engine runs three jobs, one step at a time, shown on Admin → System under *History store*:
+
+- `kraken_files` imports every CSV once (resuming from its saved position after a restart);
+- `kraken_gap` then rebuilds the minutes between the last file and the first live bar from the public Trades endpoint, one request every 4 s through the engine's own paced client (a few hours for 30 pairs);
+- `kraken_daily` refreshes the daily bars from the OHLC endpoint every day.
+
+**Adding a quarter** (Kraken publishes one a few days after it ends), or pairs added to the universe: download the zip, put the new pairs in `altnames.txt`, extract into `csv\<year>Q<n>\` (the command below does both archives; a pair missing from one is skipped), then `docker compose restart crypto-engine` so `kraken_files` picks up the new files.
+
+```powershell
+curl.exe -fLo data\kraken-ohlcvt\Kraken_OHLCVT_2026Q4.zip https://assets.kraken.com/marketing/institutions/Kraken_OHLCVT_2026Q4.zip
+docker run --rm -v ${PWD}\data\kraken-ohlcvt:/in:ro -v ${PWD}\data\kraken-ohlcvt\csv:/out alpine:3.20 sh -c 'apk add -q unzip; f=""; for a in $(cat /in/altnames.txt); do f="$f ${a}_1.csv ${a}_1440.csv"; done; mkdir -p /out/2026Q4; unzip -qoj /in/Kraken_OHLCVT_2026Q4.zip $f -d /out/2026Q4'
+```
+
+The archives can be deleted once extracted; the CSVs can be deleted once `kraken_files` is done (Admin → System), but the next quarter's import needs only its own folder anyway.
 
 ---
 

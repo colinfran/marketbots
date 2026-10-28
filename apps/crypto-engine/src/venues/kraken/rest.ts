@@ -87,6 +87,19 @@ export class KrakenRest {
     }))
   }
 
+  /**
+   * Up to 1,000 trades after `since` (a cursor in ns: the previous call's `last`, or a time in
+   * seconds × 1e9), oldest first. Used only by the history backfill.
+   */
+  async trades(pair: string, since: string): Promise<{ trades: { t: number; price: number; volume: number }[]; last: string }> {
+    const result = await this.public<Record<string, (string | number)[][] | string>>("Trades", { pair, since, count: 1000 })
+    const rows = Object.entries(result).find(([k]) => k !== "last")?.[1]
+    return {
+      trades: Array.isArray(rows) ? rows.map((r) => ({ t: Number(r[2]) * 1000, price: Number(r[0]), volume: Number(r[1]) })) : [],
+      last: typeof result.last === "string" ? result.last : since,
+    }
+  }
+
   depth = (pair: string, count = 25) =>
     this.public<Record<string, { asks: [string, string, number][]; bids: [string, string, number][] }>>("Depth", { pair, count })
 }

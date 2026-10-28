@@ -1,5 +1,6 @@
 import { bootstrap } from "@mb/engine-kit/bootstrap"
 import { HistoryStore } from "@mb/history/store"
+import { krakenDailyJob, krakenFilesJob, krakenGapJob } from "./history/backfill"
 import { AiBudget } from "./ai/budget"
 import { AiRunner } from "./ai/runner"
 import { Alerts } from "./alerts"
@@ -81,6 +82,10 @@ void bootstrap({
     const history = env.HISTORY_URL ? new HistoryStore({ url: env.HISTORY_URL, log: log.child({ component: "history" }), col: db.col }) : null
     if (history) {
       hub.onBar((bar) => history.bars.add({ ...bar, source: "kraken" }))
+      const backfill = { dir: env.KRAKEN_OHLCVT_DIR, rest, pairs: () => hub.pairs, universe: () => hub.universe }
+      history.addJob(krakenFilesJob(backfill))
+      history.addJob(krakenGapJob(backfill))
+      history.addJob(krakenDailyJob(backfill))
       history.start()
     }
 

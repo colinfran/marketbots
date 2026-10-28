@@ -42,6 +42,7 @@ services:
       SCRAPER_URL: http://scraper:8790
       LLM_URL: http://llm:11434
       LOG_DIR: /logs
+      KRAKEN_OHLCVT_DIR: /data/ohlcvt
     ports:
       # Loopback only: Caddy on the host forwards wss://engine.cryptomarketbot.app here.
       - "127.0.0.1:8787:8787"
@@ -52,6 +53,9 @@ services:
       # The log history, one file per UTC day, on the host disk: a deploy replaces Docker's log,
       # not this. docs/SERVER.md §5.2.
       - ./logs/crypto-engine:/logs
+      # Kraken's OHLCVT history for the history backfill (docs/SERVER.md §6.5); read-only. An empty
+      # or missing folder just means nothing to import.
+      - ./data/kraken-ohlcvt/csv:/data/ohlcvt:ro
       # Optional: Kraken OHLCVT CSV files for longer backtests (set BACKTEST_DATA_DIR=/data/ohlc).
       # - ./data/ohlc:/data/ohlc:ro
     stop_grace_period: 30s

@@ -131,6 +131,17 @@ export type HistoryStatus = {
   bars: { written: number; dropped: number; buffered: number; last_at: Date | null }
   /** The news archive: items and triggers kept, and the last copies from MongoDB. */
   news: { items: number; triggers: number; last_append_at: Date | null; last_sync_at: Date | null }
+  /** The backfills and other long-running jobs (absent on engines without any). */
+  jobs?: HistoryJobStatus[]
+}
+
+export type HistoryJobStatus = {
+  name: string
+  state: "waiting" | "running" | "done" | "failed"
+  /** The job's own words, e.g. "BTC/USD 1-minute: 2019-03-04 (4.1M rows)". */
+  progress: string
+  updated_at: Date | null
+  error: string | null
 }
 
 export type LeaseDoc = { _id: "engine"; holder: string; acquired_at: Date; expires_at: Date }
