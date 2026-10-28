@@ -1,0 +1,4 @@
+@import "@mb/ui/styles.css";
+
+/* The shared components: Tailwind v4 doesn't scan workspace packages by itself. */
+@source "../../../packages/ui/src";
