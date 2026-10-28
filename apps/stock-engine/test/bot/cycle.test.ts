@@ -281,13 +281,14 @@ describe("skipped cycles", () => {
     expect(types()).toContain("cycle.skipped")
   })
 
-  it("skips when the daily AI budget is spent, and says so", async () => {
+  it("never skips for how many AI calls ran today: the local model has no budget", async () => {
     const { research } = fakeAi()
-    ctx.settings.current.ai.daily_budget_usd = 0
+    await db.col.aiCalls.insertMany(
+      Array.from({ length: 500 }, (_, i) => ({ _id: `call-${i}`, at: NOW, day: DAY, task: "decision" as const, model: "local/qwen3.6-35b-a3b-q2", cycle_id: null, input_tokens: 1, output_tokens: 1, cost_usd: 0, cost_source: "local" as const, duration_ms: 1, ok: true, error: null })),
+    )
     const result = await run("intraday")
-    expect(result.status).toBe("skipped")
-    expect(research).not.toHaveBeenCalled()
-    expect(types()).toContain("budget.exhausted")
-    expect(alerts).toContainEqual(expect.objectContaining({ level: "warning", title: "Daily AI budget exhausted" }))
+    expect(result.status).toBe("succeeded")
+    expect(research).toHaveBeenCalledOnce()
+    expect(alerts.map((a) => a.title)).not.toContain("Daily AI budget exhausted")
   })
 })

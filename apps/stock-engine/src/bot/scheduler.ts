@@ -20,7 +20,7 @@ export type PhasePlan = { phase: Phase | null; reason: string }
 const RETRY_DELAY_MINUTES = 4
 const INTRADAY_RETRIES = 2
 
-/** A skipped cycle (e.g. the AI budget ran out) counts as done: retrying it soon wouldn't help. */
+/** A skipped cycle (e.g. the AI is disabled) counts as done: retrying it soon wouldn't help. */
 const isDone = (status: string) => status === "succeeded" || status === "skipped"
 
 export const planPhase = async (col: Pick<Collections, "cycles">, settings: Settings, session: Session, now: Date = new Date()): Promise<PhasePlan> => {

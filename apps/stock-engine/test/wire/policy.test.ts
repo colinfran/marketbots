@@ -61,7 +61,6 @@ const setup = async ({ held = ["NVDA"], open = true, settings = DEFAULT_SETTINGS
     session: () => ({ open, reason: open ? "regular session" : "outside the regular session" }),
     held: () => held,
     universe: () => ["SPY", "AAPL"],
-    budget: { estimate: async () => 0.1, canAfford: async () => ({ ok: true, status: { day: "", spent_usd: 0, budget_usd: 10, remaining_usd: 10, calls: 0 } }) },
     request,
     markNotable: async () => undefined,
     emergency,

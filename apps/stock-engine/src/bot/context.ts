@@ -2,7 +2,6 @@ import type { AiRunner } from "@mb/engine-kit/ai/runner"
 import type { Logger } from "@mb/engine-kit/log"
 import type { EngineStateDoc } from "@mb/stock-core/db"
 import type { CycleState } from "@mb/stock-core/events"
-import type { AiBudget } from "../ai/budget"
 import type { Alerts } from "../alerts"
 import type { Alpaca } from "../alpaca/client"
 import type { EventBus } from "../bus/event-bus"
@@ -21,7 +20,6 @@ export type EngineContext = {
   /** Desired run state (running / paused / halted + kill switch). */
   state: { readonly state: EngineStateDoc }
   ai: AiRunner
-  budget: AiBudget
   alerts: Pick<Alerts, "send" | "success">
   prices: LivePrices
   setCycleState: (state: CycleState, detail?: string) => void

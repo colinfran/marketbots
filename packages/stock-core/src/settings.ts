@@ -13,7 +13,7 @@ import { z } from "zod"
 export { diffSettings, mergeSettings, MODEL_ID_PATTERN } from "@mb/core/settings"
 
 /**
- * Runtime settings: every risk limit, options rule, AI budget and schedule knob. They live in
+ * Runtime settings: every risk limit, options rule, AI setting and schedule knob. They live in
  * MongoDB, are edited only from the dashboard's Admin page (through audited commands), and are
  * validated with this schema by both the web app and the engine. The AI never sees a way to
  * change them: no prompt, tool or output field can touch settings.
@@ -172,9 +172,7 @@ export const optionsSettingsSchema = z.object({
   contracts_per_underlying: int(2, 30),
 })
 
-/** The AI budget day is the New York trading day: it resets at midnight ET. */
 export const aiSettingsSchema = z.object({
-  daily_budget_usd: aiBase.daily_budget_usd,
   models: aiBase.models,
   /** Stream the model's reasoning summaries to the live feed when the provider returns them. */
   stream_reasoning: z.boolean(),
@@ -214,7 +212,6 @@ export const wireSettingsSchema = z.object({
   event_min_gap_seconds: wireBase.event_min_gap_seconds,
   max_event_cycles_per_hour: wireBase.max_event_cycles_per_hour,
   max_event_cycles_per_day: wireBase.max_event_cycles_per_day,
-  event_budget_reserve_pct: wireBase.event_budget_reserve_pct,
   event_research: wireBase.event_research,
   event_research_timeout_seconds: wireBase.event_research_timeout_seconds,
   event_decision_timeout_seconds: wireBase.event_decision_timeout_seconds,
@@ -320,7 +317,6 @@ export const DEFAULT_SETTINGS: Settings = {
     contracts_per_underlying: 10,
   },
   ai: {
-    daily_budget_usd: 10,
     models: { research: "local/qwen3.6-35b-a3b-q2", decision: "local/qwen3.6-35b-a3b-q2" },
     stream_reasoning: true,
     research_timeout_seconds: 180,
@@ -352,7 +348,6 @@ export const DEFAULT_SETTINGS: Settings = {
     event_min_gap_seconds: 60,
     max_event_cycles_per_hour: 4,
     max_event_cycles_per_day: 24,
-    event_budget_reserve_pct: 30,
     event_research: "x_verify",
     event_research_timeout_seconds: 45,
     event_decision_timeout_seconds: 90,

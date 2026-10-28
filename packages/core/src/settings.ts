@@ -23,8 +23,6 @@ export const modelId = z.string().regex(MODEL_ID_PATTERN, "Expected a local mode
 
 /** The AI settings both bots have. */
 export const aiSettingsBase = z.object({
-  /** Hard cap on AI spend per budget day (each bot's own day). When reached, no AI calls run and no new trades open. */
-  daily_budget_usd: z.number().min(0).max(1_000),
   models: z.object({
     research: modelId,
     decision: modelId,
@@ -85,8 +83,6 @@ export const wireSettingsBase = z.object({
   event_min_gap_seconds: z.number().min(15).max(3_600),
   max_event_cycles_per_hour: int(0, 30),
   max_event_cycles_per_day: int(0, 200),
-  /** Share of the daily AI budget scheduled cycles can't touch: it's kept for event cycles. */
-  event_budget_reserve_pct: pct(0, 90),
   event_research: z.enum(["none", "x_verify"]),
   event_research_timeout_seconds: z.number().min(15).max(300),
   event_decision_timeout_seconds: z.number().min(20).max(300),

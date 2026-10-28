@@ -5,7 +5,6 @@ import type { EventFocus, WireItemDoc } from "@mb/crypto-core/wire"
 import type { ResearchProgress, StructuredProgress } from "@mb/engine-kit/ai/runner"
 import { silentLogger } from "@mb/engine-kit/log"
 import { describe, expect, it, vi } from "vitest"
-import { AiBudget } from "../src/ai/budget"
 import type { AiRunner } from "../src/ai/runner"
 import type { Alerts } from "../src/alerts"
 import { Executor } from "../src/execution/executor"
@@ -52,7 +51,7 @@ const item = (overrides: Partial<WireItemDoc> = {}): WireItemDoc => ({
 })
 const withRoot = (i: WireItemDoc) => ({ ...i, cluster_id: i._id })
 
-const setupPolicy = async ({ held = ["BTC/USD"], settings = DEFAULT_SETTINGS, running = true, afford = true }: { held?: string[]; settings?: Settings; running?: boolean; afford?: boolean } = {}) => {
+const setupPolicy = async ({ held = ["BTC/USD"], settings = DEFAULT_SETTINGS, running = true }: { held?: string[]; settings?: Settings; running?: boolean } = {}) => {
   const bus = await makeBus(db.col)
   const request = vi.fn<(f: EventFocus) => "fired" | "queued">(() => "fired")
   const markNotable = vi.fn(async () => undefined)
@@ -67,7 +66,6 @@ const setupPolicy = async ({ held = ["BTC/USD"], settings = DEFAULT_SETTINGS, ru
     engine: () => ({ running, killSwitch: false }),
     held: () => held,
     universe: () => ["BTC/USD", "ETH/USD", "SOL/USD"],
-    budget: { estimate: async () => 0.1, canAfford: async () => ({ ok: afford, status: { day: "", spent_usd: 0, budget_usd: 5, remaining_usd: afford ? 5 : 0, calls: 0 } }) },
     request,
     markNotable,
     emergency,
@@ -114,7 +112,7 @@ describe("wire policy", () => {
     expect((await triggers())[0]).toMatchObject({ status: "suppressed", reason: expect.stringContaining("stale") })
   })
 
-  it("applies cooldowns, caps, the budget, pause and shadow mode", async () => {
+  it("applies cooldowns, caps, pause and shadow mode", async () => {
     const neg = () => withRoot(item({ polarity: -1, severity: 62 }))
     const a = await setupPolicy()
     await a.policy.onItem({ item: neg(), backfill: false, confirmation: false })
@@ -127,11 +125,6 @@ describe("wire policy", () => {
     const b = await setupPolicy({ settings: capped })
     await b.policy.onItem({ item: neg(), backfill: false, confirmation: false })
     expect((await triggers())[0]).toMatchObject({ status: "suppressed", reason: expect.stringContaining("hourly cap") })
-
-    await db.col.wireTriggers.deleteMany({})
-    const c = await setupPolicy({ afford: false })
-    await c.policy.onItem({ item: neg(), backfill: false, confirmation: false })
-    expect((await triggers())[0]).toMatchObject({ status: "suppressed", reason: expect.stringContaining("AI budget") })
 
     await db.col.wireTriggers.deleteMany({})
     const d = await setupPolicy({ running: false })
@@ -225,16 +218,6 @@ describe("wave-2 policy rules", () => {
     expect(request).toHaveBeenCalledWith(expect.objectContaining({ rule: "unexplained_move", symbol: "ETH/USD" }))
     const reading = withRoot(item({ symbols: ["ETH/USD"], kind: "derivatives", category: "funding_extreme", meta: { metric: "m" } }))
     expect(assembleDossier([reading, move], { symbols: ["ETH/USD"], since: new Date(NOW.getTime() - HOUR), now: NOW, price: () => null, timeLabel: () => "", reviewThreshold: 55 }).unexplained.map((i) => i._id)).toEqual([move._id])
-  })
-})
-
-describe("budget reserve", () => {
-  it("keeps the reserved share off-limits to scheduled cycles", async () => {
-    const budget = new AiBudget(db.col, () => 10)
-    await budget.record({ task: "research", model: "m", cycle_id: null, input_tokens: 0, output_tokens: 0, cost_usd: 6, cost_source: "estimate", duration_ms: 1, ok: true, error: null })
-    expect((await budget.canAfford(0.6, { reservePct: 30 })).ok).toBe(true)
-    expect((await budget.canAfford(0.6, { reservePct: 40 })).ok).toBe(false)
-    expect((await budget.canAfford(3)).ok).toBe(true)
   })
 })
 
@@ -391,7 +374,6 @@ describe("event cycle", () => {
       ledger,
       executor,
       ai: { available: true, research, structured } as unknown as AiRunner,
-      budget: { estimate: async () => 0.05, canAfford: async () => ({ ok: true, status: { day: "", spent_usd: 0, budget_usd: 5, remaining_usd: 5, calls: 0 } }) } as unknown as AiBudget,
       alerts: { send: vi.fn(), success: vi.fn() } as unknown as Alerts,
       gate: () => ({ runStatus: "running", killSwitch: false, venueOnline: true, reconciled: true }),
       feeBps: () => 40,

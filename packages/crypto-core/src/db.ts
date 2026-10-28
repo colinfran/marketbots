@@ -30,6 +30,7 @@ export type {
   LeaseDoc,
   LoginAttemptDoc,
   NotificationDoc,
+  ResearchPlan,
   SeedAllocation,
   SeedOrder,
   SeedRunDoc,

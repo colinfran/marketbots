@@ -7,12 +7,12 @@ describe("settings", () => {
   })
 
   it("merges a deep patch and keeps everything else", () => {
-    const result = applySettingsPatch(DEFAULT_SETTINGS, { kraken: { max_position_pct: 8 }, ai: { daily_budget_usd: 3 } })
+    const result = applySettingsPatch(DEFAULT_SETTINGS, { kraken: { max_position_pct: 8 }, ai: { research_timeout_seconds: 240 } })
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.settings.kraken.max_position_pct).toBe(8)
     expect(result.settings.kraken.max_asset_exposure_pct).toBe(DEFAULT_SETTINGS.kraken.max_asset_exposure_pct)
-    expect(result.settings.ai.daily_budget_usd).toBe(3)
+    expect(result.settings.ai.research_timeout_seconds).toBe(240)
     expect(result.settings.ai.models).toEqual(DEFAULT_SETTINGS.ai.models)
   })
 
@@ -51,6 +51,12 @@ describe("settings", () => {
     const saved = { ...DEFAULT_SETTINGS, ai: { ...DEFAULT_SETTINGS.ai, models: { ...DEFAULT_SETTINGS.ai.models, fallback: null }, x_search: true } }
     const parsed = settingsSchema.safeParse(saved)
     expect(parsed.success && parsed.data.ai).toEqual(DEFAULT_SETTINGS.ai)
+  })
+
+  it("loads settings saved with a daily AI budget: the budget and the event reserve are dropped", () => {
+    const saved = { ...DEFAULT_SETTINGS, ai: { ...DEFAULT_SETTINGS.ai, daily_budget_usd: 5 }, wire: { ...DEFAULT_SETTINGS.wire, event_budget_reserve_pct: 30 } }
+    const parsed = settingsSchema.safeParse(saved)
+    expect(parsed.success && parsed.data).toEqual(DEFAULT_SETTINGS)
   })
 
   it("diffs leaf paths for the audit log", () => {

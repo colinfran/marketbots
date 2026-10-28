@@ -307,7 +307,7 @@ The scraper publishes no port. Its health, from inside its container:
 docker compose exec scraper node -e "fetch('http://127.0.0.1:8790/health').then(r=>r.text()).then(console.log)"
 ```
 
-The detailed view (every dependency, data freshness, AI spend) is each dashboard's **Admin → System**, fed by the engine's heartbeat. Every news source's health, with its errors when you're signed in, is on the dashboard's **News** page; Admin → System has a one-line summary.
+The detailed view (every dependency, data freshness, AI calls) is each dashboard's **Admin → System**, fed by the engine's heartbeat. Every news source's health, with its errors when you're signed in, is on the dashboard's **News** page; Admin → System has a one-line summary.
 
 ### 5.4 After a deploy
 
@@ -336,7 +336,7 @@ Check with `docker stats --no-stream` (§5.2).
 
 ### 5.6 Settings
 
-Live trading settings (risk, AI budget, models, news engine, schedule) live in MongoDB and change only from the dashboard's **Admin** page, as an audited `settings.update` command. The env files hold only first-boot defaults such as `GROK_RESEARCH_MODEL`; changing those, or `DEFAULT_SETTINGS` in code, doesn't change a running bot.
+Live trading settings (risk, AI models and timeouts, news engine, schedule) live in MongoDB and change only from the dashboard's **Admin** page, as an audited `settings.update` command. The env files hold only first-boot defaults such as `STARTING_CAPITAL`; changing those, or `DEFAULT_SETTINGS` in code, doesn't change a running bot.
 
 ### 5.7 Starting over
 
@@ -508,7 +508,7 @@ Both engines moved from their old compose projects (`stockmarketbot`, `cryptomar
    - **Crypto**: reconciliation is clean (Admin → System: *Books vs wallet: match*), and the mount check in §6 names `cryptomarketbot_kraken-paper`. **Stock**: order sync is clean and the positions match Alpaca.
    - The news source count is about the pre-swap count.
    - The dashboard shows the engine *Running* and the stream connects. No dashboard change is needed: same port, same proxy, same database.
-4. Watch it for an hour, then for the rest of the day: memory, errors, triggers, AI spend.
+4. Watch it for an hour, then for the rest of the day: memory, errors, triggers, AI calls.
 
 **Afterwards:** remove the old scraper containers (`docker rm stockmarketbot-scraper cryptomarketbot-scraper`, done on 2026-10-26). Keep the old engine containers stopped, not removed, for 14 days (until 2026-11-09). They stay stopped across reboots.
 

@@ -28,8 +28,7 @@ export type BaseEventDataMap<Category extends string, RunStatus extends string, 
     cycle_state: CycleState
     ws_clients: number
     uptime_s: number
-    ai_spend_today_usd: number
-    ai_budget_usd: number
+    ai_calls_today: number
   }
   "research.query": { research_id: string; query: string; tool: string }
   "research.source": { research_id: string; title: string; url: string; domain: string }
@@ -44,7 +43,6 @@ export type BaseEventDataMap<Category extends string, RunStatus extends string, 
   }
   "ai.decision.completed": { cycle_id: string; decisions: number; attempts: number; repaired: boolean; cost_usd: number }
   "ai.decision.failed": { cycle_id: string; error: string }
-  "budget.exhausted": { spent_usd: number; budget_usd: number }
   "command.received": { command_id: string; type: string }
   "command.completed": { command_id: string; type: string; result: string }
   "command.failed": { command_id: string; type: string; error: string }

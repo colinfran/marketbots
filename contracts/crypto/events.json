@@ -30,8 +30,7 @@
         "cycle_state",
         "ws_clients",
         "uptime_s",
-        "ai_spend_today_usd",
-        "ai_budget_usd"
+        "ai_calls_today"
       ]
     },
     {
@@ -332,13 +331,6 @@
         "instrument",
         "kind",
         "price"
-      ]
-    },
-    {
-      "type": "budget.exhausted",
-      "data_keys": [
-        "spent_usd",
-        "budget_usd"
       ]
     },
     {

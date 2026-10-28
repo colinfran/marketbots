@@ -129,7 +129,6 @@ export type EventDataMap = {
   "position.closed": { symbol: string; asset_class: AssetClass; realized_pnl_usd: number | null; return_pct: number | null; reason: string; structure_id: string | null }
   "protection.placed": { symbol: string; stop: number; target: number }
   "protection.triggered": { symbol: string; kind: ProtectionKind; price: number | null; structure_id: string | null }
-  "budget.exhausted": Shared["budget.exhausted"]
   "command.received": Shared["command.received"]
   "command.completed": Shared["command.completed"]
   "command.failed": Shared["command.failed"]

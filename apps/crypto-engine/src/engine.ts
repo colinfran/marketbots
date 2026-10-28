@@ -5,6 +5,7 @@ import type { CycleState, EngineRunStatus } from "@mb/crypto-core/events"
 import { roundTo } from "@mb/crypto-core/math"
 import type { SettingsPatch } from "@mb/crypto-core/settings"
 import type { EventFocus, WireCategory, WireItemDoc } from "@mb/crypto-core/wire"
+import type { AiCallLog } from "@mb/engine-kit/ai/call-log"
 import { EventCycleQueue, type QueuedEvent } from "@mb/engine-kit/control/event-queue"
 import { ControlPlane, type ControlWording } from "@mb/engine-kit/control/plane"
 import { StatusReporter } from "@mb/engine-kit/control/status"
@@ -13,7 +14,6 @@ import { claimDueSeed, finishSeed } from "@mb/engine-kit/state/seed-runs"
 import { every, withTimeout } from "@mb/engine-kit/util/async"
 import type { HistoryStore } from "@mb/history/store"
 import { coverageGaps } from "@mb/wire/calendar"
-import type { AiBudget } from "./ai/budget"
 import type { AiRunner } from "./ai/runner"
 import type { Alerts } from "./alerts"
 import { runBacktest } from "./backtest/run"
@@ -78,7 +78,7 @@ export type EngineDeps = {
   ledger: Ledger
   executor: Executor
   ai: AiRunner
-  budget: AiBudget
+  calls: AiCallLog
   alerts: Alerts
   stream: StreamServer
   wire: Wire
@@ -143,7 +143,6 @@ export class Engine {
       ledger: d.ledger,
       executor: d.executor,
       ai: d.ai,
-      budget: d.budget,
       alerts: d.alerts,
       gate: () => ({
         runStatus: d.state.state.status,
@@ -181,7 +180,6 @@ export class Engine {
       engine: () => ({ running: d.state.state.status === "running", killSwitch: d.state.state.kill_switch.engaged }),
       held: () => this.heldSymbols,
       universe: () => d.hub.universe,
-      budget: d.budget,
       request: (focus) => this.requestEventCycle(focus),
       markNotable: (ids, reason) => d.wire.markNotable(ids, reason),
       emergency: (symbol) => this.emergencyAction(symbol),
@@ -200,7 +198,7 @@ export class Engine {
     this.reporter = new StatusReporter<EngineStatusDoc>({
       col: d.db.col,
       bus: d.bus,
-      budget: d.budget,
+      calls: d.calls,
       settings: d.settings,
       ai: d.ai,
       state: d.state,

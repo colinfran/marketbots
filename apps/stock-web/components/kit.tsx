@@ -67,7 +67,6 @@ const ICONS: Partial<Record<string, LucideIcon>> = {
   "position.closed": ArrowDownRightIcon,
   "protection.placed": ShieldCheckIcon,
   "protection.triggered": ShieldXIcon,
-  "budget.exhausted": AlertTriangleIcon,
   alert: AlertTriangleIcon,
   error: AlertTriangleIcon,
   "cycle.started": ActivityIcon,

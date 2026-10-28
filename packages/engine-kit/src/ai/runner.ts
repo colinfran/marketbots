@@ -4,7 +4,7 @@ import { generateText, NoObjectGeneratedError, Output, parsePartialJson, streamT
 import type { z } from "zod"
 import { errorMessage, type Logger } from "../log"
 import { cleanLine, cleanText } from "../util/text"
-import type { AiBudget } from "./budget"
+import type { AiCallLog } from "./call-log"
 import { isLocalModel, LOCAL_PREFIX } from "./models"
 
 /**
@@ -119,7 +119,7 @@ export class AiRunner {
   private readonly localResearch: LocalResearch | null
 
   constructor(
-    private readonly budget: Pick<AiBudget, "record">,
+    private readonly calls: Pick<AiCallLog, "record">,
     private readonly log: Logger,
     { stream = true, memoMaxChars = 16_000, localUrl = null, localResearch = null }: AiRunnerOptions = {},
   ) {
@@ -142,7 +142,7 @@ export class AiRunner {
 
   /** Records the call (it costs nothing). `searches` is null for calls without a search. */
   private async record(task: AiTask, model: string, cycleId: string | null, usage: TokenUsage, searches: number | null, started: number, error: string | null) {
-    await this.budget
+    await this.calls
       .record({
         task,
         model,

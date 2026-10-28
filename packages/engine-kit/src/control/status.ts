@@ -1,6 +1,5 @@
 import type { AiCallDoc, EngineStateDoc, EngineStatusBase } from "@mb/core/db"
 import type { BaseEventDataMap } from "@mb/core/events"
-import { roundTo } from "@mb/core/math"
 import type { AiSettingsBase } from "@mb/core/settings"
 import type { WireStatus } from "@mb/core/wire"
 import type { Collection } from "mongodb"
@@ -24,7 +23,7 @@ export type StatusParts<S extends string, C extends string> = {
   run: Pick<EngineStatusBase<S, C>, "_id" | "at" | "instance" | "version" | "started_at" | "status" | "cycle_state" | "current_task">
   /** `kill_switch`, `ws_clients`, `event_seq`. */
   live: Pick<EngineStatusBase<S, C>, "kill_switch" | "ws_clients" | "event_seq">
-  /** `ai`, `system`: AI spend and process resources. */
+  /** `ai`, `system`: AI calls and process resources. */
   usage: Pick<EngineStatusBase<S, C>, "ai" | "system">
   /** `errors_last_hour`, `wire`. */
   health: { errors_last_hour: number; wire: WireStatus }
@@ -39,8 +38,8 @@ export type StatusReporterDeps<D extends Base> = {
     engineStatus: { replaceOne(filter: { _id: "engine" }, doc: D, options: { upsert: true }): Promise<unknown> }
   }
   bus: { readonly lastSeq: number; emit(type: "engine.heartbeat", data: HeartbeatData<D>, meta: EmitMeta): unknown }
-  budget: { status(): Promise<{ spent_usd: number; calls: number }> }
-  settings: { readonly current: { ai: { models: AiSettingsBase["models"]; daily_budget_usd: number } } }
+  calls: { today(): Promise<{ calls: number }> }
+  settings: { readonly current: { ai: { models: AiSettingsBase["models"] } } }
   ai: { readonly available: boolean }
   state: { readonly state: EngineStateDoc }
   stream: { readonly clientCount: number }
@@ -65,8 +64,8 @@ export class StatusReporter<D extends Base> {
   constructor(private readonly d: StatusReporterDeps<D>) {}
 
   async write() {
-    const { col, bus, budget, settings, stream } = this.d
-    const status = await budget.status().catch(() => null)
+    const { col, bus, calls, settings, stream } = this.d
+    const today = await calls.today().catch(() => null)
     const lastAi = await col.aiCalls.findOne({}, { sort: { at: -1 } }).catch(() => null)
     const errors = await col.events.countDocuments({ level: "error", ts: { $gte: new Date(Date.now() - 3_600_000).toISOString() } }).catch(() => 0)
     this.triggersToday = await this.d.policy.triggersToday().catch(() => this.triggersToday)
@@ -78,9 +77,7 @@ export class StatusReporter<D extends Base> {
       usage: {
         ai: {
           models: s.ai.models,
-          spend_today_usd: roundTo(status?.spent_usd ?? 0, 4),
-          budget_usd: s.ai.daily_budget_usd,
-          calls_today: status?.calls ?? 0,
+          calls_today: today?.calls ?? 0,
           last_call_at: lastAi?.at ?? null,
           last_error: lastAi && !lastAi.ok ? lastAi.error : null,
           enabled: this.d.ai.available,
@@ -94,7 +91,7 @@ export class StatusReporter<D extends Base> {
       const now = this.d.run()
       bus.emit(
         "engine.heartbeat",
-        { status: now.status, cycle_state: now.cycle_state, ws_clients: stream.clientCount, uptime_s: parts.usage.system.uptime_s, ai_spend_today_usd: parts.usage.ai.spend_today_usd, ai_budget_usd: parts.usage.ai.budget_usd },
+        { status: now.status, cycle_state: now.cycle_state, ws_clients: stream.clientCount, uptime_s: parts.usage.system.uptime_s, ai_calls_today: parts.usage.ai.calls_today },
         { summary: `Engine ${now.status}, ${now.cycle_state}`, level: "debug" },
       )
     }

@@ -24,8 +24,8 @@ const setup = async (overrides: Partial<StatusReporterDeps<TestStatusDoc>> = {})
   const reporter = new StatusReporter<TestStatusDoc>({
     col: db.col,
     bus,
-    budget: { status: async () => ({ spent_usd: 1.234567, calls: 7 }) },
-    settings: { current: { ai: { models: { research: "x/r-model", decision: "x/d-model" }, daily_budget_usd: 3 } } },
+    calls: { today: async () => ({ calls: 7 }) },
+    settings: { current: { ai: { models: { research: "x/r-model", decision: "x/d-model" } } } },
     ai: { available: true },
     state,
     stream: { clientCount: 2 },
@@ -92,7 +92,7 @@ describe("StatusReporter", () => {
       ws_clients: 2,
       event_seq: bus.lastSeq,
       venue: { ok: true },
-      ai: { models: { research: "x/r-model", decision: "x/d-model" }, spend_today_usd: 1.2346, budget_usd: 3, calls_today: 7, last_error: "gateway timeout", enabled: true },
+      ai: { models: { research: "x/r-model", decision: "x/d-model" }, calls_today: 7, last_error: "gateway timeout", enabled: true },
       last_cycle: "cycle-1",
       errors_last_hour: 1,
       wire: { mode: "live", items_last_hour: 5, triggers_today: 4, event_queue: ["AAA", "MARKET"] },
@@ -110,7 +110,7 @@ describe("StatusReporter", () => {
     const { bus, events, run, reporter } = await setup()
     await reporter.write()
     expect(events.filter((e) => e.type === "engine.heartbeat").map((e) => [e.summary, e.level, e.data])).toEqual([
-      ["Engine running, deciding", "debug", { status: "running", cycle_state: "deciding", ws_clients: 2, uptime_s: expect.any(Number), ai_spend_today_usd: 1.2346, ai_budget_usd: 3 }],
+      ["Engine running, deciding", "debug", { status: "running", cycle_state: "deciding", ws_clients: 2, uptime_s: expect.any(Number), ai_calls_today: 7 }],
     ])
     vi.setSystemTime(BEAT + 5_000)
     run.status = "paused"
@@ -122,12 +122,12 @@ describe("StatusReporter", () => {
     await bus.stop()
   })
 
-  it("keeps the last trigger count when the policy can't be read, and reports no spend without a budget", async () => {
-    const { bus, triggers, reporter } = await setup({ budget: { status: async () => Promise.reject(new Error("db down")) } })
+  it("keeps the last trigger count when the policy can't be read, and reports no calls when the call log can't be read", async () => {
+    const { bus, triggers, reporter } = await setup({ calls: { today: async () => Promise.reject(new Error("db down")) } })
     await reporter.write()
     triggers.fail = true
     await reporter.write()
-    expect(await db.col.engineStatus.findOne({ _id: "engine" })).toMatchObject({ ai: { spend_today_usd: 0, calls_today: 0, last_call_at: null, last_error: null }, wire: { triggers_today: 4 } })
+    expect(await db.col.engineStatus.findOne({ _id: "engine" })).toMatchObject({ ai: { calls_today: 0, last_call_at: null, last_error: null }, wire: { triggers_today: 4 } })
     await bus.stop()
   })
 })

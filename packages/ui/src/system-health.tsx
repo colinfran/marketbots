@@ -70,9 +70,7 @@ export function AiHealthCard({ ai }: { ai: Status["ai"] }) {
         <KV label="Enabled">{ai.enabled ? "yes" : "no (LLM_URL missing)"}</KV>
         <KV label="Research model">{ai.models.research}</KV>
         <KV label="Decision model">{ai.models.decision}</KV>
-        <KV label="Spend today">
-          ${num(ai.spend_today_usd, 3)} / ${ai.budget_usd} ({ai.calls_today} calls)
-        </KV>
+        <KV label="Calls today">{ai.calls_today}</KV>
         <KV label="Last call">{ago(ai.last_call_at)}</KV>
         {ai.last_error && <p className="text-loss mt-2 line-clamp-3 text-xs">{ai.last_error}</p>}
       </CardContent>

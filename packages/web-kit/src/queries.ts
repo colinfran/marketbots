@@ -181,7 +181,7 @@ export const createQueries = <Cols extends Record<QueryCollectionName, unknown>,
     return toEvents(docs, viewer)
   }
 
-  /** AI spend per budget day: cost, calls and failures. */
+  /** AI spend per day (the bot's day): cost, calls and failures. */
   const getAiCosts = async (days = 30) => {
     await connection()
     const since = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10)
@@ -253,7 +253,7 @@ export const createQueries = <Cols extends Record<QueryCollectionName, unknown>,
 
   /**
    * The news-engine numbers both bots count the same way: items stored and triggers acted on in
-   * the last 7 days, event cycles, and the AI spend per budget day by task (last 14 days).
+   * the last 7 days, event cycles, and the AI spend per day by task (last 14 days).
    */
   const getWireActivity = async () => {
     await connection()

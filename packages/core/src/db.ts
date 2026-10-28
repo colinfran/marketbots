@@ -104,8 +104,6 @@ export type EngineStatusBase<RunStatus extends string, CycleState extends string
   event_seq: number
   ai: {
     models: AiSettingsBase["models"]
-    spend_today_usd: number
-    budget_usd: number
     calls_today: number
     last_call_at: Date | null
     last_error: string | null
@@ -188,7 +186,7 @@ export type AiTask = "research" | "decision" | "research_gap"
 export type AiCallDoc = {
   _id: string
   at: Date
-  /** The AI budget day the call counts against (each bot's own day). */
+  /** The day the call counts toward (each bot's own day: crypto UTC, stock the New York trading day). */
   day: string
   task: AiTask
   model: string
@@ -208,6 +206,9 @@ export type AiCallDoc = {
 export type CycleKind = "scheduled" | "price_move" | "manual" | "event" | "seed" | "core"
 
 export type CycleStep = { name: string; at: Date; ok: boolean; detail: string | null }
+
+/** Which web research a cycle runs (each bot decides that; see its researchPlan) and why. */
+export type ResearchPlan = { kind: "full" | "gap" | "none"; reason: string }
 
 /** The `cycles` fields both bots record. Each bot adds its own (phase, regime, candidates…). */
 export type CycleDocBase<Status extends string> = {
@@ -229,7 +230,7 @@ export type CycleDocBase<Status extends string> = {
   /** Why web research was skipped (research_mode auto), when it was. */
   research_skip_reason?: string | null
   /** Which web research the cycle ran (full, gap-fill or none) and why (absent on older cycles and on cycles that stopped before research). */
-  research_plan?: { kind: "full" | "gap" | "none"; reason: string }
+  research_plan?: ResearchPlan
 }
 
 export type SeedRunStatus = "scheduled" | "running" | "done" | "failed" | "canceled"

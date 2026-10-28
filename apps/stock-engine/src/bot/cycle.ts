@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto"
-import { affordCycle, type ResearchPlan } from "@mb/engine-kit/ai/budget"
 import { errorMessage } from "@mb/engine-kit/log"
-import type { CycleDoc, CycleKind, CycleStatus, ResearchResult } from "@mb/stock-core/db"
+import type { CycleDoc, CycleKind, CycleStatus, ResearchPlan, ResearchResult } from "@mb/stock-core/db"
 import type { CycleState } from "@mb/stock-core/events"
 import { roundTo } from "@mb/stock-core/math"
 import { botReportSchema, normalizeReport, type BotReport } from "@mb/stock-core/report"
@@ -238,16 +237,7 @@ export const runCycle = async (
     }
     const eventText = isEvent ? eventSection(events) : undefined
     const wireHealthy = !!wire && wire.healthy()
-    // Scheduled cycles leave the event reserve alone; event cycles (and the owner's seed) may use the whole budget.
-    const reservePct = !isEvent && !seed && settings.wire.mode === "live" ? settings.wire.event_budget_reserve_pct : 0
-    // Research the budget can't pay for is dropped when the decision still fits and our feeds are up.
-    const { plan, afford } = await affordCycle(ctx.budget, researchPlan(ctx, { isEvent, isSeed: !!seed, wireHealthy, dossier }), { reservePct, feedsUp: wireHealthy && !!dossier })
-    if (!afford.ok) {
-      bus.emit("budget.exhausted", { spent_usd: afford.status.spent_usd, budget_usd: afford.status.budget_usd }, { summary: `AI budget exhausted ($${afford.status.spent_usd.toFixed(2)} of $${afford.status.budget_usd}); no AI cycles until midnight ET`, level: "warn", ...meta })
-      await alerts.send("warning", "Daily AI budget exhausted", `Spent $${afford.status.spent_usd.toFixed(2)} of $${afford.status.budget_usd}. No new AI decisions until midnight ET; stops and options exits keep running.`, { key: `budget|${session.day}` })
-      await closeFallback()
-      return await skip("daily AI budget exhausted")
-    }
+    const plan = researchPlan(ctx, { isEvent, isSeed: !!seed, wireHealthy, dossier })
 
     // ─── Research ───────────────────────────────────────────────────────
     const researchId = randomUUID()

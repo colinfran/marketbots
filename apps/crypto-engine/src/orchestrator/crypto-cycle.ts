@@ -1,12 +1,11 @@
 import { randomUUID } from "node:crypto"
-import type { CandidateRecord, CycleKind, DecisionAction, DecisionDoc, PositionDoc, RegimeSnapshot, SeedAllocation, SeedOrder, SymbolFeatures } from "@mb/crypto-core/db"
+import type { CandidateRecord, CycleKind, DecisionAction, DecisionDoc, PositionDoc, RegimeSnapshot, ResearchPlan, SeedAllocation, SeedOrder, SymbolFeatures } from "@mb/crypto-core/db"
 import { roundTo } from "@mb/crypto-core/math"
 import { cryptoReportSchema, MAX_HORIZON_HOURS, normalizeCryptoReport, type NormalizedCryptoDecision } from "@mb/crypto-core/report"
 import type { Settings } from "@mb/crypto-core/settings"
 import type { StrategyId } from "@mb/crypto-core/strategies"
 import type { EventFocus } from "@mb/crypto-core/wire"
 import { ACCOUNT_ID, MODE } from "@mb/crypto-core/venues"
-import { affordCycle, type ResearchPlan } from "@mb/engine-kit/ai/budget"
 import { errorMessage } from "@mb/engine-kit/log"
 import { cleanLine } from "@mb/engine-kit/util/text"
 import { CRYPTO_PROMPT_VERSION, cryptoDecisionPrompt, cryptoDecisionSystemPrompt, cryptoGapFillPrompt, cryptoResearchPrompt, eventSection, type CryptoSubject } from "../ai/prompts"
@@ -31,7 +30,7 @@ import { exitPosition } from "./trading"
  *   3. positions due for review                 7. deterministic risk checks, then execution
  *   4. live research (local model + web)        8. everything recorded for later evaluation
  *
- * No candidates and no reviews means no AI call. Missing data, a blown budget or a failed AI call
+ * No candidates and no reviews means no AI call. Missing data or a failed AI call
  * means no new trades; positions stay protected by stops either way.
  */
 
@@ -349,7 +348,7 @@ export const runCryptoCycle = async (ctx: EngineContext, request: CycleRequest):
     return finish("completed", why, { regime })
   }
 
-  // 4. The wire dossier, budget, then research: full, gap-fill, or skipped when our feeds cover it.
+  // 4. The wire dossier, then research: full, gap-fill, or skipped when our feeds cover it.
   if (!ctx.ai.available) return finish("skipped", "AI disabled (LLM_URL not set): no new decisions")
   const subjects: CryptoSubject[] = [
     ...candidates.map((c) => ({ symbol: c.symbol, role: "candidate" as const, note: `${c.strategy}: ${c.signal}` })),
@@ -375,14 +374,7 @@ export const runCryptoCycle = async (ctx: EngineContext, request: CycleRequest):
   }
   const eventText = isEvent ? eventSection(events) : undefined
   const wireHealthy = !!wire && wire.healthy()
-  // Scheduled cycles leave the event reserve alone; event cycles may use the whole budget.
-  const reservePct = !isEvent && settings.wire.mode === "live" ? settings.wire.event_budget_reserve_pct : 0
-  // Research the budget can't pay for is dropped when the decision still fits and our feeds are up.
-  const { plan, afford } = await affordCycle(ctx.budget, researchPlan(ctx, { isEvent, wireHealthy, dossier }), { reservePct, feedsUp: wireHealthy && !!dossier })
-  if (!afford.ok) {
-    ctx.bus.emit("budget.exhausted", { spent_usd: afford.status.spent_usd, budget_usd: afford.status.budget_usd }, { summary: `AI budget exhausted ($${afford.status.spent_usd.toFixed(2)} of $${afford.status.budget_usd}${reservePct ? `, ${reservePct}% kept for news events` : ""}); no new decisions until 00:00 UTC`, level: "warn" })
-    return finish("skipped", reservePct ? "daily AI budget exhausted (the rest is reserved for news events)" : "daily AI budget exhausted")
-  }
+  const plan = researchPlan(ctx, { isEvent, wireHealthy, dossier })
 
   const researchId = randomUUID()
   let research: ResearchResult

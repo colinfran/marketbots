@@ -43,7 +43,7 @@ export function NewsFunnelCard({ funnel, medianLatencyS, latencySamples }: { fun
 
 export type SpendDay = { day: string; research: number; gap: number; decision: number }
 
-/** Research, gap-fill and decision spend per AI-budget day, newest first. With `empty`, no days shows that text instead of an empty table. */
+/** Research, gap-fill and decision spend per day (the bot's day), newest first. With `empty`, no days shows that text instead of an empty table. */
 export function SpendByTaskCard({ title, description, dayLabel, days, empty }: { title: string; description?: string; dayLabel: string; days: SpendDay[]; empty?: string }) {
   return (
     <Card>

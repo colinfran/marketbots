@@ -127,7 +127,7 @@ describe("intraday", () => {
     expect(await plan(afterOpen(70))).toEqual({ phase: null, reason: "An intraday cycle is running." })
   })
 
-  it("counts a skipped cycle (e.g. AI budget exhausted) as done", async () => {
+  it("counts a skipped cycle (e.g. AI disabled) as done", async () => {
     await briefed()
     await seed(at("intraday", 10, "skipped"))
     expect(await plan(afterOpen(14))).toMatchObject({ phase: null, reason: "Next intraday cycle in ~26 min." })

@@ -6,11 +6,11 @@ import { titleCase } from "./lib/format"
 export type EngineCardEngine = {
   online: boolean
   heartbeatAgeS: number | null
-  status: { status: string; kill_switch: boolean; ai: { spend_today_usd: number; budget_usd: number } } | null
+  status: { status: string; kill_switch: boolean; ai: { calls_today: number } } | null
 }
 
 /**
- * The engine at a glance: run state, AI spend, the bot's own health rows (venue or broker,
+ * The engine at a glance: run state, AI calls today, the bot's own health rows (venue or broker,
  * market), an optional note, and the latest cycle (`latest`, laid out by each app).
  */
 export function EngineCard({ engine, rows, note, latest }: { engine: EngineCardEngine; rows: [string, React.ReactNode][]; note?: React.ReactNode; latest?: React.ReactNode }) {
@@ -18,9 +18,9 @@ export function EngineCard({ engine, rows, note, latest }: { engine: EngineCardE
   const all: [string, React.ReactNode][] = s
     ? [
         [
-          "AI spend today",
-          <span key="spend" className="font-mono tabular-nums">
-            ${s.ai.spend_today_usd.toFixed(2)} / ${s.ai.budget_usd}
+          "AI calls today",
+          <span key="calls" className="font-mono tabular-nums">
+            {s.ai.calls_today}
           </span>,
         ],
         ...rows,

@@ -57,6 +57,12 @@ describe("settings", () => {
     expect(parsed.success && parsed.data.ai).toEqual(DEFAULT_SETTINGS.ai)
   })
 
+  it("loads settings saved with a daily AI budget: the budget and the event reserve are dropped", () => {
+    const saved = { ...DEFAULT_SETTINGS, ai: { ...DEFAULT_SETTINGS.ai, daily_budget_usd: 10 }, wire: { ...DEFAULT_SETTINGS.wire, event_budget_reserve_pct: 30 } }
+    const parsed = settingsSchema.safeParse(saved)
+    expect(parsed.success && parsed.data).toEqual(DEFAULT_SETTINGS)
+  })
+
   it("ships the core book switched off", () => {
     expect(DEFAULT_SETTINGS.core).toMatchObject({ enabled: false, target_pct: 50, max_holding_pct: 15, max_index_etf_pct: 25, stop_pct: 15, review_weekday: "mon", review_time_et: "10:15", themes: [] })
   })

@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto"
 import { utcDay } from "@mb/core/db"
 import type { WireSettingsBase } from "@mb/core/settings"
 import type { EventFocus, WireItemDoc, WireTriggerAction, WireTriggerDoc, WireTriggerStatus } from "@mb/core/wire"
-import type { AiBudget } from "@mb/engine-kit/ai/budget"
 import { errorMessage, type Logger } from "@mb/engine-kit/log"
 import type { Collection } from "mongodb"
 import { isConfirmed } from "./notable"
@@ -16,7 +15,7 @@ import type { WireEventSink } from "./types"
  *
  *   mode → item fresh (first seen within trigger_max_age_minutes, never a backfill, not old news)
  *   → confirmation (entries only) → shadow → engine running, kill switch off → market open
- *   (stocks) → per-symbol cooldown → hourly and daily caps → AI budget → fire now, or queue.
+ *   (stocks) → per-symbol cooldown → hourly and daily caps → fire now, or queue.
  *
  * The policy never trades. A trigger only asks the engine for a focused cycle, where the AI and the
  * risk engine decide as always. The one exception is the owner's `emergency_action` for a held
@@ -62,7 +61,6 @@ export type PolicyDeps<C extends string, S extends PolicySettings> = {
   session?: () => { open: boolean; reason: string }
   held: () => string[]
   universe: () => string[]
-  budget: Pick<AiBudget, "canAfford" | "estimate">
   /** Hands a focus to the engine: started now, or waiting behind a running cycle or the minimum gap. */
   request: (focus: EventFocus) => "fired" | "queued"
   markNotable: (ids: string[], reason: "triggered") => Promise<unknown>
@@ -129,9 +127,6 @@ export class WirePolicy<C extends string, S extends PolicySettings> {
     ])
     if (hour >= w.max_event_cycles_per_hour) return { status: "suppressed", reason: `hourly cap (${w.max_event_cycles_per_hour}) reached` }
     if (day >= w.max_event_cycles_per_day) return { status: "suppressed", reason: `daily cap (${w.max_event_cycles_per_day}) reached` }
-    const estimate = (w.event_research === "x_verify" ? await this.d.budget.estimate("research_gap") : 0) + (await this.d.budget.estimate("decision"))
-    const afford = await this.d.budget.canAfford(estimate)
-    if (!afford.ok) return { status: "suppressed", reason: `AI budget: $${afford.status.remaining_usd.toFixed(2)} left` }
     return { status: dryRun ? "fired" : "queued", reason: "ok" }
   }
 

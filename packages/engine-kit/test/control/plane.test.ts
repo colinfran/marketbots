@@ -136,8 +136,8 @@ describe("ControlPlane", () => {
 
   it("applies settings patches through the store and reports its version", async () => {
     const two = await setup()
-    expect(await two.control.handle({ type: "settings.update", patch: { ai: { daily_budget_usd: 5 } }, expected_version: 3 }, "owner")).toBe("2 settings updated (v3)")
-    expect(two.patches).toEqual([{ patch: { ai: { daily_budget_usd: 5 } }, by: "owner", expected: 3 }])
+    expect(await two.control.handle({ type: "settings.update", patch: { ai: { research_timeout_seconds: 240 } }, expected_version: 3 }, "owner")).toBe("2 settings updated (v3)")
+    expect(two.patches).toEqual([{ patch: { ai: { research_timeout_seconds: 240 } }, by: "owner", expected: 3 }])
     const one = await setup({ settingsResult: { ok: true, changes: 1 } })
     expect(await one.control.handle({ type: "settings.update", patch: {}, expected_version: 3 }, "owner")).toBe("1 setting updated (v3)")
     const none = await setup({ settingsResult: { ok: true, changes: 0 } })

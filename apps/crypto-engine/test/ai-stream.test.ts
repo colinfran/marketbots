@@ -56,8 +56,8 @@ const serve = (answers: Answer[]) => {
   return bodies
 }
 
-const budget = () => ({ record: vi.fn(async (_call: Record<string, unknown>) => undefined) })
-type Budget = ReturnType<typeof budget>
+const callLog = () => ({ record: vi.fn(async (_call: Record<string, unknown>) => undefined) })
+type CallLog = ReturnType<typeof callLog>
 
 const decide = (runner: SharedAiRunner, progress?: StructuredProgress) =>
   runner.structured({
@@ -80,7 +80,7 @@ type Outcome = { ok: true; output: unknown; attempts: number; repaired: boolean;
 const both = async (answers: Answer[]) => {
   const run = async (stream: boolean) => {
     const bodies = serve(answers)
-    const b = budget()
+    const b = callLog()
     const progress = { onPartial: vi.fn(), onReasoning: vi.fn() }
     const runner = stream ? new AiRunner(b as never, silentLogger, { localUrl: LLM_URL }) : new SharedAiRunner(b as never, silentLogger, { stream: false, memoMaxChars: 12_000, localUrl: LLM_URL })
     const outcome: Outcome = await decide(runner, progress).then(
@@ -89,12 +89,12 @@ const both = async (answers: Answer[]) => {
     )
     // The request, without how it is delivered.
     const calls = bodies.map(({ stream: _stream, stream_options: _options, ...rest }) => rest)
-    return { outcome, calls, budget: b, progress }
+    return { outcome, calls, callLog: b, progress }
   }
   return { streamed: await run(true), before: await run(false) }
 }
 
-const records = (b: Budget) => b.record.mock.calls.map(([c]) => [c.cost_source, c.cost_usd, c.ok])
+const records = (b: CallLog) => b.record.mock.calls.map(([c]) => [c.cost_source, c.cost_usd, c.ok])
 
 const decision = (overrides: Partial<CryptoDecision> = {}): CryptoDecision => ({
   symbol: "BTC/USD",
@@ -142,8 +142,8 @@ describe("crypto's streamed decision against the non-streamed one it replaced", 
     expect(streamed.progress.onPartial).toHaveBeenCalledWith(50, expect.objectContaining({ market_read: expect.objectContaining({ regime: "risk_on_trend" }) }))
     expect(before.progress.onPartial).not.toHaveBeenCalled()
     expect(before.progress.onReasoning).not.toHaveBeenCalled()
-    expect(records(streamed.budget)).toEqual([["local", 0, true]])
-    expect(records(before.budget)).toEqual([["local", 0, true]])
+    expect(records(streamed.callLog)).toEqual([["local", 0, true]])
+    expect(records(before.callLog)).toEqual([["local", 0, true]])
   })
 
   it("repairs a near-miss answer in code the same way", async () => {
@@ -152,8 +152,8 @@ describe("crypto's streamed decision against the non-streamed one it replaced", 
     expect(streamed.outcome).toMatchObject({ ok: true, attempts: 1, repaired: true })
     expect(streamed.outcome).toEqual(before.outcome)
     expect((streamed.outcome as { output: CryptoReport }).output.decisions[0]).toMatchObject({ conviction: 72, action: "buy", stop_loss: 63_000 })
-    expect(records(streamed.budget)).toEqual([["local", 0, true]])
-    expect(records(before.budget)).toEqual([["local", 0, true]])
+    expect(records(streamed.callLog)).toEqual([["local", 0, true]])
+    expect(records(before.callLog)).toEqual([["local", 0, true]])
   })
 
   it("asks again with the same validation error when a repair would drop a decision", async () => {
@@ -165,11 +165,11 @@ describe("crypto's streamed decision against the non-streamed one it replaced", 
     expect(streamed.calls).toEqual(before.calls)
     expect(streamed.calls[1].temperature).toBe(0.15)
     expect(JSON.stringify(streamed.calls[1].messages)).toContain("your previous answer was rejected")
-    expect(records(streamed.budget)).toEqual([
+    expect(records(streamed.callLog)).toEqual([
       ["local", 0, false],
       ["local", 0, true],
     ])
-    expect(records(streamed.budget)).toEqual(records(before.budget))
+    expect(records(streamed.callLog)).toEqual(records(before.callLog))
   })
 
   it("fails the same way when no answer can be read", async () => {

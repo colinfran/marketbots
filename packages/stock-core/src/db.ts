@@ -33,6 +33,7 @@ export type {
   LeaseDoc,
   LoginAttemptDoc,
   NotificationDoc,
+  ResearchPlan,
   SeedAllocation,
   SeedOrder,
   SeedRunDoc,
@@ -96,7 +97,7 @@ export type MarketSessionInfo = {
   next_open: Date | null
 }
 
-/** Observed state: the engine's heartbeat, written every few seconds. The AI budget day is the New York trading day. */
+/** Observed state: the engine's heartbeat, written every few seconds. AI calls today count the New York trading day. */
 export type EngineStatusDoc = EngineStatusBase<EngineRunStatus, CycleState> & {
   current_phase: Phase | null
   broker: {

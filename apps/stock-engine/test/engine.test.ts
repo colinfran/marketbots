@@ -1,3 +1,4 @@
+import { AiCallLog } from "@mb/engine-kit/ai/call-log"
 import { AiRunner } from "@mb/engine-kit/ai/runner"
 import { silentLogger } from "@mb/engine-kit/log"
 import type { Wire } from "../src/wire/wire"
@@ -5,8 +6,8 @@ import { randomUUID } from "node:crypto"
 import type { Command } from "@mb/stock-core/commands"
 import type { CommandDoc, StreamHealth } from "@mb/stock-core/db"
 import type { EngineEvent } from "@mb/stock-core/events"
+import { marketDay } from "@mb/stock-core/time"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
-import { AiBudget } from "../src/ai/budget"
 import { Alerts } from "../src/alerts"
 import type { MarketStream } from "../src/alpaca/market-stream"
 import type { TradeStream } from "../src/alpaca/trade-stream"
@@ -60,7 +61,7 @@ beforeEach(async () => {
   const env = loadEnv({ MONGODB_URI: "mongodb://test", ALPACA_API_KEY: "k", ALPACA_SECRET_KEY: "s", STREAM_TOKEN_SECRET: "x".repeat(40), ENGINE_INSTANCE: "test" })
   const settings = await loadSettings(db.col, env, silentLogger)
   const state = await EngineStateStore.load(db.col)
-  const budget = new AiBudget(db.col, () => settings.current.ai.daily_budget_usd)
+  const calls = new AiCallLog(db.col, marketDay)
   engine = new Engine({
     env,
     log: silentLogger,
@@ -72,8 +73,8 @@ beforeEach(async () => {
     prices: new LivePrices(bus),
     tradeStream: { start: () => undefined, stop: () => undefined, health: health() } as unknown as TradeStream,
     marketStream: { start: () => undefined, stop: () => undefined, setSymbols: (s: string[]) => symbols.push(s), health: health(), symbols: [] } as unknown as MarketStream,
-    ai: new AiRunner(budget, silentLogger),
-    budget,
+    ai: new AiRunner(calls, silentLogger),
+    calls,
     alerts: new Alerts(db.col, bus, silentLogger, null, null),
     stream: { clientCount: 0 } as unknown as StreamServer,
     // The news engine is covered by its own tests; here it only has to be present and inert.

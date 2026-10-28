@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
 import { z } from "zod"
-import type { AiBudget } from "../../src/ai/budget"
+import type { AiCallLog } from "../../src/ai/call-log"
 import { AiRunner, isLocalModel, localThinkingBudget } from "../../src/ai/runner"
 import { silentLogger } from "../../src/log"
 
@@ -11,7 +11,7 @@ const LLM_URL = "http://llm:8080"
 const schema = z.object({ action: z.enum(["buy", "hold"]), conviction: z.number() })
 const ANSWER = { action: "hold", conviction: 60 }
 
-const budget = () => ({ record: vi.fn(async () => undefined) }) as unknown as AiBudget & { record: ReturnType<typeof vi.fn> }
+const callLog = () => ({ record: vi.fn(async () => undefined) }) as unknown as AiCallLog & { record: ReturnType<typeof vi.fn> }
 
 const decide = (runner: AiRunner, over: { model?: string; onReasoning?: (chars: number, excerpt: string) => void } = {}) =>
   runner.structured({
@@ -77,7 +77,7 @@ describe("local models", () => {
 
   it("decide on the model server under its alias, and are recorded at no cost", async () => {
     const llm = server(() => completion(JSON.stringify(ANSWER)))
-    const b = budget()
+    const b = callLog()
     const r = await decide(new AiRunner(b, silentLogger, { stream: false, localUrl: LLM_URL }))
     expect(r).toMatchObject({ output: ANSWER, attempts: 1, repaired: false, model: MODEL, cost_usd: 0, usage: { input: 900, output: 300, total: 1_200 } })
     expect(llm.url()).toBe("http://llm:8080/v1/chat/completions")
@@ -100,7 +100,7 @@ describe("local models", () => {
         { choices: [], usage: { prompt_tokens: 900, completion_tokens: 300, total_tokens: 1_200 } },
       ]),
     )
-    const b = budget()
+    const b = callLog()
     const onReasoning = vi.fn()
     const r = await decide(new AiRunner(b, silentLogger, { localUrl: `${LLM_URL}/` }), { onReasoning })
     expect(r).toMatchObject({ output: ANSWER, cost_usd: 0, usage: { input: 900, output: 300, total: 1_200 } })
@@ -113,21 +113,21 @@ describe("local models", () => {
   it("ask again after a failed attempt, cooler, with the error, and give up after three", async () => {
     let n = 0
     const llm = server(() => (++n < 3 ? new Response("server busy", { status: 400 }) : completion(JSON.stringify(ANSWER))))
-    const b = budget()
+    const b = callLog()
     const r = await decide(new AiRunner(b, silentLogger, { stream: false, localUrl: LLM_URL }))
     expect(r).toMatchObject({ output: ANSWER, attempts: 3 })
     expect([llm.body(0).temperature, llm.body(1).temperature, llm.body(2).temperature]).toEqual([0.3, 0.15, 0])
     expect(String((llm.body(2).messages as { content: string }[]).at(-1)!.content)).toContain("IMPORTANT: your previous answer was rejected")
     expect(b.record.mock.calls.map(([call]) => (call as { ok: boolean }).ok)).toEqual([false, false, true])
     server(() => new Response("server busy", { status: 400 }))
-    await expect(decide(new AiRunner(budget(), silentLogger, { stream: false, localUrl: LLM_URL }))).rejects.toThrow(/decision failed after 3 attempts/)
+    await expect(decide(new AiRunner(callLog(), silentLogger, { stream: false, localUrl: LLM_URL }))).rejects.toThrow(/decision failed after 3 attempts/)
   })
 
   it("refuse a model that isn't local, and every model without the server", async () => {
-    const runner = new AiRunner(budget(), silentLogger, { localUrl: LLM_URL })
+    const runner = new AiRunner(callLog(), silentLogger, { localUrl: LLM_URL })
     expect(runner.available).toBe(true)
     await expect(decide(runner, { model: "spacexai/grok-4.7" })).rejects.toThrow("spacexai/grok-4.7 isn't a local model (local/<alias>)")
-    const none = new AiRunner(budget(), silentLogger)
+    const none = new AiRunner(callLog(), silentLogger)
     expect(none.available).toBe(false)
     await expect(decide(none)).rejects.toThrow("AI is disabled (LLM_URL not set)")
   })
@@ -142,7 +142,7 @@ describe("local models", () => {
       usage: { input: 8_000, output: 1_100, total: 9_100 },
       error: null,
     }))
-    const b = budget()
+    const b = callLog()
     const onQuery = vi.fn()
     const r = await new AiRunner(b, silentLogger, { localUrl: LLM_URL, localResearch }).research({ ...researchOpts, task: "research_gap", progress: { onQuery } })
     expect(r).toMatchObject({ error: null, model: MODEL, x_search: false, cost_usd: 0, queries: ["HYPE token unlock", "Hyperliquid news"], sources: [{ domain: "coindesk.com" }], usage: { total: 9_100 } })
@@ -152,18 +152,18 @@ describe("local models", () => {
 
   it("record a failed research at no cost, and an empty memo as a failure", async () => {
     const failing = vi.fn(async () => ({ memo: "", sources: [], queries: ["q"], usage: { input: 10, output: 0, total: 10 }, error: "the search service is unreachable" }))
-    const b = budget()
+    const b = callLog()
     const r = await new AiRunner(b, silentLogger, { localUrl: LLM_URL, localResearch: failing }).research(researchOpts)
     expect(r).toMatchObject({ memo: "", error: "the search service is unreachable", usage: { total: 10 } })
     expect(b.record).toHaveBeenCalledWith(expect.objectContaining({ model: MODEL, ok: false, error: "the search service is unreachable", cost_usd: 0 }))
     const blank = vi.fn(async () => ({ memo: "  ", sources: [], queries: ["q"], usage: { input: 10, output: 5, total: 15 }, error: null }))
-    expect(await new AiRunner(budget(), silentLogger, { localUrl: LLM_URL, localResearch: blank }).research(researchOpts)).toMatchObject({ memo: "", error: "research returned an empty memo" })
+    expect(await new AiRunner(callLog(), silentLogger, { localUrl: LLM_URL, localResearch: blank }).research(researchOpts)).toMatchObject({ memo: "", error: "research returned an empty memo" })
   })
 
   it("can't research without the engine's local research, or with a model that isn't local", async () => {
-    expect(await new AiRunner(budget(), silentLogger, { localUrl: LLM_URL }).research(researchOpts)).toMatchObject({ memo: "", error: "no research (LLM_URL or SEARCH_URL not set)" })
+    expect(await new AiRunner(callLog(), silentLogger, { localUrl: LLM_URL }).research(researchOpts)).toMatchObject({ memo: "", error: "no research (LLM_URL or SEARCH_URL not set)" })
     const localResearch = vi.fn()
-    expect(await new AiRunner(budget(), silentLogger, { localUrl: LLM_URL, localResearch }).research({ ...researchOpts, model: "spacexai/grok-4.5" })).toMatchObject({ error: "spacexai/grok-4.5 isn't a local model (local/<alias>)" })
+    expect(await new AiRunner(callLog(), silentLogger, { localUrl: LLM_URL, localResearch }).research({ ...researchOpts, model: "spacexai/grok-4.5" })).toMatchObject({ error: "spacexai/grok-4.5 isn't a local model (local/<alias>)" })
     expect(localResearch).not.toHaveBeenCalled()
   })
 })

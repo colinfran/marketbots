@@ -50,14 +50,14 @@ Safety: browser `Origin` allowlist, max clients and max connections per IP, 4KB 
 | --- | --- | --- |
 | `settings` | The single versioned settings document (risk, AI, schedule, strategies, universe) | permanent |
 | `engine_state` | Desired state: running/paused/halted, kill switch | permanent |
-| `engine_status` | Heartbeat: health of every dependency, data freshness, AI spend, resources | overwritten every 5s |
+| `engine_status` | Heartbeat: health of every dependency, data freshness, AI calls today, resources | overwritten every 5s |
 | `engine_lease` | Single-instance lease | 30s TTL |
 | `events` | Persisted stream events (replay + history) | TTL, default 30 days |
 | `commands` / `audit_log` | Owner commands and their results; every control and settings change | permanent |
 | `accounts` / `positions` / `orders` / `fills` | The books. Fills are the source of truth; positions and the account are running totals that can be rebuilt from fills | permanent |
 | `cycles` / `research` / `decisions` | Each cycle, its research memo + sources + queries, and every decision with evidence, costs, edge, size, all risk checks, execution, and later its scored outcome | permanent |
 | `portfolio_snapshots` / `daily_stats` | Equity every 5 minutes; per-UTC-day P&L | 1 year / permanent |
-| `ai_calls` | Every model call with tokens and cost (budget enforcement); research calls also count their searches, each one billed | permanent |
+| `ai_calls` | Every model call: task, model, tokens, time and outcome; research calls also count their searches. Costs are 0 since the local model (before 2026-10-28, Grok's billed cost) | permanent |
 | `backtests` | Backtest runs and results | permanent |
 | `wire_items` | Every stored news item: normalized text, symbols, category, tier, severity and its parts, cluster, confirmations, price when first seen, notable reasons | TTL, `wire.retention_days` (30) |
 | `wire_triggers` | Every trigger candidate the policy produced, with the gate that passed or stopped it and why | TTL, `wire.retention_days` |
@@ -90,7 +90,7 @@ features (code) → screens (code) → research (local model + web search, strea
 - **Normalization constrains the AI**: only listed symbols, only actions that fit the position state, numbers clamped, and only source URLs that research actually retrieved (anything else is dropped and the claim is downgraded to speculation).
 - **Prompt-injection defense**: all retrieved content is fenced as `<untrusted>` data, with instructions never to follow it; fence-breaking sequences are neutralized; the decision model never has tools.
 - **Calibration humility**: the AI gives `p_target_first`; code shrinks it halfway (configurable) toward the random-walk prior `stop / (stop + target)`, where the gross edge is exactly zero, then subtracts round-trip costs. Conviction is treated as a ranking, not a probability.
-- **Defaults to no trade** when data is stale, research failed, the response can't be validated, or the daily AI budget is exhausted ($5/day by default; costs come from the gateway's reported cost, or a conservative estimate). A decision on the local model costs nothing, so when the budget can't pay for a cycle's Grok research but the news engine is up, the cycle drops the research and decides from our feeds.
+- **Defaults to no trade** when data is stale, research failed or the response can't be validated. Every AI call runs on our own model server, so there is no AI budget: nothing caps how many cycles run.
 - **Visibility without chain-of-thought**: the dashboard shows search queries, sources, memo progress, structured decisions and risk checks, never hidden model reasoning.
 
 ## News engine (the wire)
@@ -119,7 +119,7 @@ Files headed `// Mirrored in cryptomarketbot and stockmarketbot: keep in sync.` 
 
 **Severity** keeps every part for the audit trail: the category base (or an adapter's own, e.g. a shock scaled by its z-score) × a tier factor, +20 if it names a holding (+8 for a candidate or universe pair, +5 market-wide), +8 per extra independent domain up to +16, and points for a matching price or volume anomaly within ±15 min. The thresholds (`wire.thresholds`, defaults 30 / 55 / 70 / 85) mean: annotate the dossier, review a holding, evaluate an entry, critical.
 
-**Trigger gates**, in order: `wire.mode` → fresh (first seen within `trigger_max_age_minutes`, never a source's first poll after a restart, published under 2 h ago) → confirmation for entries (a tier-1 source, two independent outlets, or a matching price move) → shadow mode → engine running and kill switch off → per-symbol cooldown → hourly and daily caps → AI budget. A trigger never trades: it asks for a focused event cycle, where the AI and the risk engine decide as usual. Event cycles are spaced by `event_min_gap_seconds`, and `event_budget_reserve_pct` of the daily AI budget is kept for them. The one exception is `emergency_action` for a holding hit by a critical, confirmed, negative event, and it only ever reduces risk.
+**Trigger gates**, in order: `wire.mode` → fresh (first seen within `trigger_max_age_minutes`, never a source's first poll after a restart, published under 2 h ago) → confirmation for entries (a tier-1 source, two independent outlets, or a matching price move) → shadow mode → engine running and kill switch off → per-symbol cooldown → hourly and daily caps. A trigger never trades: it asks for a focused event cycle, where the AI and the risk engine decide as usual. Event cycles are spaced by `event_min_gap_seconds`. The one exception is `emergency_action` for a holding hit by a critical, confirmed, negative event, and it only ever reduces risk.
 
 An unexplained move (a price shock no news explains) in a held pair asks for a review. In a universe pair we don't hold, it asks for an entry check only when `unexplained_move_entries` is on (off by default: on 2026-10-27, 13 of these checks cost $1.91 and none led to a trade).
 
@@ -133,7 +133,7 @@ An unexplained move (a price shock no news explains) in a held pair asks for a r
 
 Every cycle that reaches research records which one it ran and why (`cycles.research_plan`), and a skip also as `research_skip_reason`.
 
-**Settings** (the `wire` section, changed live from Admin; defaults): `mode` live, `research_mode` auto, `thresholds` 30/55/70/85, `entry_confirmation` on, `unexplained_move_entries` off, `trigger_max_age_minutes` 15, `symbol_cooldown_minutes` 30, `event_min_gap_seconds` 60, `max_event_cycles_per_hour` / `_per_day` 4 / 24, `event_budget_reserve_pct` 30, `event_research` x_verify (45 s; event decisions 90 s), `emergency_action` review, `anomaly` price z 4 / volume ×5 / market z 4, `retention_days` 30, and the crypto detectors: `depeg_pct` 1, `tvl_drop_pct` 15, `odds_swing_pts` 15, `funding_extreme_annual_pct` 100, `coinbase_premium_pct` 0.3.
+**Settings** (the `wire` section, changed live from Admin; defaults): `mode` live, `research_mode` auto, `thresholds` 30/55/70/85, `entry_confirmation` on, `unexplained_move_entries` off, `trigger_max_age_minutes` 15, `symbol_cooldown_minutes` 30, `event_min_gap_seconds` 60, `max_event_cycles_per_hour` / `_per_day` 4 / 24, `event_research` x_verify (45 s; event decisions 90 s), `emergency_action` review, `anomaly` price z 4 / volume ×5 / market z 4, `retention_days` 30, and the crypto detectors: `depeg_pct` 1, `tvl_drop_pct` 15, `odds_swing_pts` 15, `funding_extreme_annual_pct` 100, `coinbase_premium_pct` 0.3.
 
 **Events and commands**: `wire.item`, `wire.notable`, `wire.dossier`, `wire.trigger` and `wire.source` on the live stream; `wire.replay` (Admin) re-runs an item through the policy as a dry run. Source health is in the heartbeat (`engine_status.wire.sources`: state, last error, items and drops in 24 h, lag).
 

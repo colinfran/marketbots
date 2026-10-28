@@ -4,7 +4,6 @@ import { DEFAULT_SETTINGS, type Settings } from "@mb/crypto-core/settings"
 import type { StructuredProgress } from "@mb/engine-kit/ai/runner"
 import { silentLogger } from "@mb/engine-kit/log"
 import { describe, expect, it, vi } from "vitest"
-import type { AiBudget } from "../src/ai/budget"
 import { repairSeedAllocation } from "../src/ai/repair"
 import type { AiRunner } from "../src/ai/runner"
 import type { Alerts } from "../src/alerts"
@@ -87,7 +86,6 @@ describe("seed cycle", () => {
       ledger,
       executor,
       ai: { available: true, research, structured } as unknown as AiRunner,
-      budget: { estimate: async () => 0.1, canAfford: async () => ({ ok: true, status: { day: "", spent_usd: 0, budget_usd: 5, remaining_usd: 5, calls: 0 } }) } as unknown as AiBudget,
       alerts: alerts as unknown as Alerts,
       gate: () => ({ runStatus: "running", killSwitch: false, venueOnline: true, reconciled: true }),
       feeBps: () => 40,

@@ -55,7 +55,7 @@ Fills arrive instantly over Alpaca's `trade_updates` stream (binary JSON frames 
 4. **Risk checks and execution** (code): every decision is checked rule by rule and every check is recorded on the decision and streamed. Exits run first, then holds, then entries by conviction.
 5. **Record**: the report (memo, structured output, the exact context, execution summary, cost), the decisions, the cycle's steps.
 
-The daily AI budget is checked before each cycle; when it's spent, cycles are skipped (and the closing rules still run in code). A decision on the local model costs nothing, so when the budget can't pay for a cycle's Grok research but the news engine is up, the cycle drops the research and decides from our feeds.
+Every AI call runs on our own model server, so there is no AI budget: nothing caps how many cycles run. When the AI is disabled (no `LLM_URL`), cycles are skipped and the closing rules still run in code.
 
 When a scheduled phase fails (usually its decision), the scheduler retries it (intraday after 4 minutes, up to twice; the other phases right away, up to `schedule.max_phase_attempts` attempts). The failed cycle keeps its research, and the retry reuses it when it's under 20 minutes old and of the same mode instead of paying for it again; the report names the attempt it came from (`research.reused_from`).
 
@@ -87,7 +87,7 @@ Files headed `// Mirrored in cryptomarketbot and stockmarketbot: keep in sync.` 
 
 **What can start a cycle** (`wire/policy.ts`): bad news about a holding at review severity (a review, or `emergency_action` when critical and confirmed); good news naming at most three unheld tickers at evaluate severity in an entry category (M&A, FDA, earnings, guidance, index changes, analyst actions, general news); an official policy statement or a market shock while something is held (a market review); a sharp move or a halt resumption in a holding (a review); an unexplained jump in an unheld stock (a gap-fill check), only when `unexplained_move_entries` is on (off by default: on 2026-10-27, 9 of these checks cost $2.17 and all ended in hold). Odds swings only count when critical and something is held. Insider buying, attention spikes and our own readings (VIX, yields, auctions, EIA, COT, short volume) only annotate the dossier.
 
-**Trigger gates**, in order: `wire.mode` → fresh (first seen within `trigger_max_age_minutes`, never a source's first poll after a restart, published under 2 h ago) → confirmation for entries (a tier-1 source, two independent outlets, or a matching price move) → shadow mode → engine running and kill switch off → **regular session** (outside it, bad news about a holding still alerts at once) → per-symbol cooldown → hourly and daily caps → AI budget. A trigger never trades: it queues a focused event cycle, where the AI and the risk checks decide as usual. Queued events are spaced by `event_min_gap_seconds`, an event that waits more than 30 min is dropped as expired, and `event_budget_reserve_pct` of the daily AI budget is kept for them. Event cycles load a lighter context (no movers, watchlist or Alpaca news; option chains only for the event's symbols).
+**Trigger gates**, in order: `wire.mode` → fresh (first seen within `trigger_max_age_minutes`, never a source's first poll after a restart, published under 2 h ago) → confirmation for entries (a tier-1 source, two independent outlets, or a matching price move) → shadow mode → engine running and kill switch off → **regular session** (outside it, bad news about a holding still alerts at once) → per-symbol cooldown → hourly and daily caps. A trigger never trades: it queues a focused event cycle, where the AI and the risk checks decide as usual. Queued events are spaced by `event_min_gap_seconds`, and an event that waits more than 30 min is dropped as expired. Event cycles load a lighter context (no movers, watchlist or Alpaca news; option chains only for the event's symbols).
 
 **Research modes** (`wire.research_mode`):
 
@@ -99,7 +99,7 @@ Files headed `// Mirrored in cryptomarketbot and stockmarketbot: keep in sync.` 
 
 Every cycle that reaches research records which one it ran and why (`cycles.research_plan`), and a skip also as `research_skip_reason`.
 
-**Settings** (the `wire` section, changed live from Admin; defaults): `mode` live, `research_mode` auto, `thresholds` 30/55/70/85, `entry_confirmation` on, `unexplained_move_entries` off, `trigger_max_age_minutes` 15, `symbol_cooldown_minutes` 30, `event_min_gap_seconds` 60, `max_event_cycles_per_hour` / `_per_day` 4 / 24, `event_budget_reserve_pct` 30, `event_research` x_verify (45 s; event decisions 90 s), `emergency_action` review, `anomaly` price z 4 / volume ×5 / market z 4, `retention_days` 30, `odds_swing_pts` 15, `scan_max_symbols` 1,500, `scan_min_dollar_volume` $20M.
+**Settings** (the `wire` section, changed live from Admin; defaults): `mode` live, `research_mode` auto, `thresholds` 30/55/70/85, `entry_confirmation` on, `unexplained_move_entries` off, `trigger_max_age_minutes` 15, `symbol_cooldown_minutes` 30, `event_min_gap_seconds` 60, `max_event_cycles_per_hour` / `_per_day` 4 / 24, `event_research` x_verify (45 s; event decisions 90 s), `emergency_action` review, `anomaly` price z 4 / volume ×5 / market z 4, `retention_days` 30, `odds_swing_pts` 15, `scan_max_symbols` 1,500, `scan_min_dollar_volume` $20M.
 
 **Events and commands**: `wire.item`, `wire.notable`, `wire.dossier`, `wire.trigger` and `wire.source` on the live stream; `wire.replay` (Admin) re-runs an item through the policy as a dry run. Source health is in the heartbeat (`engine_status.wire.sources`: state, last error, items and drops in 24 h, lag, and a detail line for the price layers).
 
@@ -179,7 +179,7 @@ record            core_reviews (context, research, output, every rule checked), 
 | Overnight cap | `max_overnight_pct` and the intraday-horizon sells count the trading book only |
 | Daily loss limit (`flatten_loss_pct`) | Liquidates the trading book and options; core holdings keep their stops. The owner's *Halt & liquidate* still sells everything |
 | Price-move triggers | Core holdings don't start early intraday cycles |
-| News | `wire/policy.ts withCoreBook`: a core holding never starts a trading event cycle or the emergency exit. Bad news at evaluate severity or above becomes a `core_negative` trigger: a **single-holding review** (its own queue, the event window, the event budget; research 120 s; keep, trim or sell that holding only). Lesser news, price shocks and halt resumptions wait for the weekly review; halt alerts still go out |
+| News | `wire/policy.ts withCoreBook`: a core holding never starts a trading event cycle or the emergency exit. Bad news at evaluate severity or above becomes a `core_negative` trigger: a **single-holding review** (its own queue, the event window; research 120 s; keep, trim or sell that holding only). Lesser news, price shocks and halt resumptions wait for the weekly review; halt alerts still go out |
 | P&L | Every core order's client id starts `smb-core-` (its stops and liquidations too), so fills carry their book (`OrderFill.book`). `daily_stats.books`: the core book's value at the close and its day's P&L (Alpaca's intraday P&L on the holdings, plus shares sold today from yesterday's close to the sale; % of yesterday's core value), and the trading book's (the rest of the day's P&L), with realized P&L per book |
 
 ## Live stream
@@ -211,7 +211,7 @@ Events are typed (`packages/core/src/events.ts`) and carry a strictly increasing
 | Collection | Contents |
 | --- | --- |
 | `settings`, `engine_state` | the versioned settings document; desired state (running/paused/halted, kill switch) |
-| `engine_status`, `engine_lease` | heartbeat (health of everything, schedule, live prices, AI spend); single-instance lease |
+| `engine_status`, `engine_lease` | heartbeat (health of everything, schedule, live prices, AI calls today); single-instance lease |
 | `events` | persisted stream events (replay, report trails) |
 | `commands`, `audit_log` | owner commands and results; every control and settings change |
 | `cycles` | every phase run with its steps, trigger, status, AI cost |
@@ -226,7 +226,7 @@ Events are typed (`packages/core/src/events.ts`) and carry a strictly increasing
 | `wire_items` | every stored news item: normalized text, tickers, category, tier, severity and its parts, cluster, confirmations, price when first seen, notable reasons (TTL `wire.retention_days`, 30) |
 | `wire_triggers` | every trigger candidate the policy produced, with the gate that passed or stopped it and why (TTL `wire.retention_days`) |
 | `seed_runs` | the owner's one-time seed buys: schedule, status, allocations, orders, error |
-| `ai_calls`, `notifications`, `login_attempts` | AI spend (budget; research calls also count their searches), alerts, sign-in rate limits |
+| `ai_calls`, `notifications`, `login_attempts` | every AI call (research calls also count their searches; costs are 0 since the local model), alerts, sign-in rate limits |
 | `auth_*` | owner sign-in (Better Auth magic links, or emailed codes in the Home Screen app; only `OWNER_EMAIL`), written by the dashboard |
 
 ## Testing

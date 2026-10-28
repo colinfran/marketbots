@@ -1,6 +1,7 @@
+import { utcDay } from "@mb/crypto-core/db"
+import { AiCallLog } from "@mb/engine-kit/ai/call-log"
 import { silentLogger } from "@mb/engine-kit/log"
 import { describe, expect, it } from "vitest"
-import { AiBudget } from "../src/ai/budget"
 import { Executor } from "../src/execution/executor"
 import { PaperWalletExecution } from "../src/execution/paper-wallet"
 import type { MarketHub } from "../src/market/hub"
@@ -139,12 +140,13 @@ describe("reconcileWallet", () => {
   })
 })
 
-describe("AiBudget", () => {
-  it("sums today's spend and blocks calls that don't fit", async () => {
-    const budget = new AiBudget(db.col, () => 1)
-    await budget.record({ task: "research", model: "m", cycle_id: null, input_tokens: 1, output_tokens: 1, cost_usd: 0.9, cost_source: "gateway", duration_ms: 1, ok: true, error: null })
-    expect((await budget.canAfford(0.05)).ok).toBe(true)
-    expect((await budget.canAfford(0.2)).ok).toBe(false)
-    expect(await budget.estimate("decision")).toBe(0.06)
+describe("AiCallLog on crypto's day", () => {
+  it("counts the day's calls on the UTC day", async () => {
+    let now = new Date("2026-10-27T23:59:00Z")
+    const log = new AiCallLog(db.col, utcDay, () => now)
+    await log.record({ task: "research", model: "local/qwen3.6-35b-a3b-q2", cycle_id: null, input_tokens: 1, output_tokens: 1, cost_usd: 0, cost_source: "local", duration_ms: 1, ok: true, error: null })
+    expect(await log.today()).toEqual({ day: "2026-10-27", calls: 1 })
+    now = new Date("2026-10-28T00:00:00Z")
+    expect(await log.today()).toEqual({ day: "2026-10-28", calls: 0 })
   })
 })

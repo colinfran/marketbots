@@ -12,7 +12,6 @@ export const WIRE_SETTINGS: WireSettingsBase = {
   event_min_gap_seconds: 60,
   max_event_cycles_per_hour: 4,
   max_event_cycles_per_day: 24,
-  event_budget_reserve_pct: 30,
   event_research: "x_verify",
   event_research_timeout_seconds: 45,
   event_decision_timeout_seconds: 90,

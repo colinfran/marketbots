@@ -141,7 +141,6 @@ export type EventDataMap = {
     exit_reason: string
   }
   "protection.triggered": { position_id: string; instrument: string; kind: string; price: number }
-  "budget.exhausted": Shared["budget.exhausted"]
   "command.received": Shared["command.received"]
   "command.completed": Shared["command.completed"]
   "command.failed": Shared["command.failed"]

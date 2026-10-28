@@ -146,11 +146,8 @@ export const runSeedCycle = async (ctx: EngineContext, { trigger, seed }: { trig
     { summary: `Seed: ${candidates.length} candidates (regime: ${regime.label})`, cycle_id: cycleId },
   )
 
-  // 3. Budget, then full research.
+  // 3. Full research.
   if (!ctx.ai.available) return finish("skipped", "AI disabled (LLM_URL not set)", { regime })
-  const estimate = (await ctx.budget.estimate("research")) + (await ctx.budget.estimate("decision"))
-  const afford = await ctx.budget.canAfford(estimate)
-  if (!afford.ok) return finish("skipped", `daily AI budget exhausted ($${afford.status.spent_usd.toFixed(2)} of $${afford.status.budget_usd})`, { regime })
 
   const subjects: CryptoSubject[] = candidates.map((c) => ({ symbol: c.symbol, role: "candidate", note: c.signal }))
   const researchId = randomUUID()

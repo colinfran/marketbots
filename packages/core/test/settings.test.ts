@@ -17,7 +17,6 @@ type Settings = z.infer<typeof schema>
 
 const defaults: Settings = {
   ai: {
-    daily_budget_usd: 5,
     models: { research: "local/qwen3.6-35b-a3b-q2", decision: "local/qwen3.6-35b-a3b-q2" },
     research_timeout_seconds: 180,
     decision_timeout_seconds: 240,
@@ -35,8 +34,8 @@ describe("settings helpers", () => {
   })
 
   it("apply a patch against the bot's schema", () => {
-    const r = applySettingsPatch(schema, defaults, { ai: { daily_budget_usd: 3 } })
-    expect(r.ok && r.settings.ai.daily_budget_usd).toBe(3)
+    const r = applySettingsPatch(schema, defaults, { ai: { research_timeout_seconds: 240 } })
+    expect(r.ok && r.settings.ai.research_timeout_seconds).toBe(240)
     expect(r.ok && r.settings.ai.models).toEqual(defaults.ai.models)
   })
 

@@ -2,7 +2,6 @@ import type { CycleDoc } from "@mb/crypto-core/db"
 import type { CycleState } from "@mb/crypto-core/events"
 import type { Logger } from "@mb/engine-kit/log"
 import { cleanLine } from "@mb/engine-kit/util/text"
-import type { AiBudget } from "../ai/budget"
 import type { AiRunner } from "../ai/runner"
 import type { Alerts } from "../alerts"
 import type { EventBus } from "../bus/event-bus"
@@ -27,7 +26,6 @@ export type EngineContext = {
   ledger: Ledger
   executor: Executor
   ai: AiRunner
-  budget: AiBudget
   alerts: Alerts
   /** Current risk gate (run state, kill switch, connectivity, reconciliation). */
   gate: () => Gate

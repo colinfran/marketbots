@@ -1,4 +1,4 @@
-/** Model ids both the runner and the budget need to tell apart. */
+/** Model ids the runner accepts. */
 
 export const LOCAL_PREFIX = "local/"
 

@@ -3,7 +3,7 @@ import { silentLogger } from "@mb/engine-kit/log"
 import { botReportSchema, type BotReport } from "@mb/stock-core/report"
 import { NoObjectGeneratedError, streamText } from "ai"
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import type { AiBudget } from "../../src/ai/budget"
+import type { AiCallLog } from "@mb/engine-kit/ai/call-log"
 import { repairReport } from "../../src/ai/repair"
 import { decision, report } from "../helpers/factories"
 
@@ -14,7 +14,7 @@ const stream = vi.mocked(streamText)
 const LLM_URL = "http://llm:8080"
 const MODEL = "local/qwen3.6-35b-a3b-q2"
 
-const budget = () => ({ record: vi.fn(async () => undefined) }) as unknown as AiBudget & { record: ReturnType<typeof vi.fn> }
+const callLog = () => ({ record: vi.fn(async () => undefined) }) as unknown as AiCallLog & { record: ReturnType<typeof vi.fn> }
 
 /** A stand-in for streamText's result: the parts on fullStream, plus the final output and usage. */
 const fakeStream = (parts: unknown[], { output, usage = { inputTokens: 100, outputTokens: 50, totalTokens: 150 } }: { output?: unknown; usage?: unknown } = {}) =>
@@ -48,7 +48,7 @@ describe("AiRunner.research", () => {
       queries: ["NVDA earnings guidance", "Nvidia data center revenue"],
       sources: [{ url: "https://www.reuters.com/nvda", title: "Nvidia beats", domain: "reuters.com" }],
     })
-    const b = budget()
+    const b = callLog()
     const progress = { onQuery: vi.fn(), onSource: vi.fn(), onText: vi.fn() }
     const r = await new AiRunner(b, silentLogger, { localUrl: LLM_URL, localResearch }).research({ ...researchOpts(), progress })
     expect(r).toMatchObject({ error: null, x_search: false, cost_usd: 0, queries: ["NVDA earnings guidance", "Nvidia data center revenue"], usage: { input: 6_000, output: 1_000, total: 7_000 } })
@@ -62,28 +62,28 @@ describe("AiRunner.research", () => {
   })
 
   it("lists a repeated query once, and still counts every search", async () => {
-    const b = budget()
+    const b = callLog()
     const r = await new AiRunner(b, silentLogger, { localUrl: LLM_URL, localResearch: research({ memo: "memo", queries: ["nvda guidance", "nvda guidance", "nvda price target"] }) }).research(researchOpts({ task: "research_gap" }))
     expect(r.queries).toEqual(["nvda guidance", "nvda price target"])
     expect(b.record).toHaveBeenCalledWith(expect.objectContaining({ task: "research_gap", searches: 3 }))
   })
 
   it("never throws: a failed research comes back as its error, recorded as failed", async () => {
-    const b = budget()
+    const b = callLog()
     const r = await new AiRunner(b, silentLogger, { localUrl: LLM_URL, localResearch: research({ queries: ["q"], error: "the search service is unreachable" }) }).research(researchOpts())
     expect(r).toMatchObject({ memo: "", error: "the search service is unreachable" })
     expect(b.record).toHaveBeenCalledWith(expect.objectContaining({ ok: false, error: "the search service is unreachable", cost_usd: 0 }))
   })
 
   it("treats an empty memo as a failure", async () => {
-    const r = await new AiRunner(budget(), silentLogger, { localUrl: LLM_URL, localResearch: research({ memo: "   " }) }).research(researchOpts())
+    const r = await new AiRunner(callLog(), silentLogger, { localUrl: LLM_URL, localResearch: research({ memo: "   " }) }).research(researchOpts())
     expect(r).toMatchObject({ memo: "", error: "research returned an empty memo" })
   })
 
   it("won't research without the engine's local research, or with a model that isn't local", async () => {
-    expect((await new AiRunner(budget(), silentLogger, { localUrl: LLM_URL }).research(researchOpts())).error).toBe("no research (LLM_URL or SEARCH_URL not set)")
+    expect((await new AiRunner(callLog(), silentLogger, { localUrl: LLM_URL }).research(researchOpts())).error).toBe("no research (LLM_URL or SEARCH_URL not set)")
     const localResearch = research({ memo: "memo" })
-    expect((await new AiRunner(budget(), silentLogger, { localUrl: LLM_URL, localResearch }).research(researchOpts({ model: "spacexai/grok-4.5" }))).error).toBe("spacexai/grok-4.5 isn't a local model (local/<alias>)")
+    expect((await new AiRunner(callLog(), silentLogger, { localUrl: LLM_URL, localResearch }).research(researchOpts({ model: "spacexai/grok-4.5" }))).error).toBe("spacexai/grok-4.5 isn't a local model (local/<alias>)")
     expect(localResearch).not.toHaveBeenCalled()
   })
 })
@@ -102,7 +102,7 @@ describe("AiRunner.structured", () => {
     timeoutMs: 60_000,
     ...overrides,
   })
-  const runner = (b = budget()) => new AiRunner(b, silentLogger, { localUrl: LLM_URL })
+  const runner = (b = callLog()) => new AiRunner(b, silentLogger, { localUrl: LLM_URL })
   const noObject = (text: string) =>
     new NoObjectGeneratedError({
       message: "No object generated",
@@ -176,13 +176,13 @@ describe("AiRunner.structured", () => {
 
   it("records a timed-out call as failed, at no cost", async () => {
     stream.mockImplementation(() => fakeStream([{ type: "error", error: new Error("The operation was aborted due to timeout") }]))
-    const b = budget()
+    const b = callLog()
     await expect(runner(b).structured(opts())).rejects.toThrow("timeout")
     expect(b.record).toHaveBeenCalledWith(expect.objectContaining({ task: "decision", model: MODEL, input_tokens: 0, cost_usd: 0, cost_source: "local", ok: false }))
   })
 
   it("refuses to run without the model server, or with a model that isn't local", async () => {
-    await expect(new AiRunner(budget(), silentLogger).structured(opts())).rejects.toThrow("AI is disabled (LLM_URL not set)")
+    await expect(new AiRunner(callLog(), silentLogger).structured(opts())).rejects.toThrow("AI is disabled (LLM_URL not set)")
     await expect(runner().structured(opts({ model: "spacexai/grok-4.7" }))).rejects.toThrow("spacexai/grok-4.7 isn't a local model (local/<alias>)")
     expect(stream).not.toHaveBeenCalled()
   })

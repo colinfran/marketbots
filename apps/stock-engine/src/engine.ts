@@ -1,3 +1,4 @@
+import type { AiCallLog } from "@mb/engine-kit/ai/call-log"
 import type { AiRunner } from "@mb/engine-kit/ai/runner"
 import { EventCycleQueue, type QueuedEvent } from "@mb/engine-kit/control/event-queue"
 import { ControlPlane, type ControlWording } from "@mb/engine-kit/control/plane"
@@ -17,7 +18,6 @@ import { marketDay, minutesBetween } from "@mb/stock-core/time"
 import type { HistoryStore } from "@mb/history/store"
 import { coverageGaps } from "@mb/wire/calendar"
 import { eventSection } from "./ai/prompts"
-import type { AiBudget } from "./ai/budget"
 import type { Alerts } from "./alerts"
 import type { Alpaca, RestHealth } from "./alpaca/client"
 import type { MarketStream } from "./alpaca/market-stream"
@@ -87,7 +87,7 @@ export type EngineDeps = {
   tradeStream: TradeStream
   marketStream: MarketStream
   ai: AiRunner
-  budget: AiBudget
+  calls: AiCallLog
   alerts: Alerts
   stream: StreamServer
   wire: Wire
@@ -176,7 +176,6 @@ export class Engine {
       settings: d.settings,
       state: d.state,
       ai: d.ai,
-      budget: d.budget,
       alerts: d.alerts,
       prices: d.prices,
       setCycleState: (state, detail) => {
@@ -220,7 +219,6 @@ export class Engine {
       session: () => this.eventWindow(),
       held: () => [...new Set([...this.heldSymbols, ...this.underlyings])],
       universe: () => this.wireSymbols().universe,
-      budget: d.budget,
       request: (focus) => this.requestEventCycle(focus),
       markNotable: (ids, reason) => d.wire.markNotable(ids, reason),
       emergency: (symbol) => this.emergencyAction(symbol),
@@ -239,7 +237,7 @@ export class Engine {
     this.reporter = new StatusReporter<EngineStatusDoc>({
       col: d.db.col,
       bus: d.bus,
-      budget: d.budget,
+      calls: d.calls,
       settings: d.settings,
       ai: d.ai,
       state: d.state,

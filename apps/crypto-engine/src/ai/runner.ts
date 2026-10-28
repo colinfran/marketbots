@@ -1,6 +1,6 @@
 import { AiRunner as AiRunnerOf, type LocalResearch } from "@mb/engine-kit/ai/runner"
+import type { AiCallLog } from "@mb/engine-kit/ai/call-log"
 import type { Logger } from "@mb/engine-kit/log"
-import type { AiBudget } from "./budget"
 
 export type { ResearchResult } from "@mb/engine-kit/ai/runner"
 
@@ -11,7 +11,7 @@ export type { ResearchResult } from "@mb/engine-kit/ai/runner"
  * (LLM_URL) is the model server; `localResearch` is how the model researches.
  */
 export class AiRunner extends AiRunnerOf {
-  constructor(budget: AiBudget, log: Logger, { localUrl = null, localResearch = null }: { localUrl?: string | null; localResearch?: LocalResearch | null } = {}) {
-    super(budget, log, { stream: true, memoMaxChars: 12_000, localUrl, localResearch })
+  constructor(calls: AiCallLog, log: Logger, { localUrl = null, localResearch = null }: { localUrl?: string | null; localResearch?: LocalResearch | null } = {}) {
+    super(calls, log, { stream: true, memoMaxChars: 12_000, localUrl, localResearch })
   }
 }

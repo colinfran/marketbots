@@ -114,9 +114,9 @@ describe("prompts", () => {
 const gen = vi.mocked(generateText)
 const stream = vi.mocked(streamText)
 
-type BudgetMock = { record: ReturnType<typeof vi.fn<(call: Record<string, unknown>) => Promise<void>>> }
-const budgetMock = (): BudgetMock => ({ record: vi.fn(async (_call: Record<string, unknown>) => undefined) })
-const budget = () => budgetMock() as never
+type CallLogMock = { record: ReturnType<typeof vi.fn<(call: Record<string, unknown>) => Promise<void>>> }
+const callLogMock = (): CallLogMock => ({ record: vi.fn(async (_call: Record<string, unknown>) => undefined) })
+const callLog = () => callLogMock() as never
 
 const LLM_URL = "http://llm:8080"
 const MODEL = "local/qwen3.6-35b-a3b-q2"
@@ -146,7 +146,7 @@ const researchOpts = { cycleId: "c", model: MODEL, prompt: "p", fromDate: "2026-
 describe("AiRunner.research", () => {
   it("reports queries and sources from the local research, and records the call at no cost", async () => {
     const localResearch = research({ memo: "## BTC/USD\n- [CLAIM] inflows (2026-10-25, https://news.example/etf)", queries: ["bitcoin etf flows"], sources: [{ url: "https://news.example/etf", title: "ETF flows", domain: "news.example" }] })
-    const b = budgetMock()
+    const b = callLogMock()
     const onQuery = vi.fn()
     const onSource = vi.fn()
     const r = await new AiRunner(b as never, silentLogger, { localUrl: LLM_URL, localResearch }).research({ ...researchOpts, progress: { onQuery, onSource } })
@@ -157,19 +157,19 @@ describe("AiRunner.research", () => {
   })
 
   it("never throws: a failed research comes back as its error", async () => {
-    const r = await new AiRunner(budget(), silentLogger, { localUrl: LLM_URL, localResearch: research({ queries: ["q"], error: "the search service is unreachable" }) }).research(researchOpts)
+    const r = await new AiRunner(callLog(), silentLogger, { localUrl: LLM_URL, localResearch: research({ queries: ["q"], error: "the search service is unreachable" }) }).research(researchOpts)
     expect(r).toMatchObject({ memo: "", error: "the search service is unreachable" })
   })
 
   it("keeps a research memo to 12,000 characters", async () => {
-    const r = await new AiRunner(budget(), silentLogger, { localUrl: LLM_URL, localResearch: research({ memo: "x".repeat(20_000) }) }).research(researchOpts)
+    const r = await new AiRunner(callLog(), silentLogger, { localUrl: LLM_URL, localResearch: research({ memo: "x".repeat(20_000) }) }).research(researchOpts)
     expect(r.memo).toHaveLength(12_000)
     expect(r.memo.endsWith("…")).toBe(true)
   })
 
   it("won't research with a model that isn't local", async () => {
     const localResearch = research({ memo: "memo" })
-    const r = await new AiRunner(budget(), silentLogger, { localUrl: LLM_URL, localResearch }).research({ ...researchOpts, model: "spacexai/grok-4.5" })
+    const r = await new AiRunner(callLog(), silentLogger, { localUrl: LLM_URL, localResearch }).research({ ...researchOpts, model: "spacexai/grok-4.5" })
     expect(r.error).toBe("spacexai/grok-4.5 isn't a local model (local/<alias>)")
     expect(localResearch).not.toHaveBeenCalled()
   })
@@ -189,7 +189,7 @@ describe("AiRunner.structured", () => {
     timeoutMs: 240_000,
     ...overrides,
   })
-  const runner = (b: never = budget()) => new AiRunner(b, silentLogger, { localUrl: LLM_URL })
+  const runner = (b: never = callLog()) => new AiRunner(b, silentLogger, { localUrl: LLM_URL })
   const noObject = (text: string) =>
     new NoObjectGeneratedError({
       message: "No object generated",
@@ -245,7 +245,7 @@ describe("AiRunner.structured", () => {
   it("records every attempt at no cost, a rejected one included", async () => {
     const lossy = JSON.stringify({ ...report([]), decisions: [{ ...decision(), action: "short" }] })
     stream.mockReturnValueOnce(fakeStream([], { output: noObject(lossy) })).mockReturnValueOnce(fakeStream([], { output: report([]) }))
-    const b = budgetMock()
+    const b = callLogMock()
     const r = await runner(b as never).structured(opts())
     expect(r).toMatchObject({ attempts: 2, cost_usd: 0 })
     expect(b.record.mock.calls.map(([c]) => [c.cost_usd, c.cost_source, c.ok])).toEqual([
@@ -267,12 +267,12 @@ describe("AiRunner.structured", () => {
   it("throws after three failures, and refuses to run without the model server", async () => {
     stream.mockImplementation(() => fakeStream([{ type: "error", error: new Error("boom") }]))
     await expect(runner().structured(opts())).rejects.toThrow(/failed after 3 attempts/)
-    await expect(new AiRunner(budget(), silentLogger).structured(opts())).rejects.toThrow("AI is disabled (LLM_URL not set)")
+    await expect(new AiRunner(callLog(), silentLogger).structured(opts())).rejects.toThrow("AI is disabled (LLM_URL not set)")
   })
 
   it("records a timed-out call as failed, at no cost", async () => {
     stream.mockImplementation(() => fakeStream([{ type: "error", error: new Error("The operation was aborted due to timeout") }]))
-    const b = budgetMock()
+    const b = callLogMock()
     await expect(runner(b as never).structured(opts())).rejects.toThrow(/timeout/)
     expect(b.record).toHaveBeenCalledWith(expect.objectContaining({ task: "decision", model: MODEL, input_tokens: 0, cost_usd: 0, cost_source: "local", ok: false }))
   })

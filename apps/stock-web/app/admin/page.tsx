@@ -131,7 +131,7 @@ export default async function AdminPage() {
           <CardDescription>
             Long-term holdings with written theses, about {settings.core.target_pct}% of equity, reviewed {WEEKDAY_PLURAL[settings.core.review_weekday]} at {settings.core.review_time_et} ET (turn it on and tune it under Settings → Core book). Running the
             review now counts as this week&apos;s and trades in the regular session. A dry run does the research and the decision and shows the trades it would make, without placing any; it works while the
-            book is off and outside market hours. Each review costs about $0.50–0.80 of the AI budget. Results are on the{" "}
+            book is off and outside market hours. Results are on the{" "}
             <Link href="/core" className="text-foreground underline underline-offset-2">
               Core page
             </Link>

@@ -160,11 +160,6 @@
       "ai": {
         "type": "object",
         "properties": {
-          "daily_budget_usd": {
-            "type": "number",
-            "minimum": 0,
-            "maximum": 1000
-          },
           "models": {
             "type": "object",
             "properties": {
@@ -204,7 +199,6 @@
           }
         },
         "required": [
-          "daily_budget_usd",
           "models",
           "max_candidates_per_cycle",
           "probability_shrink",
@@ -475,11 +469,6 @@
             "minimum": 0,
             "maximum": 200
           },
-          "event_budget_reserve_pct": {
-            "type": "number",
-            "minimum": 0,
-            "maximum": 90
-          },
           "event_research": {
             "type": "string",
             "enum": [
@@ -622,7 +611,6 @@
           "event_min_gap_seconds",
           "max_event_cycles_per_hour",
           "max_event_cycles_per_day",
-          "event_budget_reserve_pct",
           "event_research",
           "event_research_timeout_seconds",
           "event_decision_timeout_seconds",
@@ -813,11 +801,6 @@
       "ai": {
         "type": "object",
         "properties": {
-          "daily_budget_usd": {
-            "type": "number",
-            "minimum": 0,
-            "maximum": 1000
-          },
           "models": {
             "type": "object",
             "properties": {
@@ -858,7 +841,6 @@
           }
         },
         "required": [
-          "daily_budget_usd",
           "models",
           "max_candidates_per_cycle",
           "probability_shrink",
@@ -1141,11 +1123,6 @@
             "minimum": 0,
             "maximum": 200
           },
-          "event_budget_reserve_pct": {
-            "type": "number",
-            "minimum": 0,
-            "maximum": 90
-          },
           "event_research": {
             "type": "string",
             "enum": [
@@ -1290,7 +1267,6 @@
           "event_min_gap_seconds",
           "max_event_cycles_per_hour",
           "max_event_cycles_per_day",
-          "event_budget_reserve_pct",
           "event_research",
           "event_research_timeout_seconds",
           "event_decision_timeout_seconds",

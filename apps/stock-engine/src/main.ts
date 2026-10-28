@@ -1,3 +1,4 @@
+import { AiCallLog } from "@mb/engine-kit/ai/call-log"
 import { AiRunner } from "@mb/engine-kit/ai/runner"
 import { bootstrap } from "@mb/engine-kit/bootstrap"
 import { newsMovesJob } from "@mb/history/moves"
@@ -5,8 +6,8 @@ import { HistoryStore } from "@mb/history/store"
 import { httpClient } from "@mb/engine-kit/util/http"
 import { localResearcher } from "@mb/wire/research/local"
 import { CORE_INDEX_ETFS } from "@mb/stock-core/settings"
+import { marketDay } from "@mb/stock-core/time"
 import { stockBackfillJobs } from "./history/backfill"
-import { AiBudget } from "./ai/budget"
 import { Alerts } from "./alerts"
 import { createAlpaca } from "./alpaca/client"
 import { MarketStream } from "./alpaca/market-stream"
@@ -89,8 +90,8 @@ void bootstrap({
         historySymbols = new Set(["SPY", ...symbols])
       },
     })
-    const budget = new AiBudget(db.col, () => settings.current.ai.daily_budget_usd, { models: () => settings.current.ai.models })
-    const ai = new AiRunner(budget, log.child({ component: "ai" }), {
+    const calls = new AiCallLog(db.col, marketDay)
+    const ai = new AiRunner(calls, log.child({ component: "ai" }), {
       localUrl: env.LLM_URL,
       // Research for local/… models: our search service and scraper, read by the local model.
       localResearch: localResearcher({
@@ -121,7 +122,7 @@ void bootstrap({
       history.addJob(newsMovesJob("SPY"))
       history.start()
     }
-    engine = new Engine({ env, log, db, bus, settings, state, alpaca, prices, tradeStream, marketStream, ai, budget, alerts, stream, wire, coverage, history })
+    engine = new Engine({ env, log, db, bus, settings, state, alpaca, prices, tradeStream, marketStream, ai, calls, alerts, stream, wire, coverage, history })
     return {
       engine,
       start: () => coverage.start(),

@@ -15,7 +15,7 @@ import { SYMBOL_PATTERN } from "./venues"
 export { diffSettings, mergeSettings, MODEL_ID_PATTERN } from "@mb/core/settings"
 
 /**
- * Runtime settings: every risk limit, AI budget and schedule knob. They live in MongoDB, are
+ * Runtime settings: every risk limit, AI setting and schedule knob. They live in MongoDB, are
  * edited only from the dashboard (through audited commands), and are validated with this schema by
  * both the web app and the engine. The AI never sees a way to change them: no prompt, tool or
  * output field can touch settings.
@@ -74,9 +74,7 @@ export const portfolioRiskSchema = z.object({
   drawdown_action: z.enum(["halt", "halt_and_liquidate"]),
 })
 
-/** The AI budget resets at 00:00 UTC. */
 export const aiSettingsSchema = z.object({
-  daily_budget_usd: aiBase.daily_budget_usd,
   models: aiBase.models,
   max_candidates_per_cycle: int(1, 12),
   /**
@@ -116,7 +114,6 @@ export const wireSettingsSchema = z.object({
   event_min_gap_seconds: wireBase.event_min_gap_seconds,
   max_event_cycles_per_hour: wireBase.max_event_cycles_per_hour,
   max_event_cycles_per_day: wireBase.max_event_cycles_per_day,
-  event_budget_reserve_pct: wireBase.event_budget_reserve_pct,
   event_research: wireBase.event_research,
   event_research_timeout_seconds: wireBase.event_research_timeout_seconds,
   event_decision_timeout_seconds: wireBase.event_decision_timeout_seconds,
@@ -205,7 +202,6 @@ export const DEFAULT_SETTINGS: Settings = {
     drawdown_action: "halt",
   },
   ai: {
-    daily_budget_usd: 5,
     models: {
       research: "local/qwen3.6-35b-a3b-q2",
       decision: "local/qwen3.6-35b-a3b-q2",
@@ -247,7 +243,6 @@ export const DEFAULT_SETTINGS: Settings = {
     event_min_gap_seconds: 60,
     max_event_cycles_per_hour: 4,
     max_event_cycles_per_day: 24,
-    event_budget_reserve_pct: 30,
     event_research: "x_verify",
     event_research_timeout_seconds: 45,
     event_decision_timeout_seconds: 90,

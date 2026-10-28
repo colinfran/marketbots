@@ -49,7 +49,6 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
     title: "AI",
     fields: [
-      { path: "ai.daily_budget_usd", label: "Daily AI budget ($)", kind: "number" },
       ...AI_MODEL_FIELDS,
       { path: "ai.max_candidates_per_cycle", label: "Max candidates per cycle", kind: "number" },
       { path: "ai.probability_shrink", label: "Weight on AI probability vs random-walk prior (0-1)", kind: "number", step: 0.05 },
@@ -79,7 +78,6 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
       { path: "wire.unexplained_move_entries", label: "An unexplained move in a pair we don't hold starts an entry check", kind: "boolean" },
       { path: "wire.max_event_cycles_per_hour", label: "Max event cycles per hour", kind: "number" },
       { path: "wire.max_event_cycles_per_day", label: "Max event cycles per day", kind: "number" },
-      { path: "wire.event_budget_reserve_pct", label: "AI budget reserved for events (%)", kind: "number" },
       { path: "wire.symbol_cooldown_minutes", label: "Per-symbol trigger cooldown (min)", kind: "number" },
       { path: "wire.event_min_gap_seconds", label: "Min gap between event cycles (s)", kind: "number" },
       { path: "wire.event_research", label: "Event research (a quick web check before an event decision)", kind: "select", options: [{ value: "x_verify", label: "web check" }, { value: "none", label: "none" }] },

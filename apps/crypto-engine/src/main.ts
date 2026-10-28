@@ -1,10 +1,11 @@
+import { utcDay } from "@mb/crypto-core/db"
+import { AiCallLog } from "@mb/engine-kit/ai/call-log"
 import { bootstrap } from "@mb/engine-kit/bootstrap"
 import { newsMovesJob } from "@mb/history/moves"
 import { HistoryStore } from "@mb/history/store"
 import { httpClient } from "@mb/engine-kit/util/http"
 import { localResearcher } from "@mb/wire/research/local"
 import { krakenDailyJob, krakenFilesJob, krakenGapJob } from "./history/backfill"
-import { AiBudget } from "./ai/budget"
 import { AiRunner } from "./ai/runner"
 import { Alerts } from "./alerts"
 import { EventBus } from "./bus/event-bus"
@@ -54,8 +55,8 @@ void bootstrap({
     const cli = new KrakenCli(env.KRAKEN_CLI_PATH, env.KRAKEN_WORKSPACE, env.KRAKEN_CLI_TIMEOUT_MS, log.child({ component: "kraken-cli" }))
     const ledger = new Ledger(db.col, bus)
     const executor = new Executor(db.col, ledger, new PaperWalletExecution(cli, hub), bus, log.child({ component: "executor" }))
-    const budget = new AiBudget(db.col, () => settings.current.ai.daily_budget_usd, { models: () => settings.current.ai.models })
-    const ai = new AiRunner(budget, log.child({ component: "ai" }), {
+    const calls = new AiCallLog(db.col, utcDay)
+    const ai = new AiRunner(calls, log.child({ component: "ai" }), {
       localUrl: env.LLM_URL,
       // Research for local/… models: our search service and scraper, read by the local model.
       localResearch: localResearcher({
@@ -102,7 +103,7 @@ void bootstrap({
       history.start()
     }
 
-    engine = new Engine({ env, log, db, bus, settings, state, hub, rest, candles, cli, ledger, executor, ai, budget, alerts, stream, wire, history })
+    engine = new Engine({ env, log, db, bus, settings, state, hub, rest, candles, cli, ledger, executor, ai, calls, alerts, stream, wire, history })
     return {
       engine,
       stop: () => {

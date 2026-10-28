@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto"
 import type { Command } from "@mb/crypto-core/commands"
-import type { CommandDoc } from "@mb/crypto-core/db"
+import { utcDay, type CommandDoc } from "@mb/crypto-core/db"
 import type { EngineEvent } from "@mb/crypto-core/events"
+import { AiCallLog } from "@mb/engine-kit/ai/call-log"
 import { createLogger, silentLogger } from "@mb/engine-kit/log"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { AiBudget } from "../src/ai/budget"
 import { AiRunner } from "../src/ai/runner"
 import { Alerts } from "../src/alerts"
 import type { EventBus } from "../src/bus/event-bus"
@@ -71,7 +71,7 @@ beforeEach(async () => {
   const env = loadEnv({ MONGODB_URI: "mongodb://test", STREAM_TOKEN_SECRET: "x".repeat(40), ENGINE_INSTANCE: "test" })
   const settings = await loadSettings(db.col, env, silentLogger)
   const state = await EngineStateStore.load(db.col)
-  const budget = new AiBudget(db.col, () => settings.current.ai.daily_budget_usd)
+  const calls = new AiCallLog(db.col, utcDay)
   const hub = fakeHub() as unknown as MarketHub
   const cli = new FakeWallet().cli()
   const ledger = new Ledger(db.col, bus)
@@ -88,8 +88,8 @@ beforeEach(async () => {
     cli,
     ledger,
     executor: new Executor(db.col, ledger, new PaperWalletExecution(cli, hub), bus, silentLogger),
-    ai: new AiRunner(budget, silentLogger),
-    budget,
+    ai: new AiRunner(calls, silentLogger),
+    calls,
     alerts: new Alerts(db.col, bus, silentLogger, null, null),
     stream: { clientCount: 0 } as unknown as StreamServer,
     // The news engine is covered by its own tests; here it only has to be present and inert.

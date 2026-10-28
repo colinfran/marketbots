@@ -332,13 +332,6 @@ export const runCoreReview = async (ctx: EngineContext, o: CoreReviewOptions): P
     await col.coreReviews.updateOne({ _id: reviewId }, { $set: { ranking: { day: ranking.day, as_of: ranking.as_of }, context } })
 
     if (!ctx.ai.available) return await finish("skipped", { book_after: bookBefore }, "AI is disabled (LLM_URL not set)")
-    const estimate = (await ctx.budget.estimate("research")) + (await ctx.budget.estimate("decision"))
-    // A single-holding review is a news event: it may use the event reserve; the weekly one leaves it alone.
-    const afford = await ctx.budget.canAfford(estimate, { reservePct: !holdingReview && settings.wire.mode === "live" ? settings.wire.event_budget_reserve_pct : 0 })
-    if (!afford.ok) {
-      bus.emit("budget.exhausted", { spent_usd: afford.status.spent_usd, budget_usd: afford.status.budget_usd }, { summary: `AI budget exhausted ($${afford.status.spent_usd.toFixed(2)} of $${afford.status.budget_usd}); the core review waits`, level: "warn", ...meta })
-      return await finish("skipped", { book_after: bookBefore }, `daily AI budget exhausted ($${afford.status.spent_usd.toFixed(2)} of $${afford.status.budget_usd}); the next trading day tries again`)
-    }
 
     // ─── Research ───────────────────────────────────────────────────────
     const researchId = randomUUID()
