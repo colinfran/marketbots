@@ -2,18 +2,12 @@
 
 import { LoaderIcon, MailCheckIcon } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { useState, useSyncExternalStore } from "react"
+import { useState } from "react"
 import { Button } from "./components/button"
 import { Input } from "./components/input"
 import { Label } from "./components/label"
 import { authClient } from "./lib/auth-client"
-
-/**
- * The dashboard installed as a Home Screen app keeps its own cookies, apart from the browser's: an
- * emailed link opens in the browser and signs that in, not the app. So the app asks for a code.
- */
-const installedApp = () => matchMedia("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone === true
-const noSubscribe = () => () => undefined
+import { useInstalledApp } from "./lib/installed-app"
 
 const codeError = (error: { code?: string; message?: string } | null | undefined) => {
   switch (error?.code) {
@@ -29,7 +23,9 @@ const codeError = (error: { code?: string; message?: string } | null | undefined
 }
 
 export function LoginForm({ linkError }: { linkError: string | null }) {
-  const app = useSyncExternalStore(noSubscribe, installedApp, () => false)
+  // The Home Screen app keeps its own cookies, apart from the browser's: an emailed link opens in
+  // the browser and signs that in, not the app. So the app asks for a code.
+  const app = useInstalledApp()
   const router = useRouter()
   const [email, setEmail] = useState("")
   const [sent, setSent] = useState(false)
