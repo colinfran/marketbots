@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest"
 import { z } from "zod"
 import type { AiBudget } from "../../src/ai/budget"
-import { AiRunner, isLocalModel } from "../../src/ai/runner"
+import { AiRunner, isLocalModel, localThinkingBudget } from "../../src/ai/runner"
 import { silentLogger } from "../../src/log"
 
 /** "local/…" models through the real AI SDK, against a fake llama.cpp server (its OpenAI-compatible API). */
@@ -76,6 +76,10 @@ describe("local models", () => {
     expect([MODEL, "spacexai/grok-4.7", "localhost/x"].map(isLocalModel)).toEqual([true, false, false])
   })
 
+  it("think for what the timeout leaves after reading and answering", () => {
+    expect([60, 90, 180, 240, 300].map((s) => localThinkingBudget(s * 1000))).toEqual([256, 256, 2_400, 4_096, 4_096])
+  })
+
   it("decide on the model server under its alias, without the gateway, and are recorded at no cost", async () => {
     const llm = server(() => completion(JSON.stringify(ANSWER)))
     const b = budget()
@@ -83,7 +87,13 @@ describe("local models", () => {
     const r = await decide(new AiRunner(b, silentLogger, false, { stream: false, localUrl: LLM_URL }))
     expect(r).toMatchObject({ output: ANSWER, attempts: 1, repaired: false, model: MODEL, cost_usd: 0, usage: { input: 900, output: 300, total: 1_200 } })
     expect(llm.url()).toBe("http://llm:8080/v1/chat/completions")
-    expect(llm.body()).toMatchObject({ model: "qwen3.6-35b-a3b-q2", response_format: { type: "json_schema", json_schema: { name: "decision", strict: true } } })
+    expect(llm.body()).toMatchObject({
+      model: "qwen3.6-35b-a3b-q2",
+      response_format: { type: "json_schema", json_schema: { name: "decision", strict: true } },
+      // A 60-second call leaves next to no time to think.
+      chat_template_kwargs: { enable_thinking: true },
+      thinking_budget_tokens: 256,
+    })
     expect(b.record).toHaveBeenCalledWith(expect.objectContaining({ task: "decision", model: MODEL, cost_usd: 0, cost_source: "local", input_tokens: 900, output_tokens: 300, ok: true }))
   })
 

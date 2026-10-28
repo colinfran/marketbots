@@ -13,8 +13,9 @@ import { estimateCost, gatewayCost, type AiBudget } from "./budget"
  * models can be configured for decisions, but research needs a model with live search tools.
  *
  * "local/<alias>" ids run on the local model server instead (LLM_URL: llama.cpp's OpenAI-compatible
- * API, docs/SERVER.md §9), with the model's own thinking defaults. They cost nothing, so their calls
- * are recorded at $0 ("local"), with their tokens and time. They can decide, not research.
+ * API, docs/SERVER.md §9). They think within the call's time (localThinkingBudget). They cost
+ * nothing, so their calls are recorded at $0 ("local"), with their tokens and time. They can
+ * decide, not research.
  *
  * Research streams its search queries, sources and the memo as it's written, so the dashboard can
  * show the work as it happens. The structured decision streams too (headline, then each decision,
@@ -39,6 +40,18 @@ const LOCAL_PREFIX = "local/"
 
 /** Models on the local model server: "local/<its alias>", e.g. local/qwen3.6-35b-a3b-q2. */
 export const isLocalModel = (model: string) => model.startsWith(LOCAL_PREFIX)
+
+/** What a local call keeps for reading the prompt (~10 s) and writing the answer (up to ~4,500 tokens, ~100 s). */
+const LOCAL_ANSWER_S = 120
+/** The server's speed, a little under the 44–46 tokens/s it writes on its own. */
+const LOCAL_TOKENS_PER_S = 40
+
+/**
+ * How long a local model may think, in tokens: what the call's timeout leaves after reading and
+ * answering, between 256 and 4,096 (Qwen 3.6's decisions thought ~3,600 in step 0). The server
+ * then ends the thinking and the answer follows under the schema's grammar.
+ */
+export const localThinkingBudget = (timeoutMs: number) => Math.round(Math.min(4_096, Math.max(256, (timeoutMs / 1000 - LOCAL_ANSWER_S) * LOCAL_TOKENS_PER_S)))
 
 /** How often streaming progress is reported (the feed doesn't need every token). */
 const PROGRESS_MS = 1_500
@@ -352,6 +365,8 @@ export class AiRunner {
           maxRetries: 2,
           abortSignal: opts.signal,
           timeout: { totalMs: opts.timeoutMs },
+          // Passed through to llama.cpp: Qwen's thinking switch, and the server's cap on it.
+          ...(isLocalModel(model) ? { providerOptions: { local: { chat_template_kwargs: { enable_thinking: true }, thinking_budget_tokens: localThinkingBudget(opts.timeoutMs) } } } : {}),
         }
         if (!this.stream) {
           const result = await generateText(call)

@@ -629,9 +629,10 @@ nvidia-smi                                                  # ~6.8 GB used on ea
 
 **Local decisions** (`local/<alias>` model settings, `AiRunner` in `@mb/engine-kit`):
 - **Cost:** none. Their calls are in `ai_calls` with `cost_usd: 0` and `cost_source: "local"`, with their tokens and time.
-- **Thinking:** the model's default, and Qwen 3.6 thinks. A crypto decision took ~3 minutes in step 0 (up to 4¼), against default timeouts of 240 s for decisions and 90 s for event decisions. Raise them in Admin (300 s at most) before pointing a decision model here.
+- **Thinking:** on, and capped by the call's timeout. The engine keeps ~120 s for reading the prompt and writing the answer (up to ~4,500 tokens), and lets the model think for the rest at 40 tokens/s, between 256 and 4,096 tokens. That gives 4,096 at the 240 s decision timeout and 2,400 at 180 s. At the 90 s event-decision default it gets almost no thinking, and a long answer alone can outrun 90 s, so raise *Event decision timeout* to 240 s when decisions go local.
 - **Research:** no. It needs Grok's live web and X search, so `models.research` stays a gateway model.
 - **Without LLM_URL:** a `local/…` model is refused, and never becomes a fallback.
+- **Switching:** in Admin, set *Decision model* to `local/qwen3.6-35b-a3b-q2` and *Event decision timeout* to 240. Leave *Fallback model* blank for no Grok at all, or name a Grok model to have it take over when a local call times out or fails.
 
 **The speed guard:** llama.cpp doesn't report where its tensors sit, so the engines judge by speed. A summary written slower than 20 tokens/s pauses summaries for 30 minutes. Normal is 40–50 tokens/s, less per request while other slots run. A model spilled into system RAM writes 15–20.
 
