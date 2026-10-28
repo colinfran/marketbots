@@ -444,6 +444,15 @@ docker run --rm -v ${PWD}\data\kraken-ohlcvt:/in:ro -v ${PWD}\data\kraken-ohlcvt
 
 The `chmod` matters: `unzip` restores the archive's modes (0600, owned by root), which the engine's non-root user can't read (`kraken_files` fails with `EACCES`).
 
+### 6.6 Alpaca's history (stock backfill)
+
+The stock engine fills its history store from Alpaca's SIP bars (all exchanges; the free plan serves them once they're 15 minutes old) with its own key, inside the engine: never run a second process with the live key (§1). Two jobs share one pacer, at most one request every 2 s (30 a minute, a fifth of the engine's REST budget):
+
+- `alpaca_daily`: daily bars since 2016 for the scan universe (~1,500), the benchmarks, the index ETFs and holdings, 50 symbols a request (about 15 minutes); then once a day the last 10 days again, and the full history of any symbol new to the universe.
+- `alpaca_minute`: 1-minute bars since 2016, extended hours included, for the top 300 of the scan universe by dollar volume plus the benchmarks and holdings, one symbol at a time (about two days); then once a day the last 3 days again, which replaces the live feed's IEX-only minutes with SIP's.
+
+Both resume after a restart. Progress is on Admin → System under *History store*. Nothing to download by hand.
+
 The archives can be deleted once extracted; the CSVs can be deleted once `kraken_files` is done (Admin → System), but the next quarter's import needs only its own folder anyway.
 
 ---

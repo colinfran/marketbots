@@ -64,7 +64,8 @@ export class JobRunner {
             due.status.state = "waiting"
           }
         } catch (error) {
-          due.status = { ...due.status, state: "failed", updated_at: new Date(now()), error: errorMessage(error) }
+          // An HTTP error can carry a whole HTML page: one line, and short.
+          due.status = { ...due.status, state: "failed", updated_at: new Date(now()), error: errorMessage(error).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 300) }
           due.nextAt = now() + RETRY_MS
         }
         await new Promise((r) => setTimeout(r, PAUSE_MS))

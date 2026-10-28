@@ -1,6 +1,8 @@
 import { AiRunner } from "@mb/engine-kit/ai/runner"
 import { bootstrap } from "@mb/engine-kit/bootstrap"
 import { HistoryStore } from "@mb/history/store"
+import { CORE_INDEX_ETFS } from "@mb/stock-core/settings"
+import { stockBackfillJobs } from "./history/backfill"
 import { AiBudget } from "./ai/budget"
 import { Alerts } from "./alerts"
 import { createAlpaca } from "./alpaca/client"
@@ -25,8 +27,8 @@ import { Wire } from "./wire/wire"
 /**
  * Engine entry point: the shared boot order and graceful shutdown (@mb/engine-kit/bootstrap) with
  * stock's own wiring. After the stream server is up: Alpaca (REST, trade updates, market data),
- * the news engine's price layers, AI, the news engine and the history store. The price layers start right before the
- * engine and stop right after it has shut down.
+ * the news engine's price layers, AI, the news engine and the history store (with its backfills).
+ * The price layers start right before the engine and stop right after it has shut down.
  */
 
 void bootstrap({
@@ -101,7 +103,11 @@ void bootstrap({
       userAgent: env.SEC_USER_AGENT ?? DEFAULT_USER_AGENT,
     })
 
-    history?.start()
+    if (history) {
+      const extra = () => [...new Set([...settings.current.universe.benchmarks, ...CORE_INDEX_ETFS, ...(engine?.wireSymbols().held ?? [])])]
+      for (const job of stockBackfillJobs({ alpaca, universe: () => universe.symbols, extra })) history.addJob(job)
+      history.start()
+    }
     engine = new Engine({ env, log, db, bus, settings, state, alpaca, prices, tradeStream, marketStream, ai, budget, alerts, stream, wire, coverage, history })
     return {
       engine,

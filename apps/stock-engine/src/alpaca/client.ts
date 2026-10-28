@@ -234,6 +234,17 @@ export const createAlpaca = ({ keyId, secret, feed = "iex" }: AlpacaCredentials,
       return result
     },
 
+    /**
+     * One page of historical bars (up to 10,000, oldest first per symbol) and the next page's
+     * token: the history backfill's resumable unit. SIP, adjusted for splits like getBars.
+     */
+    getBarsPage: async (symbols: string[], timeframe: BarTimeframe, start: Date, end: Date, pageToken: string | null): Promise<{ bars: Record<string, Bar[]>; next: string | null }> => {
+      const res = await data<{ bars: Record<string, Bar[]> | null; next_page_token: string | null }>("/v2/stocks/bars", {
+        query: { symbols: unique(symbols).join(","), timeframe, start: start.toISOString(), end: end.toISOString(), feed: "sip", adjustment: "split", limit: 10_000, page_token: pageToken ?? undefined },
+      })
+      return { bars: res.bars ?? {}, next: res.next_page_token }
+    },
+
     getMovers: (top = 20) => data<{ gainers: Mover[]; losers: Mover[] }>("/v1beta1/screener/stocks/movers", { query: { top } }),
 
     getMostActives: (top = 20) => data<{ most_actives: MostActive[] }>("/v1beta1/screener/stocks/most-actives", { query: { by: "volume", top } }),
