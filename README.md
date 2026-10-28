@@ -5,7 +5,7 @@ Two autonomous, AI-driven paper-trading bots in one pnpm monorepo:
 - **CryptoMarketBot** trades Kraken spot pairs 24/7 in a Kraken CLI paper wallet. Dashboard: [cryptomarketbot.app](https://cryptomarketbot.app).
 - **StockMarketBot** trades US stocks and defined-risk options on market days in an Alpaca paper account. Dashboard: [stockmarketbot.app](https://stockmarketbot.app).
 
-In both, a local model (Qwen 3.6 35B-A3B, on the server's two GPUs) researches through our own web search and decides, and deterministic code sizes and checks every order. Each bot has its own always-on engine, its own Next.js dashboard on Vercel with its own owner sign-in, and its own database on MongoDB Atlas. One Docker stack, `marketbots`, runs both engines, a shared headless scraper and a local LLM for article summaries on the owner's Windows server.
+In both, a local model (Qwen 3.6 35B-A3B, on the server's two GPUs) researches through our own web search and decides, and deterministic code sizes and checks every order. Each bot has its own always-on engine, its own Next.js dashboard on Vercel with its own owner sign-in, and its own database on MongoDB Atlas. One Docker stack, `marketbots`, runs on the owner's Windows server: both engines, the local model server, a web search service (SearXNG), a shared headless scraper and the history store (Postgres with TimescaleDB: price bars and the news archive).
 
 **Paper trading only.** Neither engine has a live-trading code path.
 
@@ -17,12 +17,18 @@ In both, a local model (Qwen 3.6 35B-A3B, on the server's two GPUs) researches t
 flowchart LR
     browser[Browser]
     dashboards[Vercel dashboards]
-    crypto[Crypto engine]
-    stock[Stock engine]
     atlas[(MongoDB Atlas<br/>separate database per bot)]
-    scraper[Shared scraper]
-    llm[Local LLM<br/>article summaries]
-    services[Kraken paper wallet<br/>Alpaca paper account<br/>news and search sources]
+    services[Kraken paper wallet<br/>Alpaca paper account<br/>news sources]
+    internet[Search engines<br/>and article pages]
+
+    subgraph server["marketbots Docker stack, on the owner's server"]
+        crypto[Crypto engine]
+        stock[Stock engine]
+        llm[Local LLM, Qwen 3.6 on two GPUs<br/>research, decisions, summaries]
+        search[Web search<br/>SearXNG]
+        scraper[Shared scraper]
+        history[(History store<br/>price bars and news archive)]
+    end
 
     browser -->|HTTPS| dashboards
     dashboards -->|Read data and write commands| atlas
@@ -30,12 +36,12 @@ flowchart LR
     browser -->|Engine WebSocket stream| stock
     crypto -->|Own trading state| atlas
     stock -->|Own trading state| atlas
-    crypto --> scraper
-    stock --> scraper
-    crypto --> llm
-    stock --> llm
-    crypto --> services
-    stock --> services
+    crypto & stock --> llm
+    crypto & stock --> search
+    crypto & stock --> scraper
+    crypto & stock --> history
+    crypto & stock --> services
+    search & scraper --> internet
 ```
 
 ## Layout
@@ -50,13 +56,14 @@ packages/config/        tsconfig base, ESLint presets with the import boundaries
 packages/core/          pure shared schemas and helpers, no I/O
 packages/engine-kit/    engine runtime shared by both engines
 packages/wire/          the news engine, shared by both engines
+packages/history/       the history store client (Postgres): bars and news archive, shared by both engines
 packages/ui/            client-safe React shared by both dashboards
 packages/web-kit/       server-only dashboard helpers
 packages/crypto-core/   crypto schemas and types
 packages/stock-core/    stock schemas and types
 contracts/              behavior snapshots per bot
 docs/                   architecture, per-bot design, server runbook
-compose.yml             the marketbots stack: both engines, the scraper, the local LLM
+compose.yml             the marketbots stack: both engines, the local LLM, search, the scraper, the history store
 .env.crypto.example     every crypto variable, by where it's used (copy to .env.crypto)
 .env.stock.example      every stock variable, by where it's used (copy to .env.stock)
 ```
