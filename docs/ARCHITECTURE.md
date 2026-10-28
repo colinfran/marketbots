@@ -88,8 +88,23 @@ Both bots were moved in from their old repos unchanged and then refactored onto 
 | `@mb/core` | Pure shared schemas and helpers, no I/O: `math`, `stream-token` (prefix as a parameter), settings base pieces and helpers, the shared command schemas, the event envelope and the events both bots define identically, base collections, indexes and document types, wire types, `metrics`, `indicators`, generic `time` | every app and package |
 | `@mb/engine-kit` | Engine runtime, generic over each bot's settings, events and commands: log, lease, heartbeat, bus, stream server, command processor, Mongo connect, state stores, alerts, AI budget/repair/runner/prompt parts, `ControlPlane`, `StatusReporter`, `EventCycleQueue`, bootstrap, env base, test helpers | both engines |
 | `@mb/wire` | The news engine: the formerly mirrored files, shared source helpers, `sharedCatalog()`, a `makeLexicon()` skeleton, and `enrich/` for article summaries | both engines |
-| `@mb/ui` | Client-safe React: the shadcn primitives, design tokens (`styles.css`), app-shell components, the live-UI shell driven by a per-bot event catalog, shared page sections, the charts (`@mb/ui/charts`) | both dashboards |
+| `@mb/ui` | Client-safe React: the shadcn primitives, design tokens (`styles.css`), app-shell components (including the navigation, below), the live-UI shell driven by a per-bot event catalog, shared page sections, the charts (`@mb/ui/charts`) | both dashboards |
 | `@mb/web-kit` | Server-only dashboard helpers: auth factory, database, command routes, shared queries, formatting, metadata, error reporting | both dashboards |
+
+### The dashboards' navigation
+
+Both dashboards have the same pages under the same URLs, in five sections (`packages/ui/src/site-header.tsx`). The header links to each section; a section with more than one page lists them in a second row.
+
+| Section | Pages |
+| --- | --- |
+| Live | `/`: the account at a glance, the latest cycle as it runs, the engine card and the activity feed |
+| Portfolio | Holdings (with the owner's sell and close buttons), Trades, and on stock the Core book (`/core`) |
+| Research | AI research (`/research`: cycles or reports, and decisions), News (`/news`: the news engine, its sources and triggers), Markets |
+| Performance | Analytics, Strategies (each strategy's or setup's results beside why it should work), Journal |
+| About | How it works |
+| Admin | Owner only |
+
+Each piece of information has one page; others link to it. The equity and daily P&L charts are only on Analytics, and the news sources only on News (with their errors when the owner is signed in; Admin → System has a one-line summary).
 
 `crypto-core` and `stock-core` build on `@mb/core`: the shared logic lives there once, and each bot core binds its own parameters (the stream-token prefix, its wire categories, its owner-only events, its settings sections). Crypto's AI output schema lives in `crypto-core/src/report.ts`.
 
@@ -139,7 +154,7 @@ Live trading settings are not configuration: they live in each bot's database an
 | Prompts and the AI output schema | Prompts and the report schema |
 | Wire catalog, lexicon rules, policy rules, domain sources (chain, DefiLlama, derivatives, Korea, hacks…) | Wire catalog, lexicon rules, policy rules, domain sources (EDGAR, halts, FDA, insiders, congress, MarketBeat…) |
 | Same-name events with different payloads (`market.ticker`, `cycle.*`, `order.*`, `position.*`, `risk.checked`…), the bot section of `engine_status`, the `cycles` / `decisions` / `daily_stats` shapes | Same |
-| Pages: dashboard, holdings, markets/[pair], decisions/[id], strategies and backtests, `/api/candles`, decision card, tables, chart wrappers (crypto's data and formats), `buildTrail` | Pages: dashboard, holdings, markets/[symbol], research/[id] report, options tab, public JSON API, report view, market status, tables, chart wrappers (stock's data and formats), `buildTrail` |
+| Pages: Live (`/`), holdings, markets/[pair], decisions/[id], strategies and backtests, `/api/candles`, decision card, tables, chart wrappers (crypto's data and formats), `buildTrail` | Pages: Live (`/`), holdings, core book, markets/[symbol], research/[id] report, options tab, public JSON API, report view, market status, tables, chart wrappers (stock's data and formats), `buildTrail` |
 
 ## Reading CRYPTO.md and STOCK.md
 

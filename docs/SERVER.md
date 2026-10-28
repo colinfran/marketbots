@@ -262,7 +262,7 @@ The scraper publishes no port. Its health, from inside its container:
 docker compose exec scraper node -e "fetch('http://127.0.0.1:8790/health').then(r=>r.text()).then(console.log)"
 ```
 
-The detailed view (every dependency, data freshness, news source health, AI spend) is each dashboard's **Admin → System**, fed by the engine's heartbeat.
+The detailed view (every dependency, data freshness, AI spend) is each dashboard's **Admin → System**, fed by the engine's heartbeat. Every news source's health, with its errors when you're signed in, is on the dashboard's **News** page; Admin → System has a one-line summary.
 
 ### 5.4 After a deploy
 
@@ -483,7 +483,7 @@ Vercel's instant rollback (*Deployments* → a previous deployment → *Instant 
 
 **How summaries are used:**
 - **Which items:** news cluster roots at severity ≥ `wire.summaries.min_severity` (Admin), and never on the trigger path.
-- **Where they show:** under the item on the Research page.
+- **Where they show:** under the item on the News page.
 - **In prompts:** the AI's wire dossier carries the summaries of its 8 best-ranked items. Each is labelled as a machine summary, and the AI is told to cite the item's URL, never the summary.
 - **Turning them off:** set `wire.summaries.enabled` to off in Admin.
 
