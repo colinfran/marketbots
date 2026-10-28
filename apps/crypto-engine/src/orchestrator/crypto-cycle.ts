@@ -6,6 +6,7 @@ import type { Settings } from "@mb/crypto-core/settings"
 import type { StrategyId } from "@mb/crypto-core/strategies"
 import type { EventFocus } from "@mb/crypto-core/wire"
 import { ACCOUNT_ID, MODE } from "@mb/crypto-core/venues"
+import { affordCycle, type ResearchPlan } from "@mb/engine-kit/ai/budget"
 import { errorMessage } from "@mb/engine-kit/log"
 import { cleanLine } from "@mb/engine-kit/util/text"
 import { CRYPTO_PROMPT_VERSION, cryptoDecisionPrompt, cryptoDecisionSystemPrompt, cryptoGapFillPrompt, cryptoResearchPrompt, eventSection, type CryptoSubject } from "../ai/prompts"
@@ -158,7 +159,7 @@ export const recentlyJudged = async (col: Pick<EngineContext["col"], "decisions"
   return new Set(docs.filter((d) => now - d.created_at.getTime() <= window(d.strategy_id)).map((d) => `${d.symbol} ${d.strategy_id}`))
 }
 
-export type ResearchPlan = { kind: "full" | "gap" | "none"; reason: string }
+export type { ResearchPlan }
 
 /**
  * Which Grok research a cycle runs. Full whenever the wire is off or
@@ -373,11 +374,11 @@ export const runCryptoCycle = async (ctx: EngineContext, request: CycleRequest):
     ctx.bus.emit("wire.dossier", { cycle_id: cycleId, rows: dossier.rows, total: dossier.items.length }, { summary: `Our research: ${dossier.items.length} items for ${subjects.length} subjects`, cycle_id: cycleId })
   }
   const eventText = isEvent ? eventSection(events) : undefined
-  const plan = researchPlan(ctx, { isEvent, wireHealthy: !!wire && wire.healthy(), dossier })
-  const estimate = (plan.kind === "full" ? await ctx.budget.estimate("research") : plan.kind === "gap" ? await ctx.budget.estimate("research_gap") : 0) + (await ctx.budget.estimate("decision"))
+  const wireHealthy = !!wire && wire.healthy()
   // Scheduled cycles leave the event reserve alone; event cycles may use the whole budget.
   const reservePct = !isEvent && settings.wire.mode === "live" ? settings.wire.event_budget_reserve_pct : 0
-  const afford = await ctx.budget.canAfford(estimate, { reservePct })
+  // Research the budget can't pay for is dropped when the decision still fits and our feeds are up.
+  const { plan, afford } = await affordCycle(ctx.budget, researchPlan(ctx, { isEvent, wireHealthy, dossier }), { reservePct, feedsUp: wireHealthy && !!dossier })
   if (!afford.ok) {
     ctx.bus.emit("budget.exhausted", { spent_usd: afford.status.spent_usd, budget_usd: afford.status.budget_usd }, { summary: `AI budget exhausted ($${afford.status.spent_usd.toFixed(2)} of $${afford.status.budget_usd}${reservePct ? `, ${reservePct}% kept for news events` : ""}); no new decisions until 00:00 UTC`, level: "warn" })
     return finish("skipped", reservePct ? "daily AI budget exhausted (the rest is reserved for news events)" : "daily AI budget exhausted")

@@ -90,7 +90,7 @@ features (code) → screens (code) → research (Grok + web/X search, streamed) 
 - **Normalization constrains the AI**: only listed symbols, only actions that fit the position state, numbers clamped, and only source URLs that research actually retrieved (anything else is dropped and the claim is downgraded to speculation).
 - **Prompt-injection defense**: all retrieved content is fenced as `<untrusted>` data, with instructions never to follow it; fence-breaking sequences are neutralized; the decision model never has tools.
 - **Calibration humility**: the AI gives `p_target_first`; code shrinks it halfway (configurable) toward the random-walk prior `stop / (stop + target)`, where the gross edge is exactly zero, then subtracts round-trip costs. Conviction is treated as a ranking, not a probability.
-- **Defaults to no trade** when data is stale, research failed, the response can't be validated, or the daily AI budget is exhausted ($5/day by default; costs come from the gateway's reported cost, or a conservative estimate).
+- **Defaults to no trade** when data is stale, research failed, the response can't be validated, or the daily AI budget is exhausted ($5/day by default; costs come from the gateway's reported cost, or a conservative estimate). A decision on the local model costs nothing, so when the budget can't pay for a cycle's Grok research but the news engine is up, the cycle drops the research and decides from our feeds.
 - **Visibility without chain-of-thought**: the dashboard shows search queries, sources, memo progress, structured decisions and risk checks, never hidden model reasoning.
 
 ## News engine (the wire)

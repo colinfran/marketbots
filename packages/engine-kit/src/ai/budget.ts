@@ -35,6 +35,28 @@ export const gatewayCost = (providerMetadata: unknown): number | null => {
 
 export type BudgetStatus = { day: string; spent_usd: number; budget_usd: number; remaining_usd: number; calls: number }
 
+/** Which Grok research a cycle plans (each bot decides that; see its researchPlan). */
+export type ResearchPlan = { kind: "full" | "gap" | "none"; reason: string }
+
+/**
+ * What a cycle can afford: its planned research and its decision. When the budget can't pay for
+ * the research but can pay for the decision (a decision on the local model costs nothing), and the
+ * cycle has our own feeds to decide from (`feedsUp`), the research is dropped instead of the cycle.
+ */
+export const affordCycle = async (
+  budget: Pick<AiBudget, "estimate" | "canAfford">,
+  plan: ResearchPlan,
+  { reservePct, feedsUp }: { reservePct: number; feedsUp: boolean },
+): Promise<{ plan: ResearchPlan; afford: { ok: boolean; status: BudgetStatus } }> => {
+  const decision = await budget.estimate("decision")
+  const research = plan.kind === "full" ? await budget.estimate("research") : plan.kind === "gap" ? await budget.estimate("research_gap") : 0
+  const afford = await budget.canAfford(research + decision, { reservePct })
+  if (afford.ok || plan.kind === "none" || !feedsUp) return { plan, afford }
+  const alone = await budget.canAfford(decision, { reservePct })
+  if (!alone.ok) return { plan, afford }
+  return { plan: { kind: "none", reason: `no AI budget left for Grok research (${plan.reason}): deciding from our feeds` }, afford: alone }
+}
+
 /** The bot's budget day and what a call is expected to cost before there is enough history. */
 export type BudgetBinding = {
   /** The budget day a moment falls in, e.g. "2026-10-25" (crypto: UTC; stock: the New York trading day). */

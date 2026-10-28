@@ -55,7 +55,7 @@ Fills arrive instantly over Alpaca's `trade_updates` stream (binary JSON frames 
 4. **Risk checks and execution** (code): every decision is checked rule by rule and every check is recorded on the decision and streamed. Exits run first, then holds, then entries by conviction.
 5. **Record**: the report (memo, structured output, the exact context, execution summary, cost), the decisions, the cycle's steps.
 
-The daily AI budget is checked before each cycle; when it's spent, cycles are skipped (and the closing rules still run in code).
+The daily AI budget is checked before each cycle; when it's spent, cycles are skipped (and the closing rules still run in code). A decision on the local model costs nothing, so when the budget can't pay for a cycle's Grok research but the news engine is up, the cycle drops the research and decides from our feeds.
 
 When a scheduled phase fails (usually its decision), the scheduler retries it (intraday after 4 minutes, up to twice; the other phases right away, up to `schedule.max_phase_attempts` attempts). The failed cycle keeps its research, and the retry reuses it when it's under 20 minutes old and of the same mode instead of paying for it again; the report names the attempt it came from (`research.reused_from`).
 

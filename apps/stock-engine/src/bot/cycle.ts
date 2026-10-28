@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto"
+import { affordCycle, type ResearchPlan } from "@mb/engine-kit/ai/budget"
 import { errorMessage } from "@mb/engine-kit/log"
 import type { CycleDoc, CycleKind, CycleStatus, ResearchResult } from "@mb/stock-core/db"
 import type { CycleState } from "@mb/stock-core/events"
@@ -54,7 +55,7 @@ export type CycleOptions = {
   events?: EventFocus[]
 }
 
-export type ResearchPlan = { kind: "full" | "gap" | "none"; reason: string }
+export type { ResearchPlan }
 
 /**
  * Which Grok research a cycle runs. Full whenever the wire is off or
@@ -232,11 +233,11 @@ export const runCycle = async (
       bus.emit("wire.dossier", { cycle_id: cycleId, rows: dossier.rows, total: dossier.items.length }, { summary: `Our research: ${dossier.items.length} items`, ...meta })
     }
     const eventText = isEvent ? eventSection(events) : undefined
-    const plan = researchPlan(ctx, { isEvent, isSeed: !!seed, wireHealthy: !!wire && wire.healthy(), dossier })
-    const estimate = (plan.kind === "full" ? await ctx.budget.estimate("research") : plan.kind === "gap" ? await ctx.budget.estimate("research_gap") : 0) + (await ctx.budget.estimate("decision"))
+    const wireHealthy = !!wire && wire.healthy()
     // Scheduled cycles leave the event reserve alone; event cycles (and the owner's seed) may use the whole budget.
     const reservePct = !isEvent && !seed && settings.wire.mode === "live" ? settings.wire.event_budget_reserve_pct : 0
-    const afford = await ctx.budget.canAfford(estimate, { reservePct })
+    // Research the budget can't pay for is dropped when the decision still fits and our feeds are up.
+    const { plan, afford } = await affordCycle(ctx.budget, researchPlan(ctx, { isEvent, isSeed: !!seed, wireHealthy, dossier }), { reservePct, feedsUp: wireHealthy && !!dossier })
     if (!afford.ok) {
       bus.emit("budget.exhausted", { spent_usd: afford.status.spent_usd, budget_usd: afford.status.budget_usd }, { summary: `AI budget exhausted ($${afford.status.spent_usd.toFixed(2)} of $${afford.status.budget_usd}); no AI cycles until midnight ET`, level: "warn", ...meta })
       await alerts.send("warning", "Daily AI budget exhausted", `Spent $${afford.status.spent_usd.toFixed(2)} of $${afford.status.budget_usd}. No new AI decisions until midnight ET; stops and options exits keep running.`, { key: `budget|${session.day}` })
