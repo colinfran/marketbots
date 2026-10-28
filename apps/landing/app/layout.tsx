@@ -71,7 +71,7 @@ const structuredData = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
-      <body className="flex min-h-full flex-col">
+      <body className="flex min-h-dvh flex-col">
         <script type="application/ld+json" dangerouslySetInnerHTML={jsonLd(structuredData)} />
         <Providers>
           <header className="mx-auto flex h-14 w-full max-w-5xl items-center gap-2 px-4">
@@ -81,12 +81,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <ThemeToggle />
             </div>
           </header>
-          <main className="mx-auto w-full max-w-5xl flex-1 px-4">{children}</main>
-          <footer className="text-muted-foreground mx-auto flex w-full max-w-5xl flex-col gap-1 border-t px-4 py-8 text-xs sm:flex-row sm:justify-between sm:gap-6">
-            <p>
-              Paper trading only: both bots trade simulated money at live prices. No real money is at risk. Not financial advice; past results do not predict future returns, and options
-              can lose their entire value.
-            </p>
+          {/* One screen: the content sits in the middle of whatever height is left. */}
+          <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col justify-center px-4">{children}</main>
+          <footer className="text-muted-foreground mx-auto flex w-full max-w-5xl flex-col gap-1 border-t px-4 py-4 text-xs sm:flex-row sm:justify-between sm:gap-6">
+            <p>Simulated money at live prices; no real money is at risk. Not financial advice.</p>
             <p className="shrink-0">
               Built by{" "}
               <a href={site.author.url} rel="author" className="hover:text-foreground underline underline-offset-2">

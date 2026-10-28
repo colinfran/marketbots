@@ -2,7 +2,6 @@ import { Badge } from "@mb/ui/components/badge"
 import { Button } from "@mb/ui/components/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@mb/ui/components/card"
 import { ArrowRightIcon, NewspaperIcon, RadioIcon, ShieldCheckIcon } from "lucide-react"
-import { Fragment } from "react"
 import { CryptoMark, StockMark } from "@/components/marks"
 
 const BOTS = [
@@ -11,12 +10,8 @@ const BOTS = [
     url: "https://cryptomarketbot.app",
     Mark: CryptoMark,
     tagline: "Crypto, around the clock",
-    summary: "Researches Bitcoin, Ethereum, Solana and other coins with live web and X search, then buys and sells 24/7 in a Kraken paper wallet at live Kraken prices.",
-    facts: [
-      ["Trades", "Kraken spot pairs"],
-      ["Hours", "24/7"],
-      ["Account", "Kraken paper wallet"],
-    ],
+    summary: "Researches Bitcoin, Ethereum, Solana and other coins with live web and X search, then trades 24/7 in a Kraken paper wallet at live prices.",
+    facts: ["Kraken spot pairs", "24/7", "Kraken paper wallet"],
   },
   {
     name: "StockMarketBot",
@@ -24,29 +19,26 @@ const BOTS = [
     Mark: StockMark,
     tagline: "US stocks and options, every market day",
     summary: "Reads the news and X in real time, then trades US stocks and defined-risk options through every market day in an Alpaca paper account.",
-    facts: [
-      ["Trades", "US stocks, defined-risk options"],
-      ["Hours", "US market days"],
-      ["Account", "Alpaca paper account"],
-    ],
+    facts: ["US stocks", "Defined-risk options", "Alpaca paper account"],
   },
 ] as const
 
+/** The loop both bots run, one line each. */
 const STEPS = [
-  { Icon: NewspaperIcon, title: "Research", text: "The engine watches about 150 news sources, and Grok searches the web and X in real time before it decides." },
-  { Icon: ShieldCheckIcon, title: "Decide", text: "The AI proposes trades with a written thesis. Deterministic code sizes every order and a risk engine checks it before it is placed." },
-  { Icon: RadioIcon, title: "Publish", text: "Every research memo, decision and trade streams live to the bot's public dashboard." },
+  { Icon: NewspaperIcon, title: "Research", text: "about 150 news sources, plus live web and X search" },
+  { Icon: ShieldCheckIcon, title: "Decide", text: "Grok proposes, a risk engine checks every order" },
+  { Icon: RadioIcon, title: "Publish", text: "every decision and trade streams live" },
 ]
 
 export default function Home() {
   return (
-    <>
-      <section className="py-16 sm:py-24">
+    <div className="flex flex-col gap-6 py-6 sm:gap-8">
+      <section>
         <Badge variant="outline">Paper trading · no real money</Badge>
-        <h1 className="mt-4 max-w-3xl text-4xl font-semibold tracking-tight text-balance sm:text-5xl">Two AI trading bots, trading in public.</h1>
-        <p className="text-muted-foreground mt-4 max-w-2xl text-lg text-pretty">
-          Marketbots is an experiment in autonomous trading. Grok researches the market and decides; deterministic code sizes and checks every order. One bot trades crypto around the
-          clock, the other trades US stocks and options on market days, and you can watch both live.
+        <h1 className="mt-3 max-w-3xl text-3xl font-semibold tracking-tight text-balance sm:text-4xl">Two AI trading bots, trading in public.</h1>
+        <p className="text-muted-foreground mt-3 max-w-2xl text-pretty">
+          Grok researches the market and decides; deterministic code sizes and checks every order. One bot trades crypto around the clock, the other US stocks and options on market
+          days, and you can watch both live.
         </p>
       </section>
 
@@ -60,16 +52,15 @@ export default function Home() {
               </CardTitle>
               <CardDescription>{tagline}</CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-1 flex-col gap-4">
+            <CardContent className="flex flex-1 flex-col gap-3">
               <p>{summary}</p>
-              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5">
-                {facts.map(([term, value]) => (
-                  <Fragment key={term}>
-                    <dt className="text-muted-foreground">{term}</dt>
-                    <dd>{value}</dd>
-                  </Fragment>
+              <ul className="flex flex-wrap gap-1.5" aria-label="At a glance">
+                {facts.map((fact) => (
+                  <li key={fact}>
+                    <Badge variant="secondary">{fact}</Badge>
+                  </li>
                 ))}
-              </dl>
+              </ul>
             </CardContent>
             <CardFooter className="flex-wrap gap-x-4 gap-y-2">
               <Button asChild>
@@ -84,27 +75,18 @@ export default function Home() {
         ))}
       </section>
 
-      <section aria-labelledby="how" className="py-16 sm:py-24">
-        <h2 id="how" className="text-2xl font-semibold tracking-tight">
-          How they work
-        </h2>
-        <p className="text-muted-foreground mt-2 max-w-2xl">
-          Each bot runs on its own always-on engine, with its own paper account, database and dashboard. Both follow the same loop.
-        </p>
-        <ol className="mt-8 grid gap-8 sm:grid-cols-3">
-          {STEPS.map(({ Icon, title, text }, i) => (
-            <li key={title} className="flex flex-col gap-2">
-              <div className="bg-muted flex size-9 items-center justify-center rounded-lg">
-                <Icon className="size-4" aria-hidden />
-              </div>
-              <h3 className="mt-1 font-medium">
-                {i + 1}. {title}
-              </h3>
-              <p className="text-muted-foreground text-sm">{text}</p>
+      <section aria-label="How they work">
+        <ol className="text-muted-foreground grid gap-3 text-sm sm:grid-cols-3">
+          {STEPS.map(({ Icon, title, text }) => (
+            <li key={title} className="flex items-start gap-2">
+              <Icon className="mt-0.5 size-4 shrink-0" aria-hidden />
+              <span>
+                <span className="text-foreground font-medium">{title}:</span> {text}
+              </span>
             </li>
           ))}
         </ol>
       </section>
-    </>
+    </div>
   )
 }
