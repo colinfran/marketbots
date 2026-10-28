@@ -14,7 +14,7 @@ describe("migrate", () => {
   it("creates every table once and records each migration", async () => {
     expect(await migrate(sql)).toEqual(MIGRATIONS.map((m) => m.id))
     const tables = (await sql.query<{ tablename: string }>("select tablename from pg_tables where schemaname = 'public' order by tablename")).rows.map((r) => r.tablename)
-    expect(tables).toEqual(["bars_1d", "bars_1m", "jobs", "news_items", "news_triggers", "schema_migrations"])
+    expect(tables).toEqual(["bars_1d", "bars_1m", "jobs", "news_items", "news_moves", "news_triggers", "schema_migrations"])
     expect(await migrate(sql)).toEqual([])
   })
 

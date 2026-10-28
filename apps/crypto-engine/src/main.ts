@@ -1,4 +1,5 @@
 import { bootstrap } from "@mb/engine-kit/bootstrap"
+import { newsMovesJob } from "@mb/history/moves"
 import { HistoryStore } from "@mb/history/store"
 import { krakenDailyJob, krakenFilesJob, krakenGapJob } from "./history/backfill"
 import { AiBudget } from "./ai/budget"
@@ -86,6 +87,7 @@ void bootstrap({
       history.addJob(krakenFilesJob(backfill))
       history.addJob(krakenGapJob(backfill))
       history.addJob(krakenDailyJob(backfill))
+      history.addJob(newsMovesJob("BTC/USD"))
       history.start()
     }
 

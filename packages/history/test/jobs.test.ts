@@ -34,13 +34,13 @@ describe("JobRunner", () => {
     await p
   }
 
-  it("runs jobs one at a time, in order, each until done, then leaves them", async () => {
+  it("runs jobs one at a time, taking turns, each until done, then leaves them", async () => {
     const order: string[] = []
     const runner = new JobRunner()
     runner.add(counting("a", 2, null, order))
     runner.add(counting("b", 1, null, order))
     await pass(runner, () => 1_000)
-    expect(order).toEqual(["a", "a", "b"])
+    expect(order).toEqual(["a", "b", "a"])
     expect(runner.status()).toMatchObject([
       { name: "a", state: "done", progress: "2/2", error: null },
       { name: "b", state: "done", progress: "1/1" },
