@@ -10,7 +10,8 @@ import tseslint from "typescript-eslint"
  *   @mb/core ← @mb/crypto-core / @mb/stock-core
  *   @mb/core ← @mb/engine-kit ← @mb/wire
  *   @mb/core ← @mb/ui, @mb/web-kit
- *   apps depend on packages; packages never import apps; crypto never imports stock, or the reverse.
+ *   apps depend on packages; packages never import apps; crypto never imports stock, or the reverse;
+ *   the landing page imports only @mb/ui and @mb/web-kit.
  */
 
 /** What each shared package may import (besides itself and @mb/config). */
@@ -23,11 +24,16 @@ const SHARED = {
   "web-kit": ["core"],
 }
 
-const APPS = "@mb/(crypto|stock)-(engine|web)(/|$)"
+/** What each app outside the two bots may import (besides itself and @mb/config). */
+const SITES = {
+  landing: ["ui", "web-kit"],
+}
+
+const APPS = "@mb/((crypto|stock)-(engine|web)|landing)(/|$)"
 
 /**
- * `no-restricted-imports` for one owner: "crypto" or "stock" (a bot's apps and core package), or
- * a shared package name from SHARED.
+ * `no-restricted-imports` for one owner: "crypto" or "stock" (a bot's apps and core package), a
+ * shared package name from SHARED, or an app name from SITES.
  */
 export const boundaries = (owner) => {
   const patterns = [{ regex: `^${APPS}`, message: "Apps are never imported; move shared code into a package." }]
@@ -35,7 +41,7 @@ export const boundaries = (owner) => {
     const other = owner === "crypto" ? "stock" : "crypto"
     patterns.push({ regex: `^@mb/${other}-`, message: `A ${owner} package or app never imports ${other} code.` })
   } else {
-    const allowed = [owner, "config", ...(SHARED[owner] ?? [])].join("|")
+    const allowed = [owner, "config", ...(SHARED[owner] ?? SITES[owner] ?? [])].join("|")
     patterns.push({ regex: `^@mb/(?!(${allowed})(/|$))`, message: `@mb/${owner} may import only ${allowed.replaceAll("|", ", ")} (AGENTS.md, Package boundaries).` })
   }
   return { "no-restricted-imports": ["error", { patterns }] }
