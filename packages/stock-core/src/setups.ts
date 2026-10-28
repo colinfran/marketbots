@@ -1,7 +1,7 @@
 import { SETUPS } from "./report"
 
 /**
- * What each trade setup means, shown on the dashboard's strategies page. Grok labels every decision
+ * What each trade setup means, shown on the dashboard's strategies page. The AI labels every decision
  * with one setup (report.ts); nothing here screens or trades automatically. The text states what the
  * setup is, why it should make money, and what the AI is there to judge, so each claim can be checked
  * against its results.
@@ -59,7 +59,7 @@ export const SETUP_INFO: Record<Setup, SetupInfo> = {
     name: "Catalyst",
     summary: "Trades a specific, verified event: earnings, guidance, an upgrade, a regulatory decision, a contract or a macro release.",
     rationale: "Markets take time to digest complex news. A verified catalyst that isn't priced in yet can offer a short-lived edge; an unverified rumor cannot.",
-    ai_role: "Primary driver: finds and verifies the catalyst with web and X search, and judges how much of it is already in the price.",
+    ai_role: "Primary driver: finds and verifies the catalyst with web search, and judges how much of it is already in the price.",
   },
   gap_and_go: {
     id: "gap_and_go",

@@ -61,7 +61,7 @@ Each includes the strategy's signal, suggested stop/target hints and the estimat
 [07:58Z | T2 coindesk.com | treasury buy | sev 62 | +2.3% since] Treasury firm says it added 40,000 ETH to its balance sheet (https://www.coindesk.com/markets/2026/10/27/eth-treasury)
 </untrusted>
 
-# RESEARCH (live web + X memo from the research desk)
+# RESEARCH (web research memo from the research desk)
 RESEARCH UNAVAILABLE (research timed out after 180 s). Decide from CONTEXT and WIRE only, lower conviction, and be defensive.
 
 # FINAL CHECKLIST

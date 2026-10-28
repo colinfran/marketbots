@@ -6,7 +6,7 @@ export type { DailyTechnicals, IntradayTechnicals }
 
 /**
  * Technical indicators computed in code. LLMs are unreliable at arithmetic, so the bot hands
- * Grok finished numbers instead of raw bars.
+ * the AI finished numbers instead of raw bars.
  */
 
 export const round = (value: number | null | undefined, digits = 2): number | null => {

@@ -182,7 +182,7 @@ export type NotificationDoc = {
   expires_at: Date
 }
 
-/** research_gap = the short Grok research that only fills gaps the wire dossier leaves. */
+/** research_gap = the short web research that only fills gaps the wire dossier leaves. */
 export type AiTask = "research" | "decision" | "research_gap"
 
 export type AiCallDoc = {
@@ -195,7 +195,7 @@ export type AiCallDoc = {
   cycle_id: string | null
   input_tokens: number
   output_tokens: number
-  /** Research calls: the web and X tool calls Grok made, each billed (absent on decisions and older docs). */
+  /** Research calls: the web searches made (before 2026-10-28, Grok's billed web and X tool calls; absent on decisions and older docs). */
   searches?: number
   cost_usd: number
   cost_source: "gateway" | "estimate" | "local"
@@ -226,9 +226,9 @@ export type CycleDocBase<Status extends string> = {
   /** Event cycles: the trigger and the wire items that started it. */
   wire_trigger_id?: string | null
   wire_item_ids?: string[]
-  /** Why Grok research was skipped (research_mode auto), when it was. */
+  /** Why web research was skipped (research_mode auto), when it was. */
   research_skip_reason?: string | null
-  /** Which Grok research the cycle ran (full, gap-fill or none) and why (absent on older cycles and on cycles that stopped before research). */
+  /** Which web research the cycle ran (full, gap-fill or none) and why (absent on older cycles and on cycles that stopped before research). */
   research_plan?: { kind: "full" | "gap" | "none"; reason: string }
 }
 

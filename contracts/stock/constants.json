@@ -65,7 +65,7 @@
       "name": "Catalyst",
       "summary": "Trades a specific, verified event: earnings, guidance, an upgrade, a regulatory decision, a contract or a macro release.",
       "rationale": "Markets take time to digest complex news. A verified catalyst that isn't priced in yet can offer a short-lived edge; an unverified rumor cannot.",
-      "ai_role": "Primary driver: finds and verifies the catalyst with web and X search, and judges how much of it is already in the price."
+      "ai_role": "Primary driver: finds and verifies the catalyst with web search, and judges how much of it is already in the price."
     },
     "gap_and_go": {
       "id": "gap_and_go",

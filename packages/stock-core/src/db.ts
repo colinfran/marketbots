@@ -47,7 +47,7 @@ export type {
  * stock's settings, commands and events and adds stock's own.
  *
  * Everything the bot sees, thinks and does is persisted: cycles (each phase run, step by step),
- * reports (research + structured output + the exact data Grok saw), decisions (each requested
+ * reports (research + structured output + the exact data the AI saw), decisions (each requested
  * action and what the risk engine did with it), orders (every Alpaca order, synced), position
  * plans (stop/target per stock), options positions, daily stats and the event stream.
  */
@@ -159,7 +159,7 @@ export type ReportDoc = {
   created_at: Date
   model: string
   attempts: number
-  /** True when Grok's output failed the schema and was salvaged in code. */
+  /** True when the AI's output failed the schema and was salvaged in code. */
   repaired: boolean
   research: ResearchResult
   report: BotReport
@@ -348,7 +348,7 @@ export type CoreDecisionStatus = "executed" | "rejected" | "failed" | "noop" | "
 export type CoreDecisionRecord = {
   symbol: string
   action: CoreAction
-  /** Grok's request as normalized; null for a holding it left out. */
+  /** The AI's request as normalized; null for a holding it left out. */
   request: CoreHoldingDecision | null
   status: CoreDecisionStatus
   reason: string | null
@@ -371,7 +371,7 @@ export type CoreDecisionRecord = {
 /** The core book at a moment. Percentages are of equity. */
 export type CoreBookState = { equity: number; cash: number; target_pct: number; core_value: number; core_pct: number; holdings: string[] }
 
-/** One run of the core review: what Grok saw and said, and what code did about it. */
+/** One run of the core review: what the AI saw and said, and what code did about it. */
 export type CoreReviewDoc = {
   _id: string
   cycle_id: string
@@ -391,14 +391,14 @@ export type CoreReviewDoc = {
   adopted: string[]
   /** The ranking the review was shown (its rows are in `context.candidates`). */
   ranking: { day: string; as_of: string | null } | null
-  /** Everything the review was given, as Grok saw it. */
+  /** Everything the review was given, as the AI saw it. */
   context: CoreReviewContext | null
   research: ResearchResult | null
-  /** Grok's answer, normalized. */
+  /** The AI's answer, normalized. */
   output: CoreReviewOutput | null
   decisions: CoreDecisionRecord[]
   summary: string | null
-  /** Names Grok likes but isn't buying; the next weekly review sees them. */
+  /** Names the AI likes but isn't buying; the next weekly review sees them. */
   watch: CoreWatchItem[]
   model: string | null
   cost_usd: number

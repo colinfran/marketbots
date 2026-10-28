@@ -17,7 +17,7 @@ import { loadFeatures, processDecision, summarize, type CycleResult, type SeedOu
  * set time, and research that morning decides what to buy.
  *
  *   features → candidates (every fresh, unheld universe pair with daily-trend levels)
- *   → full Grok research (long-term outlook, macro, flows) → structured allocation (1-4 pairs)
+ *   → full web research (long-term outlook, macro, flows) → structured allocation (1-4 pairs)
  *   → each allocation sized at amount × weight → the normal risk engine (owner-directed: no
  *     conviction, edge or reward:risk gate; every other gate and cap applies) → execution.
  *

@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto"
 import { affordCycle, type ResearchPlan } from "@mb/engine-kit/ai/budget"
-import { isLocalModel } from "@mb/engine-kit/ai/models"
 import { errorMessage } from "@mb/engine-kit/log"
 import type { CycleDoc, CycleKind, CycleStatus, ResearchResult } from "@mb/stock-core/db"
 import type { CycleState } from "@mb/stock-core/events"
@@ -24,8 +23,8 @@ import { buildDossier, type Dossier } from "../wire/dossier"
 
 /**
  * One cycle = one phase of the trading day:
- *   context (broker data + option chains) → research (Grok + web/X, streamed)
- *   → decision (Grok, structured, streamed) → risk checks + execution → record
+ *   context (broker data + option chains) → research (the AI + web search, streamed)
+ *   → decision (the AI, structured, streamed) → risk checks + execution → record
  *
  * Every step is written to the cycle document and streamed as an event, so the dashboard shows
  * the whole thing as it happens: what data was gathered, each search and source, the memo being
@@ -58,18 +57,15 @@ export type CycleOptions = {
 
 export type { ResearchPlan }
 
-/** What the Live page says while research runs: the local model searches the web through our search service, Grok also searches X. */
-const researchSummary = (kind: ResearchPlan["kind"], phase: Parameters<typeof label>[0], model: string) => {
-  const local = isLocalModel(model)
-  if (kind === "gap") return local ? "Searching the web for gaps our feeds left" : "Checking X and gaps our feeds left"
-  return `Researching the ${label(phase).toLowerCase()} with ${local ? "web search" : "web + X search"}`
-}
+/** What the Live page says while research runs. */
+const researchSummary = (kind: ResearchPlan["kind"], phase: Parameters<typeof label>[0]) =>
+  kind === "gap" ? "Searching the web for gaps our feeds left" : `Researching the ${label(phase).toLowerCase()} with web search`
 
 /**
- * Which Grok research a cycle runs. Full whenever the wire is off or
+ * Which web research a cycle runs. Full whenever the wire is off or
  * unhealthy. auto runs the gap-fill whenever the dossier has a gap on anything the cycle could
  * trade, or on the market (an unexplained move, an unconfirmed high-severity item), in any phase,
- * and skips Grok otherwise. The owner's one-time seed always gets the full research.
+ * and skips web research otherwise. The owner's one-time seed always gets the full research.
  */
 export const researchPlan = (
   ctx: Pick<EngineContext, "settings">,
@@ -261,7 +257,7 @@ export const runCycle = async (
     const researching = plan.kind !== "none" && !reuse
     if (researching) {
       state("researching", focus.length ? focus.join(", ") : "the market")
-      bus.emit("research.started", { cycle_id: cycleId, research_id: researchId, phase, model: settings.ai.models.research, focus }, { summary: researchSummary(plan.kind, phase, settings.ai.models.research), ...meta })
+      bus.emit("research.started", { cycle_id: cycleId, research_id: researchId, phase, model: settings.ai.models.research, focus }, { summary: researchSummary(plan.kind, phase), ...meta })
     }
     const skipped: ResearchResult = { memo: "", sources: [], queries: [], model: settings.ai.models.research, x_search: false, duration_ms: 0, error: null, usage: { input: 0, output: 0, total: 0 }, cost_usd: 0 }
     const research = await step(
@@ -281,7 +277,7 @@ export const runCycle = async (
           timeoutMs: (isEvent ? settings.wire.event_research_timeout_seconds : settings.ai.research_timeout_seconds) * 1000,
           signal: ctx.signal,
           progress: {
-            onQuery: (query, tool) => bus.emit("research.query", { research_id: researchId, query, tool }, { summary: `${tool === "x_search" ? "Searching X" : "Searching the web"}: ${query}`, level: "debug", ...meta }),
+            onQuery: (query, tool) => bus.emit("research.query", { research_id: researchId, query, tool }, { summary: `Searching the web: ${query}`, level: "debug", ...meta }),
             onSource: (s) => bus.emit("research.source", { research_id: researchId, title: s.title ?? s.url, url: s.url, domain: s.domain ?? "" }, { summary: `Reading: ${s.title ?? s.url}`, level: "debug", ...meta }),
             onText: (chars, excerpt) => bus.emit("research.progress", { research_id: researchId, chars, excerpt }, { summary: `Writing the research memo (${chars.toLocaleString("en-US")} chars)`, level: "debug", ...meta }),
             onReasoning: settings.ai.stream_reasoning ? (chars, excerpt) => bus.emit("ai.reasoning", { cycle_id: cycleId, task: "research", chars, excerpt }, { summary: "Reasoning (research)", level: "debug", ...meta }) : undefined,
@@ -294,7 +290,7 @@ export const runCycle = async (
             ? `skipped: ${plan.reason}`
             : r.error
               ? `failed: ${r.error}`
-              : `${plan.kind === "gap" ? "gap-fill, " : ""}${r.sources.length} sources, ${r.queries.length} searches${r.x_search ? "" : " (web only)"}, ${Math.round(r.duration_ms / 1000)}s`,
+              : `${plan.kind === "gap" ? "gap-fill, " : ""}${r.sources.length} sources, ${r.queries.length} searches, ${Math.round(r.duration_ms / 1000)}s`,
     )
     aiCost += research.cost_usd ?? 0
     await col.cycles.updateOne({ _id: cycleId }, { $set: { research_plan: plan, ...(plan.kind === "none" ? { research_skip_reason: plan.reason } : {}) } })
@@ -401,7 +397,7 @@ export const runCycle = async (
     if (execution.failed > 0) {
       await alerts.send("error", `${execution.failed} order${execution.failed > 1 ? "s" : ""} failed (${phase})`, execution.notes.join("\n") || "See the report for details.", { fields: { Cycle: cycleId }, path: `/research/${reportId}` })
     }
-    // Grok is told the overnight rules; this makes sure a "hold" or a forgotten position can't break them.
+    // The AI is told the overnight rules; this makes sure a "hold" or a forgotten position can't break them.
     await closeFallback()
     if (phase === "intraday" || phase === "close") {
       state("protecting")
@@ -462,7 +458,7 @@ export const runCycle = async (
 }
 
 /**
- * Seed cycles: keep only Grok's core buys (capped at the amount + 5%), give each exit levels a
+ * Seed cycles: keep only the AI's core buys (capped at the amount + 5%), give each exit levels a
  * long-term hold can live with, and record the allocation. Execution then applies every normal
  * risk check.
  */

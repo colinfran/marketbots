@@ -6,7 +6,7 @@ import { baseOf, num, settleAll, signed, universeBases, usd } from "./common"
  * Derivatives positioning as wire items: perpetual funding, open
  * interest, implied volatility and liquidations from public venue APIs. All of it is
  * `funding_extreme` or `liquidation_cascade`, which the policy only annotates: crowded
- * positioning is context for Grok, not a reason to start a cycle.
+ * positioning is context for the AI, not a reason to start a cycle.
  *
  *   kraken_futures  Kraken Futures tickers (PF_ linear perps; Kraken calls bitcoin XBT)
  *   hyperliquid     Hyperliquid `metaAndAssetCtxs`

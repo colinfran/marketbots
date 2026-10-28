@@ -51,7 +51,7 @@ none
 [00:05Z | T3 alternative.me | sentiment spike | sev 22] Crypto Fear & Greed index enters Extreme Greed: 78 (https://alternative.me/crypto/fear-and-greed-index/)
 </untrusted>
 
-# RESEARCH (live web + X memo from the research desk)
+# RESEARCH (web research memo from the research desk)
 RESEARCH SKIPPED: event cycle with event_research none: the dossier is the evidence. WIRE is the evidence for this cycle.
 
 # FINAL CHECKLIST

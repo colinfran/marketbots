@@ -2,7 +2,7 @@ import type { OptionStrategy } from "./options"
 import type { Phase } from "./settings"
 
 /**
- * The factual snapshot handed to Grok on every cycle (built by the engine from Alpaca), stored
+ * The factual snapshot handed to the AI on every cycle (built by the engine from Alpaca), stored
  * with each report so every decision can be audited against exactly what the bot saw.
  */
 
@@ -39,7 +39,7 @@ export type DailyTechnicals = {
   rsi14_daily: number | null
 }
 
-/** Deterministic risk state. Grok is told these numbers, and the execution engine enforces them. */
+/** Deterministic risk state. The AI is told these numbers, and the execution engine enforces them. */
 export type RiskState = {
   equity: number
   cash: number

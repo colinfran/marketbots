@@ -17,7 +17,7 @@ import { clientId, saveOrders, waitForFill } from "./orders"
 import { computeRiskState, type RiskState } from "./risk"
 
 /**
- * Turns Grok's decisions into Alpaca orders, enforcing the risk rules in code. Every rule that's
+ * Turns the AI's decisions into Alpaca orders, enforcing the risk rules in code. Every rule that's
  * evaluated is recorded on the decision (and streamed to the dashboard), pass or fail.
  *
  * Stock order mechanics:
@@ -260,7 +260,7 @@ export const executeDecisions = async (ctx: TradingContext, { cycleId, reportId,
   let tradesLeft = risk.trades_remaining
   let newBuys = 0
 
-  // Every held stock gets a recorded decision. If Grok skipped one, log a default hold (its
+  // Every held stock gets a recorded decision. If the AI skipped one, log a default hold (its
   // broker-side stop/target orders stay active) so the audit trail is complete.
   const decided = new Set(report.decisions.filter((d) => !isOptionAction(d.action)).map((d) => d.symbol))
   const defaultHolds: Decision[] = positions
@@ -275,7 +275,7 @@ export const executeDecisions = async (ctx: TradingContext, { cycleId, reportId,
       horizon: plans.get(p.symbol)?.horizon ?? "intraday",
       setup: "other",
       conviction: 5,
-      rationale: "Grok returned no decision for this position, so it is held by default. Its stop-loss and take-profit orders stay active.",
+      rationale: "The AI returned no decision for this position, so it is held by default. Its stop-loss and take-profit orders stay active.",
       evidence: [],
       invalidation: plans.get(p.symbol)?.invalidation ?? "Stop-loss hit.",
       structure_id: null,

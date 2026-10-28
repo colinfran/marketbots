@@ -7,8 +7,8 @@ import { tradingCapPct } from "./books"
 export type { RiskState }
 
 /**
- * Deterministic risk state. Grok is told these numbers, and the execution engine enforces them
- * no matter what Grok asks for.
+ * Deterministic risk state. The AI is told these numbers, and the execution engine enforces them
+ * no matter what the AI asks for.
  */
 
 /**

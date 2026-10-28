@@ -218,7 +218,7 @@ export const wireSettingsSchema = z.object({
   event_research: wireBase.event_research,
   event_research_timeout_seconds: wireBase.event_research_timeout_seconds,
   event_decision_timeout_seconds: wireBase.event_decision_timeout_seconds,
-  /** What happens at once when a held stock meets a critical, confirmed, negative event. review = Grok decides. */
+  /** What happens at once when a held stock meets a critical, confirmed, negative event. review = the AI decides. */
   emergency_action: z.enum(["review", "exit"]),
   /** Price shocks are measured after removing SPY's move, the market-wide shock is SPY's 5-minute z-score, and IEX volume is a small slice. */
   anomaly: wireBase.anomaly,

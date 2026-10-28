@@ -7,7 +7,7 @@ import type { RequestText } from "../fetch"
 import { searchWeb, type SearchRange, type SearchResult } from "./search"
 
 /**
- * Research on our own machines, in place of Grok's live web and X search (docs/SERVER.md §9). The
+ * Research on our own machines (docs/SERVER.md §9). The
  * bot's research prompt is unchanged; the local model can't browse, so the browsing is done for it:
  *   1. the model reads the request and writes up to MAX_QUERIES web searches;
  *   2. the search service (SearXNG) runs them, two at a time, for news and web results;

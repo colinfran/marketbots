@@ -25,8 +25,8 @@ import { CORE_MIN_STOP_PCT, CORE_MIN_WEIGHT_PCT, type CoreHolding, initialCoreSt
  *   book (code)       account, positions, the core plans; on the first real review, the one-time
  *                     seed's holdings are adopted into the core book
  *   ranking (code)    rebuilt now, so it covers today's holdings and themes
- *   research (Grok)   the holdings' theses, the themes, the top candidates (web + X search)
- *   decision (Grok)   keep / buy / trim / sell, each with a target weight, thesis and invalidation
+ *   research (AI)     the holdings' theses, the themes, the top candidates (web search)
+ *   decision (AI)     keep / buy / trim / sell, each with a target weight, thesis and invalidation
  *   rules (code)      ./rules: caps, cash, trade limit, stops; then ./execute in order
  *   record            the review (context, research, output, what code did), the cycle and its trail
  *
@@ -343,7 +343,7 @@ export const runCoreReview = async (ctx: EngineContext, o: CoreReviewOptions): P
     // ─── Research ───────────────────────────────────────────────────────
     const researchId = randomUUID()
     state("researching", "core holdings, themes, candidates")
-    bus.emit("research.started", { cycle_id: cycleId, research_id: researchId, phase: "intraday", model: settings.ai.models.research, focus: [...holdings.map((h) => h.symbol), ...shown.slice(0, 12).map((r) => r.symbol)] }, { summary: "Researching the core book with web + X search", ...meta })
+    bus.emit("research.started", { cycle_id: cycleId, research_id: researchId, phase: "intraday", model: settings.ai.models.research, focus: [...holdings.map((h) => h.symbol), ...shown.slice(0, 12).map((r) => r.symbol)] }, { summary: "Researching the core book with web search", ...meta })
     const research = await step(
       "research",
       () =>
@@ -355,7 +355,7 @@ export const runCoreReview = async (ctx: EngineContext, o: CoreReviewOptions): P
           timeoutMs: holdingReview ? HOLDING_RESEARCH_TIMEOUT_MS : CORE_RESEARCH_TIMEOUT_MS,
           signal: ctx.signal,
           progress: {
-            onQuery: (query, tool) => bus.emit("research.query", { research_id: researchId, query, tool }, { summary: `${tool === "x_search" ? "Searching X" : "Searching the web"}: ${query}`, level: "debug", ...meta }),
+            onQuery: (query, tool) => bus.emit("research.query", { research_id: researchId, query, tool }, { summary: `Searching the web: ${query}`, level: "debug", ...meta }),
             onSource: (s) => bus.emit("research.source", { research_id: researchId, title: s.title ?? s.url, url: s.url, domain: s.domain ?? "" }, { summary: `Reading: ${s.title ?? s.url}`, level: "debug", ...meta }),
             onText: (chars, excerpt) => bus.emit("research.progress", { research_id: researchId, chars, excerpt }, { summary: `Writing the research memo (${chars.toLocaleString("en-US")} chars)`, level: "debug", ...meta }),
           },

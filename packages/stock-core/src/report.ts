@@ -2,7 +2,7 @@ import { z } from "zod"
 import { OPTION_STRATEGIES } from "./options"
 
 /**
- * The ONE structured shape every Grok decision call returns, for every phase of the day
+ * The ONE structured shape every AI decision call returns, for every phase of the day
  * (premarket, intraday, close, postmarket). Keeping a single shape means storage, the UI and the
  * execution engine never have to special-case a phase.
  *

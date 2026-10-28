@@ -5,7 +5,7 @@ import { seedStopPct } from "../ai/prompts"
 
 /**
  * Rules for the owner's one-time seed cycle. The seed is an ordinary intraday cycle whose prompt
- * asks only for long-term core buys; these functions then hold Grok's answer to that:
+ * asks only for long-term core buys; these functions then hold the AI's answer to that:
  *   - buys only (at most three, none of a held symbol), every one multi_day;
  *   - the buys' total notional at most the seed amount + 5% (allocation_pct is % of equity);
  *   - exit levels a core hold can live with (about a 7.5% stop and a far target).
@@ -57,8 +57,8 @@ export const normalizeSeedDecisions = (decisions: Decision[], { held, equity, am
 }
 
 /**
- * Exit levels for a seed buy at `price`: Grok's stop when it sits inside the configured range,
- * else about 7.5% below; Grok's target when it clears the minimum reward:risk, else 2.5× the stop
+ * Exit levels for a seed buy at `price`: the AI's stop when it sits inside the configured range,
+ * else about 7.5% below; the AI's target when it clears the minimum reward:risk, else 2.5× the stop
  * distance above.
  */
 export const seedExits = (d: Pick<Decision, "symbol" | "stop_loss" | "take_profit">, price: number, risk: Pick<RiskSettings, "min_stop_pct" | "max_stop_pct" | "min_reward_risk">) => {

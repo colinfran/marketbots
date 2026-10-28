@@ -29,7 +29,7 @@ import { exitPosition } from "./trading"
  *   1. market data → features (code)            5. structured AI decision per candidate/position
  *   2. quant screens → candidates (code)        6. EV, costs and size (code)
  *   3. positions due for review                 7. deterministic risk checks, then execution
- *   4. live research (Grok + web/X search)      8. everything recorded for later evaluation
+ *   4. live research (local model + web)        8. everything recorded for later evaluation
  *
  * No candidates and no reviews means no AI call. Missing data, a blown budget or a failed AI call
  * means no new trades; positions stay protected by stops either way.
@@ -162,10 +162,10 @@ export const recentlyJudged = async (col: Pick<EngineContext["col"], "decisions"
 export type { ResearchPlan }
 
 /**
- * Which Grok research a cycle runs. Full whenever the wire is off or
+ * Which web research a cycle runs. Full whenever the wire is off or
  * unhealthy. auto runs the gap-fill whenever the dossier has a gap on the cycle's subjects (its
  * candidates and the holdings it reviews) or on the market: an unexplained move, an unconfirmed
- * high-severity item. It skips Grok otherwise.
+ * high-severity item. It skips web research otherwise.
  */
 export const researchPlan = (
   ctx: Pick<EngineContext, "settings">,

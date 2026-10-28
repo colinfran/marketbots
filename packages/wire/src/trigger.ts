@@ -18,7 +18,7 @@ import type { WireEventSink } from "./types"
  *   → confirmation (entries only) → shadow → engine running, kill switch off → market open
  *   (stocks) → per-symbol cooldown → hourly and daily caps → AI budget → fire now, or queue.
  *
- * The policy never trades. A trigger only asks the engine for a focused cycle, where Grok and the
+ * The policy never trades. A trigger only asks the engine for a focused cycle, where the AI and the
  * risk engine decide as always. The one exception is the owner's `emergency_action` for a held
  * position hit by a critical, confirmed, negative event, which only ever reduces risk.
  *

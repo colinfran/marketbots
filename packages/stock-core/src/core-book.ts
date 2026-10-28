@@ -8,7 +8,7 @@ import { cleanTicker } from "./report"
  *
  * The ranking is built once per trading day from a year of consolidated daily bars, in code: the
  * numbers each candidate is judged on, a trend filter and a momentum score. The weekly review
- * hands the top of it to Grok; the dashboard's Core page shows all of it.
+ * hands the top of it to the AI; the dashboard's Core page shows all of it.
  */
 
 /** Where the ranking keeps today's list in the `cache` collection. */

@@ -16,7 +16,7 @@ import { loadChain } from "./options-chain"
 export type { MarketContext, Quote, Instrument }
 
 /**
- * Builds the factual snapshot handed to Grok on every cycle. All prices, positions and cash come
+ * Builds the factual snapshot handed to the AI on every cycle. All prices, positions and cash come
  * from Alpaca (ground truth); web/X research is layered on top separately. The full object is
  * stored with each report so every decision can be audited against exactly what the bot saw.
  */

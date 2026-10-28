@@ -5,7 +5,7 @@ import type { RiskCheck } from "@mb/stock-core/events"
 import { CORE_INDEX_ETFS, type CoreTheme, type Settings } from "@mb/stock-core/settings"
 
 /**
- * The core book's rules, in code (docs/plans/CORE-BOOK.md §6). Grok proposes; this decides what
+ * The core book's rules, in code (docs/plans/CORE-BOOK.md §6). The AI proposes; this decides what
  * actually happens, and records every rule it evaluated:
  *
  * - every core holding gets exactly one decision: keep, trim or sell (left out = kept);
@@ -13,11 +13,11 @@ import { CORE_INDEX_ETFS, type CoreTheme, type Settings } from "@mb/stock-core/s
  * - a buy needs: trading not blocked, no circuit breaker, a symbol not held in either book (v1
  *   never adds to a holding), `min_conviction`, a book below its target by more than `band_pct`,
  *   room under `max_holdings`, a tradable asset over `risk.min_price`, and whole shares;
- * - a buy's size is Grok's target weight clamped to the per-holding cap (`max_holding_pct`, or
+ * - a buy's size is the AI's target weight clamped to the per-holding cap (`max_holding_pct`, or
  *   `max_index_etf_pct` for a broad-index ETF), the book's room to its target, the theme's room
  *   under `max_theme_pct` of the book, and the cash above the reserve; under CORE_MIN_WEIGHT_PCT
  *   it's rejected;
- * - a buy's stop is `stop_pct` below the price unless Grok gives a tighter level at least
+ * - a buy's stop is `stop_pct` below the price unless the AI gives a tighter level at least
  *   CORE_MIN_STOP_PCT below it; a keep may raise a stop, never lower it.
  */
 
@@ -43,7 +43,7 @@ export type CoreRulesInput = {
   holdings: CoreHolding[]
   /** Stocks held in the trading book: never bought by the core book. */
   tradingSymbols: ReadonlySet<string>
-  /** Current prices for the symbols Grok named. */
+  /** Current prices for the symbols the AI named. */
   prices: ReadonlyMap<string, number>
   /** Alpaca's assets for the buys (null: Alpaca doesn't know the symbol). */
   assets: ReadonlyMap<string, AlpacaAsset | null>

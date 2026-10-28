@@ -120,7 +120,7 @@ export const wireSettingsSchema = z.object({
   event_research: wireBase.event_research,
   event_research_timeout_seconds: wireBase.event_research_timeout_seconds,
   event_decision_timeout_seconds: wireBase.event_decision_timeout_seconds,
-  /** What happens at once when a held position meets a critical, confirmed, negative event. review = Grok decides. */
+  /** What happens at once when a held position meets a critical, confirmed, negative event. review = the AI decides. */
   emergency_action: z.enum(["review", "tighten_stop", "exit"]),
   /** The market-wide shock is BTC's 5-minute z-score. */
   anomaly: wireBase.anomaly,
