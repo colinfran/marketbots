@@ -29,7 +29,7 @@ The two engines are independent: separate images, containers, ports, env files, 
 
 **Kraken (crypto)**: no account and no keys. Market data is public; orders go to the Kraken CLI paper wallet inside the container.
 
-**Vercel AI Gateway**: one `AI_GATEWAY_API_KEY` works for both engines. The gateway needs paid credits.
+**AI**: no outside AI service and no AI key. Both engines use the local model server and its search service (§9).
 
 **useSend** (`USESEND_API_KEY`): sends the owner's sign-in magic links, and the sign-in codes the dashboard asks for when it runs as an installed Home Screen app (that app keeps its own cookies, so a link opened in the browser wouldn't sign it in). Links and codes only ever go to `OWNER_EMAIL`; nobody else can sign in.
 
@@ -630,28 +630,27 @@ nvidia-smi                                                  # ~6.8 GB used on ea
 - **GPU:** ~6.8 GB on each card.
 - **Power:** the 2080 SUPER is capped at 180 W (§2).
 
-**Local decisions** (`local/<alias>` model settings, `AiRunner` in `@mb/engine-kit`):
-- **Cost:** none. Their calls are in `ai_calls` with `cost_usd: 0` and `cost_source: "local"`, with their tokens and time. The daily AI budget expects a local decision to cost nothing. A cycle whose Grok research the budget can't pay for drops the research and decides from our feeds, as long as the news engine is up.
-- **Thinking:** on, and capped by the call's timeout. The engine keeps ~120 s for reading the prompt and writing the answer (up to ~4,500 tokens), and lets the model think for the rest at 40 tokens/s, between 256 and 4,096 tokens. That gives 4,096 at the 240 s decision timeout and 2,400 at 180 s. At the 90 s event-decision default it gets almost no thinking, and a long answer alone can outrun 90 s, so raise *Event decision timeout* to 240 s when decisions go local.
-- **Research:** see *Local research* below.
-- **Without LLM_URL:** a `local/…` model is refused, and never becomes a fallback.
-- **Switching:** in Admin, pick *Qwen 3.6 35B-A3B (local, free)* as *Decision model* and set *Event decision timeout* to 240. Pick *None* as *Fallback model* for no Grok at all, or a Grok model to have it take over when a local call times out or fails.
+**Decisions** (`AiRunner` in `@mb/engine-kit`; the *Decision model* in Admin, `local/<alias>`, the only kind of model id settings accept):
+- **Cost:** none. Every call is in `ai_calls` with `cost_usd: 0` and `cost_source: "local"`, with its tokens and time.
+- **Thinking:** on, and capped by the call's timeout. The engine keeps ~120 s for reading the prompt and writing the answer (up to ~4,500 tokens), and lets the model think for the rest at 40 tokens/s, between 256 and 4,096 tokens. That gives 4,096 at the 240 s decision timeout and 2,400 at 180 s. At 90 s it gets almost no thinking, and a long answer alone can outrun 90 s, so keep *Event decision timeout* at 180 s or more.
+- **A failed attempt** is asked again, cooler, up to three times, on the same model.
+- **Without LLM_URL:** no AI at all. The engine still protects positions, but opens nothing new.
 
-**Local research** (a *Research model* of `local/…`; `@mb/wire/research/local`): the model can't browse, so the engine does the browsing for it, and the bot's research prompt stays as it is:
+**Research** (`@mb/wire/research/local`; the *Research model* in Admin): the model can't browse, so the engine does the browsing for it, from the bot's research prompt:
 1. The model reads the request and writes up to 6 web searches (no thinking).
 2. The `search` service runs them, two at a time, for news and web results from the last day (gap fills and event checks) or week (full research).
 3. The model picks up to 5 results to read in full, and the scraper fetches them (paywalled sites are refused, as for summaries).
 4. The model writes the memo from the results and articles alone (1,024 tokens of thinking), citing their URLs.
 
-A run takes about a minute, and costs nothing (`ai_calls`: `cost_source: "local"`, the searches counted). The differences from Grok:
-- **No X.** The memo says no X sentiment was searched, rather than guessing it.
+A run takes about a minute, and costs nothing (`ai_calls`: `cost_source: "local"`, the searches counted). Its limits:
+- **No X.** The memo says so, rather than guessing at sentiment.
 - **No paywalled articles.** Their search snippets can still be cited.
 - **A search that finds nothing** is reported in the memo, and the cycle decides from our feeds. Only an unreachable search service or model fails the research.
 
 **The search service (`search`):** SearXNG, pinned by digest, on the default network (it needs the internet), with no host port. The engines reach it at `SEARCH_URL=http://search:8080`. Its settings are `packages/wire/docker/searxng.yml`: SearXNG's default engines, JSON answers, no rate limiter (only the engines call it). Its secret key is random at every start, since it keeps no sessions.
 - **Search engines throttle it:** Google, Bing News and DuckDuckGo answer most queries, but Brave and DuckDuckGo sometimes rate-limit or ask for a CAPTCHA. SearXNG suspends a failing engine for a while and asks the rest, so research gets fewer results, not none.
 - **Check it:** `docker compose ps search`, and `docker logs marketbots-search` for engines that fail.
-- **Switching:** in Admin, pick *Qwen 3.6 35B-A3B (local, free)* as *Research model*. *Grok research* (auto) and *Event research* (x_verify) keep their meaning: when to research, now with web search instead of X.
+- **When research runs:** Admin's *Web research* (auto: only when our feeds leave a gap) and *Event research* (*web check*: a quick search before an event decision; stored as `x_verify`).
 
 **The speed guard:** llama.cpp doesn't report where its tensors sit, so the engines judge by speed. A summary written slower than 20 tokens/s pauses summaries for 30 minutes. Normal is 40–50 tokens/s, less per request while other slots run. A model spilled into system RAM writes 15–20.
 
@@ -680,7 +679,6 @@ A run takes about a minute, and costs nothing (`ai_calls`: `cost_source: "local"
 | Headless news sources down in Admin | The scraper isn't running or is unhealthy: `docker compose ps scraper`, `docker compose logs scraper`, the health check in §5.3. |
 | Header says "No stream" | `ENGINE_STREAM_URL` isn't set on Vercel (redeploy after adding it). |
 | Stream stuck on "reconnecting" | Caddy isn't running or lacks the site, `STREAM_ALLOWED_ORIGINS` doesn't include the exact dashboard origin (handshake refused), or `STREAM_TOKEN_SECRET` differs between Vercel and the engine (connection closed with 4003). |
-| AI calls fail with "BYOK is available only with paid credits" | Add credits to the Vercel AI Gateway. |
 | "Owner sign-in is not configured" | `BETTER_AUTH_SECRET` (32+ characters) or `MONGODB_URI` is missing on Vercel. |
 | No sign-in email arrives | `USESEND_API_KEY` is missing or wrong, or the sender domain isn't verified in useSend (Vercel function logs show the error). Only `OWNER_EMAIL` is ever emailed. |
 | Vercel skips every build | The Ignored Build Step paths aren't anchored with `:/` (§8.2). |

@@ -37,13 +37,20 @@ describe("settings", () => {
   it("rejects malformed model ids and symbols", () => {
     expect(applySettingsPatch(DEFAULT_SETTINGS, { ai: { models: { decision: "grok 4" } } }).ok).toBe(false)
     expect(applySettingsPatch(DEFAULT_SETTINGS, { universe: { kraken_symbols: ["btc-usd"] } }).ok).toBe(false)
-    expect(applySettingsPatch(DEFAULT_SETTINGS, { ai: { models: { fallback: "openai/gpt-5.1" } } }).ok).toBe(true)
+    expect(applySettingsPatch(DEFAULT_SETTINGS, { ai: { models: { research: "spacexai/grok-4.5" } } }).ok).toBe(false)
+    expect(applySettingsPatch(DEFAULT_SETTINGS, { ai: { models: { research: "local/qwen3.6-35b-a3b-q2" } } }).ok).toBe(true)
   })
 
   it("drops unknown keys rather than storing them", () => {
     const result = applySettingsPatch(DEFAULT_SETTINGS, { kraken: { yolo: true } } as never)
     expect(result.ok).toBe(true)
     if (result.ok) expect("yolo" in result.settings.kraken).toBe(false)
+  })
+
+  it("loads settings saved in the Grok days: their X search and fallback model are dropped", () => {
+    const saved = { ...DEFAULT_SETTINGS, ai: { ...DEFAULT_SETTINGS.ai, models: { ...DEFAULT_SETTINGS.ai.models, fallback: null }, x_search: true } }
+    const parsed = settingsSchema.safeParse(saved)
+    expect(parsed.success && parsed.data.ai).toEqual(DEFAULT_SETTINGS.ai)
   })
 
   it("diffs leaf paths for the audit log", () => {

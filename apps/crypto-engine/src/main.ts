@@ -55,7 +55,7 @@ void bootstrap({
     const ledger = new Ledger(db.col, bus)
     const executor = new Executor(db.col, ledger, new PaperWalletExecution(cli, hub), bus, log.child({ component: "executor" }))
     const budget = new AiBudget(db.col, () => settings.current.ai.daily_budget_usd, { models: () => settings.current.ai.models })
-    const ai = new AiRunner(budget, log.child({ component: "ai" }), !!env.AI_GATEWAY_API_KEY, {
+    const ai = new AiRunner(budget, log.child({ component: "ai" }), {
       localUrl: env.LLM_URL,
       // Research for local/… models: our search service and scraper, read by the local model.
       localResearch: localResearcher({

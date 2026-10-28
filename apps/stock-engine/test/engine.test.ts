@@ -72,7 +72,7 @@ beforeEach(async () => {
     prices: new LivePrices(bus),
     tradeStream: { start: () => undefined, stop: () => undefined, health: health() } as unknown as TradeStream,
     marketStream: { start: () => undefined, stop: () => undefined, setSymbols: (s: string[]) => symbols.push(s), health: health(), symbols: [] } as unknown as MarketStream,
-    ai: new AiRunner(budget, silentLogger, false),
+    ai: new AiRunner(budget, silentLogger),
     budget,
     alerts: new Alerts(db.col, bus, silentLogger, null, null),
     stream: { clientCount: 0 } as unknown as StreamServer,
@@ -149,14 +149,14 @@ describe("Engine", () => {
     await command({ type: "settings.update", patch: { core: { enabled: true } }, expected_version: 1 })
     expect(await command({ type: "core.review" })).toMatchObject({ status: "failed", error: "a core review trades, so it runs only while the market is open (a dry run works any time)" })
     // A dry run works with the market closed, but still needs the AI.
-    expect(await command({ type: "core.review", dry_run: true })).toMatchObject({ status: "failed", error: "AI is disabled (AI_GATEWAY_API_KEY not set)" })
+    expect(await command({ type: "core.review", dry_run: true })).toMatchObject({ status: "failed", error: "AI is disabled (LLM_URL not set)" })
     expect(await db.col.coreReviews.countDocuments()).toBe(0)
   })
 
   it("runs a cycle on request (skipped without an AI key) and refuses a second one", async () => {
     expect(await command({ type: "cycle.run_now", phase: "postmarket" })).toMatchObject({ status: "done", result: "postmarket cycle started" })
     await until(async () => (await db.col.cycles.countDocuments({ phase: "postmarket", status: "skipped" })) === 1)
-    expect(await db.col.cycles.findOne({ phase: "postmarket" })).toMatchObject({ trigger: "manual", error: "AI is disabled (AI_GATEWAY_API_KEY not set)" })
+    expect(await db.col.cycles.findOne({ phase: "postmarket" })).toMatchObject({ trigger: "manual", error: "AI is disabled (LLM_URL not set)" })
   })
 
   it("halts with the kill switch, liquidating when asked, and stays paused after release", async () => {

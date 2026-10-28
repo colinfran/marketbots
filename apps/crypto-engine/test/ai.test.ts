@@ -4,7 +4,7 @@ import { generateText, NoObjectGeneratedError, streamText } from "ai"
 import { describe, expect, it, vi } from "vitest"
 import { cryptoDecisionPrompt, cryptoResearchPrompt } from "../src/ai/prompts"
 import { repairCryptoReport } from "../src/ai/repair"
-import { AiRunner, hasLiveSearch } from "../src/ai/runner"
+import { AiRunner } from "../src/ai/runner"
 
 vi.mock("ai", async (importOriginal) => ({ ...(await importOriginal<typeof import("ai")>()), generateText: vi.fn(), streamText: vi.fn() }))
 
@@ -114,9 +114,12 @@ describe("prompts", () => {
 const gen = vi.mocked(generateText)
 const stream = vi.mocked(streamText)
 
-type BudgetMock = { record: ReturnType<typeof vi.fn<(call: Record<string, unknown>) => Promise<void>>>; estimateByDuration: ReturnType<typeof vi.fn> }
-const budgetMock = (): BudgetMock => ({ record: vi.fn(async (_call: Record<string, unknown>) => undefined), estimateByDuration: vi.fn(async () => 0.12) })
+type BudgetMock = { record: ReturnType<typeof vi.fn<(call: Record<string, unknown>) => Promise<void>>> }
+const budgetMock = (): BudgetMock => ({ record: vi.fn(async (_call: Record<string, unknown>) => undefined) })
 const budget = () => budgetMock() as never
+
+const LLM_URL = "http://llm:8080"
+const MODEL = "local/qwen3.6-35b-a3b-q2"
 
 /** A stand-in for streamText's result: the parts on fullStream, plus the final output (read when awaited) and usage. */
 const fakeStream = (parts: unknown[], { output, usage = { inputTokens: 100, outputTokens: 50, totalTokens: 150 } }: { output?: unknown; usage?: unknown } = {}) =>
@@ -130,55 +133,45 @@ const fakeStream = (parts: unknown[], { output, usage = { inputTokens: 100, outp
     totalUsage: Promise.resolve(usage),
   }) as never
 
-describe("AiRunner.research", () => {
-  it("streams queries, sources and memo progress, and records the gateway's cost", async () => {
-    stream.mockReturnValueOnce(
-      fakeStream([
-        { type: "tool-call", toolName: "web_search", input: { query: "bitcoin etf flows" } },
-        { type: "source", sourceType: "url", url: "https://news.example/etf", title: "ETF flows" },
-        { type: "source", sourceType: "url", url: "javascript:alert(1)", title: "bad" },
-        { type: "text-delta", text: "## BTC/USD\n- [CLAIM] inflows (2026-10-25, https://news.example/etf)" },
-        { type: "finish-step", providerMetadata: { gateway: { cost: "0.0123" } } },
-        { type: "finish", totalUsage: { inputTokens: 1000, outputTokens: 200, totalTokens: 1200 } },
-      ]),
-    )
-    const b = budget()
-    const onQuery = vi.fn()
-    const onSource = vi.fn()
-    const runner = new AiRunner(b, silentLogger, true)
-    const r = await runner.research({ cycleId: "c", model: "spacexai/grok-4.5", fallback: null, prompt: "p", xSearch: true, fromDate: "2026-10-22", timeoutMs: 60_000, progress: { onQuery, onSource } })
-    expect(r.error).toBeNull()
-    expect(r.sources).toEqual([{ url: "https://news.example/etf", title: "ETF flows", domain: "news.example" }])
-    expect(r.queries).toEqual(["bitcoin etf flows"])
-    expect(r.cost_usd).toBeCloseTo(0.0123)
-    expect(onQuery).toHaveBeenCalledWith("bitcoin etf flows", "web_search")
-    expect(onSource).toHaveBeenCalledTimes(1)
-    expect(Object.keys((stream.mock.calls[0][0] as { tools: object }).tools)).toEqual(["web_search", "x_search"])
-    expect((b as { record: ReturnType<typeof vi.fn> }).record).toHaveBeenCalledWith(expect.objectContaining({ task: "research", cost_usd: 0.0123, cost_source: "gateway", ok: true }))
+/** The engine's local research, scripted. */
+const research = (result: Partial<{ memo: string; sources: { title: string; url: string; domain: string }[]; queries: string[]; error: string | null }> = {}) =>
+  vi.fn(async (job: { progress?: { onQuery?: (q: string, tool: string) => void; onSource?: (s: { title: string; url: string; domain: string }) => void } }) => {
+    for (const q of result.queries ?? []) job.progress?.onQuery?.(q, "web_search")
+    for (const s of result.sources ?? []) job.progress?.onSource?.(s)
+    return { memo: result.memo ?? "", sources: result.sources ?? [], queries: result.queries ?? [], usage: { input: 5_000, output: 900, total: 5_900 }, error: result.error ?? null }
   })
 
-  it("falls back to web-only search, and never throws", async () => {
-    stream.mockReturnValueOnce(fakeStream([{ type: "error", error: new Error("x_search unavailable") }])).mockReturnValueOnce(fakeStream([{ type: "text-delta", text: "memo" }]))
-    const r = await new AiRunner(budget(), silentLogger, true).research({ cycleId: "c", model: "spacexai/grok-4.5", fallback: null, prompt: "p", xSearch: true, fromDate: "x", timeoutMs: 1_000 })
-    expect(r).toMatchObject({ memo: "memo", x_search: false, error: null })
-    stream.mockImplementation(() => fakeStream([{ type: "error", error: new Error("gateway down") }]))
-    const failed = await new AiRunner(budget(), silentLogger, true).research({ cycleId: "c", model: "spacexai/grok-4.5", fallback: null, prompt: "p", xSearch: true, fromDate: "x", timeoutMs: 1_000 })
-    expect(failed).toMatchObject({ memo: "", error: "gateway down" })
+const researchOpts = { cycleId: "c", model: MODEL, prompt: "p", fromDate: "2026-10-22", timeoutMs: 60_000 }
+
+describe("AiRunner.research", () => {
+  it("reports queries and sources from the local research, and records the call at no cost", async () => {
+    const localResearch = research({ memo: "## BTC/USD\n- [CLAIM] inflows (2026-10-25, https://news.example/etf)", queries: ["bitcoin etf flows"], sources: [{ url: "https://news.example/etf", title: "ETF flows", domain: "news.example" }] })
+    const b = budgetMock()
+    const onQuery = vi.fn()
+    const onSource = vi.fn()
+    const r = await new AiRunner(b as never, silentLogger, { localUrl: LLM_URL, localResearch }).research({ ...researchOpts, progress: { onQuery, onSource } })
+    expect(r).toMatchObject({ error: null, cost_usd: 0, x_search: false, queries: ["bitcoin etf flows"], sources: [{ url: "https://news.example/etf", title: "ETF flows", domain: "news.example" }] })
+    expect(onQuery).toHaveBeenCalledWith("bitcoin etf flows", "web_search")
+    expect(onSource).toHaveBeenCalledTimes(1)
+    expect(b.record).toHaveBeenCalledWith(expect.objectContaining({ task: "research", model: MODEL, searches: 1, cost_usd: 0, cost_source: "local", ok: true }))
+  })
+
+  it("never throws: a failed research comes back as its error", async () => {
+    const r = await new AiRunner(budget(), silentLogger, { localUrl: LLM_URL, localResearch: research({ queries: ["q"], error: "the search service is unreachable" }) }).research(researchOpts)
+    expect(r).toMatchObject({ memo: "", error: "the search service is unreachable" })
   })
 
   it("keeps a research memo to 12,000 characters", async () => {
-    stream.mockReturnValueOnce(fakeStream([{ type: "text-delta", text: "x".repeat(20_000) }]))
-    const r = await new AiRunner(budget(), silentLogger, true).research({ cycleId: "c", model: "spacexai/grok-4.5", fallback: null, prompt: "p", xSearch: false, fromDate: "x", timeoutMs: 1_000 })
+    const r = await new AiRunner(budget(), silentLogger, { localUrl: LLM_URL, localResearch: research({ memo: "x".repeat(20_000) }) }).research(researchOpts)
     expect(r.memo).toHaveLength(12_000)
     expect(r.memo.endsWith("…")).toBe(true)
   })
 
-  it("won't research with a model that has no live search", async () => {
-    expect(hasLiveSearch("spacexai/grok-4.7")).toBe(true)
-    expect(hasLiveSearch("openai/gpt-5.1")).toBe(false)
-    const r = await new AiRunner(budget(), silentLogger, true).research({ cycleId: "c", model: "openai/gpt-5.1", fallback: null, prompt: "p", xSearch: true, fromDate: "x", timeoutMs: 1_000 })
-    expect(r.error).toMatch(/no live search/)
-    expect(stream).not.toHaveBeenCalled()
+  it("won't research with a model that isn't local", async () => {
+    const localResearch = research({ memo: "memo" })
+    const r = await new AiRunner(budget(), silentLogger, { localUrl: LLM_URL, localResearch }).research({ ...researchOpts, model: "spacexai/grok-4.5" })
+    expect(r.error).toBe("spacexai/grok-4.5 isn't a local model (local/<alias>)")
+    expect(localResearch).not.toHaveBeenCalled()
   })
 })
 
@@ -186,28 +179,28 @@ describe("AiRunner.structured", () => {
   const opts = (overrides = {}) => ({
     task: "decision" as const,
     cycleId: "c",
-    model: "spacexai/grok-4.7",
-    fallback: null as string | null,
+    model: MODEL,
     system: "s",
     prompt: "p",
     schema: cryptoReportSchema,
     name: "n",
     description: "d",
     repair: repairCryptoReport,
-    timeoutMs: 60_000,
+    timeoutMs: 240_000,
     ...overrides,
   })
+  const runner = (b: never = budget()) => new AiRunner(b, silentLogger, { localUrl: LLM_URL })
   const noObject = (text: string) =>
     new NoObjectGeneratedError({
       message: "No object generated",
       cause: new Error("Type validation failed"),
       text,
-      response: { id: "r", timestamp: new Date(), modelId: "grok" },
+      response: { id: "r", timestamp: new Date(), modelId: "qwen3.6-35b-a3b-q2" },
       usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 } as never,
       finishReason: "stop",
     })
 
-  it("streams the decision: reasoning and the partial answer as they arrive, then the validated output", async () => {
+  it("streams the decision: thinking and the partial answer as they arrive, then the validated output", async () => {
     const good = report([decision()])
     const json = JSON.stringify(good)
     const thought = "BTC is holding the breakout; funding is elevated."
@@ -217,73 +210,70 @@ describe("AiRunner.structured", () => {
           { type: "reasoning-delta", text: thought },
           { type: "text-delta", text: json.slice(0, 60) },
           { type: "text-delta", text: json.slice(60) },
-          { type: "finish-step", providerMetadata: { gateway: { cost: 0.02 } } },
         ],
         { output: good },
       ),
     )
     const progress = { onPartial: vi.fn(), onReasoning: vi.fn() }
-    const r = await new AiRunner(budget(), silentLogger, true).structured({ ...opts(), progress })
-    expect(r).toMatchObject({ output: good, attempts: 1, repaired: false, cost_usd: 0.02, usage: { input: 100, output: 50, total: 150 } })
+    const r = await runner().structured({ ...opts(), progress })
+    expect(r).toMatchObject({ output: good, attempts: 1, repaired: false, cost_usd: 0, usage: { input: 100, output: 50, total: 150 } })
     expect(progress.onReasoning).toHaveBeenCalledWith(thought.length, thought)
     expect(progress.onPartial).toHaveBeenCalledWith(60, expect.objectContaining({ market_read: expect.objectContaining({ regime: "risk_on_trend" }) }))
-    // One streamed call, with crypto's system prompt, prompt and first temperature; never the old non-streamed call.
+    // One streamed call on the model server, with crypto's system prompt, prompt, first temperature and the thinking cap for 240 s.
     expect(gen).not.toHaveBeenCalled()
-    expect(stream.mock.calls[0][0]).toMatchObject({ model: "spacexai/grok-4.7", instructions: "s", prompt: "p", temperature: 0.3 })
+    const call = stream.mock.calls[0][0] as unknown as { model: { modelId: string; provider: string }; providerOptions: unknown }
+    expect(call).toMatchObject({ instructions: "s", prompt: "p", temperature: 0.3, providerOptions: { local: { chat_template_kwargs: { enable_thinking: true }, thinking_budget_tokens: 4_096 } } })
+    expect([call.model.provider, call.model.modelId]).toEqual(["local.chat", "qwen3.6-35b-a3b-q2"])
   })
 
   it("repairs in code when nothing is lost, else asks again with the error", async () => {
     const clean = JSON.stringify({ ...report([]), decisions: [{ ...decision(), conviction: "70" }] })
     stream.mockReturnValueOnce(fakeStream([], { output: noObject(clean) }))
-    const repaired = await new AiRunner(budget(), silentLogger, true).structured(opts())
+    const repaired = await runner().structured(opts())
     expect(repaired).toMatchObject({ attempts: 1, repaired: true })
     expect((repaired.output as CryptoReport).decisions[0].conviction).toBe(70)
 
     const lossy = JSON.stringify({ ...report([]), decisions: [{ ...decision(), action: "short" }] })
     stream.mockReturnValueOnce(fakeStream([], { output: noObject(lossy) })).mockReturnValueOnce(fakeStream([], { output: report([]) }))
-    const r = await new AiRunner(budget(), silentLogger, true).structured(opts())
+    const r = await runner().structured(opts())
     expect(r).toMatchObject({ attempts: 2, repaired: false })
     const second = stream.mock.calls.at(-1)![0] as { prompt: string; temperature: number }
     expect(second.prompt).toContain("your previous answer was rejected")
     expect(second.temperature).toBe(0.15)
   })
 
-  it("charges each attempt the gateway's own cost, a rejected one included", async () => {
+  it("records every attempt at no cost, a rejected one included", async () => {
     const lossy = JSON.stringify({ ...report([]), decisions: [{ ...decision(), action: "short" }] })
-    stream
-      .mockReturnValueOnce(fakeStream([{ type: "finish-step", providerMetadata: { gateway: { cost: "0.011" } } }], { output: noObject(lossy) }))
-      .mockReturnValueOnce(fakeStream([{ type: "finish-step", providerMetadata: { gateway: { cost: 0.02 } } }], { output: report([]) }))
+    stream.mockReturnValueOnce(fakeStream([], { output: noObject(lossy) })).mockReturnValueOnce(fakeStream([], { output: report([]) }))
     const b = budgetMock()
-    const r = await new AiRunner(b as never, silentLogger, true).structured(opts())
-    expect(r.attempts).toBe(2)
-    expect(r.cost_usd).toBeCloseTo(0.031)
+    const r = await runner(b as never).structured(opts())
+    expect(r).toMatchObject({ attempts: 2, cost_usd: 0 })
     expect(b.record.mock.calls.map(([c]) => [c.cost_usd, c.cost_source, c.ok])).toEqual([
-      [0.011, "gateway", false],
-      [0.02, "gateway", true],
+      [0, "local", false],
+      [0, "local", true],
     ])
   })
 
-  it("switches to the fallback model on the last attempt after outages", async () => {
+  it("asks the same model again after outages", async () => {
     stream
       .mockReturnValueOnce(fakeStream([{ type: "error", error: new Error("503") }]))
       .mockReturnValueOnce(fakeStream([{ type: "error", error: new Error("503") }]))
       .mockReturnValueOnce(fakeStream([], { output: report([]) }))
-    const r = await new AiRunner(budget(), silentLogger, true).structured(opts({ fallback: "openai/gpt-5.1" }))
-    expect(r.model).toBe("openai/gpt-5.1")
-    expect(stream.mock.calls.map(([o]) => (o as { model: string }).model)).toEqual(["spacexai/grok-4.7", "spacexai/grok-4.7", "openai/gpt-5.1"])
+    const r = await runner().structured(opts())
+    expect(r).toMatchObject({ model: MODEL, attempts: 3 })
+    expect(stream.mock.calls.map(([o]) => (o as unknown as { model: { modelId: string } }).model.modelId)).toEqual(["qwen3.6-35b-a3b-q2", "qwen3.6-35b-a3b-q2", "qwen3.6-35b-a3b-q2"])
   })
 
-  it("throws after three failures and refuses to run without a key", async () => {
+  it("throws after three failures, and refuses to run without the model server", async () => {
     stream.mockImplementation(() => fakeStream([{ type: "error", error: new Error("boom") }]))
-    await expect(new AiRunner(budget(), silentLogger, true).structured(opts())).rejects.toThrow(/failed after 3 attempts/)
-    await expect(new AiRunner(budget(), silentLogger, false).structured(opts())).rejects.toThrow(/AI is disabled/)
+    await expect(runner().structured(opts())).rejects.toThrow(/failed after 3 attempts/)
+    await expect(new AiRunner(budget(), silentLogger).structured(opts())).rejects.toThrow("AI is disabled (LLM_URL not set)")
   })
 
-  it("charges a timed-out call by how long it ran, since it reports no usage", async () => {
+  it("records a timed-out call as failed, at no cost", async () => {
     stream.mockImplementation(() => fakeStream([{ type: "error", error: new Error("The operation was aborted due to timeout") }]))
     const b = budgetMock()
-    await expect(new AiRunner(b as never, silentLogger, true).structured(opts())).rejects.toThrow(/timeout/)
-    expect(b.estimateByDuration).toHaveBeenCalledWith("decision", "spacexai/grok-4.7", expect.any(Number))
-    expect(b.record).toHaveBeenCalledWith(expect.objectContaining({ task: "decision", input_tokens: 0, cost_usd: 0.12, cost_source: "estimate", ok: false }))
+    await expect(runner(b as never).structured(opts())).rejects.toThrow(/timeout/)
+    expect(b.record).toHaveBeenCalledWith(expect.objectContaining({ task: "decision", model: MODEL, input_tokens: 0, cost_usd: 0, cost_source: "local", ok: false }))
   })
 })

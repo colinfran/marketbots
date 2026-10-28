@@ -47,17 +47,10 @@ export const envFields = ({ dbName, streamPort }: { dbName: string; streamPort: 
   STREAM_TRUST_PROXY: bool(false),
   STREAM_MAX_CLIENTS: z.coerce.number().int().min(1).max(10_000).default(100),
 
-  /** Without it the engine runs (and keeps protecting positions) but makes no AI calls, so it never opens trades. */
-  AI_GATEWAY_API_KEY: optional,
-
   DISCORD_WEBHOOK_URL: optional,
   DASHBOARD_URL: optional,
 
   EVENT_RETENTION_DAYS: z.coerce.number().min(1).max(3650).default(30),
-
-  /** Seed values for the settings document on first boot (the dashboard owns them afterwards). */
-  GROK_RESEARCH_MODEL: optional,
-  GROK_DECISION_MODEL: optional,
 
   /** News engine. A source whose key is missing stays off; nothing else breaks. */
   /** "Name contact-email", required by the SEC's fair-access policy; also the wire's User-Agent. */
@@ -67,7 +60,7 @@ export const envFields = ({ dbName, streamPort }: { dbName: string; streamPort: 
   BLS_API_KEY: optional,
   /** The headless scraper sidecar, e.g. http://scraper:8790 inside docker compose. Unset: headless sources stay off. */
   SCRAPER_URL: optional,
-  /** The local model server (llama.cpp, OpenAI-compatible), e.g. http://llm:8080 inside docker compose. Unset: no summaries and no local/* models. */
+  /** The local model server (llama.cpp, OpenAI-compatible), e.g. http://llm:8080 inside docker compose. Unset: no AI at all (no summaries, research or decisions; positions stay protected). */
   LLM_URL: optional,
   /** The search service (SearXNG) for local research, e.g. http://search:8080 inside docker compose. Unset: local models can't research. */
   SEARCH_URL: optional,

@@ -39,7 +39,7 @@ export const makeCtx = async (col: Collections, broker: FakeBroker, patch: Setti
     alpaca: broker.client,
     settings,
     state,
-    ai: new AiRunner(budget, silentLogger, false),
+    ai: new AiRunner(budget, silentLogger),
     budget,
     alerts: {
       send: async (level, title, message, opts) => {

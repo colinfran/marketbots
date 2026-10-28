@@ -164,7 +164,7 @@ describe("the core review", () => {
     expect(plans.get("DIA")!.notes!.map((n) => n.action)).toEqual(["adopted", "trim"])
 
     const doc = await reviewDoc(result.reviewId)
-    expect(doc).toMatchObject({ status: "done", dry_run: false, adopted: ["SPY", "DIA"], summary: OUTPUT.summary, watch: OUTPUT.watch, cost_usd: 0.4, model: "spacexai/grok-4.7", ranking: { day: DAY, as_of: "2026-10-23" } })
+    expect(doc).toMatchObject({ status: "done", dry_run: false, adopted: ["SPY", "DIA"], summary: OUTPUT.summary, watch: OUTPUT.watch, cost_usd: 0.4, model: "local/qwen3.6-35b-a3b-q2", ranking: { day: DAY, as_of: "2026-10-23" } })
     expect(doc.decisions.map((d) => [d.symbol, d.action, d.status, d.qty])).toEqual([
       ["DIA", "trim", "executed", 1],
       ["NVDA", "buy", "executed", 5],
@@ -279,7 +279,7 @@ describe("the core review", () => {
   it("is skipped without AI, after taking stock of the book", async () => {
     const result = await review()
     expect(result.status).toBe("skipped")
-    expect(await reviewDoc(result.reviewId)).toMatchObject({ status: "skipped", error: "AI is disabled (AI_GATEWAY_API_KEY not set)", book_before: { holdings: ["SPY", "DIA"] } })
+    expect(await reviewDoc(result.reviewId)).toMatchObject({ status: "skipped", error: "AI is disabled (LLM_URL not set)", book_before: { holdings: ["SPY", "DIA"] } })
     expect((await db.col.cycles.findOne({ _id: result.cycleId }))!.status).toBe("skipped")
   })
 

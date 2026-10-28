@@ -78,7 +78,6 @@ export const portfolioRiskSchema = z.object({
 export const aiSettingsSchema = z.object({
   daily_budget_usd: aiBase.daily_budget_usd,
   models: aiBase.models,
-  x_search: aiBase.x_search,
   max_candidates_per_cycle: int(1, 12),
   /**
    * Weight on the AI's probability that the target hits before the stop, vs the zero-drift prior
@@ -208,11 +207,9 @@ export const DEFAULT_SETTINGS: Settings = {
   ai: {
     daily_budget_usd: 5,
     models: {
-      research: "spacexai/grok-4.5",
-      decision: "spacexai/grok-4.7",
-      fallback: null,
+      research: "local/qwen3.6-35b-a3b-q2",
+      decision: "local/qwen3.6-35b-a3b-q2",
     },
-    x_search: true,
     max_candidates_per_cycle: 4,
     probability_shrink: 0.6,
     research_timeout_seconds: 180,

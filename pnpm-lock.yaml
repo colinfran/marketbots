@@ -10,9 +10,6 @@ importers:
 
   apps/crypto-engine:
     dependencies:
-      '@ai-sdk/xai':
-        specifier: ^5.0.30
-        version: 5.0.30(zod@4.6.7)
       '@mb/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -238,9 +235,6 @@ importers:
 
   apps/stock-engine:
     dependencies:
-      '@ai-sdk/xai':
-        specifier: ^5.0.30
-        version: 5.0.30(zod@4.6.7)
       '@mb/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -468,9 +462,6 @@ importers:
       '@ai-sdk/openai-compatible':
         specifier: 3.0.78
         version: 3.0.78(zod@4.6.7)
-      '@ai-sdk/xai':
-        specifier: ^5.0.30
-        version: 5.0.30(zod@4.6.7)
       '@mb/core':
         specifier: workspace:*
         version: link:../core
@@ -753,12 +744,6 @@ packages:
   '@ai-sdk/provider@4.0.34':
     resolution: {integrity: sha512-Ip7ZQBq/FiGpM1mmOVseTtX9PBjnzo0bLC41WTgBSBBRUBz6LhNFGbYaNUzI6hPm6ll1oNSPOAZc/q/z+3QZEQ==}
     engines: {node: '>=22'}
-
-  '@ai-sdk/xai@5.0.30':
-    resolution: {integrity: sha512-BO93IsBpRv0oaPpTvUKYtHKj09DIET2I0/TOYo/+VitFqyEG+SVlY/KVgESyjgUG+hqplt9gAWdutS6vWUJ6FA==}
-    engines: {node: '>=22'}
-    peerDependencies:
-      zod: ^3.25.76 || ^4.1.8
 
   '@alloc/quick-lru@5.3.0':
     resolution: {integrity: sha512-U4+70Pc5ZS9osnCBCE5Jha/ciHM+Yp+CNMNC/7HvYbNRk1Ldd+f7qO65W5qfhu/TCv+/ozljlXXe9Nj8419DMA==}
@@ -5472,12 +5457,6 @@ snapshots:
   '@ai-sdk/provider@4.0.34':
     dependencies:
       json-schema: 0.4.0
-
-  '@ai-sdk/xai@5.0.30(zod@4.6.7)':
-    dependencies:
-      '@ai-sdk/provider': 4.0.34
-      '@ai-sdk/provider-utils': 5.0.68(zod@4.6.7)
-      zod: 4.6.7
 
   '@alloc/quick-lru@5.3.0': {}
 

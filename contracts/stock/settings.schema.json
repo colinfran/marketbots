@@ -267,32 +267,17 @@
             "properties": {
               "research": {
                 "type": "string",
-                "pattern": "^[a-z0-9-]+\\/[a-z0-9][a-z0-9.\\-]*$"
+                "pattern": "^local\\/[a-z0-9][a-z0-9.\\-]*$"
               },
               "decision": {
                 "type": "string",
-                "pattern": "^[a-z0-9-]+\\/[a-z0-9][a-z0-9.\\-]*$"
-              },
-              "fallback": {
-                "anyOf": [
-                  {
-                    "type": "string",
-                    "pattern": "^[a-z0-9-]+\\/[a-z0-9][a-z0-9.\\-]*$"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
+                "pattern": "^local\\/[a-z0-9][a-z0-9.\\-]*$"
               }
             },
             "required": [
               "research",
-              "decision",
-              "fallback"
+              "decision"
             ]
-          },
-          "x_search": {
-            "type": "boolean"
           },
           "stream_reasoning": {
             "type": "boolean"
@@ -311,7 +296,6 @@
         "required": [
           "daily_budget_usd",
           "models",
-          "x_search",
           "stream_reasoning",
           "research_timeout_seconds",
           "decision_timeout_seconds"
@@ -1017,33 +1001,18 @@
             "properties": {
               "research": {
                 "type": "string",
-                "pattern": "^[a-z0-9-]+\\/[a-z0-9][a-z0-9.\\-]*$"
+                "pattern": "^local\\/[a-z0-9][a-z0-9.\\-]*$"
               },
               "decision": {
                 "type": "string",
-                "pattern": "^[a-z0-9-]+\\/[a-z0-9][a-z0-9.\\-]*$"
-              },
-              "fallback": {
-                "anyOf": [
-                  {
-                    "type": "string",
-                    "pattern": "^[a-z0-9-]+\\/[a-z0-9][a-z0-9.\\-]*$"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
+                "pattern": "^local\\/[a-z0-9][a-z0-9.\\-]*$"
               }
             },
             "required": [
               "research",
-              "decision",
-              "fallback"
+              "decision"
             ],
             "additionalProperties": false
-          },
-          "x_search": {
-            "type": "boolean"
           },
           "stream_reasoning": {
             "type": "boolean"
@@ -1062,7 +1031,6 @@
         "required": [
           "daily_budget_usd",
           "models",
-          "x_search",
           "stream_reasoning",
           "research_timeout_seconds",
           "decision_timeout_seconds"

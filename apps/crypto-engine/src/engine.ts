@@ -296,7 +296,7 @@ export class Engine {
     if (stale.modifiedCount) log.warn("marked interrupted cycles as failed", { count: stale.modifiedCount })
     await this.control.failInterruptedSeed()
     this.control.emitStatus("startup complete")
-    if (!this.d.ai.available) await this.d.alerts.send("warning", "AI disabled", "AI_GATEWAY_API_KEY is not set: the engine will monitor and protect positions but make no new decisions.")
+    if (!this.d.ai.available) await this.d.alerts.send("warning", "AI disabled", "LLM_URL is not set: the engine will monitor and protect positions but make no new decisions.")
 
     const onError = (job: string) => (error: unknown) => log.warn(`${job} failed`, { error: errorMessage(error) })
     this.stops.push(every(3_000, () => checkProtection(this.ctx, this.protectionInFlight), onError("protection")))

@@ -88,7 +88,7 @@ beforeEach(async () => {
     cli,
     ledger,
     executor: new Executor(db.col, ledger, new PaperWalletExecution(cli, hub), bus, silentLogger),
-    ai: new AiRunner(budget, silentLogger, false),
+    ai: new AiRunner(budget, silentLogger),
     budget,
     alerts: new Alerts(db.col, bus, silentLogger, null, null),
     stream: { clientCount: 0 } as unknown as StreamServer,

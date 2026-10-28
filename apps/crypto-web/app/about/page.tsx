@@ -81,7 +81,7 @@ export default async function AboutPage() {
         <h2 className="mb-3 text-base font-semibold">Each cycle makes two Grok calls</h2>
         <ol className="text-muted-foreground list-decimal space-y-2 pl-5 text-sm leading-relaxed">
           <li>
-            <span className="text-foreground font-medium">Research</span> ({s.ai.models.research}): live web search{s.ai.x_search ? " and X search" : ""} produce a
+            <span className="text-foreground font-medium">Research</span> ({s.ai.models.research}): live web search produces a
             sourced memo, with every claim labeled fact, sourced claim, estimate or speculation. Grok does not decide anything here.
           </li>
           <li>

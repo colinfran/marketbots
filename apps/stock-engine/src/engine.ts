@@ -362,7 +362,7 @@ export class Engine {
     await this.refreshAccount().catch((e) => log.warn("initial account refresh failed", { error: errorMessage(e) }))
     void this.refreshSiteData(true).catch((e) => log.warn("initial site data refresh failed", { error: errorMessage(e) }))
     this.control.emitStatus("startup complete")
-    if (!this.d.ai.available) await alerts.send("warning", "AI disabled", "AI_GATEWAY_API_KEY is not set: the engine will monitor and protect positions but make no new decisions.")
+    if (!this.d.ai.available) await alerts.send("warning", "AI disabled", "LLM_URL is not set: the engine will monitor and protect positions but make no new decisions.")
     if (this.optionsLevel !== null && this.optionsLevel < 3 && this.d.settings.current.options.allow_spreads) {
       await alerts.send("warning", "Options spreads need level 3", `The Alpaca account's options level is ${this.optionsLevel}; debit spreads will be rejected. Raise it in the Alpaca dashboard or turn spreads off in Admin → Settings.`)
     }
@@ -791,7 +791,7 @@ export class Engine {
           if (state.state.status !== "running" || state.state.kill_switch.engaged) throw new Error(`engine is ${this.status}`)
           if (!isSessionOpen(session)) throw new Error("a core review trades, so it runs only while the market is open (a dry run works any time)")
         }
-        if (!this.d.ai.available) throw new Error("AI is disabled (AI_GATEWAY_API_KEY not set)")
+        if (!this.d.ai.available) throw new Error("AI is disabled (LLM_URL not set)")
         this.startCoreReview(session, "manual", { dryRun: !!command.dry_run })
         return command.dry_run ? "core review dry run started: its trades are planned, not placed" : "core review started; it counts as this week's"
       }

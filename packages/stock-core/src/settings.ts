@@ -176,7 +176,6 @@ export const optionsSettingsSchema = z.object({
 export const aiSettingsSchema = z.object({
   daily_budget_usd: aiBase.daily_budget_usd,
   models: aiBase.models,
-  x_search: aiBase.x_search,
   /** Stream the model's reasoning summaries to the live feed when the provider returns them. */
   stream_reasoning: z.boolean(),
   research_timeout_seconds: aiBase.research_timeout_seconds,
@@ -322,8 +321,7 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   ai: {
     daily_budget_usd: 10,
-    models: { research: "spacexai/grok-4.5", decision: "spacexai/grok-4.7", fallback: null },
-    x_search: true,
+    models: { research: "local/qwen3.6-35b-a3b-q2", decision: "local/qwen3.6-35b-a3b-q2" },
     stream_reasoning: true,
     research_timeout_seconds: 180,
     decision_timeout_seconds: 240,

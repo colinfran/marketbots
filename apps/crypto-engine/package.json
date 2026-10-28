@@ -14,7 +14,6 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@ai-sdk/xai": "^5.0.30",
     "@mb/core": "workspace:*",
     "@mb/crypto-core": "workspace:*",
     "@mb/engine-kit": "workspace:*",

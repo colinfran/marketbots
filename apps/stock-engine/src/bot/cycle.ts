@@ -224,7 +224,7 @@ export const runCycle = async (
 
     if (!ctx.ai.available) {
       await closeFallback()
-      return await skip("AI is disabled (AI_GATEWAY_API_KEY not set)")
+      return await skip("AI is disabled (LLM_URL not set)")
     }
 
     // ─── Our research: the wire dossier replaces the broker headlines ──
@@ -274,10 +274,8 @@ export const runCycle = async (
             : ctx.ai.research({
           cycleId,
           model: settings.ai.models.research,
-          fallback: settings.ai.models.fallback,
           prompt: plan.kind === "full" ? researchPrompt(phase, context, settings, { seed }) : researchGapFillPrompt(phase, context, { wire: dossier?.text ?? "", event: eventText }),
           task: plan.kind === "gap" ? "research_gap" : "research",
-          xSearch: settings.ai.x_search,
           // Premarket looks back to yesterday's session; later phases only care about today.
           fromDate: phase === "premarket" ? addDays(session.day, -1) : session.day,
           timeoutMs: (isEvent ? settings.wire.event_research_timeout_seconds : settings.ai.research_timeout_seconds) * 1000,
@@ -337,7 +335,6 @@ export const runCycle = async (
           task: "decision",
           cycleId,
           model: settings.ai.models.decision,
-          fallback: settings.ai.models.fallback,
           system: decisionSystemPrompt(settings),
           prompt: decisionPrompt(phase, context, research, settings, { seed, wire: dossier ? dossier.text : undefined, event: eventText, researchSkipped: plan.kind === "none" ? plan.reason : null }),
           schema: botReportSchema,

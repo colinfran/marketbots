@@ -4,37 +4,15 @@ import type { Collection } from "mongodb"
 import { isLocalModel } from "./models"
 
 /**
- * Daily AI spend cap. Every model call is recorded with its cost (the gateway's reported cost
- * when available, else a conservative token-based estimate). Before a call, the expected cost
+ * Daily AI spend cap. Every model call is recorded with its cost. Before a call, the expected cost
  * (the recent average for that task) must fit in what's left of today's budget. When it doesn't,
  * the engine makes no AI calls, so it opens no new trades, until the bot's budget day ends;
  * deterministic stops and risk controls keep running. Calls on the local model cost nothing.
  */
 
-/** Conservative fallback pricing when the gateway reports no cost (USD per 1M tokens). */
-const FALLBACK_PRICE = { input: 3, output: 15 }
-/** Per search/tool call, used only for estimates. */
-const FALLBACK_TOOL_COST = 0.01
-
-export const estimateCost = (inputTokens: number, outputTokens: number, toolCalls = 0) =>
-  (inputTokens * FALLBACK_PRICE.input + outputTokens * FALLBACK_PRICE.output) / 1_000_000 + toolCalls * FALLBACK_TOOL_COST
-
-/**
- * Reads the cost the Vercel AI Gateway attaches to provider metadata, if any. With your own
- * provider key (BYOK) the gateway reports `cost: "0"` and puts what the provider bills in
- * `marketCost`, so the largest reported figure is what the call actually cost.
- */
-export const gatewayCost = (providerMetadata: unknown): number | null => {
-  const g = (providerMetadata as { gateway?: Record<string, unknown> } | undefined)?.gateway
-  const costs = [g?.cost, g?.totalCost, g?.marketCost]
-    .map((raw) => (typeof raw === "string" ? Number(raw) : typeof raw === "number" ? raw : Number.NaN))
-    .filter((n) => Number.isFinite(n) && n >= 0)
-  return costs.length ? Math.max(...costs) : null
-}
-
 export type BudgetStatus = { day: string; spent_usd: number; budget_usd: number; remaining_usd: number; calls: number }
 
-/** Which Grok research a cycle plans (each bot decides that; see its researchPlan). */
+/** Which research a cycle plans (each bot decides that; see its researchPlan). */
 export type ResearchPlan = { kind: "full" | "gap" | "none"; reason: string }
 
 /**
@@ -53,7 +31,7 @@ export const affordCycle = async (
   if (afford.ok || plan.kind === "none" || !feedsUp) return { plan, afford }
   const alone = await budget.canAfford(decision, { reservePct })
   if (!alone.ok) return { plan, afford }
-  return { plan: { kind: "none", reason: `no AI budget left for Grok research (${plan.reason}): deciding from our feeds` }, afford: alone }
+  return { plan: { kind: "none", reason: `no AI budget left for research (${plan.reason}): deciding from our feeds` }, afford: alone }
 }
 
 /** The bot's budget day and what a call is expected to cost before there is enough history. */
@@ -95,21 +73,6 @@ export class AiBudget {
     const recent = await this.col.aiCalls.find({ task, ok: true }, { projection: { cost_usd: 1 } }).sort({ at: -1 }).limit(10).toArray()
     if (recent.length < 3) return this.bot.defaultEstimates[task]
     return recent.reduce((s, c) => s + c.cost_usd, 0) / recent.length
-  }
-
-  /**
-   * What a call that ended without reporting usage (a timeout or abort) probably cost: how long it
-   * ran × the cost per second of that model's recent successful calls for the task.
-   */
-  async estimateByDuration(task: AiTask, model: string, durationMs: number): Promise<number> {
-    const recent = await this.col.aiCalls
-      .find({ task, model, ok: true, cost_usd: { $gt: 0 } }, { projection: { cost_usd: 1, duration_ms: 1 } })
-      .sort({ at: -1 })
-      .limit(10)
-      .toArray()
-    const ms = recent.reduce((s, c) => s + c.duration_ms, 0)
-    if (recent.length < 3 || ms <= 0) return this.bot.defaultEstimates[task]
-    return (recent.reduce((s, c) => s + c.cost_usd, 0) / ms) * durationMs
   }
 
   /**

@@ -63,14 +63,13 @@ export function AiHealthCard({ ai }: { ai: Status["ai"] }) {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
-          <HealthDot ok={ai.enabled && !ai.last_error} /> AI (Grok via Vercel AI Gateway)
+          <HealthDot ok={ai.enabled && !ai.last_error} /> AI (local model server)
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <KV label="Enabled">{ai.enabled ? "yes" : "no (AI_GATEWAY_API_KEY missing)"}</KV>
+        <KV label="Enabled">{ai.enabled ? "yes" : "no (LLM_URL missing)"}</KV>
         <KV label="Research model">{ai.models.research}</KV>
         <KV label="Decision model">{ai.models.decision}</KV>
-        <KV label="Fallback">{ai.models.fallback ?? "none"}</KV>
         <KV label="Spend today">
           ${num(ai.spend_today_usd, 3)} / ${ai.budget_usd} ({ai.calls_today} calls)
         </KV>

@@ -276,7 +276,7 @@ describe("skipped cycles", () => {
     await db.col.plans.insertOne(planDoc("AAPL", { horizon: "intraday" }))
     const result = await run("close")
     expect(result.status).toBe("skipped")
-    expect(await cycleOf(result.cycleId)).toMatchObject({ status: "skipped", error: "AI is disabled (AI_GATEWAY_API_KEY not set)" })
+    expect(await cycleOf(result.cycleId)).toMatchObject({ status: "skipped", error: "AI is disabled (LLM_URL not set)" })
     expect(broker.holdings.has("AAPL")).toBe(false)
     expect(types()).toContain("cycle.skipped")
   })

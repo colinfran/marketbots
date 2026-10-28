@@ -1,7 +1,7 @@
 import type { AiCallDoc } from "@mb/core/db"
 import type { Collection } from "mongodb"
 import { describe, expect, it } from "vitest"
-import { affordCycle, AiBudget, gatewayCost, type BudgetStatus } from "../../src/ai/budget"
+import { affordCycle, AiBudget, type BudgetStatus } from "../../src/ai/budget"
 
 describe("affordCycle", () => {
   const status: BudgetStatus = { day: "2026-10-28", spent_usd: 5, budget_usd: 5, remaining_usd: 0, calls: 40 }
@@ -19,7 +19,7 @@ describe("affordCycle", () => {
 
   it("drops the research it can't pay for and decides from our feeds, when the decision fits", async () => {
     expect(await affordCycle(budget(0, local), gap, { reservePct: 30, feedsUp: true })).toMatchObject({
-      plan: { kind: "none", reason: "no AI budget left for Grok research (1 unexplained moves, 0 unconfirmed items): deciding from our feeds" },
+      plan: { kind: "none", reason: "no AI budget left for research (1 unexplained moves, 0 unconfirmed items): deciding from our feeds" },
       afford: { ok: true },
     })
   })
@@ -52,18 +52,5 @@ describe("AiBudget.estimate", () => {
 
   it("expects a gateway decision to cost what recent ones did", async () => {
     expect(await budget("spacexai/grok-4.7").estimate("decision")).toBeCloseTo(0.06)
-  })
-})
-
-describe("gatewayCost", () => {
-  it("reads string or number costs and ignores junk", () => {
-    expect(gatewayCost({ gateway: { cost: "0.5" } })).toBe(0.5)
-    expect(gatewayCost({ gateway: { totalCost: 0.25 } })).toBe(0.25)
-    expect(gatewayCost({ gateway: { cost: "abc" } })).toBeNull()
-    expect(gatewayCost(undefined)).toBeNull()
-  })
-
-  it("uses marketCost when the gateway bills nothing (own provider key)", () => {
-    expect(gatewayCost({ gateway: { cost: "0", marketCost: "0.00030935" } })).toBe(0.00030935)
   })
 })

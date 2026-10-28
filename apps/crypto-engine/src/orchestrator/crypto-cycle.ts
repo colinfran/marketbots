@@ -350,7 +350,7 @@ export const runCryptoCycle = async (ctx: EngineContext, request: CycleRequest):
   }
 
   // 4. The wire dossier, budget, then research: full, gap-fill, or skipped when our feeds cover it.
-  if (!ctx.ai.available) return finish("skipped", "AI disabled (AI_GATEWAY_API_KEY not set): no new decisions")
+  if (!ctx.ai.available) return finish("skipped", "AI disabled (LLM_URL not set): no new decisions")
   const subjects: CryptoSubject[] = [
     ...candidates.map((c) => ({ symbol: c.symbol, role: "candidate" as const, note: `${c.strategy}: ${c.signal}` })),
     ...reviews.map((r) => ({ symbol: r.position.symbol, role: "held" as const, note: `held since ${r.position.opened_at.toISOString().slice(0, 16)}Z; thesis: ${r.position.thesis ?? "n/a"}` })),
@@ -398,10 +398,8 @@ export const runCryptoCycle = async (ctx: EngineContext, request: CycleRequest):
     research = await ctx.ai.research({
       cycleId,
       model: settings.ai.models.research,
-      fallback: settings.ai.models.fallback,
       prompt: plan.kind === "full" ? cryptoResearchPrompt({ now: new Date(), regime, subjects }) : cryptoGapFillPrompt({ now: new Date(), regime, subjects, wire: dossier?.text ?? "", event: eventText }),
       task: plan.kind === "gap" ? "research_gap" : "research",
-      xSearch: settings.ai.x_search,
       fromDate: new Date(Date.now() - (plan.kind === "gap" ? 1 : 3) * 86_400_000).toISOString().slice(0, 10),
       timeoutMs: (isEvent ? settings.wire.event_research_timeout_seconds : settings.ai.research_timeout_seconds) * 1000,
       signal: ctx.signal,
@@ -462,7 +460,6 @@ export const runCryptoCycle = async (ctx: EngineContext, request: CycleRequest):
       task: "decision",
       cycleId,
       model: settings.ai.models.decision,
-      fallback: settings.ai.models.fallback,
       system: cryptoDecisionSystemPrompt(),
       prompt: cryptoDecisionPrompt({
         now: new Date(),

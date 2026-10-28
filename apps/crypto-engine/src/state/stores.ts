@@ -12,28 +12,15 @@ export type SettingsView = SettingsViewOf<Settings>
 /** Crypto's settings in the shared store (@mb/engine-kit/state/stores). */
 export type SettingsStore = SettingsStoreOf<Settings, SettingsPatch>
 
-/**
- * Loads crypto's settings. On first boot they are seeded from the defaults, with the research and
- * decision models the env sets (the dashboard owns them afterwards).
- */
-export const loadSettings = (col: Pick<Collections, "settings" | "audit">, env: Pick<Env, "GROK_RESEARCH_MODEL" | "GROK_DECISION_MODEL">, log: Logger): Promise<SettingsStore> =>
+/** Loads crypto's settings. On first boot they are seeded from the defaults (the dashboard owns them afterwards). */
+export const loadSettings = (col: Pick<Collections, "settings" | "audit">, _env: unknown, log: Logger): Promise<SettingsStore> =>
   SettingsStoreOf.load(
     col,
     {
       schema: settingsSchema,
       defaults: DEFAULT_SETTINGS,
       applyPatch: applySettingsPatch,
-      seed: (defaults) => ({
-        ...defaults,
-        ai: {
-          ...defaults.ai,
-          models: {
-            ...defaults.ai.models,
-            research: env.GROK_RESEARCH_MODEL ?? defaults.ai.models.research,
-            decision: env.GROK_DECISION_MODEL ?? defaults.ai.models.decision,
-          },
-        },
-      }),
+      seed: (defaults) => defaults,
     },
     log,
   )

@@ -10,10 +10,10 @@ describe("settings", () => {
   })
 
   it("merges a deep patch and keeps everything else", () => {
-    const r = applySettingsPatch(DEFAULT_SETTINGS, { options: { max_open_positions: 2 }, ai: { models: { fallback: "xai/grok-4" } } })
+    const r = applySettingsPatch(DEFAULT_SETTINGS, { options: { max_open_positions: 2 }, ai: { models: { decision: "local/gpt-oss-20b" } } })
     expect(r.ok && r.settings.options.max_open_positions).toBe(2)
     expect(r.ok && r.settings.options.min_dte).toBe(14)
-    expect(r.ok && r.settings.ai.models).toEqual({ research: "spacexai/grok-4.5", decision: "spacexai/grok-4.7", fallback: "xai/grok-4" })
+    expect(r.ok && r.settings.ai.models).toEqual({ research: "local/qwen3.6-35b-a3b-q2", decision: "local/gpt-oss-20b" })
   })
 
   it("replaces arrays instead of merging them", () => {
@@ -49,6 +49,12 @@ describe("settings", () => {
   it("drops unknown keys rather than storing them", () => {
     const r = applySettingsPatch(DEFAULT_SETTINGS, { risk: { yolo: true } } as never)
     expect(r.ok && "yolo" in r.settings.risk).toBe(false)
+  })
+
+  it("loads settings saved in the Grok days: their X search and fallback model are dropped", () => {
+    const saved = { ...DEFAULT_SETTINGS, ai: { ...DEFAULT_SETTINGS.ai, models: { ...DEFAULT_SETTINGS.ai.models, fallback: null }, x_search: true } }
+    const parsed = settingsSchema.safeParse(saved)
+    expect(parsed.success && parsed.data.ai).toEqual(DEFAULT_SETTINGS.ai)
   })
 
   it("ships the core book switched off", () => {

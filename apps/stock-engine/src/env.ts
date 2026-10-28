@@ -32,15 +32,11 @@ const envSchema = z.object({
   STREAM_TRUST_PROXY: base.STREAM_TRUST_PROXY,
   STREAM_MAX_CLIENTS: base.STREAM_MAX_CLIENTS,
 
-  AI_GATEWAY_API_KEY: base.AI_GATEWAY_API_KEY,
-
   DISCORD_WEBHOOK_URL: base.DISCORD_WEBHOOK_URL,
   DASHBOARD_URL: base.DASHBOARD_URL,
 
   EVENT_RETENTION_DAYS: base.EVENT_RETENTION_DAYS,
 
-  GROK_RESEARCH_MODEL: base.GROK_RESEARCH_MODEL,
-  GROK_DECISION_MODEL: base.GROK_DECISION_MODEL,
   /** Seed value for the settings document on first boot (the dashboard owns it afterwards). */
   STARTING_CAPITAL: z.coerce.number().min(100).max(10_000_000).optional(),
 
@@ -71,7 +67,6 @@ export const loadEnv = (source: NodeJS.ProcessEnv = process.env): Env => parseEn
 export const secretValues = (env: Env): string[] =>
   [
     env.STREAM_TOKEN_SECRET,
-    env.AI_GATEWAY_API_KEY,
     env.DISCORD_WEBHOOK_URL,
     env.MONGODB_URI,
     env.HISTORY_URL,

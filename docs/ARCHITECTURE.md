@@ -34,7 +34,7 @@ Browser ──https──▶ Vercel: cryptomarketbot.app, stockmarketbot.app ─
                                                                     ──▶ llm (llama.cpp, Qwen 3.6, both GPUs),
                                                                     ──▶ history (Postgres + TimescaleDB + pgvector),
                                                                         both on network `ai`: no host port, no internet
-External: Kraken (CLI wallet in its volume), Alpaca, Vercel AI Gateway (Grok), ~150 news sources
+External: Kraken (CLI wallet in its volume), Alpaca, ~150 news sources, and the search engines behind `search`
 ```
 
 - **Each engine owns its bot's trading state.** It is the only writer of positions, orders and fills, and a MongoDB lease in its own database guarantees one running instance per bot.
@@ -51,7 +51,6 @@ External: Kraken (CLI wallet in its volume), Alpaca, Vercel AI Gateway (Grok), ~
 | History store | One Postgres container (TimescaleDB, pgvector) on the internal `ai` network, with a database and a role per bot (`crypto_history`, `stock_history`): each engine's `HISTORY_URL` holds only its own password. Each engine writes its closed 1-minute bars and archives its news there (`@mb/history`, [plans/LOCAL-AI.md §6](plans/LOCAL-AI.md#6-the-history-store-history)). If it is down, only history stops. |
 | Atlas cluster | One cluster, a separate database per bot. |
 | The server's IP | Outbound rate limits (SEC, GDELT, ForexFactory…) apply to both bots together. |
-| Vercel AI Gateway key | Can be the same key; each bot enforces its own daily AI budget. |
 | Caddy | One host process, one site per engine. |
 
 Not shared: databases (Atlas and history), leases, env files, auth secrets, stream token secrets (whose HMAC context prefixes, `cmb-stream.` and `smb-stream.`, also keep tokens from crossing bots), and the Kraken wallet volume (crypto only).
@@ -92,7 +91,7 @@ Both bots were moved in from their old repos unchanged and then refactored onto 
 | Package | Holds | Used by |
 | --- | --- | --- |
 | `@mb/core` | Pure shared schemas and helpers, no I/O: `math`, `stream-token` (prefix as a parameter), settings base pieces and helpers, the shared command schemas, the event envelope and the events both bots define identically, base collections, indexes and document types, wire types, `metrics`, `indicators`, generic `time` | every app and package |
-| `@mb/engine-kit` | Engine runtime, generic over each bot's settings, events and commands: log, lease, heartbeat, bus, stream server, command processor, Mongo connect, state stores, alerts, AI budget/repair/runner (the gateway, and `local/*` models on the local model server)/prompt parts, `ControlPlane`, `StatusReporter`, `EventCycleQueue`, bootstrap, env base, test helpers | both engines |
+| `@mb/engine-kit` | Engine runtime, generic over each bot's settings, events and commands: log, lease, heartbeat, bus, stream server, command processor, Mongo connect, state stores, alerts, AI budget/repair/runner (the local model server)/prompt parts, `ControlPlane`, `StatusReporter`, `EventCycleQueue`, bootstrap, env base, test helpers | both engines |
 | `@mb/wire` | The news engine: the formerly mirrored files, shared source helpers, `sharedCatalog()`, a `makeLexicon()` skeleton, `enrich/` for article summaries, and `research/` for local research (web search, then the local model) | both engines |
 | `@mb/history` | The history store ([plans/LOCAL-AI.md §6](plans/LOCAL-AI.md#6-the-history-store-history)): the Postgres client (node-postgres; PGlite in tests), the migrations, the 1-minute bar writer, the news archive (wire items and triggers copied from MongoDB before their TTL), the moves after each news item, the job runner the backfills use, `HistoryStore`. `docker/initdb.sh` creates each bot's database and role | both engines |
 | `@mb/ui` | Client-safe React: the shadcn primitives, design tokens (`styles.css`), app-shell components (including the navigation, below), the live-UI shell driven by a per-bot event catalog, shared page sections, the charts (`@mb/ui/charts`) | both dashboards |

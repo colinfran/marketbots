@@ -17,9 +17,9 @@ import { z } from "zod"
 export const pct = (min: number, max: number) => z.number().min(min).max(max)
 export const int = (min: number, max: number) => z.number().int().min(min).max(max)
 
-/** Gateway model ids are plain "provider/model" strings, e.g. "spacexai/grok-4.7". */
-export const MODEL_ID_PATTERN = /^[a-z0-9-]+\/[a-z0-9][a-z0-9.\-]*$/
-export const modelId = z.string().regex(MODEL_ID_PATTERN, "Expected a gateway model id like spacexai/grok-4.7")
+/** Models on the local model server: "local/<its alias>", e.g. "local/qwen3.6-35b-a3b-q2" (docs/SERVER.md §9). */
+export const MODEL_ID_PATTERN = /^local\/[a-z0-9][a-z0-9.\-]*$/
+export const modelId = z.string().regex(MODEL_ID_PATTERN, "Expected a local model id like local/qwen3.6-35b-a3b-q2")
 
 /** The AI settings both bots have. */
 export const aiSettingsBase = z.object({
@@ -28,10 +28,7 @@ export const aiSettingsBase = z.object({
   models: z.object({
     research: modelId,
     decision: modelId,
-    /** Tried once when the primary model errors out. null = no fallback. */
-    fallback: modelId.nullable(),
   }),
-  x_search: z.boolean(),
   research_timeout_seconds: z.number().min(30).max(600),
   decision_timeout_seconds: z.number().min(20).max(300),
 })

@@ -18,8 +18,7 @@ type Settings = z.infer<typeof schema>
 const defaults: Settings = {
   ai: {
     daily_budget_usd: 5,
-    models: { research: "spacexai/grok-4.5", decision: "spacexai/grok-4.7", fallback: null },
-    x_search: true,
+    models: { research: "local/qwen3.6-35b-a3b-q2", decision: "local/qwen3.6-35b-a3b-q2" },
     research_timeout_seconds: 180,
     decision_timeout_seconds: 240,
   },
@@ -51,6 +50,8 @@ describe("settings helpers", () => {
 
   it("reject malformed model ids", () => {
     expect(applySettingsPatch(schema, defaults, { ai: { models: { decision: "grok 4" } } }).ok).toBe(false)
+    // Only local models: a gateway id is rejected.
+    expect(applySettingsPatch(schema, defaults, { ai: { models: { decision: "spacexai/grok-4.7" } } }).ok).toBe(false)
   })
 })
 

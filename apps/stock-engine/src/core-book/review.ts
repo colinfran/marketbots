@@ -331,7 +331,7 @@ export const runCoreReview = async (ctx: EngineContext, o: CoreReviewOptions): P
     }
     await col.coreReviews.updateOne({ _id: reviewId }, { $set: { ranking: { day: ranking.day, as_of: ranking.as_of }, context } })
 
-    if (!ctx.ai.available) return await finish("skipped", { book_after: bookBefore }, "AI is disabled (AI_GATEWAY_API_KEY not set)")
+    if (!ctx.ai.available) return await finish("skipped", { book_after: bookBefore }, "AI is disabled (LLM_URL not set)")
     const estimate = (await ctx.budget.estimate("research")) + (await ctx.budget.estimate("decision"))
     // A single-holding review is a news event: it may use the event reserve; the weekly one leaves it alone.
     const afford = await ctx.budget.canAfford(estimate, { reservePct: !holdingReview && settings.wire.mode === "live" ? settings.wire.event_budget_reserve_pct : 0 })
@@ -350,9 +350,7 @@ export const runCoreReview = async (ctx: EngineContext, o: CoreReviewOptions): P
         ctx.ai.research({
           cycleId,
           model: settings.ai.models.research,
-          fallback: settings.ai.models.fallback,
           prompt: coreResearchPrompt(context, { event: o.event }),
-          xSearch: settings.ai.x_search,
           fromDate: addDays(day, -30),
           timeoutMs: holdingReview ? HOLDING_RESEARCH_TIMEOUT_MS : CORE_RESEARCH_TIMEOUT_MS,
           signal: ctx.signal,
@@ -383,7 +381,6 @@ export const runCoreReview = async (ctx: EngineContext, o: CoreReviewOptions): P
           task: "decision",
           cycleId,
           model: settings.ai.models.decision,
-          fallback: settings.ai.models.fallback,
           system: coreSystemPrompt(context, settings.account.starting_capital),
           prompt: coreDecisionPrompt(context, research, { event: o.event }),
           schema: coreReviewSchema,

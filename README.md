@@ -5,7 +5,7 @@ Two autonomous, AI-driven paper-trading bots in one pnpm monorepo:
 - **CryptoMarketBot** trades Kraken spot pairs 24/7 in a Kraken CLI paper wallet. Dashboard: [cryptomarketbot.app](https://cryptomarketbot.app).
 - **StockMarketBot** trades US stocks and defined-risk options on market days in an Alpaca paper account. Dashboard: [stockmarketbot.app](https://stockmarketbot.app).
 
-In both, Grok (through the Vercel AI Gateway) researches and decides, and deterministic code sizes and checks every order. Each bot has its own always-on engine, its own Next.js dashboard on Vercel with its own owner sign-in, and its own database on MongoDB Atlas. One Docker stack, `marketbots`, runs both engines, a shared headless scraper and a local LLM for article summaries on the owner's Windows server.
+In both, a local model (Qwen 3.6 35B-A3B, on the server's two GPUs) researches through our own web search and decides, and deterministic code sizes and checks every order. Each bot has its own always-on engine, its own Next.js dashboard on Vercel with its own owner sign-in, and its own database on MongoDB Atlas. One Docker stack, `marketbots`, runs both engines, a shared headless scraper and a local LLM for article summaries on the owner's Windows server.
 
 **Paper trading only.** Neither engine has a live-trading code path.
 
@@ -22,7 +22,7 @@ flowchart LR
     atlas[(MongoDB Atlas<br/>separate database per bot)]
     scraper[Shared scraper]
     llm[Local LLM<br/>article summaries]
-    services[Kraken paper wallet<br/>Alpaca paper account<br/>Vercel AI Gateway and news sources]
+    services[Kraken paper wallet<br/>Alpaca paper account<br/>news and search sources]
 
     browser -->|HTTPS| dashboards
     dashboards -->|Read data and write commands| atlas

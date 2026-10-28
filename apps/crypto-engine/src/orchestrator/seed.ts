@@ -147,7 +147,7 @@ export const runSeedCycle = async (ctx: EngineContext, { trigger, seed }: { trig
   )
 
   // 3. Budget, then full research.
-  if (!ctx.ai.available) return finish("skipped", "AI disabled (AI_GATEWAY_API_KEY not set)", { regime })
+  if (!ctx.ai.available) return finish("skipped", "AI disabled (LLM_URL not set)", { regime })
   const estimate = (await ctx.budget.estimate("research")) + (await ctx.budget.estimate("decision"))
   const afford = await ctx.budget.canAfford(estimate)
   if (!afford.ok) return finish("skipped", `daily AI budget exhausted ($${afford.status.spent_usd.toFixed(2)} of $${afford.status.budget_usd})`, { regime })
@@ -159,9 +159,7 @@ export const runSeedCycle = async (ctx: EngineContext, { trigger, seed }: { trig
   const research: ResearchResult = await ctx.ai.research({
     cycleId,
     model: settings.ai.models.research,
-    fallback: settings.ai.models.fallback,
     prompt: cryptoSeedResearchPrompt({ now: new Date(), regime, subjects, amountUsd: seed.amountUsd }),
-    xSearch: settings.ai.x_search,
     fromDate: new Date(Date.now() - 14 * 86_400_000).toISOString().slice(0, 10),
     timeoutMs: settings.ai.research_timeout_seconds * 1000,
     signal: ctx.signal,
@@ -208,7 +206,6 @@ export const runSeedCycle = async (ctx: EngineContext, { trigger, seed }: { trig
       task: "decision",
       cycleId,
       model: settings.ai.models.decision,
-      fallback: settings.ai.models.fallback,
       system: cryptoSeedSystemPrompt(),
       prompt: cryptoSeedDecisionPrompt({
         now: new Date(),

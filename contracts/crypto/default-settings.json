@@ -29,11 +29,9 @@
   "ai": {
     "daily_budget_usd": 5,
     "models": {
-      "research": "spacexai/grok-4.5",
-      "decision": "spacexai/grok-4.7",
-      "fallback": null
+      "research": "local/qwen3.6-35b-a3b-q2",
+      "decision": "local/qwen3.6-35b-a3b-q2"
     },
-    "x_search": true,
     "max_candidates_per_cycle": 4,
     "probability_shrink": 0.6,
     "research_timeout_seconds": 180,
