@@ -84,6 +84,8 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
       { path: "wire.symbol_cooldown_minutes", label: "Per-symbol trigger cooldown (min)", kind: "number" },
       { path: "wire.event_min_gap_seconds", label: "Min gap between event cycles (s)", kind: "number" },
       { path: "wire.event_research", label: "Event research", kind: "select", options: ["x_verify", "none"] },
+      { path: "wire.event_research_timeout_seconds", label: "Event research timeout (s)", kind: "number" },
+      { path: "wire.event_decision_timeout_seconds", label: "Event decision timeout (s)", kind: "number" },
       { path: "wire.emergency_action", label: "Critical bad news on a holding", kind: "select", options: ["review", "tighten_stop", "exit"] },
       { path: "wire.anomaly.price_z", label: "Price shock z-score", kind: "number", step: 0.5 },
       { path: "wire.anomaly.volume_multiple", label: "Volume shock (× median)", kind: "number", step: 0.5 },
