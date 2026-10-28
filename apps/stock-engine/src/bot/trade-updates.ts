@@ -31,7 +31,7 @@ const notifyPurchase = async (alerts: TradingContext["alerts"], order: AlpacaOrd
   const stop = legs.find((l) => l.type === "stop" || l.type === "stop_limit")?.stop_price
   const target = legs.find((l) => l.type === "limit")?.limit_price
   await alerts.success(`Bought ${label}`, `[paper] ${qty} ${unit}${qty === 1 ? "" : "s"} at $${price.toFixed(2)}, $${cost.toFixed(2)} in total.`, {
-    path: option ? "/trades?tab=options" : `/markets/${order.symbol}`,
+    path: option ? "/holdings" : `/markets/${order.symbol}`,
     key: `buy|${order.id}`,
     fields: { Stop: stop ? `$${Number(stop).toFixed(2)}` : null, Target: target ? `$${Number(target).toFixed(2)}` : null },
   })

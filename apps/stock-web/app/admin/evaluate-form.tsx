@@ -8,7 +8,7 @@ import { Button } from "@mb/ui/components/button"
 import { Input } from "@mb/ui/components/input"
 import { CommandResult, useCommand } from "@/components/command"
 
-/** Owner: run a cycle now, optionally putting specific tickers in front of the AI (watch it work on /live). */
+/** Owner: run a cycle now, optionally putting specific tickers in front of the AI (watch it work on the Live page). */
 export function EvaluateForm({ disabled }: { disabled: boolean }) {
   const [phase, setPhase] = useState<Phase | "auto">("auto")
   const [symbols, setSymbols] = useState("")
@@ -44,7 +44,7 @@ export function EvaluateForm({ disabled }: { disabled: boolean }) {
       {!valid && <p className="text-loss text-xs">Up to 5 tickers, like NVDA or BRK.B.</p>}
       <CommandResult result={result} error={error} />
       {result && (
-        <Link href="/live" className="text-muted-foreground text-xs hover:underline">
+        <Link href="/" className="text-muted-foreground text-xs hover:underline">
           Watch it live
         </Link>
       )}

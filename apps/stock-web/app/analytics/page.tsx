@@ -1,5 +1,4 @@
 import { formatDateTime } from "@mb/stock-core/time"
-import { SETUP_INFO } from "@mb/stock-core/setups"
 import type { Metadata } from "next"
 import Link from "next/link"
 import { AiCostRows, NewsFunnelCard, SpendByTaskCard } from "@mb/ui/analytics"
@@ -8,24 +7,23 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Delta, Empty, PageHeader, SectionTitle, Stat, SymbolLink } from "@/components/bits"
 import { CumulativePnlChart, DailyPnlChart, EquityChart } from "@/components/charts"
 import { num, pct, titleCase, usd } from "@/lib/format"
-import { cumulativePnl, getAiCosts, getBookDays, getEquitySeries, getLiveAccount, getSettings, getSetupStats, getWireAnalytics, listDailyStats, listTrades, summarizeBySymbol } from "@/lib/queries"
+import { cumulativePnl, getAiCosts, getBookDays, getEquitySeries, getLiveAccount, getSettings, getWireAnalytics, listDailyStats, listTrades, summarizeBySymbol } from "@/lib/queries"
 import { compound } from "@/lib/returns"
 import { pageMetadata } from "@/lib/site"
 
 export const metadata: Metadata = pageMetadata({
   title: "Performance analytics",
-  description: "StockMarketBot's paper-trading returns, green days, drawdowns, win rates and results against SPY, plus performance by setup and by stock and what the AI costs to run.",
+  description: "StockMarketBot's paper-trading returns, green days, drawdowns and results against SPY, plus performance by book and by stock and what the AI costs to run.",
   path: "/analytics",
 })
 
 export default async function AnalyticsPage() {
-  const [live, stats, series, trades, costs, { setups }, settings, w, bookDays] = await Promise.all([
+  const [live, stats, series, trades, costs, settings, w, bookDays] = await Promise.all([
     getLiveAccount(),
     listDailyStats(),
     getEquitySeries(),
     listTrades(5000),
     getAiCosts(30),
-    getSetupStats(),
     getSettings(),
     getWireAnalytics(),
     getBookDays(),
@@ -40,7 +38,6 @@ export default async function AnalyticsPage() {
   const closed = trades.filter((t) => t.realized_pnl !== null)
   const grossWin = closed.reduce((s, t) => s + Math.max(0, t.realized_pnl ?? 0), 0)
   const grossLoss = -closed.reduce((s, t) => s + Math.min(0, t.realized_pnl ?? 0), 0)
-  const wins = closed.filter((t) => (t.realized_pnl ?? 0) > 0).length
   const green = stats.filter((s) => s.pnl > 0).length
   const benchmarked = [...stats].reverse().filter((s) => s.spy_pct != null)
   const beatSpy = benchmarked.filter((s) => s.pnl_pct > s.spy_pct!).length
@@ -54,7 +51,6 @@ export default async function AnalyticsPage() {
     maxDd = Math.min(maxDd, (s.end_equity / peak - 1) * 100)
   }
   const bySymbol = summarizeBySymbol(trades)
-  const traded = setups.filter((s) => s.entries > 0).sort((a, b) => b.realized - a.realized)
   const totalCost = costs.reduce((s, c) => s + c.cost, 0)
   const days = stats
     .slice(0, 120)
@@ -81,11 +77,11 @@ export default async function AnalyticsPage() {
         />
         <Stat label="Max drawdown" value={stats.length ? pct(maxDd) : "—"} sub={<span className="text-muted-foreground">from daily closing equity</span>} />
         <Stat
-          label="Closed trades"
-          value={closed.length}
+          label="Profit factor"
+          value={grossLoss > 0 ? num(grossWin / grossLoss) : "—"}
           sub={
             <span className="text-muted-foreground">
-              win rate {closed.length ? `${Math.round((wins / closed.length) * 100)}%` : "—"} · profit factor {grossLoss > 0 ? num(grossWin / grossLoss) : "—"}
+              {usd(grossWin)} won / {usd(grossLoss)} lost
             </span>
           }
         />
@@ -200,86 +196,51 @@ export default async function AnalyticsPage() {
         </section>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <section>
-          <SectionTitle
-            action={
-              <Link href="/strategies" className="text-muted-foreground text-sm hover:underline">
-                All setups
-              </Link>
-            }
-          >
-            By setup
-          </SectionTitle>
-          {traded.length === 0 ? (
-            <Empty>No trades yet.</Empty>
-          ) : (
-            <div className="overflow-x-auto rounded-xl border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Setup</TableHead>
-                    <TableHead className="text-right">Entries</TableHead>
-                    <TableHead className="text-right">Closed</TableHead>
-                    <TableHead className="text-right">Win rate</TableHead>
-                    <TableHead className="text-right">Net P&L</TableHead>
+      <section>
+        <SectionTitle
+          action={
+            <Link href="/strategies" className="text-muted-foreground text-sm hover:underline">
+              By book and setup
+            </Link>
+          }
+        >
+          By symbol
+        </SectionTitle>
+        {bySymbol.length === 0 ? (
+          <Empty>No trades yet.</Empty>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Symbol</TableHead>
+                  <TableHead className="text-right">Realized P&L</TableHead>
+                  <TableHead className="text-right">Closed</TableHead>
+                  <TableHead className="text-right">Wins / Losses</TableHead>
+                  <TableHead className="text-right">Last traded</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {bySymbol.map((s) => (
+                  <TableRow key={s.symbol}>
+                    <TableCell>
+                      <SymbolLink symbol={s.symbol} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Delta value={s.realized} />
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">{s.closed}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {s.wins} / {s.losses}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-right">{formatDateTime(s.last_at)}</TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {traded.map((s) => (
-                    <TableRow key={s.key}>
-                      <TableCell className="text-sm">{SETUP_INFO[s.key].name}</TableCell>
-                      <TableCell className="text-right tabular-nums">{s.executed}</TableCell>
-                      <TableCell className="text-right tabular-nums">{s.closed}</TableCell>
-                      <TableCell className="text-right tabular-nums">{s.closed ? `${Math.round((s.wins / s.closed) * 100)}%` : "—"}</TableCell>
-                      <TableCell className="text-right">
-                        <Delta value={s.realized} />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </section>
-        <section>
-          <SectionTitle>By symbol</SectionTitle>
-          {bySymbol.length === 0 ? (
-            <Empty>No trades yet.</Empty>
-          ) : (
-            <div className="overflow-x-auto rounded-xl border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Symbol</TableHead>
-                    <TableHead className="text-right">Realized P&L</TableHead>
-                    <TableHead className="text-right">Closed</TableHead>
-                    <TableHead className="text-right">Wins / Losses</TableHead>
-                    <TableHead className="text-right">Last traded</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {bySymbol.map((s) => (
-                    <TableRow key={s.symbol}>
-                      <TableCell>
-                        <SymbolLink symbol={s.symbol} />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Delta value={s.realized} />
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">{s.closed}</TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {s.wins} / {s.losses}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-right">{formatDateTime(s.last_at)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </section>
-      </div>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </section>
 
       <section>
         <SectionTitle>AI cost, last 30 days: ${totalCost.toFixed(2)}</SectionTitle>

@@ -2,7 +2,7 @@ import type { EngineEvent } from "@mb/stock-core/events"
 import { formatDateTime } from "@mb/stock-core/time"
 import { Card, CardContent, CardHeader, CardTitle } from "@mb/ui/components/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mb/ui/components/table"
-import { AiHealthCard, EngineHealthCard, HealthDot, ProblemsSection, ServerHealthCard, StreamHealthCard, WireSourcesSection } from "@mb/ui/system-health"
+import { AiHealthCard, EngineHealthCard, HealthDot, ProblemsSection, ServerHealthCard, StreamHealthCard, WireSourcesSummary } from "@mb/ui/system-health"
 import { Empty, KV, SectionTitle } from "@/components/bits"
 import { ago, pct, price, titleCase } from "@/lib/format"
 import type { EngineSummary } from "@/lib/queries"
@@ -96,17 +96,7 @@ export function SystemHealth({ engine, problems }: { engine: EngineSummary; prob
             )}
           </section>
 
-          {s.wire && (
-            <WireSourcesSection
-              wire={s.wire}
-              note={(w) => (
-                <TableCell className="max-w-xs text-xs" title={[w.detail, w.last_error].filter(Boolean).join(" · ")}>
-                  {w.detail && <p className="text-muted-foreground truncate">{w.detail}</p>}
-                  {w.last_error && <p className="text-loss truncate">{w.last_error}</p>}
-                </TableCell>
-              )}
-            />
-          )}
+          {s.wire && <WireSourcesSummary wire={s.wire} />}
         </>
       )}
 

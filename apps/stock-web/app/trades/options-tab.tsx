@@ -1,9 +1,10 @@
+import Link from "next/link"
 import { Delta, SectionTitle, Stat } from "@/components/bits"
 import { OptionsTable } from "@/components/tables"
 import { usd } from "@/lib/format"
 import { getLiveAccount, getOptionsPositions, getSettings } from "@/lib/queries"
 
-/** The Trades page's Options tab: every options position, open and closed, and how they work. */
+/** The Trades page's Options tab: the options book's numbers, every closed position and how they work. Open positions are on Holdings. */
 export async function OptionsTab() {
   const [{ open, closed }, live, settings] = await Promise.all([getOptionsPositions(), getLiveAccount(), getSettings()])
   const o = settings.options
@@ -36,11 +37,15 @@ export async function OptionsTab() {
         />
       </div>
       <section>
-        <SectionTitle>Open</SectionTitle>
-        <OptionsTable positions={open} />
-      </section>
-      <section>
-        <SectionTitle>Closed</SectionTitle>
+        <SectionTitle
+          action={
+            <Link href="/holdings" className="text-muted-foreground text-sm hover:underline">
+              Open positions
+            </Link>
+          }
+        >
+          Closed
+        </SectionTitle>
         <OptionsTable positions={closed} closed />
       </section>
       <section className="text-muted-foreground max-w-3xl space-y-2 text-sm">

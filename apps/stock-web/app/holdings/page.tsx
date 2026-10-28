@@ -6,6 +6,7 @@ import { Badge } from "@mb/ui/components/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@mb/ui/components/card"
 import { Delta, Empty, PageHeader, PaperBadge, SectionTitle, Stat, SymbolLink } from "@/components/bits"
 import { OptionsTable, PositionsTable } from "@/components/tables"
+import { getViewer } from "@/lib/auth"
 import { pct, price, titleCase, usd } from "@/lib/format"
 import { getLiveAccount } from "@/lib/queries"
 import { pageMetadata } from "@/lib/site"
@@ -45,7 +46,7 @@ function Why({ title, badges, meta, weight, thesis, invalidation, pnl }: { title
 }
 
 export default async function HoldingsPage() {
-  const live = await getLiveAccount()
+  const [viewer, live] = await Promise.all([getViewer(), getLiveAccount()])
   const equity = live?.equity ?? 0
   const share = (value: number) => (equity > 0 ? pct((value / equity) * 100, { sign: false, digits: 1 }) : "—")
   const stocksValue = live?.positions.reduce((sum, p) => sum + p.marketValue, 0) ?? 0
@@ -65,8 +66,7 @@ export default async function HoldingsPage() {
         <Empty>No account data yet. It appears once the engine has started and synced with Alpaca.</Empty>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <Stat label="Equity" value={usd(equity)} sub={<Delta value={live.totalPnl} percent={live.totalPnlPct} />} />
+          <div className="grid grid-cols-2 gap-3">
             <Stat
               label="Invested"
               value={usd(invested)}
@@ -77,16 +77,15 @@ export default async function HoldingsPage() {
                 </span>
               }
             />
-            <Stat label="Cash" value={usd(live.cash)} sub={<span className="text-muted-foreground">{share(live.cash)} of equity</span>} />
             <Stat label="Unrealized" value={<Delta value={unrealized} className="text-2xl" />} sub={<Delta percent={cost > 0 ? (unrealized / cost) * 100 : null} />} />
           </div>
           <section>
             <SectionTitle>Stock positions</SectionTitle>
-            <PositionsTable positions={live.positions} />
+            <PositionsTable positions={live.positions} owner={viewer.owner} />
           </section>
           <section>
             <SectionTitle>Options positions</SectionTitle>
-            <OptionsTable positions={live.options} />
+            <OptionsTable positions={live.options} owner={viewer.owner} />
           </section>
           {live.positions.length + live.options.length > 0 && (
             <section>

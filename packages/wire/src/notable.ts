@@ -11,7 +11,7 @@ import type { NotableReason, WireItemDoc as WireItemDocOf } from "@mb/core/wire"
  *   market    it names no symbol (market-wide) and severity ≥ review
  *   triggered it fired or queued a trigger        (added later by the policy)
  *   cited     the AI cited it as evidence           (added later, after decision normalization)
- * Everything else stays on the Research page. The web app never decides this itself.
+ * Everything else stays on the News page. The web app never decides this itself.
  */
 
 export const NOTABLE_MAX_AGE_MS = 6 * 3_600_000

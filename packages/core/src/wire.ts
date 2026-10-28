@@ -1,7 +1,7 @@
 /**
  * The news engine ("wire"): document types for what an engine ingests from news, regulators,
  * venues, calendars and its own market-data anomaly detectors, and for the triggers those items
- * fire. The engine writes them; the dashboard reads them (Research and Live pages).
+ * fire. The engine writes them; the dashboard reads them (News and Live pages).
  *
  * Everything in an item came from outside and is untrusted: titles and summaries are sanitized and
  * length-capped before storage, and rendered as plain text. Time-sensitive logic always uses

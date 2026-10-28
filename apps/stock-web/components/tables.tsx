@@ -9,12 +9,14 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@mb/ui/components/toolt
 import { price, qty, titleCase, usd } from "@/lib/format"
 import type { DecisionRow, LiveAccount, ReportSummary, TradeRow } from "@/lib/queries"
 import { ActionBadge, Delta, Empty, PhaseBadge, ResearchModeBadge, StatusBadge, SymbolLink } from "./bits"
+import { CommandButton } from "./command"
 
 function Scroll({ children }: { children: React.ReactNode }) {
   return <div className="overflow-x-auto rounded-xl border">{children}</div>
 }
 
-export function PositionsTable({ positions }: { positions: LiveAccount["positions"] }) {
+/** `owner`: adds the owner's sell button to each row. */
+export function PositionsTable({ positions, owner = false }: { positions: LiveAccount["positions"]; owner?: boolean }) {
   if (positions.length === 0) return <Empty>No stock positions.</Empty>
   return (
     <Scroll>
@@ -29,6 +31,7 @@ export function PositionsTable({ positions }: { positions: LiveAccount["position
             <TableHead className="text-right">Unrealized</TableHead>
             <TableHead className="text-right">Stop / Target</TableHead>
             <TableHead>Horizon</TableHead>
+            {owner && <TableHead />}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -62,6 +65,16 @@ export function PositionsTable({ positions }: { positions: LiveAccount["position
                 {price(p.plan?.stop_loss)} / {price(p.plan?.take_profit)}
               </TableCell>
               <TableCell className="text-muted-foreground">{p.plan?.book === "core" ? "Core: reviewed weekly" : p.plan ? titleCase(p.plan.horizon) : "—"}</TableCell>
+              {owner && (
+                <TableCell className="text-right">
+                  <CommandButton
+                    command={{ type: "position.close", symbol: p.symbol }}
+                    label="Sell at market"
+                    size="xs"
+                    confirm={{ title: `Sell all ${p.symbol}?`, description: `Cancels its exits and sells ${p.qty} shares at market.`, action: "Sell" }}
+                  />
+                </TableCell>
+              )}
             </TableRow>
           ))}
         </TableBody>
@@ -72,8 +85,8 @@ export function PositionsTable({ positions }: { positions: LiveAccount["position
 
 const legsLabel = (o: Pick<OptionPositionDoc, "legs">) => o.legs.map((l) => `${l.side === "short" ? "−" : "+"}${describeContract(l.symbol)}`).join(" / ")
 
-/** Open (or closed) options positions with their live mark and exits. */
-export function OptionsTable({ positions, closed = false }: { positions: OptionPositionDoc[]; closed?: boolean }) {
+/** Open (or closed) options positions with their live mark and exits. `owner`: adds the owner's close button to open positions. */
+export function OptionsTable({ positions, closed = false, owner = false }: { positions: OptionPositionDoc[]; closed?: boolean; owner?: boolean }) {
   if (positions.length === 0) return <Empty>{closed ? "No closed options positions yet." : "No open options positions."}</Empty>
   const today = marketDay()
   return (
@@ -89,6 +102,7 @@ export function OptionsTable({ positions, closed = false }: { positions: OptionP
             <TableHead className="text-right">{closed ? "Realized" : "Unrealized"}</TableHead>
             <TableHead className="text-right">{closed ? "Closed" : "DTE"}</TableHead>
             <TableHead className="min-w-56">{closed ? "Why" : "Exits"}</TableHead>
+            {owner && !closed && <TableHead />}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -149,6 +163,17 @@ export function OptionsTable({ positions, closed = false }: { positions: OptionP
                   </>
                 )}
               </TableCell>
+              {owner && !closed && (
+                <TableCell className="text-right">
+                  <CommandButton
+                    command={{ type: "option.close", structure_id: o._id }}
+                    label="Close"
+                    size="xs"
+                    disabled={o.status !== "open"}
+                    confirm={{ title: `Close the ${o.underlying} ${STRATEGY_LABEL[o.strategy].toLowerCase()}?`, description: "Tries a limit between the midpoint and the bid, then market.", action: "Close" }}
+                  />
+                </TableCell>
+              )}
             </TableRow>
           ))}
         </TableBody>

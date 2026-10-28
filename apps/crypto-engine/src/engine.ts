@@ -182,7 +182,7 @@ export class Engine {
       request: (focus) => this.requestEventCycle(focus),
       markNotable: (ids, reason) => d.wire.markNotable(ids, reason),
       emergency: (symbol) => this.emergencyAction(symbol),
-      alert: (title, message) => d.alerts.send("warning", title, message, { path: "/research" }),
+      alert: (title, message) => d.alerts.send("warning", title, message, { path: "/news" }),
     })
     this.control = new ControlPlane<EngineRunStatus, WireItemDoc>({
       col: d.db.col,

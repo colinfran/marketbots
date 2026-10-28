@@ -61,7 +61,7 @@ describe("handleTradeUpdate", () => {
     const spread = alpacaOrder({ id: "m1", symbol: "", side: "", order_class: "mleg", status: "filled", qty: "1", filled_qty: "1", filled_avg_price: "3.5", legs: [alpacaOrder({ symbol: NVDA_CALL_140, side: "buy" }), alpacaOrder({ symbol: NVDA_CALL_150, side: "sell" })] })
     await handleTradeUpdate(ctx, { event: "fill", order: spread, price: "3.5", qty: "1" })
     expect(events[0]).toMatchObject({ type: "order.filled", instrument: "NVDA", summary: "Filled: buy 1 NVDA spread at $3.50", data: { asset_class: "us_option" } })
-    expect(alerts).toMatchObject([{ level: "success", title: "Bought NVDA spread", message: "[paper] 1 spread at $3.50, $350.00 in total.", path: "/trades?tab=options" }])
+    expect(alerts).toMatchObject([{ level: "success", title: "Bought NVDA spread", message: "[paper] 1 spread at $3.50, $350.00 in total.", path: "/holdings" }])
     events.length = 0
     await handleTradeUpdate(ctx, { event: "canceled", order: alpacaOrder({ id: "c1", symbol: NVDA_CALL_140, side: "sell", status: "canceled" }) })
     expect(events[0]).toMatchObject({ type: "order.canceled", instrument: "NVDA", summary: "Order canceled: sell NVDA Nov 20 '26 140C", level: "debug" })

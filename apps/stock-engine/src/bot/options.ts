@@ -594,7 +594,7 @@ export const monitorOptions = async (ctx: TradingContext, { marketOpen, now = ne
     bus.emit("protection.triggered", { symbol: doc.underlying, kind: trigger.kind, price: q?.mid ?? null, structure_id: doc._id }, { summary: `${doc.underlying} options exit: ${trigger.detail}`, instrument: doc.underlying, level: "warn" })
     const result = await closeOptionPosition(ctx, doc, trigger.kind, { urgent: trigger.urgent })
     notes.push(`${doc.underlying} ${trigger.kind}: ${result.detail}`)
-    if (!result.ok) await alerts.send("error", `Couldn't close ${doc.underlying} options position`, `${trigger.detail}. ${result.detail}`, { path: "/trades?tab=options", key: `opt-close|${doc._id}` })
+    if (!result.ok) await alerts.send("error", `Couldn't close ${doc.underlying} options position`, `${trigger.detail}. ${result.detail}`, { path: "/holdings", key: `opt-close|${doc._id}` })
   }
   return notes
 }

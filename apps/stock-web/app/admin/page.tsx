@@ -1,4 +1,3 @@
-import { STRATEGY_LABEL } from "@mb/stock-core/options"
 import { formatDateTime } from "@mb/stock-core/time"
 import type { Metadata } from "next"
 import Link from "next/link"
@@ -10,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@mb/ui/components/tabs"
 import { SeedCard } from "@mb/ui/seed-card"
 import { SettingsForm } from "@mb/ui/settings-form"
-import { Empty, PageHeader, SectionTitle, StatusBadge, SymbolLink } from "@/components/bits"
+import { Empty, PageHeader, SectionTitle, StatusBadge } from "@/components/bits"
 import { CommandButton } from "@/components/command"
 import { getViewer } from "@/lib/auth"
 import { ago, titleCase, usd, WEEKDAY_PLURAL } from "@/lib/format"
@@ -160,94 +159,11 @@ export default async function AdminPage() {
       <Tabs defaultValue="system">
         <TabsList>
           <TabsTrigger value="system">System</TabsTrigger>
-          <TabsTrigger value="positions">Positions</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
           <TabsTrigger value="logs">Logs</TabsTrigger>
         </TabsList>
         <TabsContent value="system" className="mt-4">
           <SystemHealth engine={engine} problems={problems} />
-        </TabsContent>
-        <TabsContent value="positions" className="mt-4 space-y-8">
-          <section>
-            <SectionTitle>Stocks</SectionTitle>
-            {!live?.positions.length ? (
-              <Empty>No stock positions.</Empty>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Symbol</TableHead>
-                    <TableHead className="text-right">Shares</TableHead>
-                    <TableHead className="text-right">Value</TableHead>
-                    <TableHead />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {live.positions.map((p) => (
-                    <TableRow key={p.symbol}>
-                      <TableCell>
-                        <SymbolLink symbol={p.symbol} />
-                        {p.plan?.book === "core" && (
-                          <Badge variant="secondary" className="ml-1.5">
-                            Core
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">{p.qty}</TableCell>
-                      <TableCell className="text-right tabular-nums">{usd(p.marketValue)}</TableCell>
-                      <TableCell className="text-right">
-                        <CommandButton
-                          command={{ type: "position.close", symbol: p.symbol }}
-                          label="Sell at market"
-                          confirm={{ title: `Sell all ${p.symbol}?`, description: `Cancels its exits and sells ${p.qty} shares at market.`, action: "Sell" }}
-                        />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </section>
-          <section>
-            <SectionTitle>Options</SectionTitle>
-            {!live?.options.length ? (
-              <Empty>No options positions.</Empty>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Underlying</TableHead>
-                    <TableHead>Position</TableHead>
-                    <TableHead className="text-right">Qty</TableHead>
-                    <TableHead className="text-right">Value</TableHead>
-                    <TableHead />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {live.options.map((o) => (
-                    <TableRow key={o._id}>
-                      <TableCell>
-                        <SymbolLink symbol={o.underlying} />
-                      </TableCell>
-                      <TableCell>
-                        {STRATEGY_LABEL[o.strategy]} <StatusBadge status={o.status} />
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">{o.qty}</TableCell>
-                      <TableCell className="text-right tabular-nums">{o.mark ? usd(o.mark.value * 100 * o.qty) : "—"}</TableCell>
-                      <TableCell className="text-right">
-                        <CommandButton
-                          command={{ type: "option.close", structure_id: o._id }}
-                          label="Close"
-                          disabled={o.status !== "open"}
-                          confirm={{ title: `Close the ${o.underlying} ${STRATEGY_LABEL[o.strategy].toLowerCase()}?`, description: "Tries a limit between the midpoint and the bid, then market.", action: "Close" }}
-                        />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </section>
         </TabsContent>
         {/* Kept mounted so unsaved edits survive switching tabs. */}
         <TabsContent value="settings" forceMount className="mt-4 data-[state=inactive]:hidden">
