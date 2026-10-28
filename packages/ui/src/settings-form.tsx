@@ -8,6 +8,10 @@ import { Button } from "./components/button"
 import { Input } from "./components/input"
 import { Label } from "./components/label"
 import { Switch } from "./components/switch"
+import { parseField, selectChoices, toInput, type SettingsSection } from "./lib/settings-fields"
+
+// Field definitions live in ./lib/settings-fields: a "use client" module's values reach server code only as client references.
+export type { SettingsField, SettingsSection } from "./lib/settings-fields"
 
 /**
  * Every tunable setting, grouped into the sections each app passes in. Only changed fields are
@@ -15,12 +19,7 @@ import { Switch } from "./components/switch"
  * two tabs can't overwrite each other).
  */
 
-/** list: comma-separated tickers (uppercased). idlist: comma-separated ids. lines: one entry per line, for entries that contain commas. */
-export type SettingsField = { path: string; label: string; kind: "number" | "boolean" | "text" | "list" | "idlist" | "lines" | "select"; options?: string[]; step?: number }
-
-export type SettingsSection = { title: string; fields: SettingsField[] }
-
-const get = (obj: unknown, path: string): unknown => path.split(".").reduce<unknown>((o, k) => (o as Record<string, unknown> | null)?.[k], obj)
+const get =(obj: unknown, path: string): unknown => path.split(".").reduce<unknown>((o, k) => (o as Record<string, unknown> | null)?.[k], obj)
 
 const setIn = (obj: Record<string, unknown>, path: string, value: unknown) => {
   const keys = path.split(".")
@@ -29,22 +28,12 @@ const setIn = (obj: Record<string, unknown>, path: string, value: unknown) => {
   cur[keys.at(-1)!] = value
 }
 
-const toInput = (v: unknown, separator = ", ") => (Array.isArray(v) ? v.join(separator) : v === null || v === undefined ? "" : String(v))
-
 export function SettingsForm({ sections, settings, version }: { sections: SettingsSection[]; settings: object; version: number }) {
   const initial = useMemo(() => Object.fromEntries(sections.flatMap((g) => g.fields).map((f) => [f.path, get(settings, f.path)])), [sections, settings])
   const [values, setValues] = useState<Record<string, unknown>>(initial)
   const { busy, result, error, send } = useCommand<BaseCommand>()
   const fields = sections.flatMap((g) => g.fields)
-  const parse = (f: SettingsField, raw: unknown): unknown => {
-    if (f.kind === "number") return Number(raw)
-    if (f.kind === "list") return String(raw).split(",").map((s) => s.trim().toUpperCase()).filter(Boolean)
-    if (f.kind === "idlist") return String(raw).split(",").map((s) => s.trim()).filter(Boolean)
-    if (f.kind === "lines") return (Array.isArray(raw) ? raw.map(String) : String(raw).split("\n")).map((s) => s.trim()).filter(Boolean)
-    if (f.kind === "text" && f.path === "ai.models.fallback") return toInput(raw).trim() || null
-    return raw
-  }
-  const changed = fields.filter((f) => JSON.stringify(parse(f, values[f.path])) !== JSON.stringify(initial[f.path]))
+  const changed = fields.filter((f) => JSON.stringify(parseField(f, values[f.path])) !== JSON.stringify(initial[f.path]))
 
   return (
     <form
@@ -52,7 +41,7 @@ export function SettingsForm({ sections, settings, version }: { sections: Settin
       onSubmit={(e) => {
         e.preventDefault()
         const patch: Record<string, unknown> = {}
-        for (const f of changed) setIn(patch, f.path, parse(f, values[f.path]))
+        for (const f of changed) setIn(patch, f.path, parseField(f, values[f.path]))
         void send({ type: "settings.update", patch, expected_version: version })
       }}
     >
@@ -89,10 +78,10 @@ export function SettingsForm({ sections, settings, version }: { sections: Settin
                   {f.kind === "boolean" ? (
                     <Switch id={id} checked={Boolean(values[f.path])} onCheckedChange={(v) => setValues({ ...values, [f.path]: v })} />
                   ) : f.kind === "select" ? (
-                    <select id={id} className="bg-background h-8 rounded-md border px-2 text-sm" value={String(values[f.path])} onChange={(e) => setValues({ ...values, [f.path]: e.target.value })}>
-                      {f.options!.map((o) => (
-                        <option key={o} value={o}>
-                          {o.replace(/_/g, " ")}
+                    <select id={id} className="bg-background h-8 max-w-64 rounded-md border px-2 text-sm" value={toInput(values[f.path])} onChange={(e) => setValues({ ...values, [f.path]: e.target.value })}>
+                      {selectChoices(f, initial[f.path]).map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
                         </option>
                       ))}
                     </select>

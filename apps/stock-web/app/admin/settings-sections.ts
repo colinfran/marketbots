@@ -1,4 +1,4 @@
-import type { SettingsSection } from "@mb/ui/settings-form"
+import { AI_MODEL_FIELDS, type SettingsSection } from "@mb/ui/lib/settings-fields"
 
 /**
  * Every tunable setting on the Admin page, grouped. The shared form (@mb/ui/settings-form) sends
@@ -87,9 +87,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     title: "AI",
     fields: [
       { path: "ai.daily_budget_usd", label: "Daily AI budget ($)", kind: "number" },
-      { path: "ai.models.research", label: "Research model (needs live search: xai/… or spacexai/…)", kind: "text" },
-      { path: "ai.models.decision", label: "Decision model", kind: "text" },
-      { path: "ai.models.fallback", label: "Fallback model (blank = none)", kind: "text" },
+      ...AI_MODEL_FIELDS,
       { path: "ai.x_search", label: "Use X (Twitter) search", kind: "boolean" },
       { path: "ai.stream_reasoning", label: "Stream model reasoning summaries", kind: "boolean" },
       { path: "ai.research_timeout_seconds", label: "Research timeout (s)", kind: "number" },
