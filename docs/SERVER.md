@@ -58,6 +58,18 @@ node --version          # 22.12 or newer (local dev, the secret one-liner)
 
 If it says `windows/amd64`, switch Docker Desktop to Linux containers (tray icon → *Switch to Linux containers*).
 
+**GPU power limit:** under model work the RTX 2080 SUPER reached 91 °C at its default 250 W ([LOCAL-AI.md §5.1](plans/LOCAL-AI.md#51-step-0-results-2026-102728)), so it runs capped at 180 W. Generating text is limited by memory bandwidth, and the cap cost no measurable speed. The driver forgets the cap on restart, so a startup task sets it again. Once, from an administrator PowerShell:
+
+```powershell
+$uuid = "GPU-c2f63837-86e4-7c90-764a-3de017193048"   # the 2080 SUPER (nvidia-smi -L)
+nvidia-smi -i $uuid -pl 180
+$trigger = New-ScheduledTaskTrigger -AtStartup; $trigger.Delay = "PT1M"
+Register-ScheduledTask -TaskName "GPU power limit (2080 SUPER)" -TaskPath "\marketbots\" -Trigger $trigger `
+  -Action (New-ScheduledTaskAction -Execute "C:\Windows\System32\nvidia-smi.exe" -Argument "-i $uuid -pl 180") `
+  -Principal (New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest)
+nvidia-smi --query-gpu=name,power.limit,power.default_limit --format=csv   # 180.00 W on the 2080 SUPER
+```
+
 **Caddy** runs on the Windows host, not in Docker: `C:\Caddy\caddy.exe run --config C:\Caddy\Caddyfile`, started by a scheduled task (`C:\Caddy\CaddyTray.ps1` is its tray controller). It terminates TLS and passes WebSocket upgrades through on its own. The engine sites:
 
 ```caddy

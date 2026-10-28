@@ -1,6 +1,6 @@
 # Plan: a local AI agent for both bots
 
-Status: **decisions taken on 2026-10-27**: every recommendation in §15, and no Grok at all once the agent takes over (decision 1). Step 0 of §14, the measurement spike, is done: its results and a recommendation are in [§5.1](#51-step-0-results-2026-102728); the owner picks the model. Step 1 (the history store and the news archive) was built beside it on 2026-10-27, since it doesn't depend on the model: `@mb/history`, the `history` and `history-backup` services ([SERVER.md §3.6, §6.4](../SERVER.md#64-the-history-stores-volume-and-backups)). Step 2's bars are built and running: crypto's from Kraken's files, the gap since them rebuilt from trades, and a daily refresh ([SERVER.md §6.5](../SERVER.md#65-krakens-history-files-crypto-backfill)); stock's from Alpaca's SIP history since 2016 ([§6.6](../SERVER.md#66-alpacas-history-stock-backfill)). So are the moves after each news item (1 h, 1 d and 5 d, in `news_moves`). The news backfills (GDELT, EDGAR) and the embeddings are next. Nothing that trades has changed.
+Status: **decisions taken on 2026-10-27**: every recommendation in §15, and no Grok at all once the agent takes over (decision 1). Step 0 of §14, the measurement spike, is done: its results and a recommendation are in [§5.1](#51-step-0-results-2026-102728). Its second round found that Qwen 3.6 at 2-bit fits both cards and runs as fast as gpt-oss-20b. The owner picks the model. Step 1 (the history store and the news archive) was built beside it on 2026-10-27, since it doesn't depend on the model: `@mb/history`, the `history` and `history-backup` services ([SERVER.md §3.6, §6.4](../SERVER.md#64-the-history-stores-volume-and-backups)). Step 2's bars are built and running: crypto's from Kraken's files, the gap since them rebuilt from trades, and a daily refresh ([SERVER.md §6.5](../SERVER.md#65-krakens-history-files-crypto-backfill)); stock's from Alpaca's SIP history since 2016 ([§6.6](../SERVER.md#66-alpacas-history-stock-backfill)). So are the moves after each news item (1 h, 1 d and 5 d, in `news_moves`). The news backfills (GDELT, EDGAR) and the embeddings are next. Nothing that trades has changed.
 
 Both bots, crypto first. Paper trading only, as always.
 
@@ -160,7 +160,7 @@ Measured on the server with `pnpm --filter @mb/<bot>-engine eval` (the eval harn
 | Qwen 3.6 35B-A3B (UD-IQ4_XS), both cards, 5.3 GB of experts in RAM | off | 4/4 | 149 s / 228 s | | 18 | 320 | 9/9 | 0 |
 | Qwen 3.5 9B (Q4_K_M), 2080 SUPER alone, 32k context | off | 6/6 | 89 s / 131 s | | 31 | 1,000 | 17/17 | 0 |
 
-- **Only gpt-oss fits.** Gemma 4 and Qwen 3.6 push 3–5 GB of experts into this machine's DDR4 and lose 60–85% of their speed: 2.5–5 minutes a decision with thinking off, far more with it on. Qwen 3.5 9B alone on the 2080 SUPER needs a context of 32k or less (at 96k, 5 of its 33 layers went to the CPU and it ran at 17 tok/s), and its ~10k thinking tokens make thinking impractical.
+- **At 4-bit, only gpt-oss fits** (round 2, below, fits Qwen 3.6 at 2-bit). Gemma 4 and Qwen 3.6 push 3–5 GB of experts into this machine's DDR4 and lose 60–85% of their speed: 2.5–5 minutes a decision with thinking off, far more with it on. Qwen 3.5 9B alone on the 2080 SUPER needs a context of 32k or less (at 96k, 5 of its 33 layers went to the CPU and it ran at 17 tok/s), and its ~10k thinking tokens make thinking impractical.
 - **Answer length, not thinking, sets most of the latency**: today's schemas make the model write 1,500–5,000 tokens (evidence lists for every symbol). At ~45 tok/s that alone is 30–110 s. The agent's answer schema (§8.4) has to be lean, P0's above all.
 - **Low effort is fast and shallow**: asked whether 17 is prime, gpt-oss at low effort thought 19 tokens ("Need JSON answer.") and said no. Not for decisions; P0 runs at medium with a short answer instead.
 - **High effort runs away**: five of six answers thought past the 16k-token cap (54–66k characters) and never answered. For P2/P3, medium with llama.cpp's `--reasoning-budget` (thinking capped, the answer forced) replaces "high".
@@ -185,9 +185,36 @@ Prompt caching works as §5 assumed: each step reads only its ~100 new tokens; t
 
 **Memory**: the Docker VM has 15.5 GiB (32 GB of RAM, no `.wslconfig`); llama-server with gpt-oss holds 2–3 GB of it. No change needed.
 
-**Recommendation** (owner's call): **gpt-oss-20b** (ggml-org MXFP4, SHA-256 `27cd6c43…35901`) split across both cards with the setup above; medium effort, a thinking budget for long reviews, lean answer schemas. Fallback: Qwen 3.5 9B alone on the 2080 SUPER, 32k context, thinking off. Not Gemma 4 or Qwen 3.6 on this hardware. Worth trying in step 3: ggml-org's EAGLE3 draft model for gpt-oss (0.9 GB) for speculative decoding, if a smaller KV pool leaves room for it.
+**Round 2: the larger models, compressed to fit** (2026-10-28). The owner wanted the stronger models, so step 0 tried Unsloth's dynamic quants of them (unsloth/Qwen3.6-35B-A3B-GGUF at `a483e9e6`, unsloth/gemma-4-26B-A4B-it-GGUF at `c099eb48`, each file checked against its SHA-256), sized to the ~14 GB the cards hold. The setup was the same as above, at the production context (96k) unless noted. The 2080 SUPER was capped at 180 W, and no transcode ran this time.
 
-Still open from step 0: the 48-hour soak (it runs as step 3's production setup), the PSU's rating, and the 2080 SUPER's power limit.
+| Model, quant (file) | Thinking | Valid | Crypto p50 / p95 | Stock p50 / p95 | Generates | Reads | Agrees with Grok (crypto) | Buys Grok didn't make |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| **Qwen 3.6 35B-A3B UD-Q2_K_XL** (12.3 GB) | off | 15/15 | 48 s / 115 s | 55 s / 96 s | 44 tok/s | 1,085 tok/s | 22/22 | 0 in 10 cycles; no stock trades in 5 reports |
+| Qwen 3.6 UD-Q2_K_XL | on | 6/6 | 164 s / 255 s | | 44 | 1,085 | 15/17 | 2 |
+| Qwen 3.6 UD-IQ3_XXS (13.2 GB) | off | 15/15 | 73 s / 166 s | 90 s / 161 s | 29 | 720 | 21/22 | 1; 3 stock trades in 5 reports |
+| Qwen 3.6 UD-IQ3_XXS | on | 6/6 | 303 s / 398 s | | 27 | | 16/17 | 1 |
+| Qwen 3.6 UD-IQ3_XXS, 32k context | off | 10/10 | 54 s / 99 s | | 39 | 1,150 | 22/22 | 0 |
+| Gemma 4 26B-A4B UD-IQ4_XS (13.6 GB) | off | 7/7 (stopped early) | 101 s / 218 s | | 15 | 450 | 14/17 | 3 |
+| Gemma 4 UD-Q3_K_XL (12.9 GB) | off | 15/15 | 107 s / 160 s | 108 s / 132 s | 18 | 590 | 16/22 | 6 |
+| gpt-oss-20b, again, at 180 W | medium | 10/10 | 57 s / 216 s | | 51 | 2,170 | 16/22 | 6 |
+
+| Episodes (§8.2) | Free: valid, p50 | Forced (three tool steps, then the answer): valid, p50 / p95 |
+| --- | --- | --- |
+| **Qwen 3.6 UD-Q2_K_XL**, thinking off | 3/3, 43 s (no tool calls) | 3/3, 40 s / 47 s |
+| Qwen 3.6 UD-IQ3_XXS, thinking off | 3/3, 100 s (no tool calls) | 3/3, 93 s / 114 s |
+| gpt-oss-20b, medium (above) | 8/8, 61–91 s (no tool calls) | 3/3, 244 s / 270 s |
+
+- **Qwen 3.6 at 2-bit fits, and runs as fast as gpt-oss.** At 12.3 GB it sits on the cards (the server holds ~1.7 GB of RAM, against 3.6 GB at 3-bit). It generates 44 tok/s and reads half as fast as gpt-oss (1,085 against ~2,100). Its hybrid attention keeps the 96k-token KV pool small.
+- **The 2-bit compression barely changed its decisions.** On the same cycles, its crypto calls matched the 3-bit version's in 21 of 22 decisions (thinking off) and 16 of 17 (on), and the 4-bit version's (round 1) in 9 of 9. Nearly every call here is `no_trade` or `hold`, so this is a weak test. Step 4's dual decision is the real one.
+- **Without thinking, Qwen 3.6 is as cautious as Grok**: no buys in 10 crypto cycles at 2-bit, against gpt-oss's 6–7. With thinking on, its decisions take ~3 minutes (~3,600 thinking tokens) and it bought twice in 6 cycles.
+- **Its tool loops are fast**: 40 s for three tool steps and an answer with thinking off, against 244 s for gpt-oss at medium (which re-thinks at every step). That fits §8.2's 20–45 s assumption.
+- **Gemma 4 is out on this hardware.** At 3-bit as at 4-bit it ran 14–18 tok/s: at the production context its KV cache, not its weights, spills it into RAM.
+- **Qwen 3.6 at 3-bit nearly fits with a 32k context** (39 tok/s), but 32k shared by three slots is too small for thinking or long episodes.
+- **The 180 W cap costs gpt-oss nothing**: 51 tok/s generating and 2,170 reading, against 44 and 2,040 at 250 W with a transcode running beside it. Over 3.5 hours of this round, the 2080 SUPER peaked at 88 °C and spent 3 of 1,253 samples at 85 °C or more (0.2%, against 12% uncapped). The gpt-oss stretch peaked at 162 W and 79 °C. Power readings briefly went past the cap (213 W at most), since the driver enforces it as an average. The card still reached 82–88 °C for a few samples at only 110–130 W, so its airflow is worth a look. The two cards together peaked at 288 W.
+
+**Recommendation** (owner's call): **Qwen 3.6 35B-A3B UD-Q2_K_XL** (SHA-256 `96b9c0af…70dad7`) split across both cards with the setup above. Thinking off for P0 decisions and episode steps; thinking on, with a budget, for reviews. The GPU guard's floor sits around 35 tok/s (normal is 40–47; the same model partly in RAM ran 28–29). gpt-oss-20b stays downloaded as the alternative: switching is a file and a setting, and step 4's dual decision shows whether the stronger model at 2-bit actually decides better. Fallback: Qwen 3.5 9B alone on the 2080 SUPER, 32k context, thinking off. Not Gemma 4. A GPU with more memory would let Qwen 3.6 run at 4-bit or better.
+
+Still open from step 0: the 48-hour soak (it runs as step 3's production setup) and the PSU's rating. The 2080 SUPER has run capped at 180 W since 2026-10-28. The startup task that keeps the cap across reboots is still for the owner to register ([SERVER.md §2](../SERVER.md#2-server-prerequisites-once)).
 
 ## 6. The history store (`history`)
 
