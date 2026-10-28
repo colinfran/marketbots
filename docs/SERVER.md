@@ -439,8 +439,10 @@ The engine runs three jobs, one step at a time, shown on Admin → System under 
 
 ```powershell
 curl.exe -fLo data\kraken-ohlcvt\Kraken_OHLCVT_2026Q4.zip https://assets.kraken.com/marketing/institutions/Kraken_OHLCVT_2026Q4.zip
-docker run --rm -v ${PWD}\data\kraken-ohlcvt:/in:ro -v ${PWD}\data\kraken-ohlcvt\csv:/out alpine:3.20 sh -c 'apk add -q unzip; f=""; for a in $(cat /in/altnames.txt); do f="$f ${a}_1.csv ${a}_1440.csv"; done; mkdir -p /out/2026Q4; unzip -qoj /in/Kraken_OHLCVT_2026Q4.zip $f -d /out/2026Q4'
+docker run --rm -v ${PWD}\data\kraken-ohlcvt:/in:ro -v ${PWD}\data\kraken-ohlcvt\csv:/out alpine:3.20 sh -c 'apk add -q unzip; f=""; for a in $(cat /in/altnames.txt); do f="$f ${a}_1.csv ${a}_1440.csv"; done; mkdir -p /out/2026Q4; unzip -qoj /in/Kraken_OHLCVT_2026Q4.zip $f -d /out/2026Q4; chmod -R a+rX /out'
 ```
+
+The `chmod` matters: `unzip` restores the archive's modes (0600, owned by root), which the engine's non-root user can't read (`kraken_files` fails with `EACCES`).
 
 The archives can be deleted once extracted; the CSVs can be deleted once `kraken_files` is done (Admin → System), but the next quarter's import needs only its own folder anyway.
 
