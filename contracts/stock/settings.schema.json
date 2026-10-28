@@ -571,10 +571,6 @@
               "enabled": {
                 "type": "boolean"
               },
-              "model": {
-                "type": "string",
-                "pattern": "^[a-z0-9][a-z0-9._-]*(?::[a-z0-9][a-z0-9._-]*)?$"
-              },
               "min_severity": {
                 "type": "integer",
                 "minimum": 0,
@@ -604,7 +600,6 @@
             },
             "required": [
               "enabled",
-              "model",
               "min_severity",
               "max_per_hour",
               "skip_domains",
@@ -1332,10 +1327,6 @@
               "enabled": {
                 "type": "boolean"
               },
-              "model": {
-                "type": "string",
-                "pattern": "^[a-z0-9][a-z0-9._-]*(?::[a-z0-9][a-z0-9._-]*)?$"
-              },
               "min_severity": {
                 "type": "integer",
                 "minimum": 0,
@@ -1365,7 +1356,6 @@
             },
             "required": [
               "enabled",
-              "model",
               "min_severity",
               "max_per_hour",
               "skip_domains",

@@ -3,14 +3,16 @@ import type { RequestText } from "../fetch"
 import { unmatchedNumbers } from "./numbers"
 
 /**
- * The two calls behind an article summary: the scraper sidecar's
- * `POST /extract` for the article text, and Ollama's `POST /api/chat` for the summary, with the
- * stricter of the two prompts tried when the model was picked. Both answers are untrusted:
- * they are parsed, cleaned, length-capped and checked before anything is stored.
+ * The calls behind an article summary: the scraper sidecar's `POST /extract` for the article
+ * text, and the local model server's (llama.cpp, OpenAI-compatible) `POST /v1/chat/completions`
+ * for the summary, with the stricter of the two prompts tried when summaries began. Both answers
+ * are untrusted: they are parsed, cleaned, length-capped and checked before anything is stored.
  */
 
-/** ≈3,000 tokens: the spike's largest prompt was 2,688 tokens at num_ctx 4096. */
+/** ≈3,000 tokens: the summaries spike's largest prompt was 2,688 tokens. */
 export const MAX_CHARS = 12_000
+/** A summary and its key points come to ~250 tokens; this only stops a runaway reply. */
+export const MAX_REPLY_TOKENS = 1_024
 /** Shorter extractions are teasers or free previews, not articles (the spike's CNBC Investing Club case). */
 export const MIN_WORDS = 150
 export const SUMMARY_MAX_WORDS = 80
@@ -70,7 +72,7 @@ export const SYSTEM_PROMPT = [
   "- Reply with JSON only, matching the schema.",
 ].join("\n")
 
-/** Ollama's structured output: the reply must be this JSON object. */
+/** The reply must be this JSON object (the server turns the schema into a grammar). */
 export const SUMMARY_FORMAT = {
   type: "object",
   properties: {
@@ -86,9 +88,27 @@ export const articleContext = (a: { title: string; host: string; published: stri
 
 export const userPrompt = (context: string) => `Summarize this article.\n\n${fenceUntrusted("article", context)}`
 
-/** Asks the model. Throws when Ollama can't be reached or answers with an error; returns the JSON text it wrote. */
-export const chat = async (request: RequestText, base: string, job: { model: string; context: string; timeoutMs: number }): Promise<string> => {
-  const res = await request(`${base.replace(/\/+$/, "")}/api/chat`, {
+/**
+ * The model the server serves (its `--alias`, from `GET /v1/models`). Throws when the server can't
+ * be reached, or answers 503 while it loads the model.
+ */
+export const servedModel = async (request: RequestText, base: string, timeoutMs: number): Promise<string> => {
+  const res = await request(`${base.replace(/\/+$/, "")}/v1/models`, { headers: { accept: "application/json" }, timeoutMs, attempts: 1 })
+  const body = parseJson(res.text, "the local model server")
+  const first = Array.isArray(body.data) ? body.data.find(isObject) : undefined
+  const id = first ? str(first.id) : null
+  if (!id) throw new Error("the local model server lists no model")
+  return id
+}
+
+/** The JSON text the model wrote, and how fast it wrote it (the server's own timing; null if it sent none). */
+export type Reply = { content: string; tokens: number; perSecond: number | null }
+
+const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null)
+
+/** Asks the model, without thinking. Throws when the server can't be reached or answers with an error. */
+export const chat = async (request: RequestText, base: string, job: { model: string; context: string; timeoutMs: number }): Promise<Reply> => {
+  const res = await request(`${base.replace(/\/+$/, "")}/v1/chat/completions`, {
     method: "POST",
     headers: { "content-type": "application/json", accept: "application/json" },
     body: JSON.stringify({
@@ -97,33 +117,23 @@ export const chat = async (request: RequestText, base: string, job: { model: str
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: userPrompt(job.context) },
       ],
-      format: SUMMARY_FORMAT,
-      options: { temperature: 0, num_ctx: 4096 },
-      keep_alive: "5m",
+      response_format: { type: "json_schema", json_schema: { name: "summary", schema: SUMMARY_FORMAT, strict: true } },
+      temperature: 0,
+      max_tokens: MAX_REPLY_TOKENS,
+      // No thinking: Qwen's template switch, and llama.cpp's own.
+      chat_template_kwargs: { enable_thinking: false },
+      reasoning_effort: "none",
       stream: false,
     }),
     timeoutMs: job.timeoutMs,
     attempts: 1,
   })
-  const body = parseJson(res.text, "Ollama")
-  const content = isObject(body.message) ? str(body.message.content) : null
-  if (content === null) throw new Error("Ollama answered in an unexpected shape")
-  return content
-}
-
-/**
- * Loads the model without generating anything (Ollama's `/api/generate` with no prompt). A cold
- * load from disk can take minutes, and Ollama abandons a load when its caller hangs up, so the
- * load gets its own long timeout instead of sharing the chat's.
- */
-export const loadModel = async (request: RequestText, base: string, job: { model: string; timeoutMs: number }): Promise<void> => {
-  await request(`${base.replace(/\/+$/, "")}/api/generate`, {
-    method: "POST",
-    headers: { "content-type": "application/json", accept: "application/json" },
-    body: JSON.stringify({ model: job.model, keep_alive: "5m" }),
-    timeoutMs: job.timeoutMs,
-    attempts: 1,
-  })
+  const body = parseJson(res.text, "the local model")
+  const choice = Array.isArray(body.choices) ? body.choices.find(isObject) : undefined
+  const content = choice && isObject(choice.message) ? str(choice.message.content) : null
+  if (content === null) throw new Error("the local model answered in an unexpected shape")
+  const timings = isObject(body.timings) ? body.timings : {}
+  return { content, tokens: num(timings.predicted_n) ?? 0, perSecond: num(timings.predicted_per_second) }
 }
 
 const wordCount = (s: string) => (s.match(/\S+/g) ?? []).length
@@ -150,17 +160,4 @@ export const checkSummary = (raw: string, context: string): Checked => {
   const missing = unmatchedNumbers([summary, ...keyPoints], context)
   if (missing.length) return { status: "rejected", reason: `numbers not in the article: ${missing.slice(0, 5).join(", ")}`.slice(0, 200) }
   return { status: "ok", summary, key_points: keyPoints }
-}
-
-const fullTag = (tag: string) => (tag.includes(":") ? tag : `${tag}:latest`)
-
-/** How much of the model sits in GPU memory, per Ollama's `GET /api/ps`; null when it isn't loaded. Throws when Ollama can't be reached. */
-export const gpuResidency = async (request: RequestText, base: string, model: string, timeoutMs: number): Promise<{ size: number; vram: number } | null> => {
-  const res = await request(`${base.replace(/\/+$/, "")}/api/ps`, { headers: { accept: "application/json" }, timeoutMs, attempts: 1 })
-  const body = parseJson(res.text, "Ollama /api/ps")
-  const models = Array.isArray(body.models) ? body.models.filter(isObject) : []
-  const loaded = models.find((m) => [str(m.model), str(m.name)].some((t) => t !== null && fullTag(t) === fullTag(model)))
-  if (!loaded) return null
-  if (typeof loaded.size !== "number" || typeof loaded.size_vram !== "number") throw new Error("Ollama /api/ps answered in an unexpected shape")
-  return { size: loaded.size, vram: loaded.size_vram }
 }

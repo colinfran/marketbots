@@ -187,6 +187,6 @@ describe("stock wire pipeline", () => {
     expect(store.current.wire).toEqual({ ...wire, summaries: DEFAULT_SETTINGS.wire.summaries })
     expect(store.version).toBe(13)
     const doc = await db.col.settings.findOne({ _id: "current" })
-    expect(doc).toMatchObject({ version: 13, updated_by: "engine:migration", settings: { wire: { mode: "shadow", scan_max_symbols: 800, summaries: { enabled: true, model: "llama3.2:3b", min_severity: 55, max_per_hour: 60, pause_hours: [] } } } })
+    expect(doc).toMatchObject({ version: 13, updated_by: "engine:migration", settings: { wire: { mode: "shadow", scan_max_symbols: 800, summaries: { enabled: true, min_severity: 55, max_per_hour: 60, pause_hours: [] } } } })
   })
 })

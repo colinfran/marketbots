@@ -37,8 +37,6 @@ export const aiSettingsBase = z.object({
 })
 export type AiSettingsBase = z.infer<typeof aiSettingsBase>
 
-/** An Ollama model tag, e.g. "llama3.2:3b" or "qwen3:4b-instruct". */
-export const OLLAMA_MODEL_PATTERN = /^[a-z0-9][a-z0-9._-]*(?::[a-z0-9][a-z0-9._-]*)?$/
 /** A bare lowercase domain, e.g. "wsj.com". */
 export const DOMAIN_PATTERN = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/
 /** A range of UTC hours, start-end with the end excluded: "22-6" is 22:00 to 06:00 UTC, "0-24" all day. */
@@ -50,14 +48,13 @@ const hourRange = z
   .refine((r) => r.split("-")[0] !== r.split("-")[1], "an hour range can't start and end at the same hour")
 
 /**
- * Local article summaries (@mb/wire/enrich): the article behind an important
- * item, summarized by a small model on the server's GPU, for the News page and the AI's wire
- * dossier (its 8 best-ranked items, labelled as machine summaries). Never on the trigger path.
+ * Local article summaries (@mb/wire/enrich): the article behind an important item, summarized by
+ * the local model server's model (whichever it serves, see SERVER.md), for the News page and the
+ * AI's wire dossier (its 8 best-ranked items, labelled as machine summaries). Never on the
+ * trigger path.
  */
 export const wireSummariesSettings = z.object({
   enabled: z.boolean(),
-  /** The Ollama model tag. */
-  model: z.string().regex(OLLAMA_MODEL_PATTERN, "Expected an Ollama model tag like llama3.2:3b"),
   /** Cluster roots at or above this severity get a summary; notable items always qualify. */
   min_severity: int(0, 100),
   /** Articles each engine may summarize per hour. */

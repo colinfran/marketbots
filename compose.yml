@@ -1,10 +1,10 @@
-# The marketbots stack on the trading server: both engines, one shared scraper, the local LLM and
-# the history store. The dashboards run on Vercel; their MongoDB is hosted on Atlas.
+# The marketbots stack on the trading server: both engines, one shared scraper, the local model
+# server and the history store. The dashboards run on Vercel; their MongoDB is hosted on Atlas.
 #
 #   docker compose up -d --build                         build and start (restarts after reboots)
 #   docker compose up -d --build stock-engine            redeploy one engine; the other is untouched
 #   docker compose logs -f crypto-engine                 follow one engine's structured logs
-#   docker compose --profile llm up -d llm               start the local LLM
+#   docker compose up -d llm                             (re)start the local model server
 #
 # The two engines share nothing at runtime: separate images, containers, ports, env files,
 # databases (one history database each, too) and leases. See docs/SERVER.md.
@@ -40,7 +40,7 @@ services:
       STREAM_HOST: 0.0.0.0
       STREAM_PORT: 8787
       SCRAPER_URL: http://scraper:8790
-      LLM_URL: http://llm:11434
+      LLM_URL: http://llm:8080
       LOG_DIR: /logs
       KRAKEN_OHLCVT_DIR: /data/ohlcvt
     ports:
@@ -74,7 +74,7 @@ services:
       STREAM_HOST: 0.0.0.0
       STREAM_PORT: 8788
       SCRAPER_URL: http://scraper:8790
-      LLM_URL: http://llm:11434
+      LLM_URL: http://llm:8080
       LOG_DIR: /logs
     ports:
       # Loopback only: Caddy on the host forwards wss://engine.stockmarketbot.app here.
@@ -205,31 +205,103 @@ services:
     mem_limit: 256m
     logging: *logging
 
-  # Local article summaries. Off unless started with --profile llm.
-  # GPU only: ~3 GB of VRAM while a model is loaded, released after 5 idle minutes.
-  llm:
-    image: ollama/ollama:0.40.11@sha256:dea72d1e22270fe095b68fdf756d2b489d615643c5a2eaebbc5f569181e322d8
-    container_name: marketbots-llm
-    profiles: [llm]
-    restart: unless-stopped
+  # Puts the local model's file into the models volume before llm starts: downloaded from Hugging
+  # Face at a pinned commit and checked against its SHA-256 (12.3 GB, a few minutes). A file already
+  # there and checked is kept, so this exits at once on later starts.
+  llm-model:
+    image: alpine:3.21@sha256:ce64758a109eb420d874a118f87920e625e12d3634e03b4a5573fd9f6e5d3507
+    container_name: marketbots-llm-model
+    restart: "no"
+    security_opt:
+      - no-new-privileges:true
     environment:
-      OLLAMA_NUM_PARALLEL: 1
-      OLLAMA_MAX_LOADED_MODELS: 1
-      OLLAMA_KEEP_ALIVE: 5m
-      OLLAMA_FLASH_ATTENTION: 1
-      OLLAMA_KV_CACHE_TYPE: q8_0
-      OLLAMA_MAX_QUEUE: 64
+      MODEL_URL: https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/a483e9e6cbd595906af30beda3187c2663a1118c/Qwen3.6-35B-A3B-UD-Q2_K_XL.gguf
+      MODEL_FILE: Qwen3.6-35B-A3B-UD-Q2_K_XL.gguf
+      MODEL_SHA256: 96b9c0af5c77a4ecaabe3983175112b5ece763261c1ece12b2494b692a70dad7
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        set -e
+        cd /models
+        if [ -f "$$MODEL_FILE" ] && [ "$$(cat "$$MODEL_FILE.sha256ok" 2>/dev/null)" = "$$MODEL_SHA256" ]; then echo "have $$MODEL_FILE"; exit 0; fi
+        apk add --no-cache curl >/dev/null
+        echo "downloading $$MODEL_FILE"
+        curl -sSfL --retry 5 --retry-delay 10 -C - -o "$$MODEL_FILE.part" "$$MODEL_URL"
+        got=$$(sha256sum "$$MODEL_FILE.part" | cut -d' ' -f1)
+        if [ "$$got" != "$$MODEL_SHA256" ]; then echo "SHA-256 mismatch ($$got): download removed"; rm -f "$$MODEL_FILE.part"; exit 1; fi
+        mv "$$MODEL_FILE.part" "$$MODEL_FILE"
+        echo "$$MODEL_SHA256" > "$$MODEL_FILE.sha256ok"
+        echo "fetched and checked $$MODEL_FILE"
     volumes:
-      - ollama-models:/root/.ollama
+      - models:/models
+    mem_limit: 256m
+    logging: *logging
+
+  # The local model (docs/plans/LOCAL-AI.md §5): llama.cpp's server with Qwen 3.6 35B-A3B at 2-bit,
+  # split across both GPUs and loaded at all times. Three slots share one 96k-token KV cache. It
+  # writes the article summaries, and serves AiRunner's local/* models. No host port and no
+  # internet: only the engines reach it, over the `ai` network. A start takes ~1 minute; the
+  # first one ~2–3, while the CUDA kernels are compiled (kept in llm-cache after that).
+  llm:
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda@sha256:8c219fe0367f7e794e3c69da50c5992d474077d60794a218b9e9a3b0c5aed688
+    container_name: marketbots-llm
+    restart: unless-stopped
+    depends_on:
+      llm-model:
+        condition: service_completed_successfully
+    environment:
+      # The 2080 SUPER first, then the 3070 (nvidia-smi -L). By UUID: Windows and WSL may number
+      # the cards differently.
+      CUDA_VISIBLE_DEVICES: GPU-c2f63837-86e4-7c90-764a-3de017193048,GPU-0a8e2594-2e3d-878a-20b6-c967e92bc4f8
+      CUDA_CACHE_PATH: /cache
+      CUDA_CACHE_MAXSIZE: "4294967296"
+    command:
+      - --model
+      - /models/Qwen3.6-35B-A3B-UD-Q2_K_XL.gguf
+      - --alias
+      - qwen3.6-35b-a3b-q2
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+      # One slot per bot and one for news, sharing one KV cache (q8_0).
+      - --parallel
+      - "3"
+      - --kv-unified
+      - --ctx-size
+      - "98304"
+      - --flash-attn
+      - "on"
+      - --cache-type-k
+      - q8_0
+      - --cache-type-v
+      - q8_0
+      # Layers (and experts, if it must) placed to leave 512 MB free on the 2080 SUPER and 1 GB
+      # on the 3070, for the display and Jellyfin's transcodes.
+      - --fit
+      - "on"
+      - --fit-target
+      - "512,1024"
+      # Read the whole file at load: memory-mapped experts were paged in on first use, and slowly.
+      - --load-mode
+      - none
+      - --jinja
+      - --metrics
+    volumes:
+      - models:/models:ro
+      - llm-cache:/cache
+    networks: [ai]
+    security_opt:
+      - no-new-privileges:true
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              count: 1
+              count: all
               capabilities: [gpu]
-    mem_limit: 2g
-    cpus: 2
+    mem_limit: 6g
+    cpus: 4
     logging: *logging
 
 volumes:
@@ -238,7 +310,10 @@ volumes:
   kraken-paper:
     external: true
     name: cryptomarketbot_kraken-paper
-  ollama-models:
+  # The local model's files (llm-model fetches the one in use; others may sit beside it).
+  models:
+  # The CUDA kernels the driver compiled for llm's first start.
+  llm-cache:
   # The history store's data (docs/plans/LOCAL-AI.md §6). The news archive in it is backed up
   # nightly (history-backup); everything else the backfills can fetch again.
   history-data:

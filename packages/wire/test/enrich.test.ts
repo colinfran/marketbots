@@ -15,7 +15,8 @@ import { WIRE_SETTINGS } from "./helpers"
 
 const NOW = new Date("2026-10-27T12:00:00Z")
 const SCRAPER_URL = "http://scraper:8790"
-const LLM_URL = "http://llm:11434"
+const LLM_URL = "http://llm:8080"
+const MODEL = "qwen3.6-35b-a3b-q2"
 const SUMMARIES: WireSummariesSettings = WIRE_SETTINGS.summaries
 
 /** After the spike's article #13 (Costco, foxbusiness.com). */
@@ -37,18 +38,28 @@ const INVENTED = {
 
 const extracted = (over: Record<string, unknown> = {}) =>
   json({ status: "ok", url: "x", final_url: "x", title: "Costco receives $184M in tariff refunds", byline: null, published: "2026-10-27T10:00:00.000Z", lang: "en", text: ARTICLE, words: 497, rendered: false, truncated: false, ...over })
-const replied = (reply: unknown) => json({ model: "llama3.2:3b", message: { role: "assistant", content: typeof reply === "string" ? reply : JSON.stringify(reply) }, done: true })
-const onGpu = (vram = 2_500_000_000) => json({ models: [{ name: "llama3.2:3b", model: "llama3.2:3b", size: 2_500_000_000, size_vram: vram }] })
+/** llama.cpp's OpenAI-compatible reply, with its own timings (by default 120 tokens at 44 tokens/s). */
+const replied = (reply: unknown, timings = { predicted_n: 120, predicted_per_second: 44 }) =>
+  json({
+    object: "chat.completion",
+    model: MODEL,
+    choices: [{ index: 0, finish_reason: "stop", message: { role: "assistant", content: typeof reply === "string" ? reply : JSON.stringify(reply) } }],
+    usage: { prompt_tokens: 700, completion_tokens: timings.predicted_n, total_tokens: 700 + timings.predicted_n },
+    timings: { prompt_n: 700, prompt_per_second: 1_000, ...timings },
+  })
+const serving = (id = MODEL) => json({ object: "list", data: [{ id, object: "model", owned_by: "llamacpp" }] })
+/** What llama.cpp answers while it loads the model. */
+const loading = () => json({ error: { code: 503, message: "Loading model", type: "unavailable_error" } }, { status: 503 })
 
 type Handler = (body: Record<string, unknown>, init: RequestInit) => Response | Promise<Response>
+type Path = "/extract" | "/v1/chat/completions" | "/v1/models"
 
-/** A fake scraper and Ollama behind global fetch, routed by path. */
-const fakeHttp = (routes: { extract?: Handler; chat?: Handler; ps?: Handler } = {}) => {
+/** A fake scraper and model server behind global fetch, routed by path. */
+const fakeHttp = (routes: { extract?: Handler; chat?: Handler; models?: Handler } = {}) => {
   const handlers: Record<string, Handler> = {
     "/extract": routes.extract ?? (() => extracted()),
-    "/api/chat": routes.chat ?? (() => replied(GOOD)),
-    "/api/ps": routes.ps ?? (() => onGpu()),
-    "/api/generate": () => json({ model: "llama3.2:3b", done: true, done_reason: "load" }),
+    "/v1/chat/completions": routes.chat ?? (() => replied(GOOD)),
+    "/v1/models": routes.models ?? (() => serving()),
   }
   const calls: { path: string; body: Record<string, unknown>; headers: Record<string, string> }[] = []
   vi.stubGlobal(
@@ -65,7 +76,7 @@ const fakeHttp = (routes: { extract?: Handler; chat?: Handler; ps?: Handler } = 
   return {
     calls,
     count: (path: string) => calls.filter((c) => c.path === path).length,
-    route: (path: "/extract" | "/api/chat" | "/api/ps" | "/api/generate", handler: Handler) => void (handlers[path] = handler),
+    route: (path: Path, handler: Handler) => void (handlers[path] = handler),
   }
 }
 
@@ -202,40 +213,48 @@ describe("the summary queue", () => {
     vi.useRealTimers()
   })
 
-  it("loads a model that isn't loaded on its own, before spending a scrape", async () => {
-    let loaded = false
-    const http = fakeHttp({ ps: () => (loaded ? onGpu() : json({ models: [] })) })
-    http.route("/api/generate", () => {
-      loaded = true
-      return json({ model: "llama3.2:3b", done: true, done_reason: "load" })
-    })
-    const { enricher, stored } = makeEnricher()
+  it("waits while the server loads its model, without spending a scrape", async () => {
+    const http = fakeHttp({ models: loading })
+    const { enricher, stored, clock } = makeEnricher()
     enricher.offer(item("a"))
     await enricher.idle()
-    expect(http.calls.map((c) => c.path)).toEqual(["/api/ps", "/api/generate", "/api/ps", "/extract", "/api/chat", "/api/ps"])
-    expect(http.calls[1].body).toEqual({ model: "llama3.2:3b", keep_alive: "5m" })
+    expect(http.calls.map((c) => c.path)).toEqual(["/v1/models"])
+    expect(enricher.health()).toMatchObject({ state: "degraded", last_error: expect.stringMatching(/^local model: GET \/v1\/models failed \(503\)/) })
+    http.route("/v1/models", () => serving())
+    clock.now = minutes(1)
+    await vi.advanceTimersByTimeAsync(60_000)
+    await enricher.idle()
+    expect(http.calls.map((c) => c.path)).toEqual(["/v1/models", "/v1/models", "/extract", "/v1/chat/completions"])
     expect(stored.get("a")?.status).toBe("ok")
   })
 
-  it("extracts, summarizes and stores only the summary, once per item", async () => {
+  it("extracts, summarizes without thinking, and stores only the summary, once per item", async () => {
     const http = fakeHttp()
     const { enricher, stored } = makeEnricher()
     enricher.offer(item("a"))
     await enricher.idle()
-    // Ollama's GPU residency before and after the call, the article in between.
-    expect(http.calls.map((c) => c.path)).toEqual(["/api/ps", "/extract", "/api/chat", "/api/ps"])
+    // The server's model first, then the article, then the summary.
+    expect(http.calls.map((c) => c.path)).toEqual(["/v1/models", "/extract", "/v1/chat/completions"])
     const [, extract, chat] = http.calls
     expect(extract.body).toEqual({ url: "https://www.foxbusiness.com/markets/a", render: "auto", skip_domains: SUMMARIES.skip_domains, max_chars: 12_000 })
     expect(extract.headers["x-client"]).toBe("crypto")
-    expect(chat.body).toMatchObject({ model: "llama3.2:3b", format: { type: "object", required: ["summary", "key_points"] }, options: { temperature: 0, num_ctx: 4096 }, keep_alive: "5m", stream: false })
+    expect(chat.body).toMatchObject({
+      model: MODEL,
+      response_format: { type: "json_schema", json_schema: { name: "summary", strict: true, schema: { type: "object", required: ["summary", "key_points"] } } },
+      temperature: 0,
+      max_tokens: 1_024,
+      chat_template_kwargs: { enable_thinking: false },
+      reasoning_effort: "none",
+      stream: false,
+    })
     const [system, user] = chat.body.messages as { role: string; content: string }[]
     expect(system.content).toMatch(/Never calculate, total, convert or estimate a new number/)
     expect(user.content).toContain('<untrusted source="article">')
     expect(user.content).toContain("Source: foxbusiness.com")
     expect(user.content).toContain(ARTICLE.slice(0, 80))
     const article = stored.get("a")!
-    expect(article).toEqual({ status: "ok", summary: GOOD.summary, key_points: GOOD.key_points, words: 497, model: "llama3.2:3b", ms: 0, at: NOW })
-    expect(enricher.health()).toMatchObject({ id: ENRICH_SOURCE_ID, state: "ok", items_24h: 1, dropped_24h: 0, last_item_at: NOW, last_error: null })
+    expect(article).toEqual({ status: "ok", summary: GOOD.summary, key_points: GOOD.key_points, words: 497, model: MODEL, ms: 0, at: NOW })
+    expect(enricher.health()).toMatchObject({ id: ENRICH_SOURCE_ID, state: "ok", items_24h: 1, dropped_24h: 0, last_item_at: NOW, last_error: null, detail: expect.stringMatching(/last took 0\.0 s \(44 tokens\/s\)/) })
     // Offered again (a confirmation, a notable mark), or already summarized: never twice.
     enricher.offer(item("a"))
     enricher.offer(item("b", { article }))
@@ -262,7 +281,7 @@ describe("the summary queue", () => {
       robots: ["skipped", "robots.txt disallows /markets/robots", undefined],
       blocked: ["failed", "http 403", undefined],
     })
-    expect(http.count("/api/chat")).toBe(0)
+    expect(http.count("/v1/chat/completions")).toBe(0)
     expect(enricher.health()).toMatchObject({ state: "ok", items_24h: 0, dropped_24h: 4 })
   })
 
@@ -271,39 +290,22 @@ describe("the summary queue", () => {
     const { enricher, stored } = makeEnricher()
     enricher.offer(item("costco"))
     await enricher.idle()
-    expect(stored.get("costco")).toEqual({ status: "rejected", reason: "numbers not in the article: 600", words: 497, model: "llama3.2:3b", ms: 0, at: NOW })
+    expect(stored.get("costco")).toEqual({ status: "rejected", reason: "numbers not in the article: 600", words: 497, model: MODEL, ms: 0, at: NOW })
   })
 
-  it("pauses for 30 minutes when loading put the model partly outside GPU memory, before spending a scrape", async () => {
-    let ps = 0
-    const http = fakeHttp({ ps: () => (ps++ === 0 ? json({ models: [] }) : onGpu(1_200_000_000)) })
+  it("pauses for 30 minutes after a slow reply (the model spilled into system RAM or crowded off the GPUs)", async () => {
+    const http = fakeHttp({ chat: () => replied(GOOD, { predicted_n: 120, predicted_per_second: 12.4 }) })
     const { enricher, stored, clock, states } = makeEnricher()
     enricher.offer(item("a"))
     await enricher.idle()
-    expect(http.calls.map((c) => c.path)).toEqual(["/api/ps", "/api/generate", "/api/ps"])
-    expect(stored.get("a")).toBeUndefined()
-    expect(enricher.health()).toMatchObject({ state: "degraded", last_error: "llama3.2:3b not fully on the GPU (1,144 of 2,384 MB): paused for 30 min" })
-    http.route("/api/ps", () => onGpu())
-    clock.now = minutes(31)
-    await vi.advanceTimersByTimeAsync(5 * 60_000)
-    await enricher.idle()
+    // The slow reply is still a good summary: it's kept.
     expect(stored.get("a")?.status).toBe("ok")
-    expect(states).toEqual(["degraded", "ok"])
-  })
-
-  it("pauses for 30 minutes when a call left the model partly outside GPU memory, so it doesn't keep running on the CPU", async () => {
-    let ps = 0
-    // Fully on the GPU before the first call; afterwards (a reload during the call) only partly.
-    const http = fakeHttp({ ps: () => (ps++ === 0 ? onGpu() : onGpu(1_200_000_000)) })
-    const { enricher, stored, clock, states } = makeEnricher()
-    enricher.offer(item("a"))
-    await enricher.idle()
-    expect(stored.get("a")?.status).toBe("ok")
-    expect(enricher.health()).toMatchObject({ state: "degraded", last_error: "llama3.2:3b not fully on the GPU (1,144 of 2,384 MB): paused for 30 min" })
+    expect(enricher.health()).toMatchObject({ state: "degraded", last_error: "qwen3.6-35b-a3b-q2 wrote 12.4 tokens/s (floor 20): paused for 30 min" })
     enricher.offer(item("b"))
     await enricher.idle()
     expect(http.count("/extract")).toBe(1)
-    http.route("/api/ps", () => onGpu())
+    expect(enricher.health().detail).toMatch(/1 queued/)
+    http.route("/v1/chat/completions", () => replied(GOOD))
     clock.now = minutes(31)
     await vi.advanceTimersByTimeAsync(5 * 60_000)
     await enricher.idle()
@@ -312,14 +314,26 @@ describe("the summary queue", () => {
     expect(states).toEqual(["degraded", "ok"])
   })
 
-  it("doesn't start an article while the model sits partly on the CPU (the other engine may have loaded it)", async () => {
-    const http = fakeHttp({ ps: () => onGpu(2_000_000_000) })
+  it("doesn't judge speed on a short reply, or one without timings", async () => {
+    const http = fakeHttp({ chat: () => replied(GOOD, { predicted_n: 20, predicted_per_second: 5 }) })
     const { enricher, stored } = makeEnricher()
     enricher.offer(item("a"))
     await enricher.idle()
-    expect(http.calls.map((c) => c.path)).toEqual(["/api/ps"])
+    http.route("/v1/chat/completions", () => json({ choices: [{ message: { role: "assistant", content: JSON.stringify(GOOD) } }] }))
+    enricher.offer(item("b"))
+    await enricher.idle()
+    expect([stored.get("a")?.status, stored.get("b")?.status]).toEqual(["ok", "ok"])
+    expect(enricher.health()).toMatchObject({ state: "ok", last_error: null })
+  })
+
+  it("treats a server that lists no model as an outage", async () => {
+    const http = fakeHttp({ models: () => json({ object: "list", data: [] }) })
+    const { enricher, stored } = makeEnricher()
+    enricher.offer(item("a"))
+    await enricher.idle()
     expect(stored.size).toBe(0)
-    expect(enricher.health()).toMatchObject({ state: "degraded", detail: expect.stringMatching(/1 queued/), last_error: expect.stringMatching(/not fully on the GPU/) })
+    expect(http.count("/extract")).toBe(0)
+    expect(enricher.health()).toMatchObject({ state: "degraded", detail: expect.stringMatching(/1 queued/), last_error: "local model: the local model server lists no model" })
     enricher.stop()
   })
 
@@ -388,22 +402,22 @@ describe("the summary queue", () => {
   })
 
   it("treats a model that errors or stalls as an outage, not as the article's fault", async () => {
-    const http = fakeHttp({ chat: () => json({ error: "model 'llama3.2:3b' not found" }, { status: 404 }) })
+    const http = fakeHttp({ chat: () => json({ error: { code: 500, message: "failed to parse grammar", type: "server_error" } }, { status: 500 }) })
     const a = makeEnricher()
     a.enricher.offer(item("a"))
     await a.enricher.idle()
     expect(a.stored.size).toBe(0)
-    expect(a.enricher.health()).toMatchObject({ state: "degraded", last_error: expect.stringMatching(/^local model: POST \/api\/chat failed \(404\)/) })
+    expect(a.enricher.health()).toMatchObject({ state: "degraded", last_error: expect.stringMatching(/^local model: POST \/v1\/chat\/completions failed \(500\)/) })
     // Tried once more after the backoff, then given up.
     a.clock.now = minutes(1)
     await vi.advanceTimersByTimeAsync(60_000)
     await a.enricher.idle()
-    expect(http.count("/api/chat")).toBe(2)
+    expect(http.count("/v1/chat/completions")).toBe(2)
     expect(a.stored.size).toBe(0)
     a.enricher.stop()
 
-    // Ollama unreachable: the scraper isn't spent on the article.
-    http.route("/api/ps", () => {
+    // The server unreachable: the scraper isn't spent on the article.
+    http.route("/v1/models", () => {
       throw new TypeError("fetch failed")
     })
     const c = makeEnricher()
@@ -412,14 +426,14 @@ describe("the summary queue", () => {
     expect(c.enricher.health().last_error).toBe("local model: fetch failed")
     expect(http.count("/extract")).toBe(2)
     c.enricher.stop()
-    http.route("/api/ps", () => onGpu())
+    http.route("/v1/models", () => serving())
 
-    http.route("/api/chat", (_body, init) => new Promise<Response>((_resolve, reject) => init.signal!.addEventListener("abort", () => reject(init.signal!.reason))))
+    http.route("/v1/chat/completions", (_body, init) => new Promise<Response>((_resolve, reject) => init.signal!.addEventListener("abort", () => reject(init.signal!.reason))))
     const b = makeEnricher({ timeouts: { chatMs: 50 } })
     b.enricher.offer(item("b"))
     await b.enricher.idle()
     expect(b.stored.size).toBe(0)
-    expect(b.enricher.health().last_error).toMatch(/^local model: POST \/api\/chat outcome unknown: .*(timeout|aborted)/i)
+    expect(b.enricher.health().last_error).toMatch(/^local model: POST \/v1\/chat\/completions outcome unknown: .*(timeout|aborted)/i)
     b.enricher.stop()
   })
 

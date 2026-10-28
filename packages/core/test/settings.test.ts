@@ -55,20 +55,23 @@ describe("settings helpers", () => {
 })
 
 describe("article summaries settings", () => {
-  const summaries = { enabled: true, model: "llama3.2:3b", min_severity: 55, max_per_hour: 60, skip_domains: ["wsj.com"], pause_hours: [] as string[] }
+  const summaries = { enabled: true, min_severity: 55, max_per_hour: 60, skip_domains: ["wsj.com"], pause_hours: [] as string[] }
   const issues = (patch: Partial<typeof summaries>) => {
     const r = wireSummariesSettings.safeParse({ ...summaries, ...patch })
     return r.success ? [] : r.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`)
   }
 
-  it("take an Ollama tag, bare domains and UTC hour ranges", () => {
+  it("take bare domains and UTC hour ranges", () => {
     expect(issues({})).toEqual([])
-    expect(issues({ model: "qwen3:4b-instruct", skip_domains: ["markets.ft.com"], pause_hours: ["22-6", "0-24", "9-17"] })).toEqual([])
-    expect(issues({ model: "Llama 3.2 3B" })).toEqual(["model: Expected an Ollama model tag like llama3.2:3b"])
+    expect(issues({ skip_domains: ["markets.ft.com"], pause_hours: ["22-6", "0-24", "9-17"] })).toEqual([])
     expect(issues({ skip_domains: ["https://wsj.com/"] })).toEqual(["skip_domains.0: Expected a lowercase domain like wsj.com"])
     expect(issues({ pause_hours: ["22:00-06:00"] })).toEqual(["pause_hours.0: Expected a UTC hour range like 22-6"])
     expect(issues({ pause_hours: ["24-6"] })).toEqual(["pause_hours.0: Expected a UTC hour range like 22-6"])
     expect(issues({ pause_hours: ["6-6"] })).toEqual(["pause_hours.0: an hour range can't start and end at the same hour"])
     expect(issues({ max_per_hour: 0 })).toHaveLength(1)
+  })
+
+  it("drop the Ollama-era model tag from stored settings (the model server picks the model)", () => {
+    expect(wireSummariesSettings.parse({ ...summaries, model: "llama3.2:3b" })).toEqual(summaries)
   })
 })

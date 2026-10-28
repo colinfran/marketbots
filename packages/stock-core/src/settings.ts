@@ -368,8 +368,6 @@ export const DEFAULT_SETTINGS: Settings = {
     scan_min_dollar_volume: 20_000_000,
     summaries: {
       enabled: true,
-      // Picked over qwen3:4b, phi4-mini and gemma3:4b on 20 real articles.
-      model: "llama3.2:3b",
       min_severity: 55,
       max_per_hour: 60,
       skip_domains: ["wsj.com", "ft.com", "bloomberg.com", "nytimes.com", "economist.com", "barrons.com", "seekingalpha.com"],

@@ -77,7 +77,7 @@ export type WireArticle = {
   key_points?: string[]
   /** The whole article's length, as the scraper counted it. */
   words?: number
-  /** The Ollama model tag that wrote it (or would have). */
+  /** The model that wrote it (or would have): the local server's alias, e.g. qwen3.6-35b-a3b-q2; llama3.2:3b before 2026-10-28. */
   model: string
   /** Time spent on the item: extraction plus summary. */
   ms: number

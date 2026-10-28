@@ -30,9 +30,9 @@ Browser ──https──▶ Vercel: cryptomarketbot.app, stockmarketbot.app ─
                                              ├─▶ 127.0.0.1:8787  crypto-engine ───┤
                                              └─▶ 127.0.0.1:8788  stock-engine  ───┘
                      marketbots stack:  crypto-engine, stock-engine ──▶ scraper (Playwright), no host port
-                                                                    ──▶ llm (Ollama, RTX 3070), no host port
+                                                                    ──▶ llm (llama.cpp, Qwen 3.6, both GPUs),
                                                                     ──▶ history (Postgres + TimescaleDB + pgvector),
-                                                                        network `ai`: no host port, no internet
+                                                                        both on network `ai`: no host port, no internet
 External: Kraken (CLI wallet in its volume), Alpaca, Vercel AI Gateway (Grok), ~150 news sources
 ```
 
@@ -45,7 +45,7 @@ External: Kraken (CLI wallet in its volume), Alpaca, Vercel AI Gateway (Grok), ~
 | Shared | How |
 | --- | --- |
 | Scraper | One container, `http://scraper:8790` on the compose network. Three renders at a time; each caller (the `X-Client` header, else the engine container's address) may hold at most 8 of the 16 queue places, so one bot can't starve the other. If it dies, only the headless news sources go down. |
-| Local LLM | One Ollama container on the GPU, `http://llm:11434`, that summarizes news articles for both engines. If it is down, only the summaries stop. |
+| Local model | One llama.cpp server on both GPUs (`llm`, Qwen 3.6 35B-A3B at 2-bit) on the internal `ai` network, `http://llm:8080` (OpenAI-compatible), with a slot per bot and one for news. It summarizes news articles for both engines. If it is down, only the summaries stop ([SERVER.md §9](SERVER.md#9-the-local-model-server-llm)). |
 | History store | One Postgres container (TimescaleDB, pgvector) on the internal `ai` network, with a database and a role per bot (`crypto_history`, `stock_history`): each engine's `HISTORY_URL` holds only its own password. Each engine writes its closed 1-minute bars and archives its news there (`@mb/history`, [plans/LOCAL-AI.md §6](plans/LOCAL-AI.md#6-the-history-store-history)). If it is down, only history stops. |
 | Atlas cluster | One cluster, a separate database per bot. |
 | The server's IP | Outbound rate limits (SEC, GDELT, ForexFactory…) apply to both bots together. |

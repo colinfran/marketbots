@@ -22,7 +22,6 @@ export const WIRE_SETTINGS: WireSettingsBase = {
   odds_swing_pts: 15,
   summaries: {
     enabled: true,
-    model: "llama3.2:3b",
     min_severity: 55,
     max_per_hour: 60,
     skip_domains: ["wsj.com", "ft.com", "bloomberg.com", "nytimes.com", "economist.com", "barrons.com", "seekingalpha.com"],

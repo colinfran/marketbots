@@ -117,7 +117,7 @@ function ItemTitle({ title, url }: { title: string; url: string | null }) {
   )
 }
 
-const MODEL_LABEL: Record<string, string> = { "llama3.2:3b": "Llama 3.2 3B" }
+const MODEL_LABEL: Record<string, string> = { "qwen3.6-35b-a3b-q2": "Qwen 3.6 35B-A3B", "llama3.2:3b": "Llama 3.2 3B" }
 
 /** The local model's summary of an item's article, always labelled as a machine summary, with the article's link. */
 export function ArticleSummary({ article, url, open = false }: { article: ArticleView; url: string | null; open?: boolean }) {

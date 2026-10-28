@@ -8,7 +8,7 @@ What runs where:
 
 | Where | What | Config |
 | --- | --- | --- |
-| Windows server, Docker stack `marketbots` | `crypto-engine` on 127.0.0.1:8787 (with the Kraken CLI paper wallet), `stock-engine` on 127.0.0.1:8788, `scraper` (no host port), `llm` (Ollama on the GPU, no host port, `--profile llm`), `history` (Postgres with TimescaleDB and pgvector, no host port) and `history-backup` | `compose.yml`, `.env.crypto`, `.env.stock`, `.env.history` at the repo root |
+| Windows server, Docker stack `marketbots` | `crypto-engine` on 127.0.0.1:8787 (with the Kraken CLI paper wallet), `stock-engine` on 127.0.0.1:8788, `scraper` (no host port), `llm` and `llm-model` (llama.cpp with the local model on both GPUs, no host port), `history` (Postgres with TimescaleDB and pgvector, no host port) and `history-backup` | `compose.yml`, `.env.crypto`, `.env.stock`, `.env.history` at the repo root |
 | Caddy on the Windows host | `engine.cryptomarketbot.app` → 127.0.0.1:8787, `engine.stockmarketbot.app` → 127.0.0.1:8788 (WebSocket) | `C:\Caddy\Caddyfile` |
 | Vercel | two projects: `apps/crypto-web` at cryptomarketbot.app, `apps/stock-web` at stockmarketbot.app | each project's environment variables |
 | MongoDB Atlas | one cluster, databases `cryptomarketbot` and `stockmarketbot` | `MONGODB_URI` |
@@ -128,7 +128,7 @@ Don't put these in the env files. `compose.yml` sets them, and its values win ov
 | `STREAM_HOST` | `0.0.0.0` | `0.0.0.0` |
 | `STREAM_PORT` | `8787` | `8788` |
 | `SCRAPER_URL` | `http://scraper:8790` | `http://scraper:8790` |
-| `LLM_URL` | `http://llm:11434` | `http://llm:11434` |
+| `LLM_URL` | `http://llm:8080` | `http://llm:8080` |
 
 Crypto also gets `KRAKEN_OHLCVT_DIR=/data/ohlcvt`, the read-only mount of Kraken's history files (§6.5). `HISTORY_URL` is not among them: it carries the bot's history password, so it lives in the bot's env file (§3.6).
 
@@ -227,7 +227,7 @@ HISTORY_URL=postgres://crypto_history:<CRYPTO_HISTORY_PASSWORD>@history:5432/cry
 docker volume inspect cryptomarketbot_kraken-paper   # must exist: the paper wallet (§6)
 docker compose config --quiet                       # checks compose.yml and the three env files; silent when fine
 docker compose build                                # several minutes the first time
-docker compose up -d                                # the engines, scraper, history, the backups (not llm)
+docker compose up -d                                # the engines, scraper, history, the backups, llm (the first start downloads its 12 GB model, §9)
 docker compose ps                                   # engines "healthy" within ~90 s (crypto) / ~60 s (stock)
 ```
 
@@ -256,6 +256,7 @@ docker compose up -d --build stock-engine      # rebuilds and recreates only the
 docker compose up -d --build crypto-engine     # only the crypto engine
 docker compose up -d --build scraper           # both bots' headless sources pause for a few seconds
 docker compose up -d history history-backup    # the history store (engines buffer bars and retry meanwhile)
+docker compose up -d llm                       # the local model server, after a change to its service (summaries pause ~1 min)
 docker compose up -d --build                   # everything whose image or config changed
 ```
 
@@ -264,6 +265,7 @@ docker compose up -d --build                   # everything whose image or confi
 - **Crypto**: pick a moment with no cycle or seed run in progress. Stops are watched only by the engine; it is back in about a minute.
 - A stop is graceful (30 s grace period): the engine releases its lease, so the new container takes over at once.
 - **History**: any time. While it's down the engines keep up to 50,000 bars each in memory and copy the news they missed when it's back; trading never waits for it.
+- **llm**: any time. Recreating it reloads the model (~1 minute), during which the summaries back off and retry; trading never waits for it.
 - Dashboards deploy by pushing to `main` (Vercel, §8).
 
 ### 5.2 Status, logs, restart
@@ -283,7 +285,6 @@ docker stats --no-stream marketbots-crypto-engine marketbots-stock-engine market
 
 - Containers come back on their own after a crash or a reboot (`restart: unless-stopped`) once Docker Desktop is running. A container stopped by hand stays stopped across reboots.
 - `docker compose down` stops and removes every container in the stack, both engines included. Volumes survive it. **Never add `-v`** (§6).
-- Compose leaves the `llm` service alone unless `--profile llm` is given, so add it to `stop` or `down` when the LLM is running.
 - Logs are JSON lines. Docker's copy is capped per container at 5 × 10 MB (scraper 3 × 10 MB), and it goes when the container is replaced, so at every deploy.
 - The engines also append every line to `logs\<service>\<UTC date>.log` in the repo folder (`LOG_DIR`; git-ignored, on the Windows disk). A deploy, a Docker reset or a WSL reset leaves it alone: the new container carries on in the same day's file. Files older than 90 days are deleted, and a day's file stops at 25 MB (Docker's copy still gets every line). The scraper's logs are only in Docker's copy.
 
@@ -323,7 +324,8 @@ The Docker VM has 15.5 GiB and the other stacks use ~3.5 GiB of it. Every servic
 | `crypto-engine` | 1 GB | ~0.35 GB |
 | `stock-engine` | 1 GB (was 768 MB: headroom at the open with ~1,500 tracked symbols) | 0.3–0.5 GB |
 | `scraper` | 1 GB | 0.15 GB idle, up to 0.5 GB while rendering |
-| `llm` | 2 GB RAM, 2 CPUs; ~3 GB GPU memory only while a model is loaded | ~0.1 GB idle; 1.6–2 GB while a model is loaded (mostly reclaimable cache); ~2.4 GB GPU memory loaded, none when idle |
+| `llm` | 6 GB RAM, 4 CPUs | ~2 GB; ~6.8 GB of GPU memory on each card, always (§9) |
+| `llm-model` | 256 MB | runs for a moment at each start of `llm` (a few minutes when it downloads) |
 | `history` | 2 GB (`shared_buffers` 512 MB, tuned for that) | 0.6–1.2 GB, mostly cache |
 | `history-backup` | 256 MB | a few MB; more for a minute at 10:30 UTC |
 
@@ -580,38 +582,54 @@ Vercel's instant rollback (*Deployments* → a previous deployment → *Instant 
 
 ---
 
-## 9. The local LLM (article summaries)
+## 9. The local model server (`llm`)
 
-`llm` is Ollama running `llama3.2:3b`. It writes short summaries of the articles behind important news items. Both engines reach it at `LLM_URL=http://llm:11434`.
+`llm` is llama.cpp's server running **Qwen 3.6 35B-A3B at 2-bit**: Unsloth's `UD-Q2_K_XL`, 12.3 GB. It is split across both GPUs and loaded at all times. [LOCAL-AI.md §5.1](plans/LOCAL-AI.md#51-step-0-results-2026-102728) has the measurements behind the choice.
 
-**The `llm` profile:** the service sits behind it, so a plain `docker compose up -d` neither starts nor recreates it. Pass `--profile llm` whenever you bring the whole stack up. Once it is running, `restart: unless-stopped` brings it back after a reboot like everything else.
+- **Access:** both engines reach it at `LLM_URL=http://llm:8080`, an OpenAI-compatible API, over the `ai` network. It has no host port and no internet.
+- **Work:** it writes the article summaries.
+- **When it's down:** the engines keep trading. Only the summaries stop, and the source `enrich:summaries` turns degraded on the dashboard.
 
-**When it's down:** the engines keep trading. Only the summaries stop, and the source `enrich:summaries` turns degraded on the dashboard.
+**The model file:** `llm-model` is a one-shot container that runs before `llm` starts:
+- It downloads the file from Hugging Face, at a pinned commit, into the `marketbots_models` volume.
+- It checks the file's SHA-256, and `llm` can't start until the check passes.
+- Once checked, the file is kept, and later starts skip the download.
+
+To change the model, edit `llm-model`'s `MODEL_URL`, `MODEL_FILE` and `MODEL_SHA256`, and `llm`'s `--model` and `--alias`, in `compose.yml`. Then run `docker compose up -d llm`. The server's image is pinned by digest.
 
 **How summaries are used:**
 - **Which items:** news cluster roots at severity ≥ `wire.summaries.min_severity` (Admin), and never on the trigger path.
+- **Which model:** whichever the server serves. Its alias (`qwen3.6-35b-a3b-q2`) is recorded on each summary. Summaries don't think: each request turns thinking off.
 - **Where they show:** under the item on the News page.
 - **In prompts:** the AI's wire dossier carries the summaries of its 8 best-ranked items. Each is labelled as a machine summary, and the AI is told to cite the item's URL, never the summary.
 - **Turning them off:** set `wire.summaries.enabled` to off in Admin.
 
-**Requirements:** an NVIDIA GPU (the RTX 3070), the Windows NVIDIA driver, and Docker Desktop's WSL2 backend, which passes the GPU to containers (Jellyfin already uses it that way). No host port.
+**Requirements:** both NVIDIA GPUs, the Windows NVIDIA driver, and Docker Desktop's WSL2 backend, which passes the GPUs to containers (Jellyfin already uses the 3070 that way).
 
 ```powershell
-docker compose --profile llm up -d llm
-docker compose --profile llm logs llm             # the startup lines name the GPU it found
-docker exec marketbots-llm ollama pull llama3.2:3b
-docker exec marketbots-llm ollama run llama3.2:3b "Summarize in one sentence: ..."
-docker exec marketbots-llm ollama ps              # PROCESSOR must say 100% GPU
-docker compose --profile llm stop llm
+docker compose up -d llm                                    # llm-model first (exits at once if the file is there), then llm
+docker compose logs llm-model                               # "have …", or the download and its check
+docker compose ps llm                                       # "healthy" once the model is loaded (~1 min)
+docker exec marketbots-llm curl -s localhost:8080/v1/models # the alias: qwen3.6-35b-a3b-q2
+docker exec marketbots-llm curl -s localhost:8080/metrics   # tokens and requests so far
+nvidia-smi                                                  # ~6.8 GB used on each card
 ```
 
-**Caps:**
-- Container: `mem_limit: 2g`, `cpus: 2`.
-- Ollama: one request at a time and one loaded model (`OLLAMA_NUM_PARALLEL=1`, `OLLAMA_MAX_LOADED_MODELS=1`), a queue of 64, flash attention and a `q8_0` KV cache.
-- GPU: ~2.5–3 GB while a model is loaded. It unloads after 5 idle minutes (`OLLAMA_KEEP_ALIVE=5m`), so idle it uses none.
-- Models live in the `marketbots_ollama-models` volume (`down -v` would delete them).
+**Setup:**
+- **The GPUs:** picked by UUID in `CUDA_VISIBLE_DEVICES`, the 2080 SUPER first. Windows and WSL can number the cards differently. After swapping a card, update the UUIDs (`nvidia-smi -L`).
+- **Placement:** `--fit on --fit-target 512,1024` places the layers so 512 MB stays free on the 2080 SUPER and 1 GB on the 3070, for the display and a Jellyfin transcode. With this model, nothing needs to go to system RAM.
+- **Slots:** three, one per bot and one for news. They share one 96k-token KV cache (`q8_0`), with flash attention on.
+- **Loading:** `--load-mode none` reads the whole file at load. Memory-mapped experts were paged in slowly on first use.
+- **Cold starts:** the first start compiles the CUDA kernels (2–3 minutes) and keeps them in the `llm-cache` volume. Later starts take ~1 minute.
 
-**GPU only:** if `ollama ps` shows any CPU share, the model didn't fit in free GPU memory (something else is using it). The engines check this (`/api/ps`) and pause summaries rather than run slowly on the CPU. The image is pinned by digest in `compose.yml`; the model in use is `llama3.2:3b` with manifest digest `a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72` (`ollama list` ID `a80c4f17acd5`).
+**Caps:**
+- **Container:** `mem_limit: 6g` (it holds ~2 GB), `cpus: 4`.
+- **GPU:** ~6.8 GB on each card.
+- **Power:** the 2080 SUPER is capped at 180 W (§2).
+
+**The speed guard:** llama.cpp doesn't report where its tensors sit, so the engines judge by speed. A summary written slower than 20 tokens/s pauses summaries for 30 minutes. Normal is 40–50 tokens/s, less per request while other slots run. A model spilled into system RAM writes 15–20.
+
+**Leftovers:** Ollama's `marketbots_ollama-models` volume (~2 GB, `llama3.2:3b`) is no longer used. `marketbots_models` also holds the step-0 candidates beside the model in use. Delete either only on purpose: `docker volume rm` can't be undone.
 
 ---
 
@@ -641,8 +659,11 @@ docker compose --profile llm stop llm
 | No sign-in email arrives | `USESEND_API_KEY` is missing or wrong, or the sender domain isn't verified in useSend (Vercel function logs show the error). Only `OWNER_EMAIL` is ever emailed. |
 | Vercel skips every build | The Ignored Build Step paths aren't anchored with `:/` (§8.2). |
 | Vercel build can't resolve `@mb/...` | *Include files outside the root directory* is off (§8.1). |
-| `llm` won't start: `could not select device driver "nvidia"` | Docker can't see the GPU: update the NVIDIA driver and Docker Desktop, and check the WSL2 backend is on. |
-| `ollama ps` shows a CPU share | Not enough free GPU memory for the model. Summaries pause; free the GPU or use a smaller model. |
+| `llm` won't start: `could not select device driver "nvidia"` | Docker can't see the GPUs: update the NVIDIA driver and Docker Desktop, and check the WSL2 backend is on. |
+| `llm` exits at start with `cudaMalloc failed: out of memory` | Something else holds GPU memory (a game, a second model server, a big transcode). Free it, then `docker compose up -d llm`. |
+| `llm` never starts: `llm-model` exited with `SHA-256 mismatch` | The download is corrupt or the pinned file changed. It was removed; `docker compose up -d llm` downloads it again. |
+| *enrich:summaries* degraded: `… wrote 12.3 tokens/s (floor 20): paused for 30 min` | The model ran slowly: spilled into system RAM, or the GPUs are busy with something else. Summaries resume by themselves after 30 minutes; check `nvidia-smi`. |
+| *enrich:summaries* degraded: `GET /v1/models failed (503)` | The server is still loading the model (~1 minute after a start). |
 | `env file ...\.env.history not found` | Create it from `.env.history.example` (§3.6). |
 | Admin → System: *History store: unreachable*, log `history store unavailable; retrying in a minute` | `docker compose ps history`: not running, or still starting. A `password authentication failed` means the bot's `HISTORY_URL` doesn't match the role's password (§3.6). The engine keeps trading and retries every minute. |
 | *History store* shows bars *dropped* | It was down long enough for an engine's 50,000-bar buffer to fill. The backfills can fetch those minutes again. |
