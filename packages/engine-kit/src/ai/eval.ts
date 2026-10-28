@@ -160,13 +160,14 @@ export type EpisodeResult = { steps: EpisodeStep[]; answered: boolean; answer: u
 
 /**
  * A scripted agent episode (§8.2): every step is one JSON object, either a tool call with a short
- * purpose or the final answer in the bot's decision schema. Tool results are canned. After
- * `maxTools` calls, the step schema allows only the answer. Earlier steps stay in the prompt
+ * purpose or the final answer in the bot's decision schema. Tool results are canned. The first
+ * `minTools` steps may only call a tool (to time a real loop); after `maxTools` calls, the step
+ * schema allows only the answer. Earlier steps stay in the prompt
  * unchanged, so the server's prompt cache only has to read each new part.
  */
 export const runEpisode = async (
   model: EvalModel,
-  { system, brief, tools, answerSchema, maxTools = 5, timeoutMs = 600_000 }: { system: string; brief: string; tools: EpisodeTool[]; answerSchema: Record<string, unknown>; maxTools?: number; timeoutMs?: number },
+  { system, brief, tools, answerSchema, minTools = 0, maxTools = 5, timeoutMs = 600_000 }: { system: string; brief: string; tools: EpisodeTool[]; answerSchema: Record<string, unknown>; minTools?: number; maxTools?: number; timeoutMs?: number },
 ): Promise<EpisodeResult> => {
   const started = Date.now()
   const toolStep = {
@@ -199,7 +200,7 @@ export const runEpisode = async (
     const last = i === maxTools
     const remaining = timeoutMs - (Date.now() - started)
     if (remaining <= 0) break
-    const call = await complete(model, messages, last ? answerStep : { anyOf: [toolStep, answerStep] }, { timeoutMs: remaining })
+    const call = await complete(model, messages, last ? answerStep : i < minTools ? toolStep : { anyOf: [toolStep, answerStep] }, { timeoutMs: remaining })
     const step = call.json as { kind?: string; tool?: string; purpose?: string; args?: unknown; answer?: unknown } | undefined
     if (!call.ok || !step || (step.kind !== "tool" && step.kind !== "answer")) {
       steps.push({ kind: "invalid", tool: null, purpose: null, call })

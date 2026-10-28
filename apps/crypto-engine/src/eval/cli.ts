@@ -235,12 +235,15 @@ const episode = async () => {
   const out = resultFile(model, "episode")
   mkdirSync(dirname(out), { recursive: true })
   writeFileSync(out, "")
-  for (const [n, item] of items.entries()) {
-    const r = await runEpisode(model, { system: item.system, brief: item.prompt, tools: TOOLS, answerSchema: SCHEMA, maxTools: 5 })
+  // Each item twice: may the model look things up when it could answer (free), and how long a real
+  // loop takes (forced: the first 3 steps can only call tools).
+  for (const [n, [item, minTools]] of items.flatMap((i) => [[i, 0], [i, 3]] as const).entries()) {
+    const r = await runEpisode(model, { system: item.system, brief: item.prompt, tools: TOOLS, answerSchema: SCHEMA, minTools, maxTools: 5 })
     const final = r.steps.at(-1)
     const s = r.answered ? score(item, JSON.stringify(r.answer), r.answer) : null
     const row = {
       id: item.id,
+      mode: minTools ? "forced" : "free",
       answered: r.answered,
       valid: s?.valid ?? false,
       wall_ms: r.wall_ms,
@@ -249,7 +252,7 @@ const episode = async () => {
       error: final?.call.error ?? null,
     }
     writeFileSync(out, JSON.stringify(row) + "\n", { flag: "a" })
-    console.log(`${n + 1}/${items.length} ${item.id.slice(0, 8)} ${r.answered ? "answered" : "NO ANSWER"} ${(r.wall_ms / 1000).toFixed(1)}s steps=${r.steps.length} ${row.tools.join(" | ")}`)
+    console.log(`${n + 1}/${items.length * 2} ${item.id.slice(0, 8)} ${minTools ? "forced" : "free"} ${r.answered ? "answered" : "NO ANSWER"} ${(r.wall_ms / 1000).toFixed(1)}s steps=${r.steps.length} ${row.tools.join(" | ")}`)
   }
   console.log(`results in ${out}`)
 }
@@ -257,7 +260,7 @@ const episode = async () => {
 const summary = () => {
   const dir = join(DIR, "results")
   for (const f of readdirSync(dir).filter((x) => x.startsWith("crypto-")).sort()) {
-    const rows = readJsonl<Record<string, number | boolean | string | null>>(join(dir, f))
+    const rows = readJsonl<Record<string, number | boolean | string | null | string[]>>(join(dir, f))
     const secs = rows.map((r) => Number(r.wall_ms) / 1000)
     if (f.startsWith("crypto-decision")) {
       const compared = rows.reduce((s, r) => s + Number(r.compared ?? 0), 0)
@@ -265,7 +268,14 @@ const summary = () => {
         `${f}: n=${rows.length} valid=${rows.filter((r) => r.valid).length} repaired=${rows.filter((r) => r.repaired).length} covered=${rows.filter((r) => r.covered).length} agree=${rows.reduce((s, r) => s + Number(r.agree ?? 0), 0)}/${compared} entry_agree=${rows.reduce((s, r) => s + Number(r.entry_agree ?? 0), 0)}/${compared} buys=${rows.reduce((s, r) => s + Number(r.buys ?? 0), 0)} grok_buys=${rows.reduce((s, r) => s + Number(r.grok_buys ?? 0), 0)} p50=${percentile(secs, 50).toFixed(1)}s p95=${percentile(secs, 95).toFixed(1)}s gen=${percentile(rows.map((r) => Number(r.gen_per_s)), 50).toFixed(1)}t/s pp=${percentile(rows.map((r) => Number(r.prompt_per_s)), 50).toFixed(0)}t/s think=${percentile(rows.map((r) => Number(r.reasoning_chars)), 50)}ch`,
       )
     } else {
-      console.log(`${f}: n=${rows.length} answered=${rows.filter((r) => r.answered).length} valid=${rows.filter((r) => r.valid).length} p50=${percentile(secs, 50).toFixed(1)}s p95=${percentile(secs, 95).toFixed(1)}s`)
+      for (const mode of ["free", "forced"]) {
+        // Rows from before the two modes count as free.
+        const m = rows.filter((r) => (r.mode ?? "free") === mode)
+        if (!m.length) continue
+        const sec = m.map((r) => Number(r.wall_ms) / 1000)
+        const tools = m.map((r) => (Array.isArray(r.tools) ? r.tools.length : 0))
+        console.log(`${f} [${mode}]: n=${m.length} answered=${m.filter((r) => r.answered).length} valid=${m.filter((r) => r.valid).length} used_tools=${tools.filter((t) => t > 0).length} tools_avg=${(tools.reduce((x, y) => x + y, 0) / m.length).toFixed(1)} p50=${percentile(sec, 50).toFixed(1)}s p95=${percentile(sec, 95).toFixed(1)}s`)
+      }
     }
   }
 }
