@@ -1,6 +1,6 @@
 # Plan: a local AI agent for both bots
 
-Status: **decisions taken on 2026-10-27**: every recommendation in §15, and no Grok at all once the agent takes over (decision 1). Step 0 of §14, the measurement spike, is running. Step 1 (the history store and the news archive) was built beside it on 2026-10-27, since it doesn't depend on the model: `@mb/history`, the `history` and `history-backup` services ([SERVER.md §3.6, §6.4](../SERVER.md#64-the-history-stores-volume-and-backups)). Step 2's bars are built and running: crypto's from Kraken's files, the gap since them rebuilt from trades, and a daily refresh ([SERVER.md §6.5](../SERVER.md#65-krakens-history-files-crypto-backfill)); stock's from Alpaca's SIP history since 2016 ([§6.6](../SERVER.md#66-alpacas-history-stock-backfill)). So are the moves after each news item (1 h, 1 d and 5 d, in `news_moves`). The news backfills (GDELT, EDGAR) and the embeddings are next. Nothing that trades has changed.
+Status: **decisions taken on 2026-10-27**: every recommendation in §15, and no Grok at all once the agent takes over (decision 1). Step 0 of §14, the measurement spike, is done: its results and a recommendation are in [§5.1](#51-step-0-results-2026-102728); the owner picks the model. Step 1 (the history store and the news archive) was built beside it on 2026-10-27, since it doesn't depend on the model: `@mb/history`, the `history` and `history-backup` services ([SERVER.md §3.6, §6.4](../SERVER.md#64-the-history-stores-volume-and-backups)). Step 2's bars are built and running: crypto's from Kraken's files, the gap since them rebuilt from trades, and a daily refresh ([SERVER.md §6.5](../SERVER.md#65-krakens-history-files-crypto-backfill)); stock's from Alpaca's SIP history since 2016 ([§6.6](../SERVER.md#66-alpacas-history-stock-backfill)). So are the moves after each news item (1 h, 1 d and 5 d, in `news_moves`). The news backfills (GDELT, EDGAR) and the embeddings are next. Nothing that trades has changed.
 
 Both bots, crypto first. Paper trading only, as always.
 
@@ -130,9 +130,64 @@ The eval set (§10) chooses among them, on our own recorded cycles rather than p
 - an OpenAI-compatible API, so `AiRunner` gains a local provider (`@ai-sdk/openai-compatible`) and model ids like `local/<name>`. `ai_calls` records local calls with tokens, GPU time and a cost of 0;
 - no internet: the server sits only on the internal `ai` network. Models are downloaded on the host and checked against their hash.
 
-The GPU guard the summaries already use applies to the whole server: the model must sit where its configuration puts it (wholly on the GPUs, unless the configuration places some experts in RAM), or the work pauses rather than crawling on the CPU. On Windows the NVIDIA driver can also spill CUDA memory into system RAM without telling anyone, so step 0 sets *CUDA – Sysmem Fallback Policy* to *Prefer No Sysmem Fallback*. The engines check the loaded model's hash against settings at boot and before each episode; a mismatch stops episodes.
+The GPU guard the summaries already use applies to the whole server: the model must sit where its configuration puts it (wholly on the GPUs, unless the configuration places some experts in RAM), or the work pauses rather than crawling on the CPU. On Windows the NVIDIA driver can also spill CUDA memory into system RAM without telling anyone; step 0 found that Docker's WSL CUDA doesn't on this driver (§5.1), so the guard watches speed instead. The engines check the loaded model's hash against settings at boot and before each episode; a mismatch stops episodes.
 
 **Rough capacity** (to be measured in step 0): an MoE model with ~3–4B active parameters, split across these cards, should generate 40–80 tokens/s per stream and read 1,000–2,500 tokens/s (less for the Qwen option, with experts in RAM). A typical episode (a 3k-token brief, five tool results, a 1k-token answer) then takes 20–45 s, which leaves room for well over 100 episodes an hour per bot. Today's bots run a handful of AI cycles an hour.
+
+### 5.1 Step 0 results (2026-10-27/28)
+
+Measured on the server with `pnpm --filter @mb/<bot>-engine eval` (the eval harness, `@mb/engine-kit/ai/eval`), a 4K→1080p NVENC transcode running on the 3070 throughout as Jellyfin's stand-in, and the live engines, backfills and gate sharing the machine.
+
+**Setup findings**
+
+- **GPUs by UUID**: Docker Desktop's `--gpus device=<uuid>` still shows both cards inside the container; pinning works with `CUDA_VISIBLE_DEVICES=<uuid>,<uuid>` (the order is the order given, 2080 SUPER first).
+- **Usable VRAM is ~14.2 GB, not ~15.5**: inside WSL each card reports ~7.1 GB free, the 3070 included with the display on it. The monitor move (§5) would mostly matter for Jellyfin headroom. The CPU's own graphics are off (Windows lists only the two NVIDIA cards): turning them on is a BIOS change for the owner.
+- **llama.cpp** (`ghcr.io/ggml-org/llama.cpp:server-cuda`, build 11913) runs both cards with `--fit on --fit-target 512,1024`, which places layers and, when needed, experts in RAM to keep 512 MB free on the 2080 SUPER and 1 GB on the 3070. Three slots share one 96k-token KV pool (`-kvu`, q8_0); flash attention on; `--load-mode none` (memory-mapped experts were paged in on first use: a 92-token prompt took 47 s).
+- **Cold loads**: the CUDA driver compiles kernels on first use; with that cache kept on a volume (`CUDA_CACHE_PATH`), a load takes 29–55 s instead of 106–134 s.
+- **Thinking, then the grammar**: all four candidates write their thinking first (`reasoning_content`) and only then the schema-constrained answer. A request switches thinking with `reasoning_effort` (gpt-oss: low / medium / high; Qwen and Gemma: on or off through `chat_template_kwargs.enable_thinking`).
+- **The plan's GPU guard can't check placement**: llama-server doesn't report where its tensors sit, and `--fit` decides at load time. The guard that works whatever the cause is speed: every response carries its own tokens/s, so step 3 pauses model work when generation drops below a floor (normal is 40–50; a spilled or contended model does 15–20).
+
+**The eval set** is every recorded decision there is: 44 crypto cycles and 29 stock reports, all since 2026-10-26, not "a few hundred" (§10); it grows as the bots run. Grok's answers in it: crypto 54 `no_trade` and 15 `hold`, no buys; stock 6 buys and 2 sells. Agreement with Grok is a sanity check, not a score.
+
+**Decisions** (today's prompts and schemas, one call each; p50 / p95 wall time):
+
+| Model, layout | Thinking | Valid | Crypto p50 / p95 | Stock p50 / p95 | Generates | Reads | Agrees with Grok (crypto) | Buys Grok didn't make |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| **gpt-oss-20b**, both cards (0.9 GB of experts in RAM) | medium | 30/30 | 75 s / 140 s | 84 s / 178 s | 44 tok/s | 2,000 tok/s | 28/35 | 7 of 20 cycles; 6 stock trades in 10 reports where Grok made none |
+| gpt-oss-20b | low | 10/10 | 22 s / 63 s | | 34 | 2,000 | 20/22 | 2 |
+| gpt-oss-20b | high | 1/6 | 150 s for the valid one | | 55 | 1,300 | | five of six thought past 16k tokens and never answered |
+| Gemma 4 26B-A4B (Google's QAT q4_0), both cards, 3–4 GB of experts in RAM | on / off | 6/6 | 262 s on; 69 s / 138 s off | | 19–20 | 330–500 | | 2 of 2 with thinking |
+| Qwen 3.6 35B-A3B (UD-IQ4_XS), both cards, 5.3 GB of experts in RAM | off | 4/4 | 149 s / 228 s | | 18 | 320 | 9/9 | 0 |
+| Qwen 3.5 9B (Q4_K_M), 2080 SUPER alone, 32k context | off | 6/6 | 89 s / 131 s | | 31 | 1,000 | 17/17 | 0 |
+
+- **Only gpt-oss fits.** Gemma 4 and Qwen 3.6 push 3–5 GB of experts into this machine's DDR4 and lose 60–85% of their speed: 2.5–5 minutes a decision with thinking off, far more with it on. Qwen 3.5 9B alone on the 2080 SUPER needs a context of 32k or less (at 96k, 5 of its 33 layers went to the CPU and it ran at 17 tok/s), and its ~10k thinking tokens make thinking impractical.
+- **Answer length, not thinking, sets most of the latency**: today's schemas make the model write 1,500–5,000 tokens (evidence lists for every symbol). At ~45 tok/s that alone is 30–110 s. The agent's answer schema (§8.4) has to be lean, P0's above all.
+- **Low effort is fast and shallow**: asked whether 17 is prime, gpt-oss at low effort thought 19 tokens ("Need JSON answer.") and said no. Not for decisions; P0 runs at medium with a short answer instead.
+- **High effort runs away**: five of six answers thought past the 16k-token cap (54–66k characters) and never answered. For P2/P3, medium with llama.cpp's `--reasoning-budget` (thinking capped, the answer forced) replaces "high".
+- **gpt-oss trades more than Grok**: 7 buys in 20 crypto cycles where Grok bought nothing, 6 stock trades in 10 reports where Grok made none. Nothing says who is right yet; the dual decision (step 4) scores both, and the envelope and breakers (§9) exist for this.
+
+**Episodes** (the scripted tool loop, §8.2, gpt-oss at medium):
+
+| gpt-oss-20b | Runs | Valid | p50 / p95 | Notes |
+| --- | --- | --- | --- | --- |
+| Free, medium (tools offered, the answer allowed at once) | 8 | 8 | 61–91 s / 150 s | it never called a tool: today's brief already holds everything |
+| Forced, medium (three tool steps, then the answer) | 3 | 3 | 244 s / 270 s | 2,000–7,500 thinking tokens per step: it re-thinks the whole decision every step |
+| Free, low | 3 | 3 | 19 s / 24 s | no tool calls |
+| Forced, low | 3 | 3 | 23 s / 26 s | the plan's 20–45 s estimate |
+
+Prompt caching works as §5 assumed: each step reads only its ~100 new tokens; the other 6,500–8,500 come from the slot's cache. What a step costs is its thinking. The forced tool calls were thin, too (a `purpose` of "forecast" or "answer"): today's decision prompt was written for one answer, not for looking things up.
+
+**For §8.2**: the limits there assume 20–45 s episodes. At medium effort a 4-step episode takes ~4 minutes on this hardware, so step 8 sets a thinking budget per step (somewhere between low's tens of tokens and medium's thousands, ~1k to start), keeps P0 to two steps, and writes the agent prompt for tool use. Even at a few minutes an episode, that's 15–60 episodes an hour per bot, against today's handful of cycles.
+
+**No silent spill to system RAM**: asked to put ~18 GB on the two cards (`--fit off`, a 262k-token f16 KV cache), llama-server failed with `cudaMalloc failed: out of memory`. Docker's WSL CUDA doesn't fall back to system memory on this driver, so over-allocation fails loudly instead of crawling, and no NVIDIA Control Panel change is needed.
+
+**Power and heat** (2.3 h of benchmarking, sampled every 10 s): both cards together averaged 138 W and peaked at 304 W. The 3070 peaked at 165 W and 79 °C. The **2080 SUPER peaked at 258 W and 91 °C, and was at 85 °C or more in 12% of samples**: it needs a power limit (`nvidia-smi -i 1 -pl 180` from an administrator shell; generating text is bound by memory bandwidth, so little speed is lost) or more airflow. The PSU's rating is still to be checked against ~300 W of GPUs plus the rest.
+
+**Memory**: the Docker VM has 15.5 GiB (32 GB of RAM, no `.wslconfig`); llama-server with gpt-oss holds 2–3 GB of it. No change needed.
+
+**Recommendation** (owner's call): **gpt-oss-20b** (ggml-org MXFP4, SHA-256 `27cd6c43…35901`) split across both cards with the setup above; medium effort, a thinking budget for long reviews, lean answer schemas. Fallback: Qwen 3.5 9B alone on the 2080 SUPER, 32k context, thinking off. Not Gemma 4 or Qwen 3.6 on this hardware. Worth trying in step 3: ggml-org's EAGLE3 draft model for gpt-oss (0.9 GB) for speculative decoding, if a smaller KV pool leaves room for it.
+
+Still open from step 0: the 48-hour soak (it runs as step 3's production setup), the PSU's rating, and the 2080 SUPER's power limit.
 
 ## 6. The history store (`history`)
 
