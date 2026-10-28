@@ -93,6 +93,27 @@ export const MIGRATIONS: Migration[] = [
       );
     `,
   },
+  {
+    id: 3,
+    name: "moves after news",
+    sql: `
+      -- Per news item and symbol (the bot's benchmark for a market-wide item): the price when we
+      -- first saw it and the return 1 hour, 1 day and 5 days later, from bars_1m. A horizon stays
+      -- null until it has passed, or when there were no bars.
+      create table news_moves (
+        item_id text not null references news_items (id) on delete cascade,
+        symbol text not null,
+        first_seen_at timestamptz not null,
+        price double precision,
+        ret_1h double precision,
+        ret_1d double precision,
+        ret_5d double precision,
+        computed_at timestamptz not null default now(),
+        primary key (item_id, symbol)
+      );
+      create index news_moves_symbol on news_moves (symbol, first_seen_at desc);
+    `,
+  },
 ]
 
 /** Any fixed number: the advisory lock that keeps two engines (an old and a new container during a deploy) from migrating at once. */

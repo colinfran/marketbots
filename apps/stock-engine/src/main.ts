@@ -1,5 +1,6 @@
 import { AiRunner } from "@mb/engine-kit/ai/runner"
 import { bootstrap } from "@mb/engine-kit/bootstrap"
+import { newsMovesJob } from "@mb/history/moves"
 import { HistoryStore } from "@mb/history/store"
 import { CORE_INDEX_ETFS } from "@mb/stock-core/settings"
 import { stockBackfillJobs } from "./history/backfill"
@@ -106,6 +107,7 @@ void bootstrap({
     if (history) {
       const extra = () => [...new Set([...settings.current.universe.benchmarks, ...CORE_INDEX_ETFS, ...(engine?.wireSymbols().held ?? [])])]
       for (const job of stockBackfillJobs({ alpaca, universe: () => universe.symbols, extra })) history.addJob(job)
+      history.addJob(newsMovesJob("SPY"))
       history.start()
     }
     engine = new Engine({ env, log, db, bus, settings, state, alpaca, prices, tradeStream, marketStream, ai, budget, alerts, stream, wire, coverage, history })

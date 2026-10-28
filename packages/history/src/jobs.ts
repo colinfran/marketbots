@@ -28,14 +28,17 @@ const RETRY_MS = 5 * 60_000
 /** A pause between steps, so jobs never hold the database or the event loop for long. */
 const PAUSE_MS = 250
 
-/** Runs jobs one step at a time, one job at a time, in the order they were added. */
+/**
+ * Runs jobs one step at a time, one job at a time, taking turns: each step goes to the due job that
+ * stepped longest ago, so a backfill that runs for days never holds up a short or daily job.
+ */
 export class JobRunner {
-  private readonly jobs: { job: HistoryJob; status: HistoryJobStatus; nextAt: number }[] = []
+  private readonly jobs: { job: HistoryJob; status: HistoryJobStatus; nextAt: number; lastAt: number }[] = []
   private running = false
   private stopped = false
 
   add(job: HistoryJob) {
-    this.jobs.push({ job, status: { name: job.name, state: "waiting", progress: "", updated_at: null, error: null }, nextAt: 0 })
+    this.jobs.push({ job, status: { name: job.name, state: "waiting", progress: "", updated_at: null, error: null }, nextAt: 0, lastAt: 0 })
   }
 
   status(): HistoryJobStatus[] {
@@ -52,9 +55,10 @@ export class JobRunner {
     this.running = true
     try {
       for (;;) {
-        const due = this.jobs.find((j) => j.nextAt <= now())
+        const due = this.jobs.filter((j) => j.nextAt <= now()).sort((a, b) => a.lastAt - b.lastAt)[0]
         if (!due || this.stopped) return
         due.status.state = "running"
+        due.lastAt = now()
         try {
           const r = await due.job.step(sql)
           due.status = { name: due.job.name, state: r.done ? "done" : "running", progress: r.progress, updated_at: new Date(now()), error: null }
