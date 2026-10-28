@@ -10,7 +10,7 @@ const BOTS = [
     url: "https://cryptomarketbot.app",
     Mark: CryptoMark,
     tagline: "Crypto, around the clock",
-    summary: "Researches Bitcoin, Ethereum, Solana and other coins with live web and X search, then trades 24/7 in a Kraken paper wallet at live prices.",
+    summary: "Follows the news and the market for Bitcoin, Ethereum, Solana and other coins, then trades 24/7 in a Kraken paper wallet at live prices.",
     facts: ["Kraken spot pairs", "24/7", "Kraken paper wallet"],
   },
   {
@@ -18,15 +18,15 @@ const BOTS = [
     url: "https://stockmarketbot.app",
     Mark: StockMark,
     tagline: "US stocks and options, every market day",
-    summary: "Reads the news and X in real time, then trades US stocks and defined-risk options through every market day in an Alpaca paper account.",
+    summary: "Reads the news as it breaks, then trades US stocks and defined-risk options through every market day in an Alpaca paper account.",
     facts: ["US stocks", "Defined-risk options", "Alpaca paper account"],
   },
 ] as const
 
 /** The loop both bots run, one line each. */
 const STEPS = [
-  { Icon: NewspaperIcon, title: "Research", text: "about 150 news sources, plus live web and X search" },
-  { Icon: ShieldCheckIcon, title: "Decide", text: "Grok proposes, a risk engine checks every order" },
+  { Icon: NewspaperIcon, title: "Research", text: "about 150 news sources and live market data" },
+  { Icon: ShieldCheckIcon, title: "Decide", text: "the AI proposes, a risk engine checks every order" },
   { Icon: RadioIcon, title: "Publish", text: "every decision and trade streams live" },
 ]
 
@@ -37,7 +37,7 @@ export default function Home() {
         <Badge variant="outline">Paper trading · no real money</Badge>
         <h1 className="mt-3 max-w-3xl text-3xl font-semibold tracking-tight text-balance sm:text-4xl">Two AI trading bots, trading in public.</h1>
         <p className="text-muted-foreground mt-3 max-w-2xl text-pretty">
-          Grok researches the market and decides; deterministic code sizes and checks every order. One bot trades crypto around the clock, the other US stocks and options on market
+          An AI researches the market and decides; deterministic code sizes and checks every order. One bot trades crypto around the clock, the other US stocks and options on market
           days, and you can watch both live.
         </p>
       </section>

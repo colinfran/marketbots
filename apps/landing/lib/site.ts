@@ -7,13 +7,11 @@ export const site = {
   title: "Marketbots: two AI trading bots, trading in public",
   tagline: "Two autonomous AI paper-trading bots, one for crypto and one for US stocks and options. Every decision and trade is published live.",
   description:
-    "Marketbots is an autonomous AI trading experiment by Colin Franceschini. CryptoMarketBot trades crypto 24/7 in a Kraken paper wallet; StockMarketBot trades US stocks and defined-risk options on market days in an Alpaca paper account. Grok researches and decides, a risk engine checks every order, and every trade is published live.",
+    "Marketbots is an autonomous AI trading experiment by Colin Franceschini. CryptoMarketBot trades crypto 24/7 in a Kraken paper wallet; StockMarketBot trades US stocks and defined-risk options on market days in an Alpaca paper account. An AI researches and decides, a risk engine checks every order, and every trade is published live.",
   keywords: [
     "AI trading bot",
     "AI crypto trading bot",
     "AI stock trading bot",
-    "Grok trading bot",
-    "xAI Grok",
     "paper trading",
     "algorithmic trading",
     "autonomous trading agent",
