@@ -1,6 +1,7 @@
 import type { EngineStatusBase } from "@mb/core/db"
 import type { WireSourceHealth } from "@mb/core/wire"
 import { cn } from "cn"
+import Link from "next/link"
 import { Empty, KV, SectionTitle } from "./bits"
 import { Badge } from "./components/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "./components/card"
@@ -9,8 +10,8 @@ import { ago, duration, num, titleCase } from "./lib/format"
 
 /**
  * The building blocks of the Admin page's system health: the engine, AI, server and stream cards,
- * the news-source table and the recent problems. Each app lays them out with its own venue or
- * broker cards and its own price table.
+ * the news engine's summary and the recent problems. Each app lays them out with its own venue or
+ * broker cards and its own price table. The news-source table is on the News page, for the owner.
  */
 
 type Status = EngineStatusBase<string, string>
@@ -148,6 +149,25 @@ export function WireSourcesSection({ wire, note }: { wire: NonNullable<Status["w
           ))}
         </TableBody>
       </Table>
+    </section>
+  )
+}
+
+/** Admin's one line on the news engine; every source with its errors is on the News page. */
+export function WireSourcesSummary({ wire }: { wire: NonNullable<Status["wire"]> }) {
+  const running = wire.sources.filter((s) => s.state !== "disabled")
+  const ok = running.filter((s) => s.state === "ok").length
+  return (
+    <section>
+      <SectionTitle>News engine</SectionTitle>
+      <p className="text-muted-foreground text-sm">
+        Mode {wire.mode} · {ok} of {running.length} sources ok · {wire.items_last_hour} items in the last hour · {wire.triggers_today} triggers today. Every source with its
+        errors is on{" "}
+        <Link href="/news" className="text-foreground underline underline-offset-2">
+          News
+        </Link>
+        .
+      </p>
     </section>
   )
 }

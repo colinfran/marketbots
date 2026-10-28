@@ -26,7 +26,6 @@ export const {
   getCycleEvents,
   getAiCosts,
   getWireItems,
-  getNotableItems,
   getWireItemsById,
   getWireFacets,
   toTriggerViews,

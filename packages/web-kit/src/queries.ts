@@ -210,13 +210,6 @@ export const createQueries = <Cols extends Record<QueryCollectionName, unknown>,
     return docs.filter((d) => d.cluster_id === d._id).map(toRowView)
   }
 
-  /** What the Live page may show: items the engine marked notable in the last `hours`. */
-  const getNotableItems = async (hours = 6, limit = 10) => {
-    await connection()
-    const docs = (await (await wireItems()).find({ notable: true, first_seen_at: { $gte: new Date(Date.now() - hours * 3_600_000) } }, { projection: ITEM_PROJECTION }).sort({ first_seen_at: -1 }).limit(limit).toArray()) as unknown as WireItemDoc<string>[]
-    return docs.map(toRowView)
-  }
-
   /** Items by id. */
   const getWireItemsById = async (ids: string[]) => {
     await connection()
@@ -291,7 +284,6 @@ export const createQueries = <Cols extends Record<QueryCollectionName, unknown>,
     getCycleEvents,
     getAiCosts,
     getWireItems,
-    getNotableItems,
     getWireItemsById,
     getWireFacets,
     toTriggerViews,

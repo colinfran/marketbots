@@ -142,7 +142,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     ],
   },
   {
-    title: "Article summaries (local model, Research page only)",
+    title: "Article summaries (local model, News page only)",
     fields: [
       { path: "wire.summaries.enabled", label: "Summarize important articles", kind: "boolean" },
       { path: "wire.summaries.model", label: "Model (Ollama tag)", kind: "text" },

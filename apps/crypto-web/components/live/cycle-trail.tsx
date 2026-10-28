@@ -16,7 +16,7 @@ import { ago, duration, num, time, titleCase, usd } from "@/lib/format"
  * The whole thinking process of one cycle, built from its events: the market scan and what it
  * flagged, every search query and source, the research memo as it's written, the model's
  * reasoning summaries (when the provider returns them), the AI decision as it's written, then
- * each decision with its risk check and what happened. Live on /live (follows the newest cycle).
+ * each decision with its risk check and what happened. Live on the Live page, / (follows the newest cycle).
  * Mirrors stockmarketbot's trail, with crypto's steps.
  */
 

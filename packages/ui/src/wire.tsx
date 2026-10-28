@@ -3,7 +3,7 @@
 import type { BaseEventDataMap } from "@mb/core/events"
 import type { DossierRow, NotableReason, WireSourceHealth } from "@mb/core/wire"
 import { cn } from "cn"
-import { NewspaperIcon, ZapIcon } from "lucide-react"
+import { ZapIcon } from "lucide-react"
 import Link from "next/link"
 import { useMemo } from "react"
 import { SymbolLink } from "./bits"
@@ -19,7 +19,7 @@ import { type AnyEvent, useStream } from "./stream"
  * length-capped fields; links open the source in a new tab. Rows carry no feed summaries: Benzinga
  * items (via Alpaca) may show only their headline, source and link, and that holds for all rows.
  * What a row may carry is our local model's summary of the article (never Benzinga's), on the
- * Research page and an item's detail, labelled as a machine summary that may contain errors.
+ * News page and an item's detail, labelled as a machine summary that may contain errors.
  * Who published an item, symbol links and times come from the bot's kit.
  */
 
@@ -143,7 +143,7 @@ export function ArticleSummary({ article, url, open = false }: { article: Articl
   )
 }
 
-/** One item. `summary` shows its article's machine summary, if it has one: folded in the Research page's list, open on an item's detail. */
+/** One item. `summary` shows its article's machine summary, if it has one: folded in the News page's list, open on an item's detail. */
 export function WireItemRow({ item, showWhy = false, summary }: { item: WireRowView; showWhy?: boolean; summary?: "folded" | "open" }) {
   const { format, sourceLabel, symbolHref } = useKit()
   const now = useNow(30_000)
@@ -206,8 +206,8 @@ const fromEvent = (e: AnyEvent): WireRowView | null => {
   return { id: d.id, title: d.title, url: d.url, source: d.source, domain: null, tier: d.tier, category: d.category, kind: d.kind, symbols: d.symbols, severity: d.severity, first_seen_at: d.first_seen_at, notable: d.notable, notable_reasons: d.notable_reasons, price_at_seen: {}, article: null }
 }
 
-/** Server-rendered items plus everything the stream adds; `notableOnly` is the Live page's rule. */
-function useWireItems(initial: WireRowView[], { notableOnly, filter }: { notableOnly: boolean; filter?: (i: WireRowView) => boolean }) {
+/** Server-rendered items plus everything the stream adds. */
+function useWireItems(initial: WireRowView[], filter?: (i: WireRowView) => boolean) {
   const { events } = useStream()
   return useMemo(() => {
     const byId = new Map(initial.map((i) => [i.id, i]))
@@ -221,20 +221,20 @@ function useWireItems(initial: WireRowView[], { notableOnly, filter }: { notable
         else byId.set(d.id, { id: d.id, title: d.title, url: null, source: "", domain: null, tier: 2, category: "general", kind: "news", symbols: d.symbols, severity: d.severity, first_seen_at: e.ts, notable: true, notable_reasons: d.notable_reasons, price_at_seen: {}, article: null })
       }
     }
-    return [...byId.values()].filter((i) => (!notableOnly || i.notable) && (!filter || filter(i))).sort((a, b) => b.first_seen_at.localeCompare(a.first_seen_at))
-  }, [initial, events, notableOnly, filter])
+    return [...byId.values()].filter((i) => !filter || filter(i)).sort((a, b) => b.first_seen_at.localeCompare(a.first_seen_at))
+  }, [initial, events, filter])
 }
 
 export type WireListFilter = { symbol?: string; category?: string; source?: string; minSeverity?: number }
 
-/** The Research page's "Our research" list: everything stored, live, with the page's filters applied to new items too, and machine summaries folded under their items. */
+/** The News page's list: everything stored, live, with the page's filters applied to new items too, and machine summaries folded under their items. */
 export function LiveWireList({ initial, limit = 100, filter = {} }: { initial: WireRowView[]; limit?: number; filter?: WireListFilter }) {
   const { symbol, category, source, minSeverity } = filter
   const predicate = useMemo(
     () => (i: WireRowView) => (!symbol || i.symbols.includes(symbol)) && (!category || i.category === category) && (!source || i.source === source) && (!minSeverity || i.severity >= minSeverity),
     [symbol, category, source, minSeverity],
   )
-  const items = useWireItems(initial, { notableOnly: false, filter: predicate }).slice(0, limit)
+  const items = useWireItems(initial, predicate).slice(0, limit)
   if (!items.length) return <p className="text-muted-foreground rounded-lg border border-dashed p-6 text-center text-sm">Nothing matches yet.</p>
   return (
     <ol className="divide-y" aria-live="polite">
@@ -242,31 +242,6 @@ export function LiveWireList({ initial, limit = 100, filter = {} }: { initial: W
         <WireItemRow key={i.id} item={i} showWhy={i.notable} summary="folded" />
       ))}
     </ol>
-  )
-}
-
-/** The Live page's "News that matters": notable items from the last 6 hours, newest first. */
-export function NewsThatMatters({ initial }: { initial: WireRowView[] }) {
-  const now = useNow(60_000)
-  const recent = useMemo(() => (i: WireRowView) => now - Date.parse(i.first_seen_at) <= 6 * 3_600_000, [now])
-  const items = useWireItems(initial, { notableOnly: true, filter: recent }).slice(0, 10)
-  return (
-    <div>
-      {items.length === 0 ? (
-        <p className="text-muted-foreground flex items-center justify-center gap-2 rounded-lg border border-dashed p-6 text-sm">
-          <NewspaperIcon className="size-4" aria-hidden /> Nothing market-moving right now.
-        </p>
-      ) : (
-        <ol className="divide-y" aria-live="polite">
-          {items.map((i) => (
-            <WireItemRow key={i.id} item={i} showWhy />
-          ))}
-        </ol>
-      )}
-      <Link href="/research?tab=ours" className="text-muted-foreground hover:text-foreground mt-2 inline-block text-xs underline underline-offset-2">
-        Everything our feeds saw
-      </Link>
-    </div>
   )
 }
 

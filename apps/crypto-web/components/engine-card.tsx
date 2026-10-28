@@ -1,16 +1,9 @@
-import type { CycleDoc } from "@mb/crypto-core/db"
 import { EngineCard as EngineCardShell } from "@mb/ui/engine-card"
-import { ArrowRightIcon } from "lucide-react"
-import Link from "next/link"
-import { StatusBadge } from "@/components/bits"
 import type { EngineSummary } from "@/lib/data"
-import { ago, until } from "@/lib/format"
+import { until } from "@/lib/format"
 
-/**
- * The engine at a glance (@mb/ui/engine-card) with crypto's rows: data and wallet health, the
- * next scan and the latest cycle.
- */
-export function EngineCard({ engine, last }: { engine: EngineSummary; last: Pick<CycleDoc, "_id" | "status" | "started_at" | "summary" | "error"> | null }) {
+/** The engine at a glance (@mb/ui/engine-card) with crypto's rows: data and wallet health and the next scan. The latest cycle is beside it on the Live page. */
+export function EngineCard({ engine }: { engine: EngineSummary }) {
   const s = engine.status
   const rows: [string, React.ReactNode][] = s
     ? [
@@ -20,23 +13,5 @@ export function EngineCard({ engine, last }: { engine: EngineSummary; last: Pick
         ["Next scan", until(s.next_cycle_at)],
       ]
     : []
-  return (
-    <EngineCardShell
-      engine={engine}
-      rows={rows}
-      latest={
-        last && (
-          <>
-            <p className="text-muted-foreground mb-1 flex items-center gap-2 text-xs">
-              Latest cycle <StatusBadge status={last.status} /> {ago(last.started_at)}
-            </p>
-            <p className="line-clamp-3 text-sm">{last.summary ?? last.error ?? "Running…"}</p>
-            <Link href="/live" className="mt-1 inline-flex items-center gap-1 text-sm font-medium hover:underline">
-              Watch it live <ArrowRightIcon className="size-3.5" aria-hidden />
-            </Link>
-          </>
-        )
-      }
-    />
-  )
+  return <EngineCardShell engine={engine} rows={rows} />
 }

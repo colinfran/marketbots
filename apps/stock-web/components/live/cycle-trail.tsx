@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils"
  * The whole thinking process of one cycle, built from its events: what broker data was gathered,
  * what our news engine gave the AI, every search query and source, the research memo as it's
  * written, the model's reasoning summaries (when the provider returns them), the market read, then
- * each decision with every risk check and what happened. Live on /live (follows the newest cycle);
+ * each decision with every risk check and what happened. Live on the Live page, / (follows the newest cycle);
  * static on report pages. Event cycles open with what triggered them.
  */
 

@@ -1,8 +1,7 @@
 "use client"
 
 import { cn } from "cn"
-import { ArrowDownRightIcon, ArrowUpRightIcon, BrainIcon, CircleDotIcon, RefreshCwIcon, ShieldCheckIcon, ShieldXIcon, WifiIcon } from "lucide-react"
-import Link from "next/link"
+import { ArrowDownRightIcon, ArrowUpRightIcon, CircleDotIcon, RefreshCwIcon, ShieldXIcon, WifiIcon } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Badge } from "./components/badge"
@@ -11,8 +10,8 @@ import { ago, pct, titleCase, tone } from "./lib/format"
 import { type AnyEvent, useStream, useStreamEvents } from "./stream"
 
 /**
- * The live UI both dashboards share: the header's status pill, the activity feed, what the AI is
- * doing now, live prices and the stream badge. What each bot's events mean (labels, icons,
+ * The live UI both dashboards share: the header's status pill, the activity feed, live prices and
+ * the stream badge. What each bot's events mean (labels, icons,
  * filters, the lines under an event, links) comes from its kit's event catalog.
  */
 
@@ -103,7 +102,7 @@ export function LiveRefresh() {
 
 /**
  * The news engine reaches the feed only when it matters: notable items, and
- * triggers that fired or queued. Source health and everything else stay on the Research page.
+ * triggers that fired or queued. Source health and everything else stay on the News page.
  */
 const newsWorthy = (e: AnyEvent) => {
   const d = e.data as { notable?: boolean; status?: string }
@@ -173,49 +172,6 @@ export function ActivityFeed({ limit = 60, className, compact = false }: { limit
           })}
         </ol>
       )}
-    </div>
-  )
-}
-
-/** What the AI is doing right now, with the latest steps of the running cycle (compact, for the overview). */
-export function CurrentWork() {
-  const { events: catalog } = useKit()
-  const { events, engine } = useStream()
-  const now = useNow(2_000)
-  const lastStart = events.find((e) => e.type === "cycle.started")
-  const newer = lastStart ? events.slice(0, events.indexOf(lastStart)) : []
-  const active = !!lastStart && !newer.some((e) => (e.type === "cycle.completed" || e.type === "cycle.failed" || e.type === "cycle.skipped") && (!e.cycle_id || e.cycle_id === lastStart.cycle_id))
-  const trail = active ? newer.filter((e) => catalog.work.events.has(e.type)).slice(0, 8) : []
-  const state = engine?.cycle_state ?? "idle"
-  const started = (lastStart?.data ?? {}) as { trigger?: string; phase?: string }
-  return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span className={cn("size-2 rounded-full", active ? "bg-up animate-pulse" : "bg-muted-foreground/40")} aria-hidden />
-        <span className="font-medium">{active ? (catalog.stateLabels[state] ?? titleCase(state)) : "Idle"}</span>
-        {active && lastStart && (
-          <span className="text-muted-foreground text-xs">
-            {started.phase ? `${titleCase(started.phase)} cycle · started` : "cycle started"} {ago(lastStart.ts, now)} · {String(started.trigger ?? "")}
-          </span>
-        )}
-      </div>
-      {trail.length > 0 && (
-        <ul className="text-muted-foreground space-y-1 text-xs">
-          {trail.map((e, i) => {
-            const Icon =
-              e.type === "risk.checked" ? ((e.data as { approved?: boolean }).approved ? ShieldCheckIcon : ShieldXIcon) : (catalog.icons[e.type] ?? (e.type === "research.progress" ? BrainIcon : CircleDotIcon))
-            return (
-              <li key={`${e.ts}-${i}`} className="flex items-center gap-1.5">
-                <Icon className="size-3 shrink-0" aria-hidden />
-                <span className="line-clamp-1">{catalog.work.text(e)}</span>
-              </li>
-            )
-          })}
-        </ul>
-      )}
-      <Link href="/live" className="text-muted-foreground hover:text-foreground inline-block text-xs underline underline-offset-2">
-        Watch the full thinking process
-      </Link>
     </div>
   )
 }

@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import Link from "next/link"
 import { AiCostRows, NewsFunnelCard, SpendByTaskCard } from "@mb/ui/analytics"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@mb/ui/components/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mb/ui/components/table"
@@ -23,6 +24,10 @@ export default async function AnalyticsPage() {
   const base = a.decisions.baseline
   const cal = a.decisions.calibration
   const totalCost = costs.reduce((s, c) => s + c.cost, 0)
+  // Today (UTC) is still running, so only finished days count toward green days.
+  const today = new Date().toISOString().slice(0, 10)
+  const finished = daily.filter((d) => d.day < today)
+  const green = finished.filter((d) => d.pnl_usd > 0).length
   return (
     <div className="space-y-8">
       <PageHeader
@@ -34,11 +39,11 @@ export default async function AnalyticsPage() {
         <Stat label="Sharpe / Sortino" value={`${num(r.sharpe)} / ${num(r.sortino)}`} sub={<span className="text-muted-foreground">from 5-min equity snapshots</span>} />
         <Stat label="Max drawdown" value={pct(r.max_drawdown_pct)} sub={<span className="text-muted-foreground">longest {num(r.max_drawdown_hours, 0)}h below peak</span>} />
         <Stat
-          label="Closed trades"
-          value={t.trades}
+          label="Green days"
+          value={finished.length ? `${green}/${finished.length}` : "—"}
           sub={
             <span className="text-muted-foreground">
-              win rate {pct(t.win_rate_pct, { sign: false, digits: 0 })} · profit factor {num(t.profit_factor)}
+              {finished.length ? `${Math.round((green / finished.length) * 100)}% of days profitable` : "No completed days yet"} · profit factor {num(t.profit_factor)}
             </span>
           }
         />
@@ -72,68 +77,43 @@ export default async function AnalyticsPage() {
         </Card>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <section>
-          <SectionTitle>By strategy</SectionTitle>
-          {a.byStrategy.length === 0 ? (
-            <Empty>No closed trades yet.</Empty>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Strategy</TableHead>
-                  <TableHead className="text-right">Trades</TableHead>
-                  <TableHead className="text-right">Win rate</TableHead>
-                  <TableHead className="text-right">Avg trade</TableHead>
-                  <TableHead className="text-right">Net P&L</TableHead>
+      <section>
+        <SectionTitle
+          action={
+            <Link href="/strategies" className="text-muted-foreground text-sm hover:underline">
+              By strategy
+            </Link>
+          }
+        >
+          By pair
+        </SectionTitle>
+        {a.bySymbol.length === 0 ? (
+          <Empty>No closed trades yet.</Empty>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Pair</TableHead>
+                <TableHead className="text-right">Trades</TableHead>
+                <TableHead className="text-right">Win rate</TableHead>
+                <TableHead className="text-right">Net P&L</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {a.bySymbol.map((s) => (
+                <TableRow key={s.key}>
+                  <TableCell className="font-mono text-sm">{s.key}</TableCell>
+                  <TableCell className="text-right font-mono tabular-nums">{s.trades}</TableCell>
+                  <TableCell className="text-right font-mono tabular-nums">{pct(s.win_rate_pct, { sign: false, digits: 0 })}</TableCell>
+                  <TableCell className="text-right">
+                    <Delta value={s.total_pnl_usd} />
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {a.byStrategy.map((s) => (
-                  <TableRow key={s.key}>
-                    <TableCell className="text-sm">{titleCase(s.key)}</TableCell>
-                    <TableCell className="text-right font-mono tabular-nums">{s.trades}</TableCell>
-                    <TableCell className="text-right font-mono tabular-nums">{pct(s.win_rate_pct, { sign: false, digits: 0 })}</TableCell>
-                    <TableCell className="text-right font-mono tabular-nums">{pct(s.avg_return_pct)}</TableCell>
-                    <TableCell className="text-right">
-                      <Delta value={s.total_pnl_usd} />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </section>
-        <section>
-          <SectionTitle>By pair</SectionTitle>
-          {a.bySymbol.length === 0 ? (
-            <Empty>No closed trades yet.</Empty>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Pair</TableHead>
-                  <TableHead className="text-right">Trades</TableHead>
-                  <TableHead className="text-right">Win rate</TableHead>
-                  <TableHead className="text-right">Net P&L</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {a.bySymbol.map((s) => (
-                  <TableRow key={s.key}>
-                    <TableCell className="font-mono text-sm">{s.key}</TableCell>
-                    <TableCell className="text-right font-mono tabular-nums">{s.trades}</TableCell>
-                    <TableCell className="text-right font-mono tabular-nums">{pct(s.win_rate_pct, { sign: false, digits: 0 })}</TableCell>
-                    <TableCell className="text-right">
-                      <Delta value={s.total_pnl_usd} />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </section>
-      </div>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </section>
 
       <section className="space-y-4">
         <SectionTitle>Is the AI adding value?</SectionTitle>

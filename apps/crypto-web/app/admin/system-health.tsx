@@ -1,7 +1,7 @@
 import type { EngineEvent } from "@mb/crypto-core/events"
 import { Card, CardContent, CardHeader, CardTitle } from "@mb/ui/components/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mb/ui/components/table"
-import { AiHealthCard, EngineHealthCard, HealthDot, ProblemsSection, ServerHealthCard, StreamHealthCard, WireSourcesSection } from "@mb/ui/system-health"
+import { AiHealthCard, EngineHealthCard, HealthDot, ProblemsSection, ServerHealthCard, StreamHealthCard, WireSourcesSummary } from "@mb/ui/system-health"
 import { Empty, KV, SectionTitle } from "@/components/bits"
 import type { EngineSummary } from "@/lib/data"
 import { ago, dateTime, num, price, titleCase } from "@/lib/format"
@@ -98,16 +98,7 @@ export function SystemHealth({ engine, problems }: { engine: EngineSummary; prob
             </Table>
           </section>
 
-          {s.wire && (
-            <WireSourcesSection
-              wire={s.wire}
-              note={(w) => (
-                <TableCell className="text-muted-foreground max-w-xs truncate text-xs" title={w.last_error ?? ""}>
-                  {w.last_error ?? ""}
-                </TableCell>
-              )}
-            />
-          )}
+          {s.wire && <WireSourcesSummary wire={s.wire} />}
         </>
       )}
 

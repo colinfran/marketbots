@@ -30,8 +30,7 @@ export default async function HoldingsPage() {
         <Empty>No paper account yet. Start the engine: it creates the wallet on first boot.</Empty>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <Stat label="Equity" value={usd(equity)} sub={<Delta value={data.totalPnl} percent={data.totalReturnPct} />} />
+          <div className="grid grid-cols-2 gap-3">
             <Stat
               label="Invested"
               value={usd(data.marketValue)}
@@ -41,7 +40,6 @@ export default async function HoldingsPage() {
                 </span>
               }
             />
-            <Stat label="Cash" value={usd(data.account.cash_usd)} sub={<span className="text-muted-foreground">{share(data.account.cash_usd)} of equity</span>} />
             <Stat
               label="Unrealized"
               value={<Delta value={data.unrealized} className="text-2xl" />}
