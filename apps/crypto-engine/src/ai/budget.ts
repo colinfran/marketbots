@@ -7,7 +7,7 @@ import type { Collections } from "../db/mongo"
  * UTC, with crypto's expected call costs until there is enough history.
  */
 export class AiBudget extends AiBudgetOf {
-  constructor(col: Pick<Collections, "aiCalls">, budgetUsd: () => number, now?: () => Date) {
-    super(col, budgetUsd, { day: utcDay, defaultEstimates: { research: 0.2, decision: 0.06, research_gap: 0.08 } }, now)
+  constructor(col: Pick<Collections, "aiCalls">, budgetUsd: () => number, { now, decisionModel }: { now?: () => Date; decisionModel?: () => string } = {}) {
+    super(col, budgetUsd, { day: utcDay, defaultEstimates: { research: 0.2, decision: 0.06, research_gap: 0.08 } }, now, decisionModel)
   }
 }

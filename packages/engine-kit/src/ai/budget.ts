@@ -1,13 +1,15 @@
 import { randomUUID } from "node:crypto"
 import type { AiCallDoc, AiTask } from "@mb/core/db"
 import type { Collection } from "mongodb"
+import { isLocalModel } from "./models"
 
 /**
  * Daily AI spend cap. Every model call is recorded with its cost (the gateway's reported cost
  * when available, else a conservative token-based estimate). Before a call, the expected cost
  * (the recent average for that task) must fit in what's left of today's budget. When it doesn't,
  * the engine makes no AI calls, so it opens no new trades, until the bot's budget day ends;
- * deterministic stops and risk controls keep running.
+ * deterministic stops and risk controls keep running. A decision on the local model costs
+ * nothing, so with no research to pay for it always fits.
  */
 
 /** Conservative fallback pricing when the gateway reports no cost (USD per 1M tokens). */
@@ -48,6 +50,8 @@ export class AiBudget {
     private readonly budgetUsd: () => number,
     private readonly bot: BudgetBinding,
     private readonly now: () => Date = () => new Date(),
+    /** The live decision model setting. */
+    private readonly decisionModel: () => string | null = () => null,
   ) {}
 
   async status(): Promise<BudgetStatus> {
@@ -62,8 +66,10 @@ export class AiBudget {
     return { day, spent_usd: this.cache.spent, budget_usd: budget, remaining_usd: Math.max(0, budget - this.cache.spent), calls: this.cache.calls }
   }
 
-  /** Expected cost of the next call for a task: the average of its last 10 successful calls. */
+  /** Expected cost of the next call for a task: the average of its last 10 successful calls; nothing for a decision on the local model. */
   async estimate(task: AiTask): Promise<number> {
+    const model = task === "decision" ? this.decisionModel() : null
+    if (model && isLocalModel(model)) return 0
     const recent = await this.col.aiCalls.find({ task, ok: true }, { projection: { cost_usd: 1 } }).sort({ at: -1 }).limit(10).toArray()
     if (recent.length < 3) return this.bot.defaultEstimates[task]
     return recent.reduce((s, c) => s + c.cost_usd, 0) / recent.length

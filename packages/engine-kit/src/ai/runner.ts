@@ -6,6 +6,7 @@ import type { z } from "zod"
 import { errorMessage, type Logger } from "../log"
 import { cleanLine, cleanText, cleanUrl, domainOf } from "../util/text"
 import { estimateCost, gatewayCost, type AiBudget } from "./budget"
+import { isLocalModel, LOCAL_PREFIX } from "./models"
 
 /**
  * Model calls go through Vercel AI Gateway (AI_GATEWAY_API_KEY) with plain "provider/model" ids.
@@ -36,10 +37,7 @@ const ZERO: TokenUsage = { input: 0, output: 0, total: 0 }
 /** Models whose provider offers xAI's server-side web_search / x_search tools. */
 export const hasLiveSearch = (model: string) => /^(xai|spacexai)\//.test(model)
 
-const LOCAL_PREFIX = "local/"
-
-/** Models on the local model server: "local/<its alias>", e.g. local/qwen3.6-35b-a3b-q2. */
-export const isLocalModel = (model: string) => model.startsWith(LOCAL_PREFIX)
+export { isLocalModel }
 
 /** What a local call keeps for reading the prompt (~10 s) and writing the answer (up to ~4,500 tokens, ~100 s). */
 const LOCAL_ANSWER_S = 120

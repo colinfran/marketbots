@@ -628,7 +628,7 @@ nvidia-smi                                                  # ~6.8 GB used on ea
 - **Power:** the 2080 SUPER is capped at 180 W (§2).
 
 **Local decisions** (`local/<alias>` model settings, `AiRunner` in `@mb/engine-kit`):
-- **Cost:** none. Their calls are in `ai_calls` with `cost_usd: 0` and `cost_source: "local"`, with their tokens and time.
+- **Cost:** none. Their calls are in `ai_calls` with `cost_usd: 0` and `cost_source: "local"`, with their tokens and time. The daily AI budget expects a local decision to cost nothing, so it never blocks a cycle that needs no Grok research. Grok research is still counted.
 - **Thinking:** on, and capped by the call's timeout. The engine keeps ~120 s for reading the prompt and writing the answer (up to ~4,500 tokens), and lets the model think for the rest at 40 tokens/s, between 256 and 4,096 tokens. That gives 4,096 at the 240 s decision timeout and 2,400 at 180 s. At the 90 s event-decision default it gets almost no thinking, and a long answer alone can outrun 90 s, so raise *Event decision timeout* to 240 s when decisions go local.
 - **Research:** no. It needs Grok's live web and X search, so `models.research` stays a gateway model.
 - **Without LLM_URL:** a `local/…` model is refused, and never becomes a fallback.
