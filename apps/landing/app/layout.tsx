@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google"
 import { MarketbotsMark } from "@/components/marks"
 import { Providers, ThemeToggle } from "@/components/theme"
 import { jsonLd, site } from "@/lib/site"
+import { FranceschiniAnalytics } from "@colinfran/analytics"
 import "./globals.css"
 
 const geistSans = Geist({ variable: "--font-sans", subsets: ["latin"] })
@@ -93,6 +94,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </p>
           </footer>
         </Providers>
+        <FranceschiniAnalytics websiteId="web_qZcLqyl9x1O4e4Kj6cqF"/>
       </body>
     </html>
   )

@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@colinfran/analytics": "^0.1.2",
     "@mb/ui": "workspace:*",
     "@mb/web-kit": "workspace:*",
     "class-variance-authority": "^0.7.1",
