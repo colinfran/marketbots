@@ -231,13 +231,14 @@ services:
     mem_limit: 512m
     logging: *logging
 
-  # Puts the local model's file into the models volume before llm starts: downloaded from Hugging
-  # Face at a pinned commit and checked against its SHA-256 (12.3 GB, a few minutes). A file already
-  # there and checked is kept, so this exits at once on later starts.
+  # Puts the local model's file into the models volume: downloaded from Hugging Face at a pinned
+  # commit and checked against its SHA-256 (12.3 GB, a few minutes). A file already there and
+  # checked is kept. Not part of `up` (profile "setup"), so no stopped container sits in the stack:
+  # run it on a new server or after changing the model, before starting llm (docs/SERVER.md §9):
+  #   docker compose --profile setup run --rm llm-model
   llm-model:
+    profiles: ["setup"]
     image: alpine:3.21@sha256:ce64758a109eb420d874a118f87920e625e12d3634e03b4a5573fd9f6e5d3507
-    container_name: marketbots-llm-model
-    restart: "no"
     security_opt:
       - no-new-privileges:true
     environment:
@@ -267,14 +268,12 @@ services:
   # split across both GPUs and loaded at all times. Three slots share one 96k-token KV cache. It
   # writes the article summaries, and serves AiRunner's local/* models. No host port and no
   # internet: only the engines reach it, over the `ai` network. A start takes ~1 minute; the
-  # first one ~2–3, while the CUDA kernels are compiled (kept in llm-cache after that).
+  # first one ~2–3, while the CUDA kernels are compiled (kept in llm-cache after that). Its model
+  # file must be in the models volume first: llm-model puts it there.
   llm:
     image: ghcr.io/ggml-org/llama.cpp:server-cuda@sha256:8c219fe0367f7e794e3c69da50c5992d474077d60794a218b9e9a3b0c5aed688
     container_name: marketbots-llm
     restart: unless-stopped
-    depends_on:
-      llm-model:
-        condition: service_completed_successfully
     environment:
       # The 2080 SUPER first, then the 3070 (nvidia-smi -L). By UUID: Windows and WSL may number
       # the cards differently.

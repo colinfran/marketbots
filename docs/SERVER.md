@@ -8,7 +8,7 @@ What runs where:
 
 | Where | What | Config |
 | --- | --- | --- |
-| Windows server, Docker stack `marketbots` | `crypto-engine` on 127.0.0.1:8787 (with the Kraken CLI paper wallet), `stock-engine` on 127.0.0.1:8788, `scraper` (no host port), `llm` and `llm-model` (llama.cpp with the local model on both GPUs, no host port), `search` (SearXNG for local research, no host port), `history` (Postgres with TimescaleDB and pgvector, no host port) and `history-backup` | `compose.yml`, `.env.crypto`, `.env.stock`, `.env.history` at the repo root |
+| Windows server, Docker stack `marketbots` | `crypto-engine` on 127.0.0.1:8787 (with the Kraken CLI paper wallet), `stock-engine` on 127.0.0.1:8788, `scraper` (no host port), `llm` (llama.cpp with the local model on both GPUs, no host port), `search` (SearXNG for local research, no host port), `history` (Postgres with TimescaleDB and pgvector, no host port) and `history-backup` | `compose.yml`, `.env.crypto`, `.env.stock`, `.env.history` at the repo root |
 | Caddy on the Windows host | `engine.cryptomarketbot.app` → 127.0.0.1:8787, `engine.stockmarketbot.app` → 127.0.0.1:8788 (WebSocket) | `C:\Caddy\Caddyfile` |
 | Vercel | two projects: `apps/crypto-web` at cryptomarketbot.app, `apps/stock-web` at stockmarketbot.app | each project's environment variables |
 | MongoDB Atlas | one cluster, databases `cryptomarketbot` and `stockmarketbot` | `MONGODB_URI` |
@@ -327,7 +327,7 @@ The Docker VM has 15.5 GiB and the other stacks use ~3.5 GiB of it. Every servic
 | `stock-engine` | 1 GB (was 768 MB: headroom at the open with ~1,500 tracked symbols) | 0.3–0.5 GB |
 | `scraper` | 1 GB | 0.15 GB idle, up to 0.5 GB while rendering |
 | `llm` | 6 GB RAM, 6 CPUs | ~2.5 GB; ~6.8 GB of GPU memory on each card, always (§9) |
-| `llm-model` | 256 MB | runs for a moment at each start of `llm` (a few minutes when it downloads) |
+| `llm-model` | 256 MB | not running: only when you fetch a model file (§9), and removed when done |
 | `search` | 512 MB | ~0.2 GB |
 | `history` | 2 GB (`shared_buffers` 512 MB, tuned for that) | 0.6–1.2 GB, mostly cache |
 | `history-backup` | 256 MB | a few MB; more for a minute at 10:30 UTC |
@@ -590,15 +590,20 @@ Vercel's instant rollback (*Deployments* → a previous deployment → *Instant 
 `llm` is llama.cpp's server running **Qwen 3.6 35B-A3B at 2-bit**: Unsloth's `UD-Q2_K_XL`, 12.3 GB. It is split across both GPUs and loaded at all times. [LOCAL-AI.md §5.1](plans/LOCAL-AI.md#51-step-0-results-2026-102728) has the measurements behind the choice.
 
 - **Access:** both engines reach it at `LLM_URL=http://llm:8080`, an OpenAI-compatible API, over the `ai` network. It has no host port and no internet.
-- **Work:** it writes the article summaries. Decisions can run on it too: an AI model setting (Admin) of `local/qwen3.6-35b-a3b-q2` sends that call here instead of to the AI Gateway. No setting does yet.
-- **When it's down:** the engines keep trading. Only the summaries stop, and the source `enrich:summaries` turns degraded on the dashboard.
+- **Work:** every AI call: the research memos and decisions of both bots (below), and the article summaries.
+- **When it's down:** the engines keep protecting positions (stops and targets run in code), but make no new decisions: research and decisions fail. The summaries stop too, and the source `enrich:summaries` turns degraded on the dashboard.
 
-**The model file:** `llm-model` is a one-shot container that runs before `llm` starts:
+**The model file:** `llm-model` fetches it, and runs only when you ask (it's in the `setup` profile, so `docker compose up` skips it and no stopped container sits in the stack):
 - It downloads the file from Hugging Face, at a pinned commit, into the `marketbots_models` volume.
-- It checks the file's SHA-256, and `llm` can't start until the check passes.
-- Once checked, the file is kept, and later starts skip the download.
+- It checks the file's SHA-256 and removes a download that fails the check.
+- Once checked, the file is kept: running it again only confirms it ("have …").
+- Run it on a new server, after a Docker or WSL reset, and after changing the model, before `llm` starts. Without the file, `llm` exits at start.
 
-To change the model, edit `llm-model`'s `MODEL_URL`, `MODEL_FILE` and `MODEL_SHA256`, and `llm`'s `--model` and `--alias`, in `compose.yml`. Then run `docker compose up -d llm`. A new alias also goes into Admin's model dropdowns (`AI_MODELS` in `packages/ui/src/lib/settings-fields.ts`), as `local/<alias>`. The server's image is pinned by digest.
+```powershell
+docker compose --profile setup run --rm llm-model           # "have …", or the download and its check
+```
+
+To change the model, edit `llm-model`'s `MODEL_URL`, `MODEL_FILE` and `MODEL_SHA256`, and `llm`'s `--model` and `--alias`, in `compose.yml`. Run `llm-model` as above, then `docker compose up -d llm`. A new alias also goes into Admin's model dropdowns (`AI_MODELS` in `packages/ui/src/lib/settings-fields.ts`), as `local/<alias>`. The server's image is pinned by digest.
 
 **How summaries are used:**
 - **Which items:** news cluster roots at severity ≥ `wire.summaries.min_severity` (Admin), and never on the trigger path.
@@ -610,8 +615,7 @@ To change the model, edit `llm-model`'s `MODEL_URL`, `MODEL_FILE` and `MODEL_SHA
 **Requirements:** both NVIDIA GPUs, the Windows NVIDIA driver, and Docker Desktop's WSL2 backend, which passes the GPUs to containers (Jellyfin already uses the 3070 that way).
 
 ```powershell
-docker compose up -d llm                                    # llm-model first (exits at once if the file is there), then llm
-docker compose logs llm-model                               # "have …", or the download and its check
+docker compose up -d llm                                    # needs the model file (llm-model, above)
 docker compose ps llm                                       # "healthy" once the model is loaded (~1 min)
 docker exec marketbots-llm curl -s localhost:8080/v1/models # the alias: qwen3.6-35b-a3b-q2
 docker exec marketbots-llm curl -s localhost:8080/metrics   # tokens and requests so far
@@ -685,7 +689,8 @@ A run takes about a minute, and costs nothing (`ai_calls`: `cost_source: "local"
 | Vercel build can't resolve `@mb/...` | *Include files outside the root directory* is off (§8.1). |
 | `llm` won't start: `could not select device driver "nvidia"` | Docker can't see the GPUs: update the NVIDIA driver and Docker Desktop, and check the WSL2 backend is on. |
 | `llm` exits at start with `cudaMalloc failed: out of memory` | Something else holds GPU memory (a game, a second model server, a big transcode). Free it, then `docker compose up -d llm`. |
-| `llm` never starts: `llm-model` exited with `SHA-256 mismatch` | The download is corrupt or the pinned file changed. It was removed; `docker compose up -d llm` downloads it again. |
+| `llm` exits at start: the model file can't be opened | The file isn't in the `marketbots_models` volume (a new server, a Docker or WSL reset, a new model). Fetch it with `docker compose --profile setup run --rm llm-model`, then `docker compose up -d llm`. |
+| `llm-model` ends with `SHA-256 mismatch` | The download is corrupt or the pinned file changed. It was removed; run `llm-model` again to download it again. |
 | *enrich:summaries* degraded: `… wrote 12.3 tokens/s (floor 20): paused for 30 min` | The model ran slowly: spilled into system RAM, or the GPUs are busy with something else. Summaries resume by themselves after 30 minutes; check `nvidia-smi`. |
 | *enrich:summaries* degraded: `GET /v1/models failed (503)` | The server is still loading the model (~1 minute after a start). |
 | `env file ...\.env.history not found` | Create it from `.env.history.example` (§3.6). |
