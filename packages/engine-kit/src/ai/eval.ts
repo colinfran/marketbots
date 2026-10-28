@@ -89,34 +89,58 @@ export const complete = async (
         // llama.cpp's own switch: "none" turns thinking off, any other value reaches the template.
         reasoning_effort: model.thinking === "off" ? (model.family === "gpt-oss" ? "low" : "none") : model.thinking,
         cache_prompt: true,
-        stream: false,
+        // Streamed: a long answer would otherwise send nothing for minutes, and fetch gives up
+        // waiting for the response headers after 300 s.
+        stream: true,
+        stream_options: { include_usage: true },
       }),
       signal: AbortSignal.timeout(timeoutMs),
     })
-    if (!res.ok) return failed(`HTTP ${res.status}: ${(await res.text()).slice(0, 500)}`)
-    const body = (await res.json()) as {
-      choices?: { message?: { content?: string | null; reasoning_content?: string | null }; finish_reason?: string }[]
+    if (!res.ok || !res.body) return failed(`HTTP ${res.status}: ${(await res.text()).slice(0, 500)}`)
+    type Chunk = {
+      choices?: { delta?: { content?: string | null; reasoning_content?: string | null }; finish_reason?: string | null }[]
       usage?: { prompt_tokens?: number; completion_tokens?: number; prompt_tokens_details?: { cached_tokens?: number } }
       timings?: { cache_n?: number; prompt_ms?: number; prompt_per_second?: number; predicted_ms?: number; predicted_per_second?: number }
     }
-    const choice = body.choices?.[0]
-    const content = choice?.message?.content ?? ""
+    let content = ""
+    let reasoning = ""
+    let finish: string | null = null
+    let usage: Chunk["usage"]
+    let timings: Chunk["timings"]
+    let buffer = ""
+    const decoder = new TextDecoder()
+    for await (const bytes of res.body as AsyncIterable<Uint8Array>) {
+      buffer += decoder.decode(bytes, { stream: true })
+      const lines = buffer.split("\n")
+      buffer = lines.pop()!
+      for (const line of lines) {
+        const data = line.startsWith("data: ") ? line.slice(6).trim() : ""
+        if (!data || data === "[DONE]") continue
+        const chunk = parse(data) as Chunk | undefined
+        const choice = chunk?.choices?.[0]
+        content += choice?.delta?.content ?? ""
+        reasoning += choice?.delta?.reasoning_content ?? ""
+        finish = choice?.finish_reason ?? finish
+        usage = chunk?.usage ?? usage
+        timings = chunk?.timings ?? timings
+      }
+    }
     const json = parse(content)
     return {
       ok: json !== undefined,
-      error: json === undefined ? `answer is not JSON (finish: ${choice?.finish_reason ?? "?"})` : null,
+      error: json === undefined ? `answer is not JSON (finish: ${finish ?? "?"})` : null,
       content,
-      reasoning: choice?.message?.reasoning_content ?? "",
+      reasoning,
       json,
       wall_ms: Date.now() - started,
-      prompt_tokens: num(body.usage?.prompt_tokens),
-      completion_tokens: num(body.usage?.completion_tokens),
-      cached_tokens: num(body.timings?.cache_n ?? body.usage?.prompt_tokens_details?.cached_tokens),
-      prompt_ms: num(body.timings?.prompt_ms),
-      prompt_per_s: num(body.timings?.prompt_per_second),
-      gen_ms: num(body.timings?.predicted_ms),
-      gen_per_s: num(body.timings?.predicted_per_second),
-      finish_reason: choice?.finish_reason ?? null,
+      prompt_tokens: num(usage?.prompt_tokens),
+      completion_tokens: num(usage?.completion_tokens),
+      cached_tokens: num(timings?.cache_n ?? usage?.prompt_tokens_details?.cached_tokens),
+      prompt_ms: num(timings?.prompt_ms),
+      prompt_per_s: num(timings?.prompt_per_second),
+      gen_ms: num(timings?.predicted_ms),
+      gen_per_s: num(timings?.predicted_per_second),
+      finish_reason: finish,
     }
   } catch (error) {
     return failed(error instanceof Error ? error.message : String(error))
