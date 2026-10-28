@@ -30,7 +30,9 @@ let events: EngineEvent[]
 let queues: (string[] | undefined)[]
 let lines: Record<string, unknown>[]
 
-const until = async (check: () => Promise<boolean> | boolean, ms = 5_000) => {
+// Generous: the engine polls commands every second, and on the busy trading server (backfills,
+// the GPU) a pass can take several. A real failure still times out.
+const until = async (check: () => Promise<boolean> | boolean, ms = 15_000) => {
   const start = Date.now()
   while (!(await check())) {
     if (Date.now() - start > ms) throw new Error("timed out")

@@ -17,7 +17,9 @@ export const engineTest = {
   restoreMocks: true,
   unstubEnvs: true,
   unstubGlobals: true,
-  testTimeout: 20_000,
+  // Wall-clock waits on engine loops: generous, because the trading server runs the backfills and
+  // the GPU beside the gate. A hung test still fails.
+  testTimeout: 60_000,
   hookTimeout: 120_000,
 }
 
