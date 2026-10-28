@@ -22,7 +22,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const result = stats ? `finished the day ${usd(stats.pnl_usd, { sign: true })} (${pct(stats.pnl_pct)}) with ${stats.wins} winning and ${stats.losses} losing exits` : "day in progress"
   return pageMetadata({
     title: `Trading journal: ${formatDay(day)}`,
-    description: `CryptoMarketBot's AI ${result} on ${formatDay(day)} (UTC). Every Grok research cycle, decision and trade from the day.`,
+    description: `CryptoMarketBot's AI ${result} on ${formatDay(day)} (UTC). Every AI research cycle, decision and trade from the day.`,
     path: `/journal/${day}`,
   })
 }

@@ -20,12 +20,12 @@ Browser ──https──▶ Vercel (Next.js dashboard) ──▶ MongoDB Atlas 
    │                                                                   │  ▲  ▲
    └──────── wss://engine.stockmarketbot.app/v1/stream (reverse proxy) ─┘  │  │
                                        Alpaca paper: REST, trade_updates WS, IEX data WS
-                                       Vercel AI Gateway (Grok + web/X search)
+                                       Local model server (llm) + search service (search)
                                        ~80 free news and price sources (the wire, below)
                                        Scraper sidecar (Docker, headless Chromium)
 ```
 
-- **The engine owns trading.** It is the only process that talks to Alpaca or Grok. A MongoDB lease guarantees a single running instance.
+- **The engine owns trading.** It is the only process that talks to Alpaca or the model server. A MongoDB lease guarantees a single running instance.
 - **The dashboard never trades and holds no broker keys.** It reads MongoDB (including the account, equity history and chart bars the engine copies into the `cache` collection) and writes only commands, audit entries and owner sign-in records.
 - **Control goes through MongoDB.** Commands are inserted by the dashboard, polled by the engine every second, validated twice, audited, and answered with a result. The engine accepts no inbound control traffic; its only listener is the read-only stream.
 - **Stocks don't depend on the engine to be protected.** Every buy is a bracket order and every held position gets an OCO pair, all resting at Alpaca. Options exits do need the engine (Alpaca has no bracket orders for options), which is why options are limited to defined risk.
@@ -50,8 +50,8 @@ Fills arrive instantly over Alpaca's `trade_updates` stream (binary JSON frames 
 ## One cycle
 
 1. **Context** (code): account, positions, open orders, quotes and technicals (VWAP, RSI, EMA trend, ATR, opening range, 20-day levels, the 50- and 200-day averages, the 52-week high) for held, watched, requested and moving symbols, the screener, news, the morning briefing, the previous cycle, recent days and their lessons. Intraday and in the closing cycle it also loads **option chain menus** (below).
-2. **Research** (Grok + `web_search` + `x_search`): a sourced memo. It never decides. Each query, source and chunk of the memo streams as it happens, and the call's `ai_calls` entry counts its searches (each one is billed).
-3. **Decision** (Grok, structured output validated with zod): one fixed schema for every phase. It streams too (the headline and decision count appear as they're written). Schema failures are repaired in code when nothing trade-related is lost, else retried with the exact error at a lower temperature; an optional fallback model covers outages, and takes over at once after a timeout.
+2. **Research** (the local model, with web search through our own search service and the scraper, no X): a sourced memo. It never decides. Each query, source and chunk of the memo streams as it happens, and the call's `ai_calls` entry counts its searches (each one is billed).
+3. **Decision** (the local model, structured output validated with zod): one fixed schema for every phase. It streams too (the headline and decision count appear as they're written). Schema failures are repaired in code when nothing trade-related is lost, else retried with the exact error at a lower temperature; an optional fallback model covers outages, and takes over at once after a timeout.
 4. **Risk checks and execution** (code): every decision is checked rule by rule and every check is recorded on the decision and streamed. Exits run first, then holds, then entries by conviction.
 5. **Record**: the report (memo, structured output, the exact context, execution summary, cost), the decisions, the cycle's steps.
 
@@ -61,7 +61,7 @@ When a scheduled phase fails (usually its decision), the scheduler retries it (i
 
 ## News engine (the wire)
 
-The engine reads about 80 free news, filing and market-data sources itself, so Grok doesn't have to find everything by searching, and so the bot can react to news between scheduled cycles.
+The engine reads about 80 free news, filing and market-data sources itself, so the AI doesn't have to find everything by searching, and so the bot can react to news between scheduled cycles.
 
 ```
 sources (each isolated) → normalize → dedupe → tag tickers → classify → relevance filter
@@ -87,15 +87,15 @@ Files headed `// Mirrored in cryptomarketbot and stockmarketbot: keep in sync.` 
 
 **What can start a cycle** (`wire/policy.ts`): bad news about a holding at review severity (a review, or `emergency_action` when critical and confirmed); good news naming at most three unheld tickers at evaluate severity in an entry category (M&A, FDA, earnings, guidance, index changes, analyst actions, general news); an official policy statement or a market shock while something is held (a market review); a sharp move or a halt resumption in a holding (a review); an unexplained jump in an unheld stock (a gap-fill check), only when `unexplained_move_entries` is on (off by default: on 2026-10-27, 9 of these checks cost $2.17 and all ended in hold). Odds swings only count when critical and something is held. Insider buying, attention spikes and our own readings (VIX, yields, auctions, EIA, COT, short volume) only annotate the dossier.
 
-**Trigger gates**, in order: `wire.mode` → fresh (first seen within `trigger_max_age_minutes`, never a source's first poll after a restart, published under 2 h ago) → confirmation for entries (a tier-1 source, two independent outlets, or a matching price move) → shadow mode → engine running and kill switch off → **regular session** (outside it, bad news about a holding still alerts at once) → per-symbol cooldown → hourly and daily caps → AI budget. A trigger never trades: it queues a focused event cycle, where Grok and the risk checks decide as usual. Queued events are spaced by `event_min_gap_seconds`, an event that waits more than 30 min is dropped as expired, and `event_budget_reserve_pct` of the daily AI budget is kept for them. Event cycles load a lighter context (no movers, watchlist or Alpaca news; option chains only for the event's symbols).
+**Trigger gates**, in order: `wire.mode` → fresh (first seen within `trigger_max_age_minutes`, never a source's first poll after a restart, published under 2 h ago) → confirmation for entries (a tier-1 source, two independent outlets, or a matching price move) → shadow mode → engine running and kill switch off → **regular session** (outside it, bad news about a holding still alerts at once) → per-symbol cooldown → hourly and daily caps → AI budget. A trigger never trades: it queues a focused event cycle, where the AI and the risk checks decide as usual. Queued events are spaced by `event_min_gap_seconds`, an event that waits more than 30 min is dropped as expired, and `event_budget_reserve_pct` of the daily AI budget is kept for them. Event cycles load a lighter context (no movers, watchlist or Alpaca news; option chains only for the event's symbols).
 
 **Research modes** (`wire.research_mode`):
 
-| Mode | What Grok research does |
+| Mode | What web research does |
 | --- | --- |
 | `full` | The usual research; the dossier goes into the decision prompt. Also used whenever the wire is off or unhealthy (fewer than half its sources `ok`), and for the seed |
 | `gap_fill` | A shorter prompt that gets the dossier and only fills its gaps: X sentiment, unexplained moves, unconfirmed items, anything critical it missed |
-| `auto` (default) | `gap_fill` whenever the dossier has a gap on a stock in the cycle (held, watched, requested or moving) or on the market: an unexplained move, or a high-severity item only one source has. Grok is skipped otherwise, in any phase. Single-source headlines are common (about 180 a day on 2026-10-27, mostly Alpaca and Finnhub company news), so most cycles still run the gap-fill |
+| `auto` (default) | `gap_fill` whenever the dossier has a gap on a stock in the cycle (held, watched, requested or moving) or on the market: an unexplained move, or a high-severity item only one source has. Web research is skipped otherwise, in any phase. Single-source headlines are common (about 180 a day on 2026-10-27, mostly Alpaca and Finnhub company news), so most cycles still run the gap-fill |
 
 Every cycle that reaches research records which one it ran and why (`cycles.research_plan`), and a skip also as `research_skip_reason`.
 
@@ -130,8 +130,8 @@ scheduled ──(due, engine running, regular session)──▶ running ──�
 ```
 
 - **When**: in the regular session, after `schedule.open_buffer_minutes` (10) from the open, so a 09:30 ET schedule runs about 09:40.
-- **What it buys**: an ordinary intraday cycle with full research whose prompt asks only for long-term core buys. Code then holds Grok's answer to it: buys only, at most three, none of a held symbol, every one `multi_day`; the total at most the seed amount + 5%; exit levels a core hold can live with (about a 7.5% stop and a far target).
-- **Risk**: execution goes through the usual stock execution, so every risk check and cap applies. The per-position cap (`risk.max_position_pct`) clamps each buy, so a seed larger than that cap needs at least two holdings; Grok is told so.
+- **What it buys**: an ordinary intraday cycle with full research whose prompt asks only for long-term core buys. Code then holds the AI's answer to it: buys only, at most three, none of a held symbol, every one `multi_day`; the total at most the seed amount + 5%; exit levels a core hold can live with (about a 7.5% stop and a far target).
+- **Risk**: execution goes through the usual stock execution, so every risk check and cap applies. The per-position cap (`risk.max_position_pct`) clamps each buy, so a seed larger than that cap needs at least two holdings; the AI is told so.
 - **Once**: only one run can be scheduled or running, and a new one is refused while any run is `done` unless the command sets `force`. A run is a single attempt: a failure is alerted and never retried. `seed.started` and `seed.completed` go on the live stream.
 
 ## Core book (long-term holdings)
@@ -155,15 +155,15 @@ A failed build is retried after 30 minutes and the last ranking keeps serving.
 ```
 book (code)       account, positions, core plans; the first real review adopts the one-time seed's holdings
 ranking (code)    rebuilt now, so it covers today's holdings and themes
-research (Grok)   each holding's thesis and invalidation, the themes, the top 12 candidates, the backdrop (web + X, 300 s)
-decision (Grok)   coreReviewSchema: keep / buy / trim / sell, target weight, thesis, invalidation, verdict, theme, conviction, stop; a watch list
+research (AI)     each holding's thesis and invalidation, the themes, the top 12 candidates, the backdrop (web search, 300 s)
+decision (AI)     coreReviewSchema: keep / buy / trim / sell, target weight, thesis, invalidation, verdict, theme, conviction, stop; a watch list
 rules (code)      core-book/rules.ts, then core-book/execute.ts: sells and trims, then buys by conviction, then keeps
 record            core_reviews (context, research, output, every rule checked), the cycle's steps and events, an alert
 ```
 
 - **When** (`core-book/schedule.ts`): `review_weekday` from `review_time_et`, in the regular session after the opening buffer and before the closing window. A slot that can't run (holiday, early close, engine down, a failed or skipped attempt) runs at the same time on the next trading day, until the week's review is done; one attempt a day. The owner's **Run core review now** (Admin, the `core.review` command) counts as the week's review and needs the book on and the market open. A **dry run** (`dry_run: true`) does the research and the decision and records the trades it would make as `planned`, without orders or plan changes; it works while the book is off and outside market hours.
 - **Rules** (`core-book/rules.ts`; every rule evaluated is recorded on the decision): every holding gets exactly one decision (left out = kept); at most `max_trades_per_review` trades; a buy needs trading not blocked, no circuit breaker, research that worked, a symbol in neither book (v1 never adds to a holding, and never buys what the trading book holds), `min_conviction`, the book (after the review's sells and trims) more than `band_pct` under its target, fewer than `max_holdings`, a tradable asset over `risk.min_price`, and at least 2% of equity after its size is clamped to the per-holding cap (`max_holding_pct`, or `max_index_etf_pct` for SPY, QQQ, DIA, IWM, VTI, VOO), the book's room to its target, its theme's room under `max_theme_pct` of the book, and the cash above `risk.cash_reserve_pct`. A trim sells down to its target weight.
-- **Stops**: core holdings rest on a plain GTC stop at Alpaca, no take-profit, so a winner isn't sold at a target. A buy's stop is `stop_pct` below the price unless Grok gives a tighter daily level at least 3% below it; a keep may raise a stop, never lower it. Maintenance gives a core holding without a resting order its stop back (or sells it when the price is already through it).
+- **Stops**: core holdings rest on a plain GTC stop at Alpaca, no take-profit, so a winner isn't sold at a target. A buy's stop is `stop_pct` below the price unless the AI gives a tighter daily level at least 3% below it; a keep may raise a stop, never lower it. Maintenance gives a core holding without a resting order its stop back (or sells it when the price is already through it).
 - **Execution** (`core-book/execute.ts`): market orders; buys re-read the cash after the sells; every trade is also a `decisions` document (`trigger_kind: "core"`, `report_id` = the review, which the dashboard's report links resolve to the Core page), so the journal, trades and analytics see it.
 - **Adoption**: the first real review takes what the one-time seed bought and still holds into the core book (its plan becomes `book: "core"` with the seed's reasoning as the thesis, the OCO gives way to a core stop `stop_pct` below the average entry), once. That review writes each adopted holding a proper thesis and invalidation; later reviews add notes (`notes`, the last 12) and only raise stops.
 - **Events**: `core.review.started`, `core.review.completed` (each decision's status, trades executed and rejected, cost), plus the usual research, decision, risk-check, order and decision-result events under the review's cycle id.
@@ -215,11 +215,11 @@ Events are typed (`packages/core/src/events.ts`) and carry a strictly increasing
 | `events` | persisted stream events (replay, report trails) |
 | `commands`, `audit_log` | owner commands and results; every control and settings change |
 | `cycles` | every phase run with its steps, trigger, status, AI cost |
-| `reports` | research memo + sources + queries, structured output, the full context Grok saw, execution summary, cost |
+| `reports` | research memo + sources + queries, structured output, the full context the AI saw, execution summary, cost |
 | `decisions` | each requested action (stock or option), every risk check, what happened, and the order ids |
 | `orders` | every Alpaca order and leg (stocks, option legs, spread parents), synced continuously |
 | `position_plans` | live stop/target/horizon/thesis per stock; core holdings add `book: "core"`, `theme`, `last_reviewed_at` and `notes` (a missing `book` means trading) |
-| `core_reviews` | each core book review: kind, trigger, dry run, the book before and after, what it was shown (`context`), research, Grok's output, every decision with its rule checks and orders, the summary and watch list, cost |
+| `core_reviews` | each core book review: kind, trigger, dry run, the book before and after, what it was shown (`context`), research, the AI's output, every decision with its rule checks and orders, the summary and watch list, cost |
 | `option_positions` | each options position: legs, entry, exits, live mark, exit and realized P&L |
 | `daily_stats` | per-day equity, P&L vs SPY, wins/losses |
 | `cache` | what the website shows from Alpaca: the account snapshot, equity history, chart bars; also the day's scan universe and the core book's ranking |

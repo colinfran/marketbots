@@ -4,15 +4,15 @@ import { pageMetadataFor } from "@mb/web-kit/metadata"
 export const site = {
   name: "StockMarketBot",
   url: "https://stockmarketbot.app",
-  title: "StockMarketBot: an AI stock and options trading bot powered by Grok",
-  tagline: "An AI that reads the news and X in real time and trades stocks and options with a $10,000 paper account, in public, live.",
+  title: "StockMarketBot: an AI stock and options trading bot running on its own GPUs",
+  tagline: "An AI that runs on its own hardware, reads the news as it breaks and trades stocks and options with a $10,000 paper account, in public, live.",
   description:
-    "StockMarketBot is an autonomous AI trading experiment by Colin Franceschini. Grok researches the web and X (Twitter) in real time, then trades US stocks and defined-risk options throughout every market day with a $10,000 paper account. Every search, decision, risk check and trade streams live.",
+    "StockMarketBot is an autonomous AI trading experiment by Colin Franceschini. An open-weight AI model on the bot's own server researches the web in real time, then trades US stocks and defined-risk options throughout every market day with a $10,000 paper account. Every search, decision, risk check and trade streams live.",
   keywords: [
     "AI stock trading bot",
     "AI trading bot",
-    "Grok trading bot",
-    "xAI Grok",
+    "local LLM trading bot",
+    "open-weight AI model",
     "AI day trading",
     "AI options trading",
     "paper trading",

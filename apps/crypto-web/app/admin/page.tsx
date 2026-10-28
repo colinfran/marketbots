@@ -129,7 +129,7 @@ export default async function AdminPage() {
       <SeedCard
         runs={seedRuns}
         weekdaysOnly={false}
-        note="Puts about the amount into long-term core holdings, once. Research that morning decides what to buy: Grok allocates it across 1-4 pairs, then the normal risk checks apply (only the conviction, edge and reward:risk gates are skipped). Positions are then managed like any long-term trend position. A failed run is never retried."
+        note="Puts about the amount into long-term core holdings, once. Research that morning decides what to buy: the AI allocates it across 1-4 pairs, then the normal risk checks apply (only the conviction, edge and reward:risk gates are skipped). Positions are then managed like any long-term trend position. A failed run is never retried."
       />
 
       <Tabs defaultValue="system">

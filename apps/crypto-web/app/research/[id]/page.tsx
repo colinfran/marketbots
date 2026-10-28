@@ -24,7 +24,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const symbols = [...new Set(decisions.map((d) => d.symbol))]
   return pageMetadata({
     title: clip(`AI research: ${symbols.join(", ") || "market scan"} · ${dateTime(cycle.started_at)}`, 70),
-    description: clip(cycle.summary ?? `Grok's research memo, sources and trade decisions for the ${dateTime(cycle.started_at)} crypto trading cycle.`, 160),
+    description: clip(cycle.summary ?? `The AI's research memo, sources and trade decisions for the ${dateTime(cycle.started_at)} crypto trading cycle.`, 160),
     path: `/research/${id}`,
     type: "article",
     publishedTime: cycle.started_at.toISOString(),
@@ -118,7 +118,7 @@ export default async function CyclePage({ params }: Props) {
         <SectionTitle>
           AI research {wire?.mode && <Badge variant="outline" className="ml-2 align-middle font-normal">{wire.mode === "gap_fill" ? "gap-fill" : wire.mode}</Badge>}
         </SectionTitle>
-        {wire?.skipReason && <p className="text-muted-foreground mb-3 text-sm">Grok research was skipped: {wire.skipReason}. The decision used our own feeds.</p>}
+        {wire?.skipReason && <p className="text-muted-foreground mb-3 text-sm">Web research was skipped: {wire.skipReason}. The decision used our own feeds.</p>}
         {!research ? (
           <Empty>No research ran this cycle.</Empty>
         ) : wire?.mode === "skipped" ? null : (

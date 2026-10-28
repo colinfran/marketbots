@@ -28,7 +28,7 @@ export default async function LivePage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Live AI trading desk</h1>
           <p className="text-muted-foreground mt-1 max-w-3xl text-sm">
-            Grok researches the crypto market with live web and X search, decides what to buy, hold or avoid, and a deterministic risk engine sizes and checks every
+            An AI model on the bot&apos;s own server researches the crypto market with live web search, decides what to buy, hold or avoid, and a deterministic risk engine sizes and checks every
             order before it executes in a Kraken paper wallet. Running 24/7.
           </p>
         </div>

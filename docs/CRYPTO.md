@@ -19,7 +19,7 @@ Browser ──https──▶ Vercel (Next.js dashboard) ──▶ MongoDB Atlas 
    │                                                                    │   ▲
    └──────── wss://engine.<domain>/v1/stream (via your reverse proxy) ──┘   │
                                                        Kraken public API ───┘ (WebSocket v2 + REST)
-                                                       Vercel AI Gateway (Grok)
+                                                       Local model server (llm) + search service (search)
                                                        Kraken CLI (paper wallet, in the container)
                                                        ~70 free news sources (the wire, below)
                                                        Scraper sidecar (Docker, headless Chromium)
@@ -81,7 +81,7 @@ The CLI runs via `execFile` (no shell), with validated arguments, a minimal envi
 ## AI workflow
 
 ```
-features (code) → screens (code) → research (Grok + web/X search, streamed) → decision (Grok, structured)
+features (code) → screens (code) → research (local model + web search, streamed) → decision (local model, structured)
    → edge & sizing (code) → risk engine (code) → paper wallet → outcome scoring (code, later)
 ```
 
@@ -95,7 +95,7 @@ features (code) → screens (code) → research (Grok + web/X search, streamed) 
 
 ## News engine (the wire)
 
-The engine reads about 70 free news and market-data sources itself, so Grok doesn't have to find everything by searching, and so the bot can react to news between scheduled cycles.
+The engine reads about 70 free news and market-data sources itself, so the AI doesn't have to find everything by searching, and so the bot can react to news between scheduled cycles.
 
 ```
 sources (each isolated) → normalize → dedupe → tag symbols → classify → relevance filter
@@ -119,17 +119,17 @@ Files headed `// Mirrored in cryptomarketbot and stockmarketbot: keep in sync.` 
 
 **Severity** keeps every part for the audit trail: the category base (or an adapter's own, e.g. a shock scaled by its z-score) × a tier factor, +20 if it names a holding (+8 for a candidate or universe pair, +5 market-wide), +8 per extra independent domain up to +16, and points for a matching price or volume anomaly within ±15 min. The thresholds (`wire.thresholds`, defaults 30 / 55 / 70 / 85) mean: annotate the dossier, review a holding, evaluate an entry, critical.
 
-**Trigger gates**, in order: `wire.mode` → fresh (first seen within `trigger_max_age_minutes`, never a source's first poll after a restart, published under 2 h ago) → confirmation for entries (a tier-1 source, two independent outlets, or a matching price move) → shadow mode → engine running and kill switch off → per-symbol cooldown → hourly and daily caps → AI budget. A trigger never trades: it asks for a focused event cycle, where Grok and the risk engine decide as usual. Event cycles are spaced by `event_min_gap_seconds`, and `event_budget_reserve_pct` of the daily AI budget is kept for them. The one exception is `emergency_action` for a holding hit by a critical, confirmed, negative event, and it only ever reduces risk.
+**Trigger gates**, in order: `wire.mode` → fresh (first seen within `trigger_max_age_minutes`, never a source's first poll after a restart, published under 2 h ago) → confirmation for entries (a tier-1 source, two independent outlets, or a matching price move) → shadow mode → engine running and kill switch off → per-symbol cooldown → hourly and daily caps → AI budget. A trigger never trades: it asks for a focused event cycle, where the AI and the risk engine decide as usual. Event cycles are spaced by `event_min_gap_seconds`, and `event_budget_reserve_pct` of the daily AI budget is kept for them. The one exception is `emergency_action` for a holding hit by a critical, confirmed, negative event, and it only ever reduces risk.
 
 An unexplained move (a price shock no news explains) in a held pair asks for a review. In a universe pair we don't hold, it asks for an entry check only when `unexplained_move_entries` is on (off by default: on 2026-10-27, 13 of these checks cost $1.91 and none led to a trade).
 
 **Research modes** (`wire.research_mode`):
 
-| Mode | What Grok research does |
+| Mode | What web research does |
 | --- | --- |
 | `full` | The usual research; the dossier goes into the decision prompt. Also used whenever the wire is off or unhealthy (fewer than half its sources `ok`) |
 | `gap_fill` | A shorter prompt that gets the dossier and only fills its gaps: X sentiment, unexplained moves, unconfirmed items, anything critical it missed |
-| `auto` (default) | `gap_fill` whenever the dossier has a gap on the cycle's subjects (its candidates and the holdings it reviews) or on the market: an unexplained move, or a high-severity item only one source has. Grok is skipped otherwise. Single-source headlines are common (about 60 a day on 2026-10-27), so most cycles still run the gap-fill |
+| `auto` (default) | `gap_fill` whenever the dossier has a gap on the cycle's subjects (its candidates and the holdings it reviews) or on the market: an unexplained move, or a high-severity item only one source has. Web research is skipped otherwise. Single-source headlines are common (about 60 a day on 2026-10-27), so most cycles still run the gap-fill |
 
 Every cycle that reaches research records which one it ran and why (`cycles.research_plan`), and a skip also as `research_skip_reason`.
 
@@ -149,8 +149,8 @@ scheduled ──(due, engine running)──▶ running ──▶ done | failed
     └──(seed.cancel)──▶ canceled
 ```
 
-- **What it buys**: features → every fresh, unheld universe pair with daily-trend levels → full Grok research (long-term outlook, macro, flows) → a structured allocation of 1–4 pairs → each sized at amount × weight → the normal risk engine → execution. The positions are ordinary `daily_trend` positions afterwards.
-- **Risk**: the seed is owner-directed, so the conviction, edge and reward:risk gates don't apply; every other gate and cap does. The caps resize rather than reject, so a seed bigger than the per-position or per-strategy caps allow is trimmed, and Grok is told the limits so it splits the amount accordingly.
+- **What it buys**: features → every fresh, unheld universe pair with daily-trend levels → full web research (long-term outlook, macro, flows) → a structured allocation of 1–4 pairs → each sized at amount × weight → the normal risk engine → execution. The positions are ordinary `daily_trend` positions afterwards.
+- **Risk**: the seed is owner-directed, so the conviction, edge and reward:risk gates don't apply; every other gate and cap does. The caps resize rather than reject, so a seed bigger than the per-position or per-strategy caps allow is trimmed, and the AI is told the limits so it splits the amount accordingly.
 - **Once**: only one run can be scheduled or running, and a new one is refused while any run is `done` unless the command sets `force`. A run is a single attempt: a failure is alerted (Discord and the dashboard) and never retried. `seed.started` and `seed.completed` go on the live stream.
 
 ## Strategies

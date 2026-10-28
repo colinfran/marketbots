@@ -6,7 +6,7 @@ import { pageMetadata } from "@/lib/site"
 
 export const metadata: Metadata = pageMetadata({
   title: "Trading journal",
-  description: "Day-by-day results of StockMarketBot, an AI trading bot by Colin Franceschini: daily profit and loss, every Grok market report, decision and trade.",
+  description: "Day-by-day results of StockMarketBot, an AI trading bot by Colin Franceschini: daily profit and loss, every AI market report, decision and trade.",
   path: "/journal",
 })
 

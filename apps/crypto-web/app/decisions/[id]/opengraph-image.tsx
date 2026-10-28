@@ -9,7 +9,7 @@ export const contentType = "image/png"
 
 export default async function Image({ params }: { params: Promise<{ id: string }> }) {
   const data = await getDecision((await params).id).catch(() => null)
-  if (!data) return ogCard({ eyebrow: "AI trade decision", title: "An AI that researches crypto on the web and X, then trades around the clock." })
+  if (!data) return ogCard({ eyebrow: "AI trade decision", title: "An AI on its own GPUs that researches crypto on the web, then trades around the clock." })
   const d = data.decision
   return ogCard({
     eyebrow: `AI trade decision · ${dateTime(d.created_at)}`,

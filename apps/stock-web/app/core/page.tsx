@@ -176,8 +176,8 @@ export default async function CorePage() {
         <h2 className="text-foreground text-base font-semibold">How it works</h2>
         <p>
           The book aims for {c.target_pct}% of equity in {c.min_holdings} to {c.max_holdings} holdings: at most {c.max_holding_pct}% in one stock, {c.max_index_etf_pct}% in a broad-index ETF ({CORE_INDEX_ETFS.join(", ")}) and{" "}
-          {c.max_theme_pct}% of the book in one theme. Every {WEEKDAY_PLURAL[c.review_weekday].replace(/s$/, "")} at {c.review_time_et} ET, Grok researches each holding&apos;s thesis, the themes and the top of the
-          ranking with live web and X search, then keeps, trims, sells or buys; code enforces the caps, the cash, at most {c.max_trades_per_review} trades and a conviction of {c.min_conviction}/10 for a buy.
+          {c.max_theme_pct}% of the book in one theme. Every {WEEKDAY_PLURAL[c.review_weekday].replace(/s$/, "")} at {c.review_time_et} ET, the AI researches each holding&apos;s thesis, the themes and the top of the
+          ranking with live web search, then keeps, trims, sells or buys; code enforces the caps, the cash, at most {c.max_trades_per_review} trades and a conviction of {c.min_conviction}/10 for a buy.
           Serious bad news about a holding starts a review of that holding alone. Each holding rests on a stop at the broker that starts {c.stop_pct}% below entry and only moves up, with no profit
           target: winners run while the thesis holds. The trading cycles leave the book alone.
         </p>

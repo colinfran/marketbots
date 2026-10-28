@@ -7,7 +7,7 @@ import { pageMetadata } from "@/lib/site"
 
 export const metadata: Metadata = pageMetadata({
   title: "AI research & decisions",
-  description: "Every Grok research cycle on crypto with live web and X search, and the evidence and reasoning behind every buy, hold, reduce or close decision.",
+  description: "Every AI research cycle on crypto with live web search, and the evidence and reasoning behind every buy, hold, reduce or close decision.",
   path: "/research",
 })
 
@@ -19,7 +19,7 @@ export default async function ResearchPage() {
         title="AI research & decisions"
         description={
           <>
-            Every cycle the AI ran: Grok searches the web and X live, writes a sourced memo, then decides on each candidate and open position, and the risk engine approves,
+            Every cycle the AI ran: it searches the web live, writes a sourced memo, then decides on each candidate and open position, and the risk engine approves,
             resizes or rejects every proposal. What the bot&apos;s own news engine sees is on{" "}
             <Link href="/news" className="text-foreground underline underline-offset-2">
               News

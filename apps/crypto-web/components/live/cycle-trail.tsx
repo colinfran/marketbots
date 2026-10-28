@@ -230,7 +230,7 @@ export function CycleTrailView({ trail, live }: { trail: Trail; live: boolean })
 
         <Step
           n={3}
-          title="Research the web and X"
+          title="Research the web"
           status={researchStatus}
           aside={r.started ? `${r.started.model}${r.completed ? ` · ${plural(r.queries.length, "search", "searches")} · ${plural(r.sources.length, "source")} · ${duration(r.completed.duration_ms)}` : ""}` : undefined}
         >

@@ -31,7 +31,7 @@ export default async function LivePage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Live AI trading desk</h1>
           <p className="text-muted-foreground mt-1 max-w-3xl text-sm">
-            Grok researches the web and X, decides, and trades stocks and defined-risk options with a {usd(settings.account.starting_capital, { whole: true })} paper account every market
+            An AI model on the bot&apos;s own server researches the web, decides, and trades stocks and defined-risk options with a {usd(settings.account.starting_capital, { whole: true })} paper account every market
             day. Every search, decision and risk check streams live. The goal: finish every day green.
           </p>
         </div>

@@ -39,7 +39,7 @@ const host = (url: string) => {
 }
 
 /**
- * One cycle's report. The two kinds of research stay separate: AI research (Grok's memo, its
+ * One cycle's report. The two kinds of research stay separate: AI research (the model's memo, its
  * searches and sources) and our research (what the news engine gave the AI, and for event cycles
  * the trigger and items that started the cycle).
  */
@@ -253,10 +253,10 @@ export function ReportView({ doc, decisions, cycle, events, wire }: { doc: Repor
           <AccordionTrigger>
             <span className="flex flex-wrap items-center gap-2">
               {mode === "skipped" ? (
-                "AI research: Grok memo (skipped)"
+                "AI research: memo (skipped)"
               ) : (
                 <>
-                  AI research: Grok memo ({doc.research.model}
+                  AI research: memo ({doc.research.model}
                   {doc.research.x_search ? ", web + X" : ", web only"}, {Math.round(doc.research.duration_ms / 1000)}s)
                 </>
               )}
@@ -266,11 +266,11 @@ export function ReportView({ doc, decisions, cycle, events, wire }: { doc: Repor
           <AccordionContent>
             {mode === "skipped" ? (
               <p className="text-muted-foreground text-sm">
-                Grok research was skipped{cycle?.research_skip_reason ? `: ${cycle.research_skip_reason}` : ""}. The decision used our own feeds.
+                Web research was skipped{cycle?.research_skip_reason ? `: ${cycle.research_skip_reason}` : ""}. The decision used our own feeds.
               </p>
             ) : (
               <>
-                {mode === "gap_fill" && <p className="text-muted-foreground mb-2 text-sm">Gap-fill: Grok only checked X and what our own feeds lacked.</p>}
+                {mode === "gap_fill" && <p className="text-muted-foreground mb-2 text-sm">Gap-fill: only what our own feeds lacked was searched.</p>}
                 {doc.research.error && <p className="text-loss mb-2 text-sm">Research failed: {doc.research.error}</p>}
                 <div className="bg-muted/40 max-h-[32rem] overflow-y-auto rounded-lg p-4 text-sm leading-relaxed whitespace-pre-wrap">
                   {doc.research.memo || "No memo."}

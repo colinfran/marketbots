@@ -9,7 +9,7 @@ export const contentType = "image/png"
 
 export default async function Image({ params }: { params: Promise<{ id: string }> }) {
   const meta = await getReportMeta((await params).id).catch(() => null)
-  if (!meta) return ogCard({ eyebrow: "AI market report", title: "An AI that reads the news and X, then trades stocks and options with $10,000." })
+  if (!meta) return ogCard({ eyebrow: "AI market report", title: "An AI on its own GPUs that reads the news, then trades stocks and options with $10,000." })
   const headline = meta.report.headline.length > 110 ? `${meta.report.headline.slice(0, 109)}…` : meta.report.headline
   return ogCard({
     eyebrow: `${titleCase(meta.phase)} · ${formatDay(meta.trading_day)}`,

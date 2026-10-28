@@ -127,7 +127,7 @@ export const isCoreReview = async (id: string) => {
   return !!(await (await collections()).coreReviews.findOne({ _id: id }, { projection: { _id: 1 } }))
 }
 
-/** Recent core reviews, newest first, without their heavy parts (what they were shown, the research, Grok's raw answer). */
+/** Recent core reviews, newest first, without their heavy parts (what they were shown, the research, the model's raw answer). */
 export const listCoreReviews = async (limit = 12) => {
   await connection()
   return (await collections()).coreReviews.find({}, { projection: { context: 0, research: 0, output: 0 } }).sort({ created_at: -1 }).limit(limit).toArray()
@@ -179,7 +179,7 @@ export type ReportSummary = Pick<ReportDoc, "_id" | "phase" | "trading_day" | "c
   sentiment: string
   stance: string
   decisions: number
-  /** How much Grok research ran (absent on reports from before the news engine). */
+  /** How much web research ran (absent on reports from before the news engine). */
   research_mode: ResearchResult["mode"] | null
 }
 

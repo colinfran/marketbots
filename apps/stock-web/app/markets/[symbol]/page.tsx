@@ -14,7 +14,7 @@ export async function generateMetadata({ params }: { params: Promise<{ symbol: s
   const symbol = decodeURIComponent((await params).symbol).toUpperCase()
   return pageMetadata({
     title: `${symbol} trades by an AI trading bot`,
-    description: `${symbol} price chart with every stock and options trade made by StockMarketBot's Grok-powered AI, plus realized profit and loss and the reasoning behind each ${symbol} trade.`,
+    description: `${symbol} price chart with every stock and options trade made by StockMarketBot's AI, plus realized profit and loss and the reasoning behind each ${symbol} trade.`,
     path: `/markets/${encodeURIComponent(symbol)}`,
   })
 }

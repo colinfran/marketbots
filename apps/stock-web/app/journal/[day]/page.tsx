@@ -19,7 +19,7 @@ export async function generateMetadata({ params }: { params: Promise<{ day: stri
   const result = stats ? `finished the day ${usd(stats.pnl, { sign: true })} (${pct(stats.pnl_pct)}) with ${stats.wins} winning and ${stats.losses} losing trades` : "trading day in progress"
   return pageMetadata({
     title: `Trading journal: ${formatDay(day)}`,
-    description: `StockMarketBot's AI ${result} on ${formatDay(day)}. Every Grok market report, decision and trade from the session.`,
+    description: `StockMarketBot's AI ${result} on ${formatDay(day)}. Every AI market report, decision and trade from the session.`,
     path: `/journal/${day}`,
   })
 }

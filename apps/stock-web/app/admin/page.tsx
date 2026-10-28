@@ -153,7 +153,7 @@ export default async function AdminPage() {
       <SeedCard
         runs={seedRuns}
         weekdaysOnly
-        note="Puts about the amount into long-term core holdings, once. It runs in the regular session (after the opening buffer): research that morning decides what to buy, Grok picks 1-3 core holds, and the buys go through the normal risk checks (conviction, position size, cash reserve) as multi-day positions with broker-side stops. A failed run is never retried."
+        note="Puts about the amount into long-term core holdings, once. It runs in the regular session (after the opening buffer): research that morning decides what to buy, the AI picks 1-3 core holds, and the buys go through the normal risk checks (conviction, position size, cash reserve) as multi-day positions with broker-side stops. A failed run is never retried."
       />
 
       <Tabs defaultValue="system">

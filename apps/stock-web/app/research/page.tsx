@@ -8,7 +8,7 @@ import { pageMetadata } from "@/lib/site"
 export const metadata: Metadata = pageMetadata({
   title: "AI research & market reports",
   description:
-    "Every stock market report written by Grok for StockMarketBot: premarket briefings, intraday trading cycles, closing calls and postmarket reviews, sourced from the web and X and from the bot's own news engine, with every decision.",
+    "Every stock market report written by the AI for StockMarketBot: premarket briefings, intraday trading cycles, closing calls and postmarket reviews, sourced from the web and from the bot's own news engine, with every decision.",
   path: "/research",
 })
 
@@ -20,7 +20,7 @@ export default async function ResearchPage() {
         title="AI research & reports"
         description={
           <>
-            Grok searches the web and X live, then writes one structured report per cycle: the market read, catalysts, a watchlist and a decision per idea and open position.
+            The AI searches the web live, then writes one structured report per cycle: the market read, catalysts, a watchlist and a decision per idea and open position.
             The risk engine checks every decision in code. What the bot&apos;s own news engine sees is on{" "}
             <Link href="/news" className="text-foreground underline underline-offset-2">
               News

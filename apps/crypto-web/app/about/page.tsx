@@ -10,7 +10,7 @@ import { pageMetadata } from "@/lib/site"
 export const metadata: Metadata = pageMetadata({
   title: "How the AI crypto trading bot works",
   description:
-    "How CryptoMarketBot works: Grok researches crypto on the web and X, decides, and trades a Kraken paper wallet 24/7 with risk rules enforced in code. Built by Colin Franceschini.",
+    "How CryptoMarketBot works: an open-weight AI model on our own server researches crypto on the web, decides, and trades a Kraken paper wallet 24/7 with risk rules enforced in code. Built by Colin Franceschini.",
   path: "/about",
 })
 
@@ -31,7 +31,7 @@ const cycle = (s: Settings) => [
   {
     title: "Stops and targets",
     when: "Every 3 seconds",
-    body: "The engine checks every position against the live order book and exits at its stop or target. This runs whether or not the AI is working, the engine is paused, or the daily budget is spent.",
+    body: "The engine checks every position against the live order book and exits at its stop or target. This runs whether or not the AI is working or the engine is paused.",
   },
   {
     title: "Scoring",
@@ -50,7 +50,7 @@ const rules = (s: Settings) => {
     `Code keeps only ${num(s.ai.probability_shrink * 100, 0)}% of the edge the AI claims, then subtracts fees, spread and slippage walked through the real order book. A trade needs ${num(k.min_edge_bps)} bps of expected edge left over and ${num(k.min_conviction)}/100 conviction.`,
     `No entries on quotes older than ${num(k.max_quote_age_seconds)} s or spreads wider than ${num(k.max_spread_bps)} bps, and no re-buying a coin within ${minutes(k.reentry_cooldown_minutes)} of selling it. The AI can't close a position younger than ${minutes(k.min_hold_minutes)} unless its stop or invalidation hits, and stops only ever move up.`,
     `A day down ${num(p.max_daily_loss_pct)}% blocks new entries until the next UTC day. A ${num(p.max_drawdown_pct)}% drawdown from peak equity engages the kill switch${p.drawdown_action === "halt_and_liquidate" ? " and sells everything" : ""}.`,
-    `AI spend is capped at ${usd(s.ai.daily_budget_usd, { whole: Number.isInteger(s.ai.daily_budget_usd) })} a day. Stale data, failed research, an invalid response or a spent budget all mean no trade.`,
+    "Stale data, failed research or an invalid response all mean no trade.",
     "The AI can't change any of this: settings change only through audited owner commands. Every research memo, decision (including no-trades and rejected orders), risk check, order and fill is stored and shown on this site.",
   ]
 }
@@ -62,7 +62,7 @@ export default async function AboutPage() {
     <div className="space-y-8">
       <PageHeader
         title="How it works"
-        description="An experiment in whether an AI that reads the web and X in real time can trade crypto profitably, 24/7, after fees, with a risk engine that has the final word."
+        description="An experiment in whether an AI running on our own hardware, reading the web as news breaks, can trade crypto profitably, 24/7, after fees, with a risk engine that has the final word."
       />
       <section className="grid gap-3 sm:grid-cols-2">
         {cycle(s).map((step, i) => (
@@ -78,11 +78,16 @@ export default async function AboutPage() {
         ))}
       </section>
       <section>
-        <h2 className="mb-3 text-base font-semibold">Each cycle makes two Grok calls</h2>
+        <h2 className="mb-3 text-base font-semibold">Each cycle makes two AI calls</h2>
+        <p className="text-muted-foreground mb-3 text-sm leading-relaxed">
+          Both run on an open-weight model on two graphics cards in the server that runs the bot (its name is shown with each call): no AI service and no
+          per-call cost.
+        </p>
         <ol className="text-muted-foreground list-decimal space-y-2 pl-5 text-sm leading-relaxed">
           <li>
-            <span className="text-foreground font-medium">Research</span> ({s.ai.models.research}): live web search produces a
-            sourced memo, with every claim labeled fact, sourced claim, estimate or speculation. Grok does not decide anything here.
+            <span className="text-foreground font-medium">Research</span> ({s.ai.models.research}): the model writes web searches, our own search engine runs them, and
+            it reads the most relevant articles in full. It then writes a sourced memo, with every claim labeled fact, sourced claim, estimate or speculation.
+            It doesn&apos;t decide anything here.
           </li>
           <li>
             <span className="text-foreground font-medium">Decision</span> ({s.ai.models.decision}): the memo, the market data and the risk limits become one

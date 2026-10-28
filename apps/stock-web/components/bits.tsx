@@ -50,11 +50,11 @@ export function CycleKindBadge({ kind }: { kind?: string | null }) {
 
 const RESEARCH_MODE_LABEL: Record<string, string> = { full: "full research", gap_fill: "gap-fill research", skipped: "research skipped" }
 
-/** How much Grok research a cycle ran: full, gap-fill (only what our feeds lacked) or skipped. */
+/** How much web research a cycle ran: full, gap-fill (only what our feeds lacked) or skipped. */
 export function ResearchModeBadge({ mode, className }: { mode?: string | null; className?: string }) {
   if (!mode) return null
   return (
-    <Badge variant="outline" className={cn("font-normal", mode === "skipped" && "text-muted-foreground", className)} title="Grok research this cycle">
+    <Badge variant="outline" className={cn("font-normal", mode === "skipped" && "text-muted-foreground", className)} title="Web research this cycle">
       {RESEARCH_MODE_LABEL[mode] ?? mode}
     </Badge>
   )

@@ -19,7 +19,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!SYMBOL_PATTERN.test(symbol)) return { title: "Market not found", robots: { index: false } }
   return pageMetadata({
     title: `${symbol} price, AI research and trades`,
-    description: `Live ${symbol} price from Kraken, the indicators the bot computes, and every Grok research memo, AI decision and paper trade on ${baseAsset(symbol)}.`,
+    description: `Live ${symbol} price from Kraken, the indicators the bot computes, and every AI research memo, decision and paper trade on ${baseAsset(symbol)}.`,
     path: `/markets/${symbolSlug(symbol)}`,
   })
 }

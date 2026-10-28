@@ -304,7 +304,7 @@ export default async function AnalyticsPage() {
             </CardContent>
           </Card>
           <SpendByTaskCard
-            title="Grok spend per day by task"
+            title="AI spend per day by task"
             description="Gap-fill research and skipped research came with the news engine."
             dayLabel="Day (ET)"
             days={w.researchSpend}

@@ -174,7 +174,7 @@ export function CycleTrailView({ trail, live, triggerItems = [] }: { trail: Trai
   const r = trail.research
   const d = trail.decision
   const wire = trail.wire
-  // The research step's log line says when Grok research was skipped (our feeds covered it) or only filled gaps.
+  // The research step's log line says when web research was skipped (our feeds covered it) or only filled gaps.
   const researchNote = trail.steps.find((s) => s.name === "research" && s.ok)?.detail ?? null
   const researchSkipped = researchNote?.startsWith("skipped: ") ? researchNote.slice(9) : null
   const event = trail.started?.trigger.startsWith("event:") ? trail.started.trigger.slice(6).trim() : null
@@ -271,7 +271,7 @@ export function CycleTrailView({ trail, live, triggerItems = [] }: { trail: Trai
 
         <Step
           n={3}
-          title="Research the web and X"
+          title="Research the web"
           status={researchStatus}
           aside={
             r.started
@@ -279,7 +279,7 @@ export function CycleTrailView({ trail, live, triggerItems = [] }: { trail: Trai
               : undefined
           }
         >
-          {researchSkipped && <p className="text-muted-foreground text-xs">Grok research was skipped: {researchSkipped}. The decision used our own feeds.</p>}
+          {researchSkipped && <p className="text-muted-foreground text-xs">Web research was skipped: {researchSkipped}. The decision used our own feeds.</p>}
           {r.started && (
             <>
               {r.queries.length > 0 && (
