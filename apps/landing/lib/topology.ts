@@ -1,21 +1,27 @@
 /**
  * The homepage's animated topology, as data: the runtime chart in the README (its nodes, edges and
- * the Docker stack), laid out twice, wide and tall, and the cycle each bot runs through it. Pure
- * geometry and timing, no React or DOM: components/topology.tsx draws it.
+ * the Docker stack), laid out twice, wide and tall, and what each bot runs through it: a timed
+ * cycle, then an episode of its agent in shadow. Pure geometry and timing, no React or DOM:
+ * components/topology.tsx draws it.
  *
  * Both layouts mirror the bots around what they share: crypto on the left, stock on the right, the
  * stack's shared services down the middle, Browser, Vercel and Atlas above, the outside world
  * below. Laid out that way no two engine edges cross; the one crossing left (search to the
  * internet, over the stock engine's scraper edge) is drawn as a hop.
+ *
+ * One departure from the chart: news sources, which it lists with the two paper accounts, get a
+ * node of their own under the search engines and article pages. They are where the bots read, not
+ * where they trade, so each engine has its own line to them and the paper accounts sit at each
+ * bot's side.
  */
 
 export type Bot = "crypto" | "stock"
 export const BOTS = ["crypto", "stock"] as const satisfies readonly Bot[]
 
-export type NodeId = "browser" | "dashboards" | "atlas" | "services" | "internet" | Bot | "llm" | "search" | "scraper" | "history"
+export type NodeId = "browser" | "dashboards" | "atlas" | "services" | "news" | "internet" | Bot | "llm" | "search" | "scraper" | "history"
 
 /** What both engines connect to: `crypto & stock --> …` in the chart, plus each one's own state in Atlas. */
-type Shared = "atlas" | "llm" | "history" | "search" | "scraper" | "services"
+type Shared = "atlas" | "llm" | "history" | "search" | "scraper" | "services" | "news"
 
 export type EdgeId = "browser-dashboards" | "dashboards-atlas" | `browser-${Bot}` | `${Bot}-${Shared}` | "search-internet" | "scraper-internet"
 
@@ -37,6 +43,8 @@ export const EDGES: Record<EdgeId, { from: NodeId; to: NodeId; label?: string }>
   "stock-scraper": { from: "stock", to: "scraper" },
   "crypto-services": { from: "crypto", to: "services" },
   "stock-services": { from: "stock", to: "services" },
+  "crypto-news": { from: "crypto", to: "news" },
+  "stock-news": { from: "stock", to: "news" },
   "search-internet": { from: "search", to: "internet" },
   "scraper-internet": { from: "scraper", to: "internet" },
 }
@@ -141,9 +149,12 @@ export type Layout = {
   h: number
   /** Font sizes, in layout units: node titles, node details, edge labels. */
   type: { title: number; detail: number; label: number }
-  /** The Docker stack, and where its name sits (centered, just inside the top edge). */
+  /**
+   * The Docker stack, and the baseline its name is centered on: on its top edge, which the name
+   * breaks like a fieldset's legend (`border`), or just inside it.
+   */
   server: Box
-  legend: Pt
+  legend: Pt & { border: boolean }
   nodes: Record<NodeId, Box>
   routes: Record<EdgeId, Route>
   labels: Label[]
@@ -183,42 +194,44 @@ function mirrored(
 const WIDE = mirrored({
   id: "wide",
   w: 960,
-  h: 644,
-  type: { title: 12.5, detail: 10, label: 9.5 },
-  server: { x: 24, y: 210, w: 912, h: 284 },
-  legend: { x: 480, y: 232 },
+  h: 562,
+  type: { title: 11.5, detail: 9.5, label: 9 },
+  server: { x: 24, y: 178, w: 912, h: 230 },
+  legend: { x: 480, y: 181.5, border: true },
   nodes: {
-    browser: { x: 414, y: 12, w: 132, h: 36 },
-    dashboards: { x: 335, y: 70, w: 290, h: 46 },
-    atlas: { x: 335, y: 138, w: 290, h: 46 },
-    crypto: { x: 52, y: 309, w: 180, h: 64 },
-    llm: { x: 352, y: 246, w: 256, h: 60 },
-    history: { x: 352, y: 318, w: 256, h: 46 },
-    search: { x: 352, y: 376, w: 256, h: 46 },
-    scraper: { x: 352, y: 434, w: 256, h: 38 },
-    internet: { x: 330, y: 518, w: 300, h: 40 },
-    services: { x: 210, y: 584, w: 540, h: 48 },
+    browser: { x: 420, y: 8, w: 120, h: 30 },
+    dashboards: { x: 335, y: 56, w: 290, h: 42 },
+    atlas: { x: 335, y: 116, w: 290, h: 42 },
+    crypto: { x: 52, y: 259, w: 180, h: 48 },
+    llm: { x: 326, y: 198, w: 308, h: 56 },
+    history: { x: 326, y: 262, w: 308, h: 42 },
+    search: { x: 326, y: 312, w: 308, h: 42 },
+    scraper: { x: 326, y: 362, w: 308, h: 30 },
+    internet: { x: 300, y: 426, w: 360, h: 30 },
+    news: { x: 300, y: 470, w: 360, h: 30 },
+    services: { x: 300, y: 514, w: 360, h: 38 },
   },
   crypto: {
-    browser: { pts: [{ x: 414, y: 30 }, { x: 142, y: 30 }, { x: 142, y: 309 }] },
-    atlas: { pts: [{ x: 196, y: 309 }, { x: 196, y: 161 }, { x: 335, y: 161 }] },
-    llm: { pts: [{ x: 232, y: 341 }, { x: 296, y: 341 }, { x: 296, y: 276 }, { x: 352, y: 276 }] },
-    history: { pts: [{ x: 232, y: 341 }, { x: 352, y: 341 }] },
-    search: { pts: [{ x: 232, y: 341 }, { x: 296, y: 341 }, { x: 296, y: 399 }, { x: 352, y: 399 }] },
-    scraper: { pts: [{ x: 232, y: 341 }, { x: 296, y: 341 }, { x: 296, y: 453 }, { x: 352, y: 453 }] },
-    services: { pts: [{ x: 142, y: 373 }, { x: 142, y: 608 }, { x: 210, y: 608 }] },
+    browser: { pts: [{ x: 420, y: 23 }, { x: 142, y: 23 }, { x: 142, y: 259 }] },
+    atlas: { pts: [{ x: 196, y: 259 }, { x: 196, y: 137 }, { x: 335, y: 137 }] },
+    llm: { pts: [{ x: 232, y: 283 }, { x: 296, y: 283 }, { x: 296, y: 226 }, { x: 326, y: 226 }] },
+    history: { pts: [{ x: 232, y: 283 }, { x: 326, y: 283 }] },
+    search: { pts: [{ x: 232, y: 283 }, { x: 296, y: 283 }, { x: 296, y: 333 }, { x: 326, y: 333 }] },
+    scraper: { pts: [{ x: 232, y: 283 }, { x: 296, y: 283 }, { x: 296, y: 377 }, { x: 326, y: 377 }] },
+    services: { pts: [{ x: 142, y: 307 }, { x: 142, y: 533 }, { x: 300, y: 533 }] },
+    news: { pts: [{ x: 156, y: 307 }, { x: 156, y: 485 }, { x: 300, y: 485 }] },
   },
   middle: {
-    "browser-dashboards": { pts: [{ x: 480, y: 48 }, { x: 480, y: 70 }] },
-    "dashboards-atlas": { pts: [{ x: 480, y: 116 }, { x: 480, y: 138 }] },
-    "search-internet": { pts: [{ x: 608, y: 411 }, { x: 624, y: 411 }, { x: 624, y: 518 }], hops: [{ x: 624, y: 453, side: 1 }] },
-    "scraper-internet": { pts: [{ x: 480, y: 472 }, { x: 480, y: 518 }] },
+    "browser-dashboards": { pts: [{ x: 480, y: 38 }, { x: 480, y: 56 }] },
+    "dashboards-atlas": { pts: [{ x: 480, y: 98 }, { x: 480, y: 116 }] },
+    "search-internet": { pts: [{ x: 634, y: 343 }, { x: 650, y: 343 }, { x: 650, y: 426 }], hops: [{ x: 650, y: 377, side: 1 }] },
+    "scraper-internet": { pts: [{ x: 480, y: 392 }, { x: 480, y: 426 }] },
   },
   labels: [
-    { edge: "browser-dashboards", x: 488, y: 62.5, anchor: "start", lines: ["HTTPS"] },
-    { edge: "dashboards-atlas", x: 488, y: 130.5, anchor: "start", lines: ["Read data and write commands"] },
-    { edge: "browser-crypto", x: 278, y: 23, anchor: "middle", lines: ["Engine WebSocket stream"] },
-    { edge: "crypto-atlas", x: 266, y: 154, anchor: "middle", lines: ["Own trading state"] },
+    { edge: "browser-dashboards", x: 488, y: 50.5, anchor: "start", lines: ["HTTPS"] },
+    { edge: "dashboards-atlas", x: 488, y: 110.5, anchor: "start", lines: ["Read data and write commands"] },
+    { edge: "browser-crypto", x: 281, y: 16.5, anchor: "middle", lines: ["Engine WebSocket stream"] },
+    { edge: "crypto-atlas", x: 265, y: 130.5, anchor: "middle", lines: ["Own trading state"] },
   ],
 })
 
@@ -229,42 +242,44 @@ const WIDE = mirrored({
 const TALL = mirrored({
   id: "tall",
   w: 380,
-  h: 738,
+  h: 700,
   type: { title: 12, detail: 9.5, label: 8.5 },
-  server: { x: 12, y: 214, w: 356, h: 368 },
-  legend: { x: 190, y: 233 },
+  server: { x: 12, y: 200, w: 356, h: 330 },
+  legend: { x: 190, y: 219, border: false },
   nodes: {
-    browser: { x: 134, y: 10, w: 112, h: 32 },
-    dashboards: { x: 100, y: 64, w: 180, h: 54 },
-    atlas: { x: 92, y: 142, w: 196, h: 44 },
-    crypto: { x: 24, y: 248, w: 152, h: 56 },
-    llm: { x: 66, y: 330, w: 248, h: 64 },
-    history: { x: 66, y: 406, w: 248, h: 46 },
-    search: { x: 66, y: 464, w: 248, h: 46 },
-    scraper: { x: 66, y: 522, w: 248, h: 38 },
-    internet: { x: 50, y: 606, w: 280, h: 40 },
-    services: { x: 50, y: 672, w: 280, h: 54 },
+    browser: { x: 134, y: 8, w: 112, h: 30 },
+    dashboards: { x: 100, y: 58, w: 180, h: 52 },
+    atlas: { x: 92, y: 134, w: 196, h: 42 },
+    crypto: { x: 24, y: 232, w: 152, h: 50 },
+    llm: { x: 66, y: 304, w: 248, h: 70 },
+    history: { x: 66, y: 382, w: 248, h: 42 },
+    search: { x: 66, y: 432, w: 248, h: 42 },
+    scraper: { x: 66, y: 482, w: 248, h: 32 },
+    internet: { x: 50, y: 548, w: 280, h: 34 },
+    news: { x: 50, y: 596, w: 280, h: 30 },
+    services: { x: 50, y: 640, w: 280, h: 50 },
   },
   crypto: {
-    browser: { pts: [{ x: 134, y: 26 }, { x: 6, y: 26 }, { x: 6, y: 276 }, { x: 24, y: 276 }] },
-    atlas: { pts: [{ x: 44, y: 248 }, { x: 44, y: 164 }, { x: 92, y: 164 }] },
-    llm: { pts: [{ x: 48, y: 304 }, { x: 48, y: 362 }, { x: 66, y: 362 }] },
-    history: { pts: [{ x: 48, y: 304 }, { x: 48, y: 429 }, { x: 66, y: 429 }] },
-    search: { pts: [{ x: 48, y: 304 }, { x: 48, y: 487 }, { x: 66, y: 487 }] },
-    scraper: { pts: [{ x: 48, y: 304 }, { x: 48, y: 541 }, { x: 66, y: 541 }] },
-    services: { pts: [{ x: 34, y: 304 }, { x: 34, y: 699 }, { x: 50, y: 699 }] },
+    browser: { pts: [{ x: 134, y: 23 }, { x: 6, y: 23 }, { x: 6, y: 257 }, { x: 24, y: 257 }] },
+    atlas: { pts: [{ x: 44, y: 232 }, { x: 44, y: 155 }, { x: 92, y: 155 }] },
+    llm: { pts: [{ x: 48, y: 282 }, { x: 48, y: 339 }, { x: 66, y: 339 }] },
+    history: { pts: [{ x: 48, y: 282 }, { x: 48, y: 403 }, { x: 66, y: 403 }] },
+    search: { pts: [{ x: 48, y: 282 }, { x: 48, y: 453 }, { x: 66, y: 453 }] },
+    scraper: { pts: [{ x: 48, y: 282 }, { x: 48, y: 498 }, { x: 66, y: 498 }] },
+    services: { pts: [{ x: 34, y: 282 }, { x: 34, y: 665 }, { x: 50, y: 665 }] },
+    news: { pts: [{ x: 41, y: 282 }, { x: 41, y: 611 }, { x: 50, y: 611 }] },
   },
   middle: {
-    "browser-dashboards": { pts: [{ x: 190, y: 42 }, { x: 190, y: 64 }] },
-    "dashboards-atlas": { pts: [{ x: 190, y: 118 }, { x: 190, y: 142 }] },
-    "search-internet": { pts: [{ x: 314, y: 497 }, { x: 324, y: 497 }, { x: 324, y: 606 }], hops: [{ x: 324, y: 541 }] },
-    "scraper-internet": { pts: [{ x: 190, y: 560 }, { x: 190, y: 606 }] },
+    "browser-dashboards": { pts: [{ x: 190, y: 38 }, { x: 190, y: 58 }] },
+    "dashboards-atlas": { pts: [{ x: 190, y: 110 }, { x: 190, y: 134 }] },
+    "search-internet": { pts: [{ x: 314, y: 463 }, { x: 324, y: 463 }, { x: 324, y: 548 }], hops: [{ x: 324, y: 498 }] },
+    "scraper-internet": { pts: [{ x: 190, y: 514 }, { x: 190, y: 548 }] },
   },
   labels: [
-    { edge: "browser-dashboards", x: 197, y: 56, anchor: "start", lines: ["HTTPS"] },
-    { edge: "dashboards-atlas", x: 197, y: 128, anchor: "start", lines: ["Read data and", "write commands"] },
-    { edge: "browser-crypto", x: 70, y: 19, anchor: "middle", lines: ["Engine WebSocket stream"] },
-    { edge: "crypto-atlas", x: 50, y: 201, anchor: "start", lines: ["Own trading state"] },
+    { edge: "browser-dashboards", x: 197, y: 51, anchor: "start", lines: ["HTTPS"] },
+    { edge: "dashboards-atlas", x: 197, y: 120, anchor: "start", lines: ["Read data and", "write commands"] },
+    { edge: "browser-crypto", x: 70, y: 16.5, anchor: "middle", lines: ["Engine WebSocket stream"] },
+    { edge: "crypto-atlas", x: 50, y: 190, anchor: "start", lines: ["Own trading state"] },
   ],
 })
 
@@ -283,6 +298,7 @@ export type HotKey =
   | "dashboards:stock"
   | "llm:research"
   | "llm:decisions"
+  | "llm:agents"
   | "llm:summaries"
   | "history:bars"
   | "history:archive"
@@ -290,26 +306,35 @@ export type HotKey =
   | "internet:articles"
   | "services:kraken"
   | "services:alpaca"
-  | "services:news"
+  | "news:sources"
 
-/** A packet along an edge: forward (caller to callee) or `back`. Minor ones are background traffic. */
-export type Hop = { t: number; dur: number; edge: EdgeId; back: boolean; bot: Bot; major: boolean }
+/**
+ * A packet along an edge: forward (caller to callee) or `back`. Minor ones are background traffic;
+ * the agent's (`agent`) are drawn as shadows of the cycle's.
+ */
+export type Hop = { t: number; dur: number; edge: EdgeId; back: boolean; bot: Bot; major: boolean; agent: boolean }
 
 export type Cue =
-  | { t: number; bot: Bot; kind: "state"; label: string }
+  | { t: number; bot: Bot; kind: "state"; label: string; agent: boolean }
   | { t: number; bot: Bot; kind: "lit"; key: HotKey; dur: number }
-  | { t: number; bot: Bot; kind: "think"; dur: number }
+  | { t: number; bot: Bot; kind: "think"; dur: number; agent: boolean }
   | { t: number; bot: Bot; kind: "check" }
 
-/** Seconds per loop. Each bot runs one cycle per loop, stock half a loop after crypto. */
-export const LOOP = 11.6
+/**
+ * Seconds per loop. Each bot runs one timed cycle and then one agent episode per loop, stock half a
+ * loop after crypto.
+ */
+export const LOOP = 16
 export const OFFSET: Record<Bot, number> = { crypto: 0, stock: LOOP / 2 }
 
 /** The script below is written at a calm pace and played a little faster. */
-const PACE = 0.85
+const PACE = 0.8
 
-/** Where each step (Research, Decide, Publish) starts in a cycle, then where the cycle ends, in seconds. */
+/** Where each step (Research, Decide, Publish) of a timed cycle starts, then where the cycle ends, in seconds. */
 export const PHASES = [0, 5.4, 9.55, 12.1].map((t) => t * PACE)
+
+/** When the agent's episode starts, just after the cycle, in the script's seconds. */
+const EPISODE = 12.4
 
 /** Each engine's own state labels, as its dashboard shows them (apps/<bot>-web/components/kit.tsx). */
 const STATES: Record<Bot, { gather: string; decide: string; check: string; order: string; after: string }> = {
@@ -325,18 +350,20 @@ function build() {
   const cues: Cue[] = []
   for (const bot of BOTS) {
     const at = (t: number) => (OFFSET[bot] + t * PACE) % LOOP
-    const go = (t: number, edge: EdgeId, dur: number, back = false) => hops.push({ t: at(t), dur: dur * PACE, edge, back, bot, major: true })
-    const say = (t: number, label: string) => cues.push({ t: at(t), bot, kind: "state", label })
+    let agent = false // the cycle's beats first, then the agent's
+    const go = (t: number, edge: EdgeId, dur: number, back = false) => hops.push({ t: at(t), dur: dur * PACE, edge, back, bot, major: true, agent })
+    const say = (t: number, label: string) => cues.push({ t: at(t), bot, kind: "state", label, agent })
     const lit = (t: number, key: HotKey, dur = 1.1) => cues.push({ t: at(t), bot, kind: "lit", key, dur: dur * PACE })
-    const think = (t: number, dur: number) => cues.push({ t: at(t), bot, kind: "think", dur: dur * PACE })
+    const think = (t: number, dur: number) => cues.push({ t: at(t), bot, kind: "think", dur: dur * PACE, agent })
     const s = STATES[bot]
     const e = (to: Shared) => `${bot}-${to}` as const
 
     // Research: news and prices arrive, the engine reads its bars, searches the web, fetches the
     // article pages, then asks the model to summarize and research.
     say(0, s.gather)
-    go(0, e("services"), 0.8, true)
-    lit(0, "services:news")
+    go(0, e("news"), 0.8, true)
+    lit(0, "news:sources")
+    go(0.15, e("services"), 0.8, true)
     go(0.3, e("history"), 0.5)
     lit(0.8, "history:bars")
     go(0.85, e("history"), 0.5, true)
@@ -383,25 +410,60 @@ function build() {
     go(11.3, "dashboards-atlas", 0.35, true)
     go(11.65, "browser-dashboards", 0.4, true)
     say(12.1, "Idle")
+
+    // The agent, in shadow ("The agent (shadow)" in docs/CRYPTO.md and docs/STOCK.md): news wakes
+    // it; it reads its brief on the model, looks up past news in the history store and past
+    // decisions in its own database, then decides. Its answer passes the envelope and the risk
+    // checks and fills in the shadow book (in Atlas, never at the broker) while the Agent page
+    // streams the episode. The labels follow the Agent page's steps (packages/ui/src/agent.tsx),
+    // short enough for the phone layout's engine cards.
+    const E = EPISODE
+    go(E, e("news"), 0.7, true)
+    lit(E, "news:sources")
+    agent = true
+    say(E + 0.7, "Agent woke")
+    lit(E + 1.1, "llm:agents", 4.4)
+    go(E + 0.75, e("llm"), 0.35)
+    think(E + 1.1, 0.4)
+    go(E + 1.5, e("llm"), 0.35, true)
+    say(E + 1.85, "Looking up")
+    go(E + 1.85, e("history"), 0.35)
+    lit(E + 2.2, "history:archive", 0.9)
+    go(E + 2.2, e("history"), 0.35, true)
+    go(E + 2.55, e("llm"), 0.35)
+    think(E + 2.9, 0.4)
+    go(E + 3.3, e("llm"), 0.35, true)
+    go(E + 3.65, e("atlas"), 0.4)
+    go(E + 4.05, e("atlas"), 0.4, true)
+    say(E + 4.45, "Agent deciding")
+    go(E + 4.45, e("llm"), 0.35)
+    think(E + 4.8, 0.7)
+    go(E + 5.5, e("llm"), 0.35, true)
+    say(E + 5.85, "Shadow fill")
+    cues.push({ t: at(E + 5.85), bot, kind: "check" })
+    go(E + 6.15, e("atlas"), 0.55)
+    for (const t of [6.15, 6.33]) go(E + t, `browser-${bot}`, 0.8, true)
+    say(E + 6.95, "Idle")
   }
 
-  // Background traffic, the same every loop: live prices and events down each stream, news and
-  // market data into each engine.
+  // Background traffic, the same every loop: live prices and events down each stream, market data
+  // from each bot's paper account and news from the sources into each engine.
   let seed = 7
   const rand = () => {
     seed = (seed * 16807) % 2147483647
     return seed / 2147483647
   }
   for (const bot of BOTS) {
-    for (let t = rand() * 1.4; t < LOOP - 1; t += 1.4 + rand() * 1.1) hops.push({ t, dur: 0.9, edge: `browser-${bot}`, back: true, bot, major: false })
-    for (let t = 0.6 + rand() * 1.5; t < LOOP - 1; t += 2.1 + rand() * 1.3) hops.push({ t, dur: 0.8, edge: `${bot}-services`, back: true, bot, major: false })
+    for (let t = rand() * 1.4; t < LOOP - 1; t += 1.4 + rand() * 1.1) hops.push({ t, dur: 0.9, edge: `browser-${bot}`, back: true, bot, major: false, agent: false })
+    for (let t = 0.6 + rand() * 1.5; t < LOOP - 1; t += 2.1 + rand() * 1.3) hops.push({ t, dur: 0.8, edge: `${bot}-services`, back: true, bot, major: false, agent: false })
+    for (let t = 1.2 + rand() * 2; t < LOOP - 1; t += 2.6 + rand() * 1.6) hops.push({ t, dur: 0.85, edge: `${bot}-news`, back: true, bot, major: false, agent: false })
   }
   return { hops: hops.sort((a, b) => a.t - b.t), cues: cues.sort((a, b) => a.t - b.t) }
 }
 
 export const TIMELINE = build()
 
-/** Which step a bot is in at loop time `t`, and how far through it; null between cycles. */
+/** Which step of its timed cycle a bot is in at loop time `t`, and how far through it; null outside the cycle. */
 export function phaseAt(bot: Bot, t: number): { step: number; p: number } | null {
   const rel = (t - OFFSET[bot] + LOOP) % LOOP
   for (let i = 0; i < 3; i++) if (rel < PHASES[i + 1]) return { step: i, p: (rel - PHASES[i]) / (PHASES[i + 1] - PHASES[i]) }
@@ -409,7 +471,7 @@ export function phaseAt(bot: Bot, t: number): { step: number; p: number } | null
 }
 
 /** A bot's engine state at loop time `t`: its latest state cue, wrapping from the previous loop. */
-export function stateAt(bot: Bot, t: number): string {
+export function stateAt(bot: Bot, t: number): Extract<Cue, { kind: "state" }> {
   const states = TIMELINE.cues.filter((c): c is Extract<Cue, { kind: "state" }> => c.kind === "state" && c.bot === bot)
-  return (states.findLast((c) => c.t <= t) ?? states[states.length - 1]).label
+  return states.findLast((c) => c.t <= t) ?? states[states.length - 1]
 }
