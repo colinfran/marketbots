@@ -126,6 +126,24 @@ export const MIGRATIONS: Migration[] = [
       where proc_name = 'policy_compression' and hypertable_name = 'bars_1m';
     `,
   },
+  {
+    id: 5,
+    name: "agent episodes",
+    sql: `
+      -- Every agent episode in full (docs/plans/LOCAL-AI.md §8.6): the brief, each step's thinking,
+      -- tool call and result, the answer and what became of it. MongoDB keeps a capped copy.
+      create table agent_episodes (
+        id text primary key,
+        started_at timestamptz not null,
+        priority smallint not null,
+        subject text not null,
+        status text not null,
+        doc jsonb not null
+      );
+      create index agent_episodes_started on agent_episodes (started_at desc);
+      create index agent_episodes_subject on agent_episodes (subject, started_at desc);
+    `,
+  },
 ]
 
 /** Any fixed number: the advisory lock that keeps two engines (an old and a new container during a deploy) from migrating at once. */

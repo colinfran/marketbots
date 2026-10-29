@@ -1,8 +1,10 @@
+import type { AgentEpisodeDoc } from "@mb/core/agent"
 import type { HistoryStatus } from "@mb/core/db"
 import type { WireItemDoc, WireTriggerDoc } from "@mb/core/wire"
 import { errorMessage, type Logger } from "@mb/engine-kit/log"
 import type { Collection } from "mongodb"
 import pg from "pg"
+import { dailyBars, newsWithMoves, saveEpisode, type DayBar, type PastNews } from "./agent"
 import { NewsArchive } from "./archive"
 import { BarWriter } from "./bars"
 import { JobRunner, loadJob, saveJob, type HistoryJob } from "./jobs"
@@ -91,6 +93,20 @@ export class HistoryStore<C extends string> {
     this.jobs.stop()
     await this.bars.flush()
     await this.pool?.end().catch(() => undefined)
+  }
+
+  /** The full record of an agent episode; dropped (not retried) while the store isn't ready. */
+  async saveEpisode(doc: AgentEpisodeDoc) {
+    if (this.ready && this.sql) await saveEpisode(this.sql, doc)
+  }
+
+  /** The agent's lookups: null while the store isn't ready. */
+  async dailyBars(symbol: string, days: number): Promise<DayBar[] | null> {
+    return this.ready && this.sql ? dailyBars(this.sql, symbol, days) : null
+  }
+
+  async newsWithMoves(symbol: string, o: { days: number; minSeverity: number; limit: number }): Promise<PastNews[] | null> {
+    return this.ready && this.sql ? newsWithMoves(this.sql, symbol, o) : null
   }
 
   status(): HistoryStatus {
