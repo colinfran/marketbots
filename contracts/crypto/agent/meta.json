@@ -1,0 +1,30 @@
+{
+  "prompt_version": "crypto-agent-v1",
+  "limits": {
+    "watches_per_symbol": 5,
+    "watches_total": 40,
+    "watch_note_chars": 300,
+    "watch_max_hours": 168,
+    "notes_per_subject": 5,
+    "note_chars": 500,
+    "note_days": 14
+  },
+  "watch_kinds": [
+    "price_above",
+    "price_below",
+    "move_pct",
+    "news",
+    "time"
+  ],
+  "watch_priority": {
+    "risk": 0,
+    "opportunity": 1,
+    "review": 2
+  },
+  "priority_label": {
+    "0": "risk",
+    "1": "opportunity",
+    "2": "review",
+    "3": "background"
+  }
+}

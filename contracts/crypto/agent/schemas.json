@@ -1,0 +1,550 @@
+{
+  "tools": [
+    {
+      "name": "book",
+      "description": "your shadow book again (positions, cash, P&L) and the limits code enforces right now. Args: {}.",
+      "args": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "quote",
+      "description": "the live bid, ask, spread, 24 h change and data age of a pair. Args: {symbol}.",
+      "args": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "description": "A pair exactly as listed, e.g. SOL/USD."
+          }
+        },
+        "required": [
+          "symbol"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "features",
+      "description": "the indicators the screens use for a pair: returns over 1 h-30 d, EMAs and trends on 1 h/4 h/1 d, RSI, ATR, Bollinger position, 20×4 h range, volatility, volume ratio. Args: {symbol}.",
+      "args": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "description": "A pair exactly as listed, e.g. SOL/USD."
+          }
+        },
+        "required": [
+          "symbol"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "depth",
+      "description": "the order book of a pair: the top levels each side and what a buy of $1,000 / $5,000 would pay above the mid. Args: {symbol}.",
+      "args": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "description": "A pair exactly as listed, e.g. SOL/USD."
+          }
+        },
+        "required": [
+          "symbol"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "news",
+      "description": "what our feeds saw about a pair (or the market, symbol null) in the last N hours, most severe first, with article summaries. Args: {symbol|null, hours 1-72}.",
+      "args": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A pair exactly as listed, e.g. SOL/USD."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "hours": {
+            "type": "number",
+            "description": "1-72"
+          }
+        },
+        "required": [
+          "symbol",
+          "hours"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "dossier",
+      "description": "our feeds' dossier on up to 5 pairs: the top items of the last 72 h, market-wide items, scheduled releases, moves nothing explains and items nobody confirmed. Args: {symbols}.",
+      "args": {
+        "type": "object",
+        "properties": {
+          "symbols": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A pair exactly as listed, e.g. SOL/USD."
+            },
+            "description": "1-5 pairs"
+          }
+        },
+        "required": [
+          "symbols"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "item",
+      "description": "one news item in full by the id the news tool shows (its first 12 characters are enough): title, source, confirmations, article summary and key points. Args: {id}.",
+      "args": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The item id, or its first 12 characters."
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "past_decisions",
+      "description": "the bot's last decisions on a pair (the timed cycles' and yours in the shadow book), with how they turned out. Args: {symbol}.",
+      "args": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "description": "A pair exactly as listed, e.g. SOL/USD."
+          }
+        },
+        "required": [
+          "symbol"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "calendar",
+      "description": "scheduled US macro releases (FOMC, CPI, jobs, PPI, PCE, GDP) in the next N days. Args: {days 1-14}.",
+      "args": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "number",
+            "description": "1-14"
+          }
+        },
+        "required": [
+          "days"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "history",
+      "description": "a pair's daily history from our history store (years deep): return, range, volatility, worst drawdown, biggest days, weekly closes. Args: {symbol, days 7-1825}.",
+      "args": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "description": "A pair exactly as listed, e.g. SOL/USD."
+          },
+          "days": {
+            "type": "number",
+            "description": "7-1825"
+          }
+        },
+        "required": [
+          "symbol",
+          "days"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "past_news",
+      "description": "earlier news about a pair from our archive (beyond the last 30 days too), most severe first, with the price move 1 h, 1 d and 5 d after each. Args: {symbol, days 7-730}.",
+      "args": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "description": "A pair exactly as listed, e.g. SOL/USD."
+          },
+          "days": {
+            "type": "number",
+            "description": "7-730"
+          }
+        },
+        "required": [
+          "symbol",
+          "days"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ],
+  "answer": {
+    "type": "object",
+    "properties": {
+      "decisions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "symbol": {
+              "type": "string",
+              "description": "Pair exactly as listed, e.g. BTC/USD."
+            },
+            "action": {
+              "type": "string",
+              "enum": [
+                "buy",
+                "hold",
+                "reduce",
+                "close",
+                "no_trade"
+              ],
+              "description": "Pairs you don't hold: buy or no_trade. Pairs you hold (YOUR BOOK): hold, reduce or close. no_trade is a normal, often correct answer."
+            },
+            "conviction": {
+              "type": "number",
+              "description": "0-100: how strongly the evidence supports the action. It is NOT a probability."
+            },
+            "uncertainty": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high"
+              ]
+            },
+            "p_target_first": {
+              "description": "BUY only: probability 0-1 that take_profit is hit before stop_loss. A random walk gives stop_distance / (stop_distance + target_distance); deviate from that only as far as the evidence justifies. null otherwise.",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "stop_loss": {
+              "description": "BUY: stop price below the current price. HELD: a new stop price, or null to keep the current one.",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "take_profit": {
+              "description": "BUY: target price above the current price. HELD: a new target, or null to keep it.",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "horizon_hours": {
+              "type": "number",
+              "description": "Expected holding period in hours (1-2160). When it elapses the position is reviewed, not sold."
+            },
+            "size_pct_of_max": {
+              "description": "BUY only: 10-100, the share of the maximum position size the risk engine allows. Size down when uncertain. null otherwise.",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "reduce_pct": {
+              "description": "REDUCE only: % of the position to sell (10-90); the rest stays open with its stop and target. null otherwise.",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "priced_in": {
+              "type": "string",
+              "enum": [
+                "not_priced",
+                "partially",
+                "fully",
+                "unknown"
+              ],
+              "description": "How much of the thesis or catalyst the price already reflects."
+            },
+            "thesis": {
+              "type": "string",
+              "description": "2-3 sentences: why this action, why now. Cite numbers from the brief or your tool results."
+            },
+            "bull_evidence": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "claim": {
+                    "type": "string",
+                    "description": "One concrete statement, with numbers and dates where possible."
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "fact",
+                      "sourced_claim",
+                      "estimate",
+                      "speculation"
+                    ],
+                    "description": "fact = verifiable data (exchange numbers from CONTEXT, official announcements). sourced_claim = reported by a source in RESEARCH. estimate = your own quantitative estimate. speculation = plausible but unverified."
+                  },
+                  "source_url": {
+                    "description": "A URL that appears in the brief or a tool result and supports the claim, or null. Never invent URLs.",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "as_of": {
+                    "description": "When the information was published or observed (ISO date/time), or null.",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "claim",
+                  "kind",
+                  "source_url",
+                  "as_of"
+                ],
+                "additionalProperties": false
+              },
+              "description": "1-5 items for upside."
+            },
+            "bear_evidence": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "claim": {
+                    "type": "string",
+                    "description": "One concrete statement, with numbers and dates where possible."
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "fact",
+                      "sourced_claim",
+                      "estimate",
+                      "speculation"
+                    ],
+                    "description": "fact = verifiable data (exchange numbers from CONTEXT, official announcements). sourced_claim = reported by a source in RESEARCH. estimate = your own quantitative estimate. speculation = plausible but unverified."
+                  },
+                  "source_url": {
+                    "description": "A URL that appears in the brief or a tool result and supports the claim, or null. Never invent URLs.",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "as_of": {
+                    "description": "When the information was published or observed (ISO date/time), or null.",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "claim",
+                  "kind",
+                  "source_url",
+                  "as_of"
+                ],
+                "additionalProperties": false
+              },
+              "description": "1-5 counterarguments and downside risks. Always include at least one."
+            },
+            "risks": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "1-4 key risk factors: event risk, liquidity, correlation with other holdings."
+            },
+            "invalidation": {
+              "type": "string",
+              "description": "The specific price level or event that proves the thesis wrong."
+            },
+            "strategy": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "trend",
+                    "daily_trend",
+                    "mean_reversion",
+                    "momentum",
+                    "event_driven",
+                    "discretionary"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "BUY only: the strategy the entry follows (discretionary when none fits). null otherwise."
+            }
+          },
+          "required": [
+            "symbol",
+            "action",
+            "conviction",
+            "uncertainty",
+            "p_target_first",
+            "stop_loss",
+            "take_profit",
+            "horizon_hours",
+            "size_pct_of_max",
+            "reduce_pct",
+            "priced_in",
+            "thesis",
+            "bull_evidence",
+            "bear_evidence",
+            "risks",
+            "invalidation",
+            "strategy"
+          ],
+          "additionalProperties": false
+        },
+        "description": "0-3 decisions, only about what woke you and what you hold. An empty list is a normal answer: watch instead of acting early."
+      },
+      "watches": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "price_above",
+                "price_below",
+                "move_pct",
+                "news",
+                "time"
+              ],
+              "description": "price_above / price_below: wake when the symbol trades above / below `level`. move_pct: wake when it moves `level` % either way from now. news: wake when an item about the symbol (null = market-wide) reaches severity `level` (0-100). time: wake at `at`."
+            },
+            "symbol": {
+              "description": "The symbol exactly as listed. null only for news and time watches about the whole market.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "level": {
+              "description": "The price, the % move or the minimum severity, as `kind` says. null for time watches.",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "at": {
+              "description": "time watches only: when to wake, as an ISO date-time with its offset. null otherwise.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hours": {
+              "type": "number",
+              "description": "How long the watch lasts, 1-168 hours."
+            },
+            "priority": {
+              "type": "string",
+              "enum": [
+                "risk",
+                "opportunity",
+                "review"
+              ],
+              "description": "risk = something you hold is in danger; opportunity = a possible entry; review = anything else."
+            },
+            "note": {
+              "type": "string",
+              "description": "At most 300 characters: what to check when it fires. You will see it then."
+            }
+          },
+          "required": [
+            "kind",
+            "symbol",
+            "level",
+            "at",
+            "hours",
+            "priority",
+            "note"
+          ],
+          "additionalProperties": false
+        },
+        "description": "0-5 conditions to wake you on. Prefer a watch to deciding early."
+      },
+      "cancel_watches": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Ids of your own watches (from YOUR WATCHES) that no longer matter."
+      },
+      "notes": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "subject": {
+              "type": "string",
+              "description": "A symbol exactly as listed, MARKET or BOOK."
+            },
+            "text": {
+              "type": "string",
+              "description": "At most 500 characters you want to see in your next brief on this subject (kept 14 days)."
+            }
+          },
+          "required": [
+            "subject",
+            "text"
+          ],
+          "additionalProperties": false
+        },
+        "description": "0-3 notes for later: a level that matters, what you are waiting for, what you learned."
+      },
+      "reply": {
+        "type": "string",
+        "description": "1-3 sentences in plain English: what you saw and what you did about it. To an owner's question: the answer."
+      }
+    },
+    "required": [
+      "decisions",
+      "watches",
+      "cancel_watches",
+      "notes",
+      "reply"
+    ],
+    "additionalProperties": false
+  }
+}

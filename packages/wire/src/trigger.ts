@@ -67,6 +67,12 @@ export type PolicyDeps<C extends string, S extends PolicySettings> = {
   /** Runs the owner's emergency action on a held symbol; returns what was done. */
   emergency: (symbol: string, focus: EventFocus) => Promise<string>
   alert: (title: string, message: string) => Promise<void>
+  /**
+   * The agent (docs/plans/LOCAL-AI.md §8.1) sees every candidate that passes the gates on the item
+   * itself (`itemGate`: fresh, not old news, confirmed when it is an entry), once per item and rule,
+   * whatever the caps, cooldown or session say: those exist for the timed cycles.
+   */
+  observe?: (item: WireItemDoc<C>, candidate: Candidate) => void
   now?: () => Date
 }
 
@@ -101,8 +107,8 @@ export class WirePolicy<C extends string, S extends PolicySettings> {
     return this.d.rules(item, { held: new Set(this.d.held()), universe: new Set(this.d.universe()), settings: this.d.settings(), now: this.now(), hasRecentNews: this.hasRecentNews })
   }
 
-  /** The gates, in order. `dryRun` skips the side effects (used by wire.replay). */
-  async gate(item: WireItemDoc<C>, c: Candidate, { backfill, dryRun = false }: { backfill: boolean; dryRun?: boolean }): Promise<GateResult> {
+  /** The gates on the item itself, in order: the wire is on, not a backfill, fresh, not old news, confirmed (entries). Null when it passes them. */
+  itemGate(item: WireItemDoc<C>, c: Candidate, { backfill }: { backfill: boolean }): GateResult | null {
     const w = this.d.settings().wire
     const now = this.now()
     if (w.mode === "off") return { status: "suppressed", reason: "wire is off" }
@@ -110,6 +116,15 @@ export class WirePolicy<C extends string, S extends PolicySettings> {
     if (now.getTime() - item.first_seen_at.getTime() > w.trigger_max_age_minutes * 60_000) return { status: "suppressed", reason: `stale: first seen more than ${w.trigger_max_age_minutes} min ago` }
     if (now.getTime() - item.published_at.getTime() > MAX_PUBLISHED_AGE_MS) return { status: "suppressed", reason: "old news: published more than 2 h ago" }
     if (c.entry && w.entry_confirmation && !isConfirmed(item)) return { status: "suppressed", reason: "unconfirmed: entries need a tier-1 source, two independent outlets, or a matching price move" }
+    return null
+  }
+
+  /** The gates, in order: the item's own (`itemGate`), then the engine's and the caps. `dryRun` skips the side effects (used by wire.replay). */
+  async gate(item: WireItemDoc<C>, c: Candidate, { backfill, dryRun = false }: { backfill: boolean; dryRun?: boolean }): Promise<GateResult> {
+    const stopped = this.itemGate(item, c, { backfill })
+    if (stopped) return stopped
+    const w = this.d.settings().wire
+    const now = this.now()
     if (w.mode === "shadow") return { status: "shadow", reason: "shadow mode: logged, not acted on" }
     if (c.action === "alert_only") return { status: "fired", reason: "alert" }
     const engine = this.d.engine()
@@ -144,6 +159,7 @@ export class WirePolicy<C extends string, S extends PolicySettings> {
         if (this.evaluated.size > 20_000) this.evaluated.delete(this.evaluated.keys().next().value!)
         // Backfill is the expected state after every restart: not worth an audit row.
         if (gate.reason.startsWith("backfill")) continue
+        if (this.d.observe && !this.itemGate(e.item, c, { backfill: e.backfill })) this.d.observe(e.item, c)
         await this.act(e.item, c, gate)
       }
     } catch (error) {

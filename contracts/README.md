@@ -39,12 +39,13 @@ Output format:
 | crypto | `apps/crypto-engine/test/contracts/*.test.ts` | `contracts/crypto/` |
 | stock | `apps/stock-engine/test/contracts/*.test.ts` | `contracts/stock/` |
 
-Each folder has a `snapshot.ts` helper and four test files:
+Each folder has a `snapshot.ts` helper and five test files:
 
 - `schemas.test.ts`
 - `catalog.test.ts`
 - `sources.test.ts`
 - `prompts.test.ts`
+- `agent.test.ts`
 
 None of them use the database.
 
@@ -66,6 +67,9 @@ These are the same for both bots.
 | `parsed/<fixture>.json` | One file per saved source payload in `apps/<bot>-engine/test/fixtures/wire/`: what the source's parser makes of it. See below. | sources |
 | `prompts/*.txt` | Rendered prompts for a fixed, realistic cycle: research, gap-fill, event section, wire dossier, decision system and user prompts, and the seed prompts. Every text file ends with one added newline. | prompts |
 | `prompts/meta.json` | Prompt versions, the owner's seed lean, and the inputs derived from the fixtures: regime, event and seed candidates (crypto), and the dossier's item lists. | prompts |
+| `agent/system.txt` | The agent's system message as the model gets it: the bot's agent prompt, then the tool list and the turn protocol from `@mb/agent` (at the P1 step limit). | agent |
+| `agent/schemas.json` | Each agent tool's name, description and argument schema, and the answer schema the grammar enforces. | agent |
+| `agent/meta.json` | The agent prompt version and the fixed agent limits (watches, notes, priorities). | agent |
 
 ### Parsed source fixtures
 

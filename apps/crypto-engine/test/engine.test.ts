@@ -143,10 +143,17 @@ describe("Engine", () => {
       "reconciliation",
       "errors_last_hour",
       "wire",
+      "agent",
     ])
     expect(engine.ready).toBe(true)
     expect(await db.col.cycles.findOne({ _id: "interrupted" })).toMatchObject({ status: "failed", error: "the engine restarted during this cycle" })
     expect(events.map((e) => e.type)).toEqual(expect.arrayContaining(["engine.started", "engine.status", "alert"]))
+  })
+
+  it("runs the agent in shadow by default, and says why it can't answer without the model server", async () => {
+    expect((await db.col.settings.findOne({ _id: "current" }))!.settings.agent.level).toBe("shadow")
+    expect(engine.agent.agent.status()).toMatchObject({ level: "shadow", state: "off", blocked: "no model server (LLM_URL not set)" })
+    expect(await command({ type: "agent.ask", question: "What do you hold?" })).toMatchObject({ status: "failed", error: "the agent needs the model server (LLM_URL)" })
   })
 
   it("pauses, resumes and applies settings from audited commands", async () => {

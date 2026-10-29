@@ -51,7 +51,7 @@ const item = (overrides: Partial<WireItemDoc> = {}): WireItemDoc => ({
 })
 const withRoot = (i: WireItemDoc) => ({ ...i, cluster_id: i._id })
 
-const setupPolicy = async ({ held = ["BTC/USD"], settings = DEFAULT_SETTINGS, running = true }: { held?: string[]; settings?: Settings; running?: boolean } = {}) => {
+const setupPolicy = async ({ held = ["BTC/USD"], settings = DEFAULT_SETTINGS, running = true, observe }: { held?: string[]; settings?: Settings; running?: boolean; observe?: (item: WireItemDoc, c: { rule: string }) => void } = {}) => {
   const bus = await makeBus(db.col)
   const request = vi.fn<(f: EventFocus) => "fired" | "queued">(() => "fired")
   const markNotable = vi.fn(async () => undefined)
@@ -70,6 +70,7 @@ const setupPolicy = async ({ held = ["BTC/USD"], settings = DEFAULT_SETTINGS, ru
     markNotable,
     emergency,
     alert,
+    observe,
     now: () => NOW,
   })
   return { policy, request, markNotable, emergency, alert }
@@ -78,6 +79,20 @@ const triggers = () => db.col.wireTriggers.find({}).sort({ at: 1 }).toArray()
 const unexplainedOn: Settings = { ...DEFAULT_SETTINGS, wire: { ...DEFAULT_SETTINGS.wire, unexplained_move_entries: true } }
 
 describe("wire policy", () => {
+  it("lets the agent observe what passes the item's own gates, whatever the caps say", async () => {
+    const observe = vi.fn()
+    const capped: Settings = { ...DEFAULT_SETTINGS, wire: { ...DEFAULT_SETTINGS.wire, max_event_cycles_per_hour: 0 } }
+    const { policy, request } = await setupPolicy({ settings: capped, observe })
+    const fresh = withRoot(item({ polarity: -1, severity: 62, category: "regulatory_action", title: "SEC probes bitcoin custodian" }))
+    await policy.onItem({ item: fresh, backfill: false, confirmation: false })
+    expect(request).not.toHaveBeenCalled()
+    expect(observe).toHaveBeenCalledWith(fresh, expect.objectContaining({ rule: "held_negative", action: "review", symbols: ["BTC/USD"] }))
+    observe.mockClear()
+    await policy.onItem({ item: withRoot(item({ polarity: -1, severity: 62, category: "regulatory_action", first_seen_at: new Date(NOW.getTime() - 3 * HOUR) })), backfill: false, confirmation: false })
+    await policy.onItem({ item: withRoot(item({ polarity: -1, severity: 62, category: "regulatory_action" })), backfill: true, confirmation: false })
+    expect(observe).not.toHaveBeenCalled()
+  })
+
   it("reviews a held position on negative news and marks the item notable", async () => {
     const { policy, request, markNotable } = await setupPolicy()
     const i = withRoot(item({ polarity: -1, severity: 62, category: "regulatory_action", title: "SEC probes bitcoin custodian" }))

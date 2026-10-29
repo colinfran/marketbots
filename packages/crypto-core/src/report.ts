@@ -123,6 +123,48 @@ const emptyDecision = (symbol: string, held: boolean, reason: string): Normalize
   defaulted: true,
 })
 
+/**
+ * One decision, bounded: an action that fits the position (a buy or no_trade on a held position
+ * becomes hold, a sell-side action on one that isn't held becomes no_trade), numbers clamped, text
+ * capped, evidence URLs kept only when they were retrieved. `symbol` is the cleaned symbol.
+ */
+export const normalizeCryptoDecision = (d: CryptoDecision, symbol: string, isHeld: boolean, sourceUrls: ReadonlySet<string>): NormalizedCryptoDecision => {
+  const notes: string[] = []
+  let action = d.action
+  if (isHeld && (action === "buy" || action === "no_trade")) {
+    notes.push(`"${action}" on a held position treated as hold (adding to positions is disabled)`)
+    action = "hold"
+  }
+  if (!isHeld && action !== "buy" && action !== "no_trade") {
+    notes.push(`"${action}" on a symbol that isn't held treated as no_trade`)
+    action = "no_trade"
+  }
+  let reducePct = action === "reduce" ? clamp(d.reduce_pct ?? 50, 10, 90) : null
+  if (action === "reduce" && (d.reduce_pct ?? 0) >= 95) {
+    action = "close"
+    reducePct = null
+  }
+  return {
+    ...d,
+    symbol,
+    action,
+    conviction: Math.round(clamp(Number.isFinite(d.conviction) ? d.conviction : 0, 0, 100)),
+    p_target_first: action === "buy" && d.p_target_first !== null && Number.isFinite(d.p_target_first) ? clamp(d.p_target_first, 0.01, 0.99) : null,
+    stop_loss: finitePositive(d.stop_loss),
+    take_profit: finitePositive(d.take_profit),
+    horizon_hours: clamp(Number.isFinite(d.horizon_hours) ? d.horizon_hours : 24, 1, MAX_HORIZON_HOURS),
+    size_pct_of_max: action === "buy" ? clamp(d.size_pct_of_max ?? 50, 10, 100) : null,
+    reduce_pct: reducePct,
+    thesis: truncate(d.thesis.trim(), 800),
+    bull_evidence: normalizeEvidence(d.bull_evidence, sourceUrls),
+    bear_evidence: normalizeEvidence(d.bear_evidence, sourceUrls),
+    risks: d.risks.slice(0, 4).map((r) => truncate(r, 300)),
+    invalidation: truncate(d.invalidation.trim(), 300),
+    notes,
+    defaulted: false,
+  }
+}
+
 export const normalizeCryptoReport = (
   report: CryptoReport,
   { candidates, held, sourceUrls }: { candidates: ReadonlySet<string>; held: ReadonlySet<string>; sourceUrls: ReadonlySet<string> },
@@ -134,40 +176,7 @@ export const normalizeCryptoReport = (
     const isHeld = held.has(symbol)
     if (seen.has(symbol) || (!isHeld && !candidates.has(symbol))) continue // unlisted or duplicate: ignored
     seen.add(symbol)
-    const notes: string[] = []
-    let action = d.action
-    if (isHeld && (action === "buy" || action === "no_trade")) {
-      notes.push(`"${action}" on a held position treated as hold (adding to positions is disabled)`)
-      action = "hold"
-    }
-    if (!isHeld && action !== "buy" && action !== "no_trade") {
-      notes.push(`"${action}" on a symbol that isn't held treated as no_trade`)
-      action = "no_trade"
-    }
-    let reducePct = action === "reduce" ? clamp(d.reduce_pct ?? 50, 10, 90) : null
-    if (action === "reduce" && (d.reduce_pct ?? 0) >= 95) {
-      action = "close"
-      reducePct = null
-    }
-    decisions.push({
-      ...d,
-      symbol,
-      action,
-      conviction: Math.round(clamp(Number.isFinite(d.conviction) ? d.conviction : 0, 0, 100)),
-      p_target_first: action === "buy" && d.p_target_first !== null && Number.isFinite(d.p_target_first) ? clamp(d.p_target_first, 0.01, 0.99) : null,
-      stop_loss: finitePositive(d.stop_loss),
-      take_profit: finitePositive(d.take_profit),
-      horizon_hours: clamp(Number.isFinite(d.horizon_hours) ? d.horizon_hours : 24, 1, MAX_HORIZON_HOURS),
-      size_pct_of_max: action === "buy" ? clamp(d.size_pct_of_max ?? 50, 10, 100) : null,
-      reduce_pct: reducePct,
-      thesis: truncate(d.thesis.trim(), 800),
-      bull_evidence: normalizeEvidence(d.bull_evidence, sourceUrls),
-      bear_evidence: normalizeEvidence(d.bear_evidence, sourceUrls),
-      risks: d.risks.slice(0, 4).map((r) => truncate(r, 300)),
-      invalidation: truncate(d.invalidation.trim(), 300),
-      notes,
-      defaulted: false,
-    })
+    decisions.push(normalizeCryptoDecision(d, symbol, isHeld, sourceUrls))
   }
   // Every listed symbol gets a recorded decision, even if the model skipped it.
   for (const symbol of [...candidates, ...held]) {

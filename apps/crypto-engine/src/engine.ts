@@ -14,6 +14,7 @@ import { claimDueSeed, finishSeed } from "@mb/engine-kit/state/seed-runs"
 import { every, withTimeout } from "@mb/engine-kit/util/async"
 import type { HistoryStore } from "@mb/history/store"
 import { coverageGaps } from "@mb/wire/calendar"
+import { createCryptoAgent, type CryptoAgent } from "./agent"
 import type { AiRunner } from "./ai/runner"
 import type { Alerts } from "./alerts"
 import { runBacktest } from "./backtest/run"
@@ -96,6 +97,7 @@ export type EngineDeps = {
  *   every 5m   portfolio snapshot and paper-wallet reconciliation
  *   every 30m  scoring of decisions whose horizon has passed
  *   every 1s   dashboard commands
+ *   every 1s   the agent (./agent): its observations, watches and the next episode
  *
  * It never depends on the dashboard being open, and on restart it reconciles with the paper
  * wallet before allowing new entries.
@@ -112,6 +114,8 @@ export class Engine {
   readonly ctx: EngineContext
   readonly control: ControlPlane<EngineRunStatus, WireItemDoc>
   readonly policy: WirePolicy
+  /** The agent (docs/plans/LOCAL-AI.md §8), deciding into its shadow book. */
+  readonly agent: CryptoAgent
 
   private readonly abort = new AbortController()
   private readonly protectionInFlight = new Set<string>()
@@ -155,6 +159,7 @@ export class Engine {
       signal: this.abort.signal,
       wire: d.wire,
     }
+    this.agent = createCryptoAgent({ ctx: this.ctx, history: d.history ?? null, calls: d.calls, llmUrl: d.env.LLM_URL ?? null })
     this.commands = new CommandProcessor(d.db.col, d.bus, d.log.child({ component: "commands" }), (c, doc) => this.handleCommand(c, doc))
     d.hub.heldSymbols = () => this.heldSymbols
     this.eventQueue = new EventCycleQueue({
@@ -184,6 +189,7 @@ export class Engine {
       markNotable: (ids, reason) => d.wire.markNotable(ids, reason),
       emergency: (symbol) => this.emergencyAction(symbol),
       alert: (title, message) => d.alerts.send("warning", title, message, { path: "/news" }),
+      observe: (item, c) => this.agent.onCandidate(item, c),
     })
     this.control = new ControlPlane<EngineRunStatus, WireItemDoc>({
       col: d.db.col,
@@ -194,6 +200,7 @@ export class Engine {
       policy: this.policy,
       liquidate: () => liquidateAll(this.ctx, "liquidation"),
       wording: WORDING,
+      agent: this.agent.agent,
     })
     this.reporter = new StatusReporter<EngineStatusDoc>({
       col: d.db.col,
@@ -221,9 +228,12 @@ export class Engine {
         reconciliation: this.reconciliation ? { ok: this.reconciliation.ok, at: this.reconciliation.at, issues: this.reconciliation.issues.slice(0, 20) } : null,
         ...p.health,
         ...(d.history ? { history: d.history.status() } : {}),
+        agent: this.agent.agent.status(),
       }),
     })
     d.wire.onItem((e) => this.policy.onItem(e))
+    // News watches fire on fresh items only: a source's first poll after a restart is old news.
+    d.wire.onItem((e) => (e.backfill ? undefined : this.agent.agent.onItem(e.item)))
   }
 
   /** The run status (owned by the control plane). */
@@ -311,6 +321,7 @@ export class Engine {
     // The news engine fails open: if it can't start, trading carries on exactly as before.
     void this.d.wire.start().catch((e) => log.warn("news engine failed to start", { error: errorMessage(e) }))
     this.stops.push(every(86_400_000, () => this.checkCalendar(), onError("calendar check"), { immediate: true }))
+    await this.agent.agent.start().catch((e) => log.warn("agent failed to start", { error: errorMessage(e) }))
   }
 
   /** Makes sure the Kraken CLI works and the paper workspace exists and matches the books. */
@@ -544,9 +555,11 @@ export class Engine {
     this.d.wire.stop()
     this.eventQueue.stop()
     for (const stop of this.stops) stop()
+    this.agent.agent.stop()
     // Abort in-flight AI calls; an order already handed to the wallet still completes.
     this.abort.abort()
     if (this.cycle) await withTimeout(this.cycle, 20_000, "cycle shutdown").catch(() => undefined)
+    if (this.agent.agent.current) await withTimeout(this.agent.agent.current, 20_000, "agent shutdown").catch(() => undefined)
     await this.reporter.write().catch(() => undefined)
   }
 }
