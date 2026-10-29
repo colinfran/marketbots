@@ -85,12 +85,12 @@ const NODES: Record<Exclude<NodeId, Bot | "services">, { Icon: LucideIcon; rows:
   search: { Icon: SearchIcon, rows: [title("Web search"), detail("SearXNG")] },
   scraper: { Icon: ScanTextIcon, rows: [title("Shared scraper")] },
   internet: { Icon: GlobeIcon, rows: [title(hot("Search engines", "internet:search"), " and ", hot("article pages", "internet:articles"))] },
+  news: { Icon: NewspaperIcon, rows: [title(hot("News sources", "news:sources"))] },
 }
 
-/** The services node, one segment each: crypto's account on its side, stock's on the other. */
+/** The paper accounts, one segment each: crypto's on its side, stock's on the other. */
 const SERVICES: { key: HotKey; Icon: LucideIcon; wide: string; tall: [string, string] }[] = [
   { key: "services:kraken", Icon: WalletIcon, wide: "Kraken paper wallet", tall: ["Kraken", "paper wallet"] },
-  { key: "services:news", Icon: NewspaperIcon, wide: "News sources", tall: ["News", "sources"] },
   { key: "services:alpaca", Icon: LandmarkIcon, wide: "Alpaca paper account", tall: ["Alpaca", "paper account"] },
 ]
 
@@ -111,7 +111,8 @@ const NAMES: Record<NodeId, string> = {
   browser: "Browser",
   dashboards: "Vercel dashboards",
   atlas: "MongoDB Atlas, a separate database per bot",
-  services: "the Kraken paper wallet, the Alpaca paper account and news sources",
+  services: "the Kraken paper wallet and the Alpaca paper account",
+  news: "news sources",
   internet: "search engines and article pages",
   crypto: "Crypto engine",
   stock: "Stock engine",
@@ -278,7 +279,7 @@ function Diagram({ layout, hover, onHover, className }: { layout: Layout; hover:
         <NodeCard id="services" layout={id} box={nodes.services} dim={dimNode("services")}>
           {SERVICES.map((s, i) => {
             const b = nodes.services
-            const seg = { x: b.x + (b.w / 3) * i, y: b.y, w: b.w / 3, h: b.h }
+            const seg = { x: b.x + (b.w / SERVICES.length) * i, y: b.y, w: b.w / SERVICES.length, h: b.h }
             return (
               <g key={s.key}>
                 {i > 0 && <path d={`M${seg.x} ${seg.y + 10}V${seg.y + seg.h - 10}`} className={NODE_STROKE} />}

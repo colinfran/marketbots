@@ -8,15 +8,20 @@
  * stack's shared services down the middle, Browser, Vercel and Atlas above, the outside world
  * below. Laid out that way no two engine edges cross; the one crossing left (search to the
  * internet, over the stock engine's scraper edge) is drawn as a hop.
+ *
+ * One departure from the chart: news sources, which it lists with the two paper accounts, get a
+ * node of their own under the search engines and article pages. They are where the bots read, not
+ * where they trade, so each engine has its own line to them and the paper accounts sit at each
+ * bot's side.
  */
 
 export type Bot = "crypto" | "stock"
 export const BOTS = ["crypto", "stock"] as const satisfies readonly Bot[]
 
-export type NodeId = "browser" | "dashboards" | "atlas" | "services" | "internet" | Bot | "llm" | "search" | "scraper" | "history"
+export type NodeId = "browser" | "dashboards" | "atlas" | "services" | "news" | "internet" | Bot | "llm" | "search" | "scraper" | "history"
 
 /** What both engines connect to: `crypto & stock --> …` in the chart, plus each one's own state in Atlas. */
-type Shared = "atlas" | "llm" | "history" | "search" | "scraper" | "services"
+type Shared = "atlas" | "llm" | "history" | "search" | "scraper" | "services" | "news"
 
 export type EdgeId = "browser-dashboards" | "dashboards-atlas" | `browser-${Bot}` | `${Bot}-${Shared}` | "search-internet" | "scraper-internet"
 
@@ -38,6 +43,8 @@ export const EDGES: Record<EdgeId, { from: NodeId; to: NodeId; label?: string }>
   "stock-scraper": { from: "stock", to: "scraper" },
   "crypto-services": { from: "crypto", to: "services" },
   "stock-services": { from: "stock", to: "services" },
+  "crypto-news": { from: "crypto", to: "news" },
+  "stock-news": { from: "stock", to: "news" },
   "search-internet": { from: "search", to: "internet" },
   "scraper-internet": { from: "scraper", to: "internet" },
 }
@@ -184,7 +191,7 @@ function mirrored(
 const WIDE = mirrored({
   id: "wide",
   w: 960,
-  h: 658,
+  h: 712,
   type: { title: 12.5, detail: 10, label: 9.5 },
   server: { x: 24, y: 210, w: 912, h: 298 },
   legend: { x: 480, y: 232 },
@@ -197,8 +204,9 @@ const WIDE = mirrored({
     history: { x: 352, y: 332, w: 256, h: 46 },
     search: { x: 352, y: 390, w: 256, h: 46 },
     scraper: { x: 352, y: 448, w: 256, h: 38 },
-    internet: { x: 330, y: 532, w: 300, h: 40 },
-    services: { x: 210, y: 598, w: 540, h: 48 },
+    internet: { x: 300, y: 532, w: 360, h: 40 },
+    news: { x: 300, y: 594, w: 360, h: 36 },
+    services: { x: 300, y: 652, w: 360, h: 48 },
   },
   crypto: {
     browser: { pts: [{ x: 414, y: 30 }, { x: 142, y: 30 }, { x: 142, y: 323 }] },
@@ -207,7 +215,8 @@ const WIDE = mirrored({
     history: { pts: [{ x: 232, y: 355 }, { x: 352, y: 355 }] },
     search: { pts: [{ x: 232, y: 355 }, { x: 296, y: 355 }, { x: 296, y: 413 }, { x: 352, y: 413 }] },
     scraper: { pts: [{ x: 232, y: 355 }, { x: 296, y: 355 }, { x: 296, y: 467 }, { x: 352, y: 467 }] },
-    services: { pts: [{ x: 142, y: 387 }, { x: 142, y: 622 }, { x: 210, y: 622 }] },
+    services: { pts: [{ x: 142, y: 387 }, { x: 142, y: 676 }, { x: 300, y: 676 }] },
+    news: { pts: [{ x: 156, y: 387 }, { x: 156, y: 612 }, { x: 300, y: 612 }] },
   },
   middle: {
     "browser-dashboards": { pts: [{ x: 480, y: 48 }, { x: 480, y: 70 }] },
@@ -230,7 +239,7 @@ const WIDE = mirrored({
 const TALL = mirrored({
   id: "tall",
   w: 380,
-  h: 752,
+  h: 810,
   type: { title: 12, detail: 9.5, label: 8.5 },
   server: { x: 12, y: 214, w: 356, h: 382 },
   legend: { x: 190, y: 233 },
@@ -244,7 +253,8 @@ const TALL = mirrored({
     search: { x: 66, y: 478, w: 248, h: 46 },
     scraper: { x: 66, y: 536, w: 248, h: 38 },
     internet: { x: 50, y: 620, w: 280, h: 40 },
-    services: { x: 50, y: 686, w: 280, h: 54 },
+    news: { x: 50, y: 684, w: 280, h: 36 },
+    services: { x: 50, y: 744, w: 280, h: 54 },
   },
   crypto: {
     browser: { pts: [{ x: 134, y: 26 }, { x: 6, y: 26 }, { x: 6, y: 276 }, { x: 24, y: 276 }] },
@@ -253,7 +263,8 @@ const TALL = mirrored({
     history: { pts: [{ x: 48, y: 304 }, { x: 48, y: 443 }, { x: 66, y: 443 }] },
     search: { pts: [{ x: 48, y: 304 }, { x: 48, y: 501 }, { x: 66, y: 501 }] },
     scraper: { pts: [{ x: 48, y: 304 }, { x: 48, y: 555 }, { x: 66, y: 555 }] },
-    services: { pts: [{ x: 34, y: 304 }, { x: 34, y: 713 }, { x: 50, y: 713 }] },
+    services: { pts: [{ x: 34, y: 304 }, { x: 34, y: 771 }, { x: 50, y: 771 }] },
+    news: { pts: [{ x: 41, y: 304 }, { x: 41, y: 702 }, { x: 50, y: 702 }] },
   },
   middle: {
     "browser-dashboards": { pts: [{ x: 190, y: 42 }, { x: 190, y: 64 }] },
@@ -292,7 +303,7 @@ export type HotKey =
   | "internet:articles"
   | "services:kraken"
   | "services:alpaca"
-  | "services:news"
+  | "news:sources"
 
 /**
  * A packet along an edge: forward (caller to callee) or `back`. Minor ones are background traffic;
@@ -347,8 +358,9 @@ function build() {
     // Research: news and prices arrive, the engine reads its bars, searches the web, fetches the
     // article pages, then asks the model to summarize and research.
     say(0, s.gather)
-    go(0, e("services"), 0.8, true)
-    lit(0, "services:news")
+    go(0, e("news"), 0.8, true)
+    lit(0, "news:sources")
+    go(0.15, e("services"), 0.8, true)
     go(0.3, e("history"), 0.5)
     lit(0.8, "history:bars")
     go(0.85, e("history"), 0.5, true)
@@ -403,8 +415,8 @@ function build() {
     // streams the episode. The labels follow the Agent page's steps (packages/ui/src/agent.tsx),
     // short enough for the phone layout's engine cards.
     const E = EPISODE
-    go(E, e("services"), 0.7, true)
-    lit(E, "services:news")
+    go(E, e("news"), 0.7, true)
+    lit(E, "news:sources")
     agent = true
     say(E + 0.7, "Agent woke")
     lit(E + 1.1, "llm:agents", 4.4)
@@ -431,8 +443,8 @@ function build() {
     say(E + 6.95, "Idle")
   }
 
-  // Background traffic, the same every loop: live prices and events down each stream, news and
-  // market data into each engine.
+  // Background traffic, the same every loop: live prices and events down each stream, market data
+  // from each bot's paper account and news from the sources into each engine.
   let seed = 7
   const rand = () => {
     seed = (seed * 16807) % 2147483647
@@ -441,6 +453,7 @@ function build() {
   for (const bot of BOTS) {
     for (let t = rand() * 1.4; t < LOOP - 1; t += 1.4 + rand() * 1.1) hops.push({ t, dur: 0.9, edge: `browser-${bot}`, back: true, bot, major: false, agent: false })
     for (let t = 0.6 + rand() * 1.5; t < LOOP - 1; t += 2.1 + rand() * 1.3) hops.push({ t, dur: 0.8, edge: `${bot}-services`, back: true, bot, major: false, agent: false })
+    for (let t = 1.2 + rand() * 2; t < LOOP - 1; t += 2.6 + rand() * 1.6) hops.push({ t, dur: 0.85, edge: `${bot}-news`, back: true, bot, major: false, agent: false })
   }
   return { hops: hops.sort((a, b) => a.t - b.t), cues: cues.sort((a, b) => a.t - b.t) }
 }
