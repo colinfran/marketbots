@@ -166,7 +166,10 @@ export function AgentLive({ initial }: { initial: EpisodeView | null }) {
     }
     return ep
   }, [events])
-  const ep = live ?? (initial ? fromStored(initial) : null)
+  // The stored episode is complete once it has finished (the page's history may lack its debug-level
+  // steps); a newer or still-running episode comes from the stream.
+  const stored = initial ? fromStored(initial) : null
+  const ep = live && !(stored && live.id === stored.id && stored.answered) ? live : stored
   if (!ep) return <Empty>No episode yet. The agent wakes on news, setups, moves in what it holds, its watches, the session and a periodic review.</Empty>
   const running = !ep.answered
   const lastStep = ep.steps.at(-1)
