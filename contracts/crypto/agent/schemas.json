@@ -267,7 +267,7 @@
               "description": "Expected holding period in hours (1-2160). When it elapses the position is reviewed, not sold."
             },
             "size_pct_of_max": {
-              "description": "BUY only: 10-100, the share of the maximum position size the risk engine allows. Size down when uncertain. null otherwise.",
+              "description": "BUY only: a whole number from 10 to 100, the percent of the largest position the risk checks allow (100 = the largest, 50 = half of it). Size down when uncertain. null otherwise.",
               "type": [
                 "number",
                 "null"

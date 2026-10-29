@@ -19,6 +19,10 @@ export const cryptoAgentDecisionSchema = cryptoDecisionSchema.extend({
   thesis: z.string().describe("2-3 sentences: why this action, why now. Cite numbers from the brief or your tool results."),
   bull_evidence: z.array(agentEvidenceSchema).describe("1-5 items for upside."),
   bear_evidence: z.array(agentEvidenceSchema).describe("1-5 counterarguments and downside risks. Always include at least one."),
+  size_pct_of_max: z
+    .number()
+    .nullable()
+    .describe("BUY only: a whole number from 10 to 100, the percent of the largest position the risk checks allow (100 = the largest, 50 = half of it). Size down when uncertain. null otherwise."),
   strategy: z.enum(STRATEGY_IDS).nullable().describe("BUY only: the strategy the entry follows (discretionary when none fits). null otherwise."),
 })
 
@@ -33,7 +37,11 @@ export type CryptoAgentAnswer = z.infer<typeof cryptoAgentAnswerSchema>
 
 export type NormalizedCryptoAgentDecision = NormalizedCryptoDecision & { strategy: StrategyId | null }
 
-/** Keeps decisions on known pairs (the first per pair, at most three), bounded like the cycle's. */
+/**
+ * Keeps decisions on known pairs (the first per pair, at most three), bounded like the cycle's. A
+ * size of 1 or less is read as a fraction (the local model sometimes writes 0.5 for 50%), so it
+ * isn't clamped up to the 10% floor.
+ */
 export const normalizeCryptoAgentDecisions = (
   decisions: CryptoAgentAnswer["decisions"],
   { universe, held, sourceUrls }: { universe: ReadonlySet<string>; held: ReadonlySet<string>; sourceUrls: ReadonlySet<string> },
@@ -49,7 +57,9 @@ export const normalizeCryptoAgentDecisions = (
       continue
     }
     seen.add(symbol)
-    const n = normalizeCryptoDecision(d, symbol, held.has(symbol), sourceUrls)
+    const fraction = d.size_pct_of_max !== null && d.size_pct_of_max > 0 && d.size_pct_of_max <= 1
+    const n = normalizeCryptoDecision(fraction ? { ...d, size_pct_of_max: d.size_pct_of_max! * 100 } : d, symbol, held.has(symbol), sourceUrls)
+    if (fraction) n.notes.push(`size_pct_of_max ${d.size_pct_of_max} read as ${d.size_pct_of_max! * 100}%`)
     out.push({ ...n, strategy: n.action === "buy" ? (d.strategy ?? "discretionary") : null })
   }
   if (out.length > 3) dropped.push(...out.slice(3).map((d) => `${d.symbol}: more than three decisions`))
