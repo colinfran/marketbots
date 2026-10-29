@@ -4,13 +4,15 @@ import { errorMessage, type Logger } from "@mb/engine-kit/log"
 import { cleanLine, cleanText, domainOf, fenceUntrusted } from "@mb/engine-kit/util/text"
 import { extractArticle } from "../enrich/article"
 import type { RequestText } from "../fetch"
-import { searchWeb, type SearchRange, type SearchResult } from "./search"
+import { FREE_ENGINES, PAID_ENGINES, searchWeb, type SearchEngine, type SearchRange, type SearchResult } from "./search"
 
 /**
  * Research on our own machines (docs/SERVER.md §9). The
  * bot's research prompt is unchanged; the local model can't browse, so the browsing is done for it:
  *   1. the model reads the request and writes up to MAX_QUERIES web searches;
- *   2. the search service (SearXNG) runs them, two at a time, for news and web results;
+ *   2. the search service (SearXNG) runs them, two at a time, on the free news engines, and on
+ *      the paid web engines (the residential proxy, billed per GB) for a query the free ones
+ *      found fewer than ENOUGH_FREE_RESULTS for, up to PAID_SEARCHES_PER_DAY;
  *   3. the model picks up to MAX_ARTICLES results worth reading, and the scraper fetches them;
  *   4. the model writes the memo from the results and articles alone, citing their URLs, thinking
  *      only as the time left allows (memoBudget).
@@ -23,6 +25,10 @@ export const MAX_QUERIES = 6
 export const MAX_ARTICLES = 5
 /** Per query: the results the model may pick from. */
 const RESULTS_PER_QUERY = 8
+/** A query the free engines find fewer results for than this is searched on the paid ones too. */
+const ENOUGH_FREE_RESULTS = 3
+/** Paid searches a UTC day, at most, per engine (the proxy's data is limited). */
+export const PAID_SEARCHES_PER_DAY = 100
 /** Per article: what the memo step reads (~1,250 tokens). */
 const ARTICLE_CHARS = 5_000
 const SEARCH_CONCURRENCY = 2
@@ -105,6 +111,8 @@ export type LocalResearchDeps = {
   /** Sent to the scraper as `X-Client` (its per-caller queue share): "crypto", "stock". */
   client: string
   log: Logger
+  /** Default PAID_SEARCHES_PER_DAY. */
+  paidSearchesPerDay?: number
 }
 
 type Json = Record<string, unknown>
@@ -167,6 +175,18 @@ export const localResearcher = (d: LocalResearchDeps): LocalResearch => {
     return content
   }
 
+  const paidPerDay = d.paidSearchesPerDay ?? PAID_SEARCHES_PER_DAY
+  let paidDay = ""
+  let paidToday = 0
+  /** One of today's paid searches (UTC), if any are left. */
+  const takePaidSearch = () => {
+    const day = new Date().toISOString().slice(0, 10)
+    if (day !== paidDay) [paidDay, paidToday] = [day, 0]
+    if (paidToday >= paidPerDay) return false
+    if (++paidToday === paidPerDay) d.log.warn("local research: that was today's last paid search", { limit: paidPerDay })
+    return true
+  }
+
   return async ({ model, prompt, fromDate, timeoutMs, progress }) => {
     const started = Date.now()
     const left = () => timeoutMs - (Date.now() - started)
@@ -191,18 +211,29 @@ export const localResearcher = (d: LocalResearchDeps): LocalResearch => {
       }
       if (!queries.length) return failed("the local model planned no searches")
 
-      // 2. Running them.
+      // 2. Running them: on the free engines, then on the paid ones if those found too little.
       const range = rangeFor(fromDate, new Date())
       let reached = false
       const found = await pool(queries, SEARCH_CONCURRENCY, async (q) => {
+        const search = (engines: SearchEngine[]) => searchWeb(d.request, SEARCH_URL, q, { engines, range, since: fromDate, timeoutMs: slice(1 / 4, 20_000) })
+        let results: SearchResult[]
         try {
-          const r = await searchWeb(d.request, SEARCH_URL, q, { range, timeoutMs: slice(1 / 4, 20_000) })
+          results = (await search(FREE_ENGINES)).results
           reached = true
-          return r.results.slice(0, RESULTS_PER_QUERY)
         } catch (error) {
           d.log.warn("local research: a search failed", { query: q, error: errorMessage(error) })
           return []
         }
+        if (results.length < ENOUGH_FREE_RESULTS && takePaidSearch()) {
+          try {
+            const paid = (await search(PAID_ENGINES)).results
+            d.log.info("local research: a paid search", { query: q, free: results.length, paid: paid.length, today: paidToday })
+            results = [...results, ...paid.filter((r) => !results.some((x) => x.url === r.url))]
+          } catch (error) {
+            d.log.warn("local research: a paid search failed", { query: q, error: errorMessage(error) })
+          }
+        }
+        return results.slice(0, RESULTS_PER_QUERY)
       })
       if (!reached) return failed("the search service is unreachable")
       const results: SearchResult[] = []

@@ -1,16 +1,41 @@
-# SearXNG for local research (compose `search`; docs/SERVER.md §9): its default engines, plus
-# JSON answers for the engines, no bot limiter (only the engines reach it) and no image proxy.
-# The secret key comes from SEARXNG_SECRET, random at every start: the service keeps no sessions.
-use_default_settings: true
+# SearXNG for local research (compose `search`; docs/SERVER.md §9): only the engines research
+# asks, JSON answers, no bot limiter (only the engines reach it) and no image proxy.
+# searxng-start.sh sets a random secret key at every start: the service keeps no sessions.
+#
+# Free engines answer from our own IP. Paid ones block it (rate limits, CAPTCHAs), so they go
+# through the residential proxy, which is billed per GB. They're disabled: only a request that
+# names them runs them, and research names them only when the free ones find too little
+# (@mb/wire/research/search). A request naming no loaded engine runs nothing. searxng-start.sh
+# writes SEARCH_PROXY_URL over the placeholders; without one, it drops those lines, and the paid
+# engines go direct.
+use_default_settings:
+  engines:
+    keep_only: [duckduckgo news, yahoo news, bing news, google cse]
 server:
   limiter: false
   image_proxy: false
 search:
   formats: [html, json]
   safe_search: 0
-# Tor-only engines: they can't load without a Tor proxy.
+  # How long a blocked engine rests, in seconds. The proxy's next request leaves from another
+  # exit, so not the hours or days a CAPTCHA otherwise costs.
+  suspended_times:
+    SearxEngineCaptcha: 600
+    cf_SearxEngineCaptcha: 1800
+    cf_SearxEngineAccessDenied: 1800
+    recaptcha_SearxEngineCaptcha: 1800
+# The one paid engine, Google CSE: through the proxy it answered every search, at ~20 KB for 20
+# results. Brave (rate-limited, 81 KB per refusal) and DuckDuckGo's web search (CAPTCHAs after two
+# searches, ~30 KB each) cost more for less. It's asked for 8 results, all research reads, and
+# gets its own network (SearXNG suspends a blocked engine's whole network) and a longer timeout,
+# since residential exits are slower than our line and a timed-out answer is paid for anyway.
 engines:
-  - name: ahmia
-    inactive: true
-  - name: torch
-    inactive: true
+  - name: yahoo news
+    inactive: false
+  - name: google cse
+    disabled: true
+    page_size: 8
+    timeout: 8.0
+    network:
+      retries: 0
+      proxies: "__SEARCH_PROXY_URL__"

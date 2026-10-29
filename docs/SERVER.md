@@ -8,7 +8,7 @@ What runs where:
 
 | Where | What | Config |
 | --- | --- | --- |
-| Windows server, Docker stack `marketbots` | `crypto-engine` on 127.0.0.1:8787 (with the Kraken CLI paper wallet), `stock-engine` on 127.0.0.1:8788, `scraper` (no host port), `llm` (llama.cpp with the local model on both GPUs, no host port), `search` (SearXNG for local research, no host port), `history` (Postgres with TimescaleDB and pgvector, no host port) and `history-backup` | `compose.yml`, `.env.crypto`, `.env.stock`, `.env.history` at the repo root |
+| Windows server, Docker stack `marketbots` | `crypto-engine` on 127.0.0.1:8787 (with the Kraken CLI paper wallet), `stock-engine` on 127.0.0.1:8788, `scraper` (no host port), `llm` (llama.cpp with the local model on both GPUs, no host port), `search` (SearXNG for local research, no host port), `history` (Postgres with TimescaleDB and pgvector, no host port) and `history-backup` | `compose.yml`, `.env.crypto`, `.env.stock`, `.env.history`, `.env.search` (optional) at the repo root |
 | Caddy on the Windows host | `engine.cryptomarketbot.app` → 127.0.0.1:8787, `engine.stockmarketbot.app` → 127.0.0.1:8788 (WebSocket) | `C:\Caddy\Caddyfile` |
 | Vercel | two projects: `apps/crypto-web` at cryptomarketbot.app, `apps/stock-web` at stockmarketbot.app | each project's environment variables |
 | MongoDB Atlas | one cluster, databases `cryptomarketbot` and `stockmarketbot` | `MONGODB_URI` |
@@ -94,9 +94,11 @@ git config core.autocrlf false        # the repo is LF only (.gitattributes)
 Copy-Item .env.crypto.example .env.crypto
 Copy-Item .env.stock.example .env.stock
 Copy-Item .env.history.example .env.history
+Copy-Item .env.search.example .env.search   # optional: the search proxy (§3.7)
 notepad .env.crypto
 notepad .env.stock
 notepad .env.history
+notepad .env.search
 ```
 
 **The wallet volume**: on this server `cryptomarketbot_kraken-paper` already exists and holds the live paper wallet (§6). Only on a brand-new server, create it once with `docker volume create cryptomarketbot_kraken-paper`; the engine creates the workspace on first boot.
@@ -219,6 +221,16 @@ HISTORY_URL=postgres://crypto_history:<CRYPTO_HISTORY_PASSWORD>@history:5432/cry
 - The passwords take effect when the `history-data` volume is created (the first start, by `packages/history/docker/initdb.sh`). Changing one in the file afterwards changes nothing: change it in Postgres too (`docker compose exec history psql -U postgres -c "alter role crypto_history password '…'"`), then in the bot's `HISTORY_URL`, then run `docker compose up -d <bot>-engine`.
 - Generate them like the other secrets (§1). Hex values need no quoting in a URL.
 - Without `HISTORY_URL` an engine keeps no history, and nothing else changes.
+
+### 3.7 The search service's file
+
+`.env.search` (git-ignored; template `.env.search.example`) holds the residential proxy (Evomi) for the paid search engines (§9). compose loads it into `search` only, and only if it exists: without it, the paid engines go direct, and our IP is blocked by most of them.
+
+| Variable | What |
+| --- | --- |
+| `SEARCH_PROXY_URL` | `http://<user>:<password>_country-US@core-residential.evomi.com:1000`: Evomi's dashboard shows `host:port:user:password`, which doesn't work here. `_country-US` (an Evomi option, after the password) keeps the exits in the US. Percent-encode special characters in the password. |
+
+The proxy is billed per GB, so research uses it sparingly (§9). At start, `packages/wire/docker/searxng-start.sh` writes the URL into a copy of the settings in the container's `/tmp`; the committed `searxng.yml` holds only a placeholder. After changing it, run `docker compose up -d search`.
 
 ---
 
@@ -655,7 +667,7 @@ nvidia-smi                                                  # ~6.8 GB used on ea
 
 **Research** (`@mb/wire/research/local`; the *Research model* in Admin): the model can't browse, so the engine does the browsing for it, from the bot's research prompt:
 1. The model reads the request and writes up to 6 web searches (no thinking).
-2. The `search` service runs them, two at a time, for news and web results from the last day (gap fills and event checks) or week (full research).
+2. The `search` service runs them, two at a time, for results from the last day (gap fills and event checks) or week (full research): first on the free news engines, then on the paid web engine for any search the free ones found fewer than 3 results for (below).
 3. The model picks up to 5 results to read in full, and the scraper fetches them (paywalled sites are refused, as for summaries).
 4. The model writes the memo from the results and articles alone, citing their URLs.
 
@@ -665,8 +677,12 @@ A run takes about a minute, and costs nothing (`ai_calls`: `cost_source: "local"
 - **No paywalled articles.** Their search snippets can still be cited.
 - **A search that finds nothing** is reported in the memo, and the cycle decides from our feeds. Only an unreachable search service or model fails the research.
 
-**The search service (`search`):** SearXNG, pinned by digest, on the default network (it needs the internet), with no host port. The engines reach it at `SEARCH_URL=http://search:8080`. Its settings are `packages/wire/docker/searxng.yml`: SearXNG's default engines, JSON answers, no rate limiter (only the engines call it). Its secret key is random at every start, since it keeps no sessions.
-- **Search engines throttle it:** Google, Bing News and DuckDuckGo answer most queries, but Brave and DuckDuckGo sometimes rate-limit or ask for a CAPTCHA. SearXNG suspends a failing engine for a while and asks the rest, so research gets fewer results, not none.
+**The search service (`search`):** SearXNG, pinned by digest, on the default network (it needs the internet), with no host port. The engines reach it at `SEARCH_URL=http://search:8080`. Its settings are `packages/wire/docker/searxng.yml`: only the four engines research uses, JSON answers, no rate limiter (only the engines call it). `searxng-start.sh` starts it with a random secret key (it keeps no sessions) and the proxy's URL (§3.7).
+- **Free engines** answer from our own IP: DuckDuckGo News, Yahoo News and Bing News. Bing News filters by date itself. The other two can't, so SearXNG would skip them on a dated search: they're asked without a date, and only results dated since the research's start date are kept.
+- **The paid engine**, Google CSE, blocks our IP ("unusual traffic"), so it goes through the residential proxy (Evomi, US home IPs). The proxy is billed per GB, so the engine is disabled in SearXNG (only a request that names it runs it), and research names it only for a search the free engines found fewer than 3 results for: at most 100 a UTC day per engine (`PAID_SEARCHES_PER_DAY`). It's asked for 8 results, all research reads. Each paid search is logged (`local research: a paid search`).
+- **Its cost**, measured through the proxy on 2026-10-29: ~11 KB a search, plus ~8 KB for Google's search token at most once an hour, and ~5 KB to open a new tunnel. Even at the cap on both engines (200 a day) that's under 4 MB a day, ~110 MB a month. Evomi's dashboard shows the real use.
+- **Blocks:** SearXNG suspends a blocked engine for 3–30 minutes (`suspended_times`), not the hours or days of its defaults: the proxy's next tunnel leaves from another IP.
+- **Not used:** Brave (rate-limited even through the proxy, and its refusal page is 81 KB), DuckDuckGo's web search (CAPTCHAs after two searches through one exit), Mojeek and Startpage (proof-of-work CAPTCHAs, off upstream), Google News and Qwant (access denied), Reuters (401).
 - **Check it:** `docker compose ps search`, and `docker logs marketbots-search` for engines that fail.
 - **When research runs:** Admin's *Web research* (auto: only when our feeds leave a gap) and *Event research* (*web check*: a quick search before an event decision; stored as `x_verify`).
 

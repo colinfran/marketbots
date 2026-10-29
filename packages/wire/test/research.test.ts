@@ -8,11 +8,16 @@ const ENV = { LLM_URL: "http://llm:8080", SEARCH_URL: "http://search:8080", SCRA
 const MODEL = "local/qwen3.6-35b-a3b-q2"
 const PROMPT = "You are the research desk. Use your live tools (x_search first, web_search to confirm) for these gaps:\n- HYPE/USD [candidate]: unexplained -6% in 4 h"
 const yesterday = () => new Date(Date.now() - 86_400_000).toISOString().slice(0, 10)
+const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString()
+
+const FREE = "duckduckgo news,yahoo news"
+const FREE_BY_RANGE = "bing news"
+const PAID = "google cse"
 
 const RESULTS = [
-  { url: "https://www.coindesk.com/markets/2026/10/28/hype-unlock", title: "Hyperliquid unlocks 9.9M HYPE", content: "The team unlocked 9.9 million HYPE tokens on Tuesday.", engines: ["google cse", "bing news"], publishedDate: "2026-10-28T09:00:00Z" },
-  { url: "https://www.coingecko.com/en/coins/hyperliquid", title: "Hyperliquid price chart", content: "Live HYPE price.", engines: ["duckduckgo"] },
-  { url: "https://www.theblock.co/post/1/hyperliquid-outflows", title: "Hyperliquid sees $40M outflows", content: "Bridge outflows rose after the unlock.", engines: ["google cse"], publishedDate: "2026-10-28T11:30:00Z" },
+  { url: "https://www.coindesk.com/markets/2026/10/28/hype-unlock", title: "Hyperliquid unlocks 9.9M HYPE", content: "The team unlocked 9.9 million HYPE tokens on Tuesday.", engines: ["duckduckgo news", "bing news"], publishedDate: hoursAgo(5) },
+  { url: "https://www.coingecko.com/en/coins/hyperliquid", title: "Hyperliquid price chart", content: "Live HYPE price.", engines: ["bing news"] },
+  { url: "https://www.theblock.co/post/1/hyperliquid-outflows", title: "Hyperliquid sees $40M outflows", content: "Bridge outflows rose after the unlock.", engines: ["yahoo news"], publishedDate: hoursAgo(2) },
 ]
 
 const MEMO = `- [FACT] Hyperliquid unlocked 9.9M HYPE on Tuesday (2026-10-28, https://www.coindesk.com/markets/2026/10/28/hype-unlock)
@@ -24,7 +29,7 @@ const completion = (content: string, usage = { prompt_tokens: 1_000, completion_
 type Call = { path: string; body: Record<string, unknown>; url: URL; headers: Record<string, string> }
 
 /** A fake model server, search service and scraper behind global fetch. */
-const fakeServices = ({ search = () => json({ results: RESULTS, unresponsive_engines: [["brave", "too many requests"]] }), extract }: { search?: (q: string) => Response; extract?: (url: string) => Response } = {}) => {
+const fakeServices = ({ search = () => json({ results: RESULTS, unresponsive_engines: [["bing news", "parsing error"]] }), extract }: { search?: (q: string, engines: string) => Response; extract?: (url: string) => Response } = {}) => {
   const calls: Call[] = []
   vi.stubGlobal(
     "fetch",
@@ -32,7 +37,7 @@ const fakeServices = ({ search = () => json({ results: RESULTS, unresponsive_eng
       const url = new URL(String(input))
       const body = init.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {}
       calls.push({ path: url.pathname, body, url, headers: (init.headers ?? {}) as Record<string, string> })
-      if (url.pathname === "/search") return search(url.searchParams.get("q") ?? "")
+      if (url.pathname === "/search") return search(url.searchParams.get("q") ?? "", url.searchParams.get("engines") ?? "")
       if (url.pathname === "/extract") {
         const target = String(body.url)
         return extract ? extract(target) : json({ status: "ok", title: "Hyperliquid unlocks 9.9M HYPE", published: "2026-10-28T09:00:00Z", lang: "en", text: `Full article about ${target}. `.repeat(20), words: 400 })
@@ -49,7 +54,7 @@ const fakeServices = ({ search = () => json({ results: RESULTS, unresponsive_eng
   return { calls, of: (path: string) => calls.filter((c) => c.path === path) }
 }
 
-const researcher = (env: Record<string, string | undefined> = ENV) => localResearcher({ request: httpClient("test").requestText, env, client: "crypto", log: silentLogger })
+const researcher = (env: Record<string, string | undefined> = ENV, paidSearchesPerDay?: number) => localResearcher({ request: httpClient("test").requestText, env, client: "crypto", log: silentLogger, paidSearchesPerDay })
 const job = (over = {}) => ({ model: MODEL, prompt: PROMPT, fromDate: yesterday(), timeoutMs: 120_000, ...over })
 
 describe("local research", () => {
@@ -65,10 +70,17 @@ describe("local research", () => {
       ["Hyperliquid HYPE news", "web_search"],
       ["HYPE token unlock", "web_search"],
     ])
-    expect(http.of("/search").map((c) => Object.fromEntries(c.url.searchParams))).toEqual([
-      { q: "Hyperliquid HYPE news", format: "json", categories: "news,general", time_range: "day", language: "en" },
-      { q: "HYPE token unlock", format: "json", categories: "news,general", time_range: "day", language: "en" },
-    ])
+    // The free engines only: Bing News filters by date itself, the others are dated here. They found enough, so no paid search.
+    const searches = http.of("/search").map((c) => Object.fromEntries(c.url.searchParams))
+    expect(searches).toHaveLength(4)
+    expect(searches).toEqual(
+      expect.arrayContaining(
+        ["Hyperliquid HYPE news", "HYPE token unlock"].flatMap((q) => [
+          { q, format: "json", engines: FREE_BY_RANGE, time_range: "day", language: "en" },
+          { q, format: "json", engines: FREE, language: "en" },
+        ]),
+      ),
+    )
     // The picks, best first and once each (an index out of range is dropped), go to the scraper as this bot.
     expect(http.of("/extract").map((c) => [c.body.url, c.headers["x-client"]])).toEqual([
       ["https://www.theblock.co/post/1/hyperliquid-outflows", "crypto"],
@@ -102,6 +114,42 @@ describe("local research", () => {
     const r = await researcher()(job())
     expect(r).toMatchObject({ error: null, sources: [], memo: "Web search found nothing for: Hyperliquid HYPE news; HYPE token unlock. No other research this cycle: decide from WIRE and the market data." })
     expect(http.of("/v1/chat/completions")).toHaveLength(1)
+  })
+
+  it("searches the paid engines only for a query the free ones found too little for, and keeps only results dated since the request's date", async () => {
+    const old = { url: "https://example.com/old", title: "Old news", content: "", engines: ["yahoo news"], publishedDate: hoursAgo(24 * 5) }
+    const undated = { url: "https://example.com/undated", title: "Undated", content: "", engines: ["duckduckgo news"] }
+    const web = { url: "https://hyperliquid.xyz/blog/unlock", title: "Unlock schedule", content: "The official schedule.", engines: ["google cse"] }
+    const http = fakeServices({
+      search: (q, engines) => {
+        if (engines === PAID) return json({ results: [web], unresponsive_engines: [] })
+        if (q !== "HYPE token unlock") return json({ results: RESULTS, unresponsive_engines: [] })
+        return json({ results: engines === FREE ? [old, undated, RESULTS[2]] : [], unresponsive_engines: [] })
+      },
+    })
+    expect((await researcher()(job())).error).toBeNull()
+    const paid = http.of("/search").filter((c) => c.url.searchParams.get("engines") === PAID)
+    expect(paid.map((c) => Object.fromEntries(c.url.searchParams))).toEqual([{ q: "HYPE token unlock", format: "json", engines: PAID, time_range: "day", language: "en" }])
+    // The model picks from what's left: the free results, then the paid one, without the old or undated ones.
+    const listing = (http.of("/v1/chat/completions")[1].body.messages as { content: string }[])[1].content
+    expect(listing).toContain("https://hyperliquid.xyz/blog/unlock")
+    expect(listing).not.toContain("example.com")
+  })
+
+  it("stops searching the paid engines at the day's limit", async () => {
+    const http = fakeServices({ search: () => json({ results: [], unresponsive_engines: [] }) })
+    const research = researcher(ENV, 1)
+    await research(job())
+    await research(job())
+    // Two runs of two queries the free engines found nothing for: one paid search in all.
+    expect(http.of("/search").filter((c) => c.url.searchParams.get("engines") === PAID)).toHaveLength(1)
+  })
+
+  it("keeps what one free request found when the other fails", async () => {
+    fakeServices({ search: (_q, engines) => (engines === FREE_BY_RANGE ? new Response("bad gateway", { status: 502 }) : json({ results: engines === FREE ? RESULTS : [], unresponsive_engines: [] })) })
+    const r = await researcher()(job())
+    expect(r.error).toBeNull()
+    expect(r.sources.map((s) => s.domain)).toEqual(["coindesk.com", "theblock.co"])
   })
 
   it("fails when the search service is unreachable, or isn't configured", async () => {
