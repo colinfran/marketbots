@@ -6,13 +6,13 @@ import { StatusReporter } from "@mb/engine-kit/control/status"
 import { errorMessage, type Logger } from "@mb/engine-kit/log"
 import { claimDueSeed, finishSeed } from "@mb/engine-kit/state/seed-runs"
 import { every, withTimeout } from "@mb/engine-kit/util/async"
-import type { TradeUpdate } from "@mb/stock-core/alpaca"
+import type { AlpacaAccount, AlpacaPosition, TradeUpdate } from "@mb/stock-core/alpaca"
 import type { Command } from "@mb/stock-core/commands"
 import type { CommandDoc, CoreReviewKind, CycleKind, EngineStatusDoc, HistoryRangeKey, MarketSessionInfo, SeedRunDoc } from "@mb/stock-core/db"
 import type { CycleState, EngineRunStatus } from "@mb/stock-core/events"
 import { roundTo } from "@mb/stock-core/math"
 import { STRATEGY_LABEL } from "@mb/stock-core/options"
-import type { Phase } from "@mb/stock-core/settings"
+import type { Phase, SettingsPatch } from "@mb/stock-core/settings"
 import type { EventFocus, WireCategory, WireItemDoc } from "@mb/stock-core/wire"
 import { marketDay, minutesBetween } from "@mb/stock-core/time"
 import type { HistoryStore } from "@mb/history/store"
@@ -150,6 +150,8 @@ export class Engine {
   private readonly reference = new Map<string, number>()
   private readonly triggerCooldown = new Map<string, number>()
   private heldSymbols: string[] = []
+  /** The broker's account and positions at the last refresh (every 15 s): the agent's view of the paper account. */
+  private snapshot: { account: AlpacaAccount; positions: AlpacaPosition[] } | null = null
   /** The core book's holdings while it is on (refreshed with the account): the trading cycles and their triggers leave them alone. */
   private coreSymbols: ReadonlySet<string> = new Set()
   private watchSymbols: string[] = []
@@ -189,7 +191,26 @@ export class Engine {
       signal: this.abort.signal,
       wire: d.wire,
     }
-    this.agent = createStockAgent({ ctx: this.ctx, history: d.history ?? null, calls: d.calls, llmUrl: d.env.LLM_URL ?? null, session: () => this.session, layerPrice: (s, ms) => d.coverage.price(s, ms) })
+    this.agent = createStockAgent({
+      ctx: this.ctx,
+      history: d.history ?? null,
+      calls: d.calls,
+      llmUrl: d.env.LLM_URL ?? null,
+      session: () => this.session,
+      layerPrice: (s, ms) => d.coverage.price(s, ms),
+      snapshot: () => this.snapshot,
+      // At level auto the cycle slot runs only the one-time seed and the core book's reviews: the agent waits for them, so they never spend the same cash.
+      busy: () => (this.agentTrades && this.cycle ? "a core review or the one-time seed is running" : null),
+      demote: async (reason) => {
+        const r = await d.settings.apply({ agent: { level: "shadow" } } as SettingsPatch, "engine:agent-breaker", null)
+        if (!r.ok) throw new Error(r.error)
+        d.log.warn("agent dropped to shadow", { reason })
+      },
+      promotion: {
+        get: () => d.state.state.agent_promotion ?? null,
+        set: (p) => d.state.update({ agent_promotion: p }, "engine", "agent.promoted", {}),
+      },
+    })
     this.commands = new CommandProcessor(d.db.col, d.bus, d.log.child({ component: "commands" }), (c, doc) => this.handleCommand(c, doc))
     this.coreRanking = new CoreRankingStore({ col: d.db.col, alpaca: d.alpaca, settings: () => d.settings.current, log: d.log.child({ component: "core-book" }), held: () => this.heldSymbols })
     this.eventQueue = new EventCycleQueue({
@@ -433,6 +454,7 @@ export class Engine {
   private async refreshAccount() {
     const snapshot = await writeAccountSnapshot(this.ctx)
     const { account, positions } = snapshot
+    this.snapshot = { account, positions }
     this.optionsLevel = account.options_trading_level ?? account.options_approved_level ?? null
     const stocks = positions.filter((p) => (p.asset_class ?? "us_equity") === "us_equity")
     this.heldSymbols = stocks.map((p) => p.symbol)
@@ -493,7 +515,8 @@ export class Engine {
     const now = new Date()
     const session = await this.refreshSession(now)
     const settings = this.d.settings.current
-    this.plan = await planPhase(this.d.db.col, settings, session, now)
+    // At level auto the agent decides on its own events: no session phases, intraday, price-move or event cycles.
+    this.plan = this.agentTrades ? { phase: null, reason: "The agent trades (level auto): no timed cycles." } : await planPhase(this.d.db.col, settings, session, now)
     // In the background: a few REST calls once a day, never blocking a cycle.
     void this.coreRanking.refresh(session, now)
     if (this.cycle) return
@@ -512,8 +535,9 @@ export class Engine {
       if (core.due) return this.startCoreReview(session, "schedule", { dryRun: false })
     }
     // News events go before scheduled intraday cycles (the planner's other phases still come first).
-    if ((!this.plan.phase || this.plan.phase === "intraday") && (this.coreQueue.drain() || this.eventQueue.drain())) return
+    if ((!this.plan.phase || this.plan.phase === "intraday") && (this.coreQueue.drain() || (!this.agentTrades && this.eventQueue.drain()))) return
     if (this.plan.phase) return this.startCycle(this.plan.phase, session, "schedule", { kind: "scheduled" })
+    if (this.agentTrades) return
 
     // Between scheduled intraday cycles, a held stock or option underlying moving sharply triggers an early one.
     const s = settings.schedule
@@ -648,10 +672,17 @@ export class Engine {
    * running and the minimum gap since the last event cycle has passed; otherwise it waits, merged
    * by symbol (highest severity kept), and runs the moment the current cycle ends.
    */
-  requestEventCycle(focus: EventFocus): "fired" | "queued" {
+  requestEventCycle(focus: EventFocus): "fired" | "queued" | "agent" {
     // Bad news about a core holding goes to the core book's single-holding review, not an event cycle.
     if (focus.rule === CORE_REVIEW_RULE) return this.coreQueue.request(focus)
+    // At level auto the agent trades: it has already seen the trigger's candidate.
+    if (this.agentTrades) return "agent"
     return this.eventQueue.request(focus)
+  }
+
+  /** Level auto: the agent decides and the timed cycles stop (the core book's reviews carry on). */
+  private get agentTrades() {
+    return this.d.settings.current.agent.level === "auto"
   }
 
   /** Drops triggers that waited too long (the queue does this on every drain; tests call it with a later clock). */
@@ -704,15 +735,18 @@ export class Engine {
     const near = this.nearSession(session, now)
     if (Date.now() - this.lastMaintenance < (near ? MIN : 15 * MIN)) return
     this.lastMaintenance = Date.now()
-    // While a cycle is trading, only sync: re-protecting a stock the cycle is selling would fight
-    // it for the shares. The cycle checks protection itself before it finishes.
-    if (this.cycle) {
+    // While a cycle or an agent episode is trading, only sync: re-protecting a stock it is selling
+    // would fight it for the shares. The cycle checks protection itself before it finishes; the
+    // next pass does it after an episode.
+    if (this.cycle || (this.agentTrades && this.agent.agent.current)) {
       await syncOrders(this.d.db.col, this.d.alpaca)
       return
     }
     const notes = await maintain(this.ctx, session, {
       now,
-      closeCycleDone: async () => (await this.d.db.col.cycles.countDocuments({ trading_day: session.day, phase: "close", status: { $in: ["succeeded", "running"] } })) > 0,
+      // At level auto there is no closing cycle: the overnight rules always run in the last minutes.
+      closeCycleDone: async () => !this.agentTrades && (await this.d.db.col.cycles.countDocuments({ trading_day: session.day, phase: "close", status: { $in: ["succeeded", "running"] } })) > 0,
+      agentTrades: this.agentTrades,
     })
     if (notes.length) this.d.log.info("maintenance", { notes })
   }
@@ -759,6 +793,8 @@ export class Engine {
     const by = doc.created_by
     switch (command.type) {
       case "cycle.run_now": {
+        // At level auto there are no cycles: the agent reviews what was asked, and may act on it.
+        if (this.agentTrades) return this.agent.agent.review(command.symbols ?? [], by)
         if (this.cycle) throw new Error("a cycle is already running")
         if (state.state.status !== "running" || state.state.kill_switch.engaged) throw new Error(`engine is ${this.status}`)
         const session = await this.refreshSession()

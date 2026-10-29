@@ -3,6 +3,7 @@ import { checkEntry, entryRoomUsd, type EnvelopeHistory } from "@mb/agent/envelo
 import type { ShadowPositionDoc } from "@mb/core/agent"
 import { utcDay } from "@mb/crypto-core/db"
 import { roundTo } from "@mb/crypto-core/math"
+import type { Settings } from "@mb/crypto-core/settings"
 import type { HistoryStore } from "@mb/history/store"
 import type { WireCategory } from "@mb/crypto-core/wire"
 import type { EngineContext } from "../orchestrator/context"
@@ -12,7 +13,7 @@ import { formatPrice, roundPrice } from "../venues/kraken/pairs"
 /**
  * What the crypto agent works with: the engine's context, its shadow book and the history store.
  * The shadow book fills at the paper wallet's own fee and slippage, so its results compare with
- * the timed cycles' book.
+ * the timed cycles' book. At level auto the agent decides into the paper account instead (./live).
  */
 
 export type CryptoAgentDeps = {
@@ -34,6 +35,25 @@ export const createShadowBook = (ctx: EngineContext) =>
   })
 
 export const mid = (ctx: EngineContext) => (symbol: string) => ctx.hub.quote(symbol)?.mid ?? null
+
+/** Level auto: the agent trades the paper account. */
+export const isLive = (d: Pick<CryptoAgentDeps, "ctx">) => d.ctx.settings.current.agent.level === "auto"
+
+/** How far inside the allowed stop range a clamped stop lands, as a share of the range's edge, so rounding and a moving mid can't push it back out. */
+const STOP_MARGIN = 0.02
+
+/**
+ * The agent's stop for an entry: its own when it is below the price and within the allowed range;
+ * moved just inside the range when it is outside it (the model often lands a hair past an edge);
+ * `fallback` when it gave none or one at or above the price.
+ */
+export const agentStop = (mid: number, stop: number | null, fallback: number, k: Pick<Settings["kraken"], "min_stop_pct" | "max_stop_pct">) => {
+  if (stop === null || stop >= mid) return fallback
+  const pct = ((mid - stop) / mid) * 100
+  if (pct > k.max_stop_pct) return mid * (1 - (k.max_stop_pct * (1 - STOP_MARGIN)) / 100)
+  if (pct < k.min_stop_pct) return mid * (1 - (k.min_stop_pct * (1 + STOP_MARGIN)) / 100)
+  return stop
+}
 
 /** The risk engine's gate for the shadow book: the engine's run state and the venue; the paper wallet's reconciliation is the live book's business. */
 export const shadowGate = (ctx: EngineContext): Gate => ({ ...ctx.gate(), reconciled: true })
@@ -61,16 +81,30 @@ export const shadowRiskState = async (d: CryptoAgentDeps, now = new Date()): Pro
   }
 }
 
-const price = (d: CryptoAgentDeps, symbol: string, p: number | null) => {
+export const price = (d: Pick<CryptoAgentDeps, "ctx">, symbol: string, p: number | null) => {
   if (p === null) return "n/a"
   const pair = d.ctx.hub.pairs.get(symbol)
   return pair ? formatPrice(pair, p) : String(roundTo(p, 6))
 }
 
-/** YOUR BOOK and LIMITS: the brief's account part, also the `book` tool's answer. */
-export const bookText = async (d: CryptoAgentDeps, now = new Date()) => {
-  const s = d.ctx.settings.current
-  const k = s.kraken
+/** LIMITS: what code enforces right now, the same for both books. `blocked` lists why entries can't happen at all. */
+export const limitsText = (d: Pick<CryptoAgentDeps, "ctx">, { equityUsd, history, blocked }: { equityUsd: number; history: EnvelopeHistory; blocked: string[] }, now = new Date()) => {
+  const k = d.ctx.settings.current.kraken
+  const env = d.ctx.settings.current.agent.envelope
+  const envelope = checkEntry("", history, env, now.getTime())
+  const room = entryRoomUsd(Number.POSITIVE_INFINITY, history, env, now.getTime())
+  const maxPosition = (equityUsd * k.max_position_pct) / 100
+  return [
+    "LIMITS (enforced by code)",
+    `- New entries: ${blocked.length ? `blocked (${blocked.join("; ")})` : envelope.approved ? "allowed" : `blocked by your envelope (${envelope.reason})`}.`,
+    `- Your envelope: ${history.entries.length}/${env.entries_per_day} entries in 24 h, ${history.entries.filter((e) => now.getTime() - e.at < 3_600_000).length}/${env.entries_per_hour} in the last hour, ${history.openPositions}/${env.max_open_positions} open; $${room.toFixed(0)} more can be committed this hour; an entry is ${env.size_pct}% of what the risk checks allow; one action per pair per ${env.symbol_action_minutes} min; no re-entry for ${env.reentry_after_stop_hours} h after a stop-out or ${env.flip_hours} h after an exit.`,
+    `- Risk checks: lose at most ${k.risk_per_trade_pct}% of equity at the stop; at most ${k.max_position_pct}% of equity in one position ($${maxPosition.toFixed(0)}); reward:risk ≥ ${k.min_reward_risk}; edge after costs ≥ ${k.min_edge_bps} bps; conviction ≥ ${k.min_conviction}; stop ${k.min_stop_pct}-${k.max_stop_pct}% below the price; spread ≤ ${k.max_spread_bps} bps; positions held at least ${k.min_hold_minutes} min before you can close them.`,
+    `- Costs: taker fee ${d.ctx.feeBps()} bps a side plus ${k.paper_slippage_bps} bps slippage, and the spread.`,
+  ]
+}
+
+/** YOUR BOOK and LIMITS for the shadow book: the brief's account part, also the `book` tool's answer. */
+export const shadowBookText = async (d: CryptoAgentDeps, now = new Date()) => {
   const { state, history, open } = await shadowRiskState(d, now)
   const account = await d.shadow.account(mid(d.ctx))
   const lines = open.map((p) => {
@@ -84,20 +118,12 @@ export const bookText = async (d: CryptoAgentDeps, now = new Date()) => {
     gate.runStatus !== "running" ? `the engine is ${gate.runStatus}` : null,
     gate.killSwitch ? "the kill switch is engaged" : null,
     gate.venueOnline ? null : "Kraken data or the paper wallet is unavailable",
-  ].filter(Boolean)
-  const env = s.agent.envelope
-  const envelope = checkEntry("", history, env, now.getTime())
-  const room = entryRoomUsd(Number.POSITIVE_INFINITY, history, env, now.getTime())
-  const maxPosition = (state.equityUsd * k.max_position_pct) / 100
+  ].filter((x): x is string => x !== null)
   return [
     `YOUR BOOK (shadow; started with $${account.starting_usd.toLocaleString("en-US")})`,
     `cash $${account.cash_usd.toFixed(2)} · equity $${account.equity_usd.toFixed(2)} (${account.return_pct >= 0 ? "+" : ""}${account.return_pct}%) · realized $${account.realized_pnl_usd.toFixed(2)} · ${account.open_positions} open, ${account.closed_positions} closed`,
     ...(lines.length ? lines : ["- no open positions"]),
     "",
-    "LIMITS (enforced by code)",
-    `- New entries: ${blocked.length ? `blocked (${blocked.join("; ")})` : envelope.approved ? "allowed" : `blocked by your envelope (${envelope.reason})`}.`,
-    `- Your envelope: ${history.entries.length}/${env.entries_per_day} entries in 24 h, ${history.entries.filter((e) => now.getTime() - e.at < 3_600_000).length}/${env.entries_per_hour} in the last hour, ${history.openPositions}/${env.max_open_positions} open; $${room.toFixed(0)} more can be committed this hour; an entry is ${env.size_pct}% of what the risk checks allow; one action per pair per ${env.symbol_action_minutes} min; no re-entry for ${env.reentry_after_stop_hours} h after a stop-out or ${env.flip_hours} h after an exit.`,
-    `- Risk checks: lose at most ${k.risk_per_trade_pct}% of equity at the stop; at most ${k.max_position_pct}% of equity in one position ($${maxPosition.toFixed(0)}); reward:risk ≥ ${k.min_reward_risk}; edge after costs ≥ ${k.min_edge_bps} bps; conviction ≥ ${k.min_conviction}; stop ${k.min_stop_pct}-${k.max_stop_pct}% below the price; spread ≤ ${k.max_spread_bps} bps; positions held at least ${k.min_hold_minutes} min before you can close them.`,
-    `- Costs: taker fee ${d.ctx.feeBps()} bps a side plus ${k.paper_slippage_bps} bps slippage, and the spread.`,
+    ...limitsText(d, { equityUsd: state.equityUsd, history, blocked }, now),
   ].join("\n")
 }

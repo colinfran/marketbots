@@ -61,8 +61,8 @@ export type PolicyDeps<C extends string, S extends PolicySettings> = {
   session?: () => { open: boolean; reason: string }
   held: () => string[]
   universe: () => string[]
-  /** Hands a focus to the engine: started now, or waiting behind a running cycle or the minimum gap. */
-  request: (focus: EventFocus) => "fired" | "queued"
+  /** Hands a focus to the engine: started now, waiting behind a running cycle or the minimum gap, or left to the agent (which trades at level auto, and has already seen the candidate through `observe`). */
+  request: (focus: EventFocus) => "fired" | "queued" | "agent"
   markNotable: (ids: string[], reason: "triggered") => Promise<unknown>
   /** Runs the owner's emergency action on a held symbol; returns what was done. */
   emergency: (symbol: string, focus: EventFocus) => Promise<string>
@@ -189,8 +189,8 @@ export class WirePolicy<C extends string, S extends PolicySettings> {
     if (go) {
       // One request per symbol (the engine's queue merges by symbol); market-wide reviews have none.
       const results = (c.symbols.length ? c.symbols : [null]).map((sym) => this.d.request(focus(sym)))
-      doc.status = results.includes("fired") ? "fired" : "queued"
-      doc.reason = doc.status === "fired" ? "event cycle started" : "queued behind a running cycle or the minimum gap"
+      doc.status = results.includes("fired") || results.includes("agent") ? "fired" : "queued"
+      doc.reason = results.includes("agent") ? "handed to the agent" : doc.status === "fired" ? "event cycle started" : "queued behind a running cycle or the minimum gap"
     } else if (gate.status === "fired" && c.action === "alert_only") {
       doc.reason = "alert sent"
     }

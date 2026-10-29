@@ -319,6 +319,16 @@ describe("maintain", () => {
     })
   })
 
+  it("at level auto always applies the overnight rules in the last minutes, as the day's end rather than a fallback", async () => {
+    const now = beforeClose(6)
+    vi.setSystemTime(now)
+    broker.setPosition("AAPL", 10, 100)
+    await addPlan("AAPL", { horizon: "intraday" })
+    const notes = await settle(upkeep(ctx, session(), { now, closeCycleDone: async () => false, agentTrades: true }))
+    expect(notes).toEqual(["flattened AAPL"])
+    expect(alerts).toContainEqual({ level: "info", title: "Overnight rules: sold the day's intraday positions", message: "flattened AAPL", path: "/journal/2026-10-26" })
+  })
+
   it("leaves positions alone when the closing cycle succeeded", async () => {
     const now = beforeClose(6)
     vi.setSystemTime(now)

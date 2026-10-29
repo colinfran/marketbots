@@ -2,7 +2,7 @@
   "tools": [
     {
       "name": "book",
-      "description": "your shadow book again (positions, cash, P&L) and the limits code enforces right now. Args: {}.",
+      "description": "your book again (positions, cash, P&L) and the limits code enforces right now. Args: {}.",
       "args": {
         "type": "object",
         "properties": {},
@@ -129,7 +129,7 @@
     },
     {
       "name": "past_decisions",
-      "description": "the bot's last decisions on a pair (the timed cycles' and yours in the shadow book), with how they turned out. Args: {symbol}.",
+      "description": "the bot's last decisions on a pair (yours on the paper account, the timed cycles' before you, and yours in the shadow book), with how they turned out. Args: {symbol}.",
       "args": {
         "type": "object",
         "properties": {

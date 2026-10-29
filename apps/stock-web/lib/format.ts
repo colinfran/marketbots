@@ -19,3 +19,6 @@ export const wireSource = (source: string, domain?: string | null) => WIRE_SOURC
 
 /** "10:30:15 AM" in New York time (for live feeds). */
 export const { time, dateTime } = zonedFormat(MARKET_TZ)
+
+/** Where a decision's reasoning lives: the agent's episode (level auto), else the cycle's report. */
+export const decisionHref = (d: { report_id: string | null; agent_episode_id?: string | null }) => (d.agent_episode_id ? `/agent/${d.agent_episode_id}` : d.report_id ? `/research/${d.report_id}` : null)

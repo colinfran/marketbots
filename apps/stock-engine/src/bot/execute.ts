@@ -204,7 +204,7 @@ export type ExecuteInput = {
   cycleId: string
   reportId: string
   phase: Phase
-  report: BotReport
+  report: Pick<BotReport, "decisions">
   /** Contracts that were offered to the AI this cycle (options entries must come from here). */
   chains: Map<string, ChainContract>
   /** Why new entries are blocked right now (kill switch, pause), or null. */
@@ -213,9 +213,16 @@ export type ExecuteInput = {
   triggerKind?: CycleKind
   /** Event cycles: wire item ids per symbol ("*" = market-wide), recorded on the decisions. */
   wireItemIds?: Record<string, string[]>
+  /** Record a default hold for every held stock the decisions leave out (a cycle reviews them all; an agent episode only what woke it). Default true. */
+  holdUnmentioned?: boolean
+  /** The agent episode that made the decisions (level auto), recorded on them. */
+  agentEpisodeId?: string
 }
 
-export const executeDecisions = async (ctx: TradingContext, { cycleId, reportId, phase, report, chains, entriesBlocked, triggerKind, wireItemIds }: ExecuteInput): Promise<ExecutionSummary> => {
+export const executeDecisions = async (
+  ctx: TradingContext,
+  { cycleId, reportId, phase, report, chains, entriesBlocked, triggerKind, wireItemIds, holdUnmentioned = true, agentEpisodeId }: ExecuteInput,
+): Promise<ExecutionSummary> => {
   const { alpaca, col, bus } = ctx
   const settings = ctx.settings.current
   const r = settings.risk
@@ -264,7 +271,7 @@ export const executeDecisions = async (ctx: TradingContext, { cycleId, reportId,
   // broker-side stop/target orders stay active) so the audit trail is complete.
   const decided = new Set(report.decisions.filter((d) => !isOptionAction(d.action)).map((d) => d.symbol))
   const defaultHolds: Decision[] = positions
-    .filter((p) => !decided.has(p.symbol))
+    .filter((p) => holdUnmentioned && !decided.has(p.symbol))
     .map((p) => ({
       symbol: p.symbol,
       action: "hold",
@@ -334,6 +341,7 @@ export const executeDecisions = async (ctx: TradingContext, { cycleId, reportId,
       action: d.action,
       ...(triggerKind ? { trigger_kind: triggerKind } : {}),
       ...(wireItemIds && (wireItemIds[d.symbol] ?? wireItemIds["*"])?.length ? { wire_item_ids: wireItemIds[d.symbol] ?? wireItemIds["*"] } : {}),
+      ...(agentEpisodeId ? { agent_episode_id: agentEpisodeId } : {}),
       request: d,
       status: outcome.status,
       reason: outcome.reason,

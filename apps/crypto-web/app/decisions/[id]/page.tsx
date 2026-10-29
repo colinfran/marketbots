@@ -57,9 +57,15 @@ export default async function DecisionPage({ params }: Props) {
         description={
           <>
             {dateTime(d.created_at)} ·{" "}
-            <Link href={`/research/${d.cycle_id}`} className="hover:underline">
-              view the full cycle and research memo
-            </Link>
+            {d.agent_episode_id ? (
+              <Link href={`/agent/${d.agent_episode_id}`} className="hover:underline">
+                view the agent&apos;s episode: what woke it, each lookup and its thinking
+              </Link>
+            ) : (
+              <Link href={`/research/${d.cycle_id}`} className="hover:underline">
+                view the full cycle and research memo
+              </Link>
+            )}
           </>
         }
       />

@@ -7,13 +7,21 @@ import { addDays, formatDateTime, formatTime, marketDay, marketTime } from "@mb/
 import type { WireCategory } from "@mb/stock-core/wire"
 import { z } from "zod"
 import { dailyTechnicals, intradayTechnicals, snapshotPrice } from "../market/indicators"
-import { bookText, sidePrices, type StockAgentDeps } from "./book"
+import { loadChain } from "../market/options-chain"
+import { isLive, sidePrices, type StockAgentDeps } from "./book"
+import { bookText } from "./view"
 
 /**
  * The stock agent's tools (docs/plans/LOCAL-AI.md §8.3), all read-only: its own (the book, quotes,
- * technicals from Alpaca's bars, past decisions) and the ones both bots share
+ * technicals from Alpaca's bars, option menus, past decisions) and the ones both bots share
  * (@mb/agent/wire-tools: news, the dossier, an item, the calendar, history and past news).
+ *
+ * An option menu is the cycle's OPTION CHAINS for one stock; the contracts it shows are remembered
+ * for the episode (`offered`), and an options entry may use only those.
  */
+
+/** The most stocks one episode may load option menus for. */
+const MAX_MENUS = 3
 
 const symbolArg = z.string().describe("A US ticker in uppercase, e.g. NVDA.")
 
@@ -45,9 +53,34 @@ export const stockAgentTools = (d: StockAgentDeps): AgentTool[] => {
   return [
     defineTool({
       name: "book",
-      description: "your shadow book again (positions, cash, P&L), the session and the limits code enforces right now. Args: {}.",
+      description: "your book again (positions, cash, P&L), the session and the limits code enforces right now. Args: {}.",
       args: z.object({}),
       run: async () => bookText(d),
+    }),
+    defineTool({
+      name: "option_menu",
+      description: "the liquid option contracts you may buy on a stock: calls and puts in the allowed expirations, with bid, ask, delta, IV and open interest. A buy_option must copy its contracts from this list. Level auto only. Args: {symbol}.",
+      args: z.object({ symbol: symbolArg }),
+      run: async ({ symbol }, t) => {
+        if (!isLive(d)) return "options are traded only at level auto: the shadow book has none"
+        const o = ctx.settings.current.options
+        if (!o.enabled) return "options trading is disabled"
+        if (!valid(symbol)) return `${symbol} is not a ticker`
+        const offered = d.offered.get(t.episodeId) ?? new Map()
+        const menus = new Set([...offered.values()].map((c) => c.symbol.slice(0, -15)))
+        if (menus.size >= MAX_MENUS && !menus.has(symbol)) return `at most ${MAX_MENUS} option menus per episode`
+        const price = d.price(symbol)
+        if (price === null) return `${symbol}: no price`
+        if (price < ctx.settings.current.risk.min_price) return `${symbol} at ${price} is below the $${ctx.settings.current.risk.min_price} minimum`
+        const chain = await loadChain(ctx.alpaca, symbol, price, marketDay(new Date()), o)
+        if (!chain.contracts.length) return `${symbol}: no contracts pass the liquidity filters (${o.min_dte}-${o.max_dte} days, spread ≤ ${o.max_spread_pct}%, open interest ≥ ${o.min_open_interest})`
+        for (const c of chain.contracts) offered.set(c.symbol, c)
+        d.offered.set(t.episodeId, offered)
+        return [
+          `${symbol} @ ${price} (prices per share, × 100 per contract):`,
+          ...chain.contracts.map((x) => `  ${x.symbol} ${x.type} ${x.expiration} (${x.dte}d) K=${x.strike} bid ${x.bid} ask ${x.ask} mid ${x.mid} spread ${x.spread_pct}% Δ ${x.delta ?? "?"} iv ${x.iv ?? "?"} OI ${x.open_interest ?? "?"}`),
+        ].join("\n")
+      },
     }),
     defineTool({
       name: "quote",
@@ -98,14 +131,21 @@ export const stockAgentTools = (d: StockAgentDeps): AgentTool[] => {
     ...wireTools(wire),
     defineTool({
       name: "past_decisions",
-      description: "the bot's last decisions on a stock (the timed cycles' and yours in the shadow book), with what came of them. Args: {symbol}.",
+      description: "the bot's last decisions on a stock and its options (yours on the paper account, the timed cycles' before you, and yours in the shadow book), with what came of them. Args: {symbol}.",
       args: z.object({ symbol: symbolArg }),
       run: async ({ symbol }) => {
         const [cycles, shadow] = await Promise.all([
-          ctx.col.decisions.find({ symbol, instrument: "stock" }, { projection: { created_at: 1, action: 1, status: 1, reason: 1, price: 1, "request.conviction": 1, "request.rationale": 1 } }).sort({ created_at: -1 }).limit(6).toArray(),
+          ctx.col.decisions
+            .find({ symbol }, { projection: { created_at: 1, action: 1, status: 1, reason: 1, price: 1, agent_episode_id: 1, "request.conviction": 1, "request.rationale": 1 } })
+            .sort({ created_at: -1 })
+            .limit(6)
+            .toArray(),
           ctx.col.shadowPositions.find({ symbol }).sort({ opened_at: -1 }).limit(5).toArray(),
         ])
-        const a = cycles.map((x) => `- ${formatDateTime(x.created_at)} cycle: ${x.action} at ${x.price ?? "?"} (conviction ${x.request.conviction}/10, ${x.status}${x.reason ? `: ${cleanLine(x.reason, 100)}` : ""}): ${cleanLine(x.request.rationale, 160)}`)
+        const a = cycles.map(
+          (x) =>
+            `- ${formatDateTime(x.created_at)} ${x.agent_episode_id ? "you" : "cycle"}: ${x.action.replace(/_/g, " ")} at ${x.price ?? "?"} (conviction ${x.request.conviction}/10, ${x.status}${x.reason ? `: ${cleanLine(x.reason, 100)}` : ""}): ${cleanLine(x.request.rationale, 160)}`,
+        )
         const b = shadow.map((p) => `- ${formatDateTime(p.opened_at)} you (shadow): bought ${p.qty || ""} at ${p.entry_price.toFixed(2)}${p.status === "closed" ? `, sold at ${p.exit_price?.toFixed(2)} (${p.exit_reason}) for ${p.realized_pnl_usd >= 0 ? "+" : ""}$${p.realized_pnl_usd.toFixed(2)}` : ", still open"}: ${cleanLine(p.thesis, 160)}`)
         return [...a, ...b].join("\n") || `no decisions on ${symbol} yet`
       },

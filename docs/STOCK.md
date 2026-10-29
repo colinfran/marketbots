@@ -38,8 +38,8 @@ Browser ──https──▶ Vercel (Next.js dashboard) ──▶ MongoDB Atlas 
 | 5 s | heartbeat to `engine_status` (the Admin page) and the stream |
 | 15 s | account snapshot for the dashboard; live-price subscriptions; periodic summary |
 | 15 s (setting) | options monitor: marks every position, checks its exits, closes what's hit |
-| 30 s | scheduler: the phase that's due (premarket / intraday / close / postmarket), or an early intraday cycle when a held stock moves `trigger_move_pct` |
-| 60 s (15 min off-hours) | maintenance: order sync, the daily loss limit, stock protection, the overnight fallback, options reconciliation |
+| 30 s | scheduler: the phase that's due (premarket / intraday / close / postmarket), or an early intraday cycle when a held stock moves `trigger_move_pct`; at agent level auto, only the core book's reviews and the one-time seed |
+| 60 s (15 min off-hours) | maintenance: order sync, the daily loss limit, stock protection, the overnight fallback (at agent level auto, the overnight rules), options reconciliation |
 | 5 / 60 min | equity history and chart bars for the website |
 | continuous | the news engine: each source on its own interval or stream (below) |
 | 1 s | the agent: its observations, watches and the next episode (below) |
@@ -49,6 +49,8 @@ Browser ──https──▶ Vercel (Next.js dashboard) ──▶ MongoDB Atlas 
 Fills arrive instantly over Alpaca's `trade_updates` stream (binary JSON frames on paper). The REST sync still runs every minute, so a dropped connection never loses a fill. Market data comes from the IEX stream (the free plan allows one connection and 30 symbols, so the engine subscribes to held stocks, option underlyings, SPY/QQQ and then the watchlist).
 
 ## One cycle
+
+The timed cycles below run while the agent is at level off or shadow; at level auto they stop and the agent decides (see The agent).
 
 1. **Context** (code): account, positions, open orders, quotes and technicals (VWAP, RSI, EMA trend, ATR, opening range, 20-day levels, the 50- and 200-day averages, the 52-week high) for held, watched, requested and moving symbols, the screener, news, the morning briefing, the previous cycle, recent days and their lessons. Intraday and in the closing cycle it also loads **option chain menus** (below).
 2. **Research** (the local model, with web search through our own search service and the scraper, no X): a sourced memo. It never decides. Each query, source and chunk of the memo streams as it happens, and the call's `ai_calls` entry counts its searches (each one is billed).
@@ -60,28 +62,38 @@ Every AI call runs on our own model server, so there is no AI budget: nothing ca
 
 When a scheduled phase fails (usually its decision), the scheduler retries it (intraday after 4 minutes, up to twice; the other phases right away, up to `schedule.max_phase_attempts` attempts). The failed cycle keeps its research, and the retry reuses it when it's under 20 minutes old and of the same mode instead of paying for it again; the report names the attempt it came from (`research.reused_from`).
 
-## The agent (shadow)
+## The agent
 
-Beside the timed cycles, an agent runs on the same local model ([plans/LOCAL-AI.md §8](plans/LOCAL-AI.md#8-the-agent), `@mb/agent` and `src/agent/`). Code watches the session, prices and the news all the time and wakes it when something matters; in each wake-up (an *episode*) it looks things up one step at a time and decides. At level **shadow** (the default, `agent.level` in Admin) its decisions fill only in its own simulated account, the **shadow book**. The timed cycles keep trading the Alpaca paper account exactly as before, so the two records can be compared.
+An agent runs on the same local model ([plans/LOCAL-AI.md §8](plans/LOCAL-AI.md#8-the-agent), `@mb/agent` and `src/agent/`). Code watches the session, prices, the setup screen and the news all the time and wakes it when something matters; in each wake-up (an *episode*) it looks things up one step at a time and decides. Its level is `agent.level` in Admin:
+
+- **shadow** (the default): its decisions fill only in its own simulated account, the **shadow book** (stocks only), and the timed cycles keep trading the Alpaca paper account.
+- **auto**: it trades the paper account itself, **stocks and options**, through the cycles' own execution path, and **the timed cycles stop** (premarket, intraday, closing and postmarket cycles, price-move and news event cycles). News triggers are recorded as "handed to the agent", and the owner's *Run now* becomes a review it may act on. Stops and targets rest at the broker as before, the options monitor and maintenance run as before, and the overnight rules always run in the last 7 minutes (the day's end now, not a fallback). The core book's weekly and single-holding reviews and the one-time seed still run in the cycle slot, and the agent waits for them, so they never spend the same cash.
 
 **What wakes it** (observations, scored in code and queued per subject: a burst waits 2–10 s to become one wake-up, risk before opportunity before review, and a subject that woke it waits `agent.wake_cooldown_minutes` unless its salience rises 15 points, a P0, its own watch or the owner):
 
 | Source | Priority |
 | --- | --- |
-| News, around the clock: every trigger candidate that passes the wire's gates on the item itself (fresh, not old news, confirmed for entries). The session gate and the caps are the timed cycles' | P0 bad news on a shadow holding (or a critical market review while it holds anything), P1 entry ideas, P2 the rest |
+| News, around the clock: every trigger candidate that passes the wire's gates on the item itself (fresh, not old news, confirmed for entries). The session gate and the caps are the timed cycles' | P0 bad news on a holding (or a critical market review while it holds anything), P1 entry ideas, P2 the rest |
+| The setup screen (`src/agent/screen.ts`), on each closed minute of the price board (the scan universe and what the engine tracks): the first close above the opening range (the first 15 minutes) and, an hour in, a new session high, each on at least twice the stock's median minute volume today (IEX volume against its own). While buys are allowed and the envelope would take one, a minute's best five setups on stocks it doesn't hold wake it together, with a SUBJECT section each | P1 |
 | The session: premarket (plan; watches and notes only), the open after its buffer, the closing window while it holds anything, after the close | P2, P2, P1, P3 |
-| A held stock moving `schedule.trigger_move_pct` since its last review, again at every further step | P0 down, P2 up |
-| A shadow stop or target hit (every 5 s in session, against the bid or last price) | P2 |
+| A held stock moving `schedule.trigger_move_pct` since its last review (checked every 5 s in session), again at every further step | P0 down, P2 up |
+| A stop or target hit: the shadow book's (every 5 s in session, against the bid or last price), or at level auto a stop-loss or take-profit leg the broker fills | P2 |
 | A macro release 15 minutes out | P2 |
 | Its own watches (price above or below, a % move, news at a severity, a time) | the watch's |
-| A sweep every `agent.sweep_minutes` (2 h) in session | P2 |
+| A quiet-time review in session once nothing has woken it for `agent.sweep_minutes` (2 h) | P2 |
 | The owner's question (Agent page) | P2, read-only |
+| The owner's *Run now* at level auto | P1 |
 
-**An episode**: a short brief (why it woke, the shadow book, the session and the limits in force, the benchmarks, the subject, its notes and watches), then steps. Each step is one JSON object under a grammar: a call to one of 11 read-only tools (`book`, `quote`, `technicals` from Alpaca's daily and 5-minute bars, `news`, `dossier`, `item`, `past_decisions`, `calendar`, and from the history store `history` and `past_news`), or the answer: the cycle's stock decision schema (buy, sell, adjust_exits, hold) plus watches, notes and a reply. Limits per priority as in crypto (`agent.limits`). It may name any ticker it has a price for (the broker's stream or the price layers, which track the scan universe) or holds.
+**An episode**: a short brief (why it woke, its book, the session and the limits in force, the benchmarks, a SUBJECT section per stock it woke for, its notes and watches), then steps. Each step is one JSON object under a grammar: a call to one of 12 read-only tools (`book`, `option_menu`, `quote`, `technicals` from Alpaca's daily and 5-minute bars, `news`, `dossier`, `item`, `past_decisions`, `calendar`, and from the history store `history` and `past_news`), or the answer: the cycle's decision schema (buy, sell, adjust_exits, hold, buy_option, close_option, hold_option) plus watches, notes and a reply. Limits per priority as in crypto (`agent.limits`). It may name any ticker it has a price for (the broker's stream or the price layers, which track the scan universe) or holds. The system prompt follows the level; at auto it adds the options rules.
 
-**Its decisions**, in the shadow book, stocks only (options stay with the timed cycles): normalized with the cycle's rules (`normalizeDecision`), sales first. A buy happens only in the regular session after the opening buffer (the closing window counts as the close phase: overnight or multi-day buys with conviction 8 or more), passes the **envelope** (as in crypto), then the cycle's own `evaluateStockBuy` against the shadow book's account (`computeRiskState` from its equity and cash), and is cut to the envelope's share. Fills are at the ask or bid (the last price where there is no quote) plus 5 bps, commission-free, whole shares. Sales fill only while the market is open; exits are never rate-limited; stops only move up; intraday positions are closed by code 3 minutes before the bell. Its decisions are not written to `decisions`; the shadow book is its record.
+**Its decisions** are normalized with the cycle's rules (`normalizeDecision`), sales first. A buy happens only in the regular session after the opening buffer (the closing window counts as the close phase: overnight or multi-day buys with conviction 8 or more) and passes the **envelope** (as in crypto). Then:
 
-**Circuit breakers** are recorded, streamed and alerted, as in crypto; at level shadow nothing is enforced. **Where to see it**: Research → Agent, and the heartbeat's `agent` block.
+- **In the shadow book** (stocks only; option decisions are recorded as not applicable): the cycle's own `evaluateStockBuy` against the shadow book's account (`computeRiskState` from its equity and cash), cut to the envelope's share. Fills are at the ask or bid (the last price where there is no quote) plus 5 bps, commission-free, whole shares. Sales fill only while the market is open; intraday positions are closed by code 3 minutes before the bell. These decisions are not written to `decisions`.
+- **At level auto**: each decision goes through `executeDecisions`, the cycles' own path (the buy rules, the options rules, bracket and OCO orders at the broker), one at a time so the envelope sees each entry before the next. A buy's `allocation_pct` and an option's `premium_pct` are cut to the envelope's share of the caps and the hour's budget first. An options entry must use contracts from an `option_menu` it loaded in the same episode (the cycle's OPTION CHAINS for one stock, at most three per episode), and nothing else passes. Each decision is a `decisions` record with `trigger_kind: "agent"`, `cycle_id` and `report_id` and `agent_episode_id` set to the episode, and no default holds for positions it didn't mention. Buys post to Discord when they fill, as the cycles' do; the agent's sales post too, linking the episode. The account it reads is the engine's 15-second snapshot. The core book's holdings stay the weekly review's. While an episode runs, maintenance only syncs orders, so it never re-protects a stock the agent is selling.
+
+Exits are never rate-limited and stops only move up, at either level.
+
+**Circuit breakers** as in crypto: recorded at level shadow; at level auto each drops it back to shadow and the timed cycles don't come back, and a slow model only pauses its entries. **Where to see it**: Research → Agent, the decisions and trades tables (an agent decision links its episode), and the heartbeat's `agent` block.
 
 ## News engine (the wire)
 
@@ -266,7 +278,7 @@ Engine (in-memory MongoDB, a fake Alpaca broker that fills stocks, single legs a
 - **Not yet run against Alpaca's live paper APIs.** The REST shapes and WebSocket protocols follow Alpaca's documentation and are tested against fakes; the first market day on the server is the real test. Things to watch: options order rejections (price increments, levels), and the paper trade stream's message format.
 - **Options exits need the engine.** If the container is down, options positions aren't monitored. Docker restarts it automatically, and the most any position can lose is what was paid.
 - **The agent shares the model server** with the timed cycles, the crypto bot and the article summaries (three slots). Busy hours slow every call; the Agent page shows its speed, and a slow model trips a recorded breaker.
-- **The agent trades stocks only**, in its shadow book; options stay with the timed cycles until their menus and quotes are simulated too.
+- **The shadow book has no options**: in shadow the agent trades stocks only; at level auto it trades options on the paper account from the menus it loads.
 - **Indicative options data.** The free feed's quotes can lag or differ from OPRA. Paper fills follow Alpaca's own simulation, so paper results can be better than live trading would be.
 - **IEX data.** Stock prices are real, but IEX sees only a slice of volume, and quieter names can have stale last trades (the quote midpoint is used when it's tight and newer).
 - **Free plan limits.** One market data connection and 30 streamed symbols; anything beyond that is priced from REST snapshots each cycle.

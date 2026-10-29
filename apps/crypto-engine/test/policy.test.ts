@@ -53,7 +53,7 @@ const withRoot = (i: WireItemDoc) => ({ ...i, cluster_id: i._id })
 
 const setupPolicy = async ({ held = ["BTC/USD"], settings = DEFAULT_SETTINGS, running = true, observe }: { held?: string[]; settings?: Settings; running?: boolean; observe?: (item: WireItemDoc, c: { rule: string }) => void } = {}) => {
   const bus = await makeBus(db.col)
-  const request = vi.fn<(f: EventFocus) => "fired" | "queued">(() => "fired")
+  const request = vi.fn<(f: EventFocus) => "fired" | "queued" | "agent">(() => "fired")
   const markNotable = vi.fn(async () => undefined)
   const emergency = vi.fn(async () => "stop raised")
   const alert = vi.fn(async () => undefined)
@@ -100,6 +100,13 @@ describe("wire policy", () => {
     expect(request).toHaveBeenCalledWith(expect.objectContaining({ symbol: "BTC/USD", rule: "held_negative", action: "review" }))
     expect(await triggers()).toEqual([expect.objectContaining({ rule: "held_negative", status: "fired", item_ids: [i._id] })])
     expect(markNotable).toHaveBeenCalledWith([i._id], "triggered")
+  })
+
+  it("records a trigger the engine leaves to the agent (level auto) as handed to it", async () => {
+    const { policy, request } = await setupPolicy()
+    request.mockReturnValue("agent")
+    await policy.onItem({ item: withRoot(item({ polarity: -1, severity: 62, category: "regulatory_action" })), backfill: false, confirmation: false })
+    expect(await triggers()).toEqual([expect.objectContaining({ rule: "held_negative", status: "fired", reason: "handed to the agent" })])
   })
 
   it("holds an entry back until it is confirmed, then fires on the confirmation", async () => {

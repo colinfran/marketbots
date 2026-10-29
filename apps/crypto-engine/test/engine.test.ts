@@ -156,6 +156,17 @@ describe("Engine", () => {
     expect(await command({ type: "agent.ask", question: "What do you hold?" })).toMatchObject({ status: "failed", error: "the agent needs the model server (LLM_URL)" })
   })
 
+  it("at level auto runs no timed cycles: news triggers and Run now go to the agent", async () => {
+    expect(await command({ type: "settings.update", patch: { agent: { level: "auto" } }, expected_version: 1 })).toMatchObject({ status: "done" })
+    expect(engine.requestEventCycle(focus)).toBe("agent")
+    expect(internals().eventQueue.size).toBe(0)
+    await internals().schedule()
+    expect(await db.col.cycles.countDocuments({ _id: { $ne: "interrupted" } })).toBe(0)
+    expect(await command({ type: "cycle.run_now", symbols: ["BTC/USD"] })).toMatchObject({ status: "failed", error: "the agent needs the model server (LLM_URL)" })
+    await until(async () => (await db.col.engineStatus.findOne({ _id: "engine" }))?.agent?.level === "auto")
+    expect((await db.col.engineStatus.findOne({ _id: "engine" }))!.next_cycle_at).toBeNull()
+  })
+
   it("pauses, resumes and applies settings from audited commands", async () => {
     expect(await command({ type: "pause", reason: "lunch" })).toMatchObject({ status: "done", result: "paused: no new decisions or entries; stops and targets stay active" })
     expect(engine.status).toBe("paused")

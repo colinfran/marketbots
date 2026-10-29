@@ -4,8 +4,9 @@ import { BOOK_SUBJECT, MARKET_SUBJECT, type Observation } from "@mb/core/agent"
 import { errorMessage } from "@mb/engine-kit/log"
 import { formatTime, marketDay } from "@mb/stock-core/time"
 import { upcomingMacro } from "@mb/wire/calendar"
-import { bookText, sessionWindow, shadowRiskState, sidePrices, type StockAgentDeps } from "./book"
+import { isLive, sessionWindow, sidePrices, type StockAgentDeps } from "./book"
 import { StockScreen } from "./screen"
+import { bookText, envelopeHistory, heldPositions, heldSymbols } from "./view"
 
 /**
  * What wakes the stock agent besides news (docs/plans/LOCAL-AI.md §8.1, §8.7), checked by code as
@@ -17,11 +18,13 @@ import { StockScreen } from "./screen"
  *                tracks) goes through the setup screen (./screen); while buys are allowed and the
  *                envelope would take one, the minute's best setups on stocks not in the book wake
  *                the agent together, as one P1
- *   every 5 s    in session: the shadow book's stops and targets against the bid (a fill is a P2),
- *                and a held stock moving `schedule.trigger_move_pct` since your last review (down:
- *                P0, up: P2), again at every further step
- *   every 15 s   in session: marks
- *   bell - 3 min intraday positions are closed by code (the overnight rule), as the cycles do
+ *   every 5 s    in session: the shadow book's stops and targets against the bid (a fill is a P2; at
+ *                level auto they rest at the broker, and a stop or target it fills is the P2), and a
+ *                held stock moving `schedule.trigger_move_pct` since your last review (down: P0,
+ *                up: P2), again at every further step
+ *   every 15 s   in session: the shadow book's marks
+ *   bell - 3 min the shadow book's intraday positions are closed by code (the overnight rule); at
+ *                level auto the engine's maintenance does it for the paper account
  *   each minute  a scheduled release 15 minutes out is a P2 about the market
  *   quiet time   in session, a P2 review once nothing has woken the agent for `agent.sweep_minutes`
  *
@@ -55,9 +58,8 @@ export class StockObserver {
     const s = this.d.session()
     const setups = this.screen.onBars(bars, { open: s?.is_trading_day ? (s.open ?? null) : null, day: marketDay(now), minPrice: this.d.ctx.settings.current.risk.min_price })
     if (!setups.length || !sessionWindow(this.d, now).entries) return
-    const { history, open } = await shadowRiskState(this.d, now)
-    if (!checkEntry("", history, this.d.ctx.settings.current.agent.envelope, now.getTime()).approved) return
-    const held = new Set(open.map((p) => p.symbol))
+    if (!checkEntry("", await envelopeHistory(this.d, now.getTime()), this.d.ctx.settings.current.agent.envelope, now.getTime()).approved) return
+    const held = await heldSymbols(this.d)
     for (const x of setups.filter((x) => !held.has(x.symbol)).slice(0, MAX_SETUPS)) {
       this.observe({ id: `setup:${x.symbol}:${x.kind}:${x.t}`, subject: MARKET_SUBJECT, kind: "setup", priority: 1, salience: x.score, summary: x.summary, refs: { symbol: x.symbol }, at: now })
     }
@@ -81,16 +83,19 @@ export class StockObserver {
     const s = this.d.session()
     const window = sessionWindow(this.d, now)
     await this.phases(now)
+    // The shadow book's stops, targets, marks and overnight rule are the agent's to run; the paper
+    // account's rest at the broker and in the engine's maintenance.
+    const live = isLive(this.d)
     if (window.open && t - this.last.exits >= EXITS_MS) {
       this.last.exits = t
-      await this.exits(now)
+      if (!live) await this.exits(now)
       await this.priceMoves(now)
     }
-    if (window.open && t - this.last.mark >= MARK_MS) {
+    if (!live && window.open && t - this.last.mark >= MARK_MS) {
       this.last.mark = t
       await this.d.shadow.mark(this.d.price)
     }
-    if (window.open && s?.close && s.close.getTime() - t <= OVERNIGHT_MINUTES * MIN && this.once(`overnight:${s.day}`)) await this.overnight()
+    if (!live && window.open && s?.close && s.close.getTime() - t <= OVERNIGHT_MINUTES * MIN && this.once(`overnight:${s.day}`)) await this.overnight()
     if (t - this.last.calendar >= MIN) {
       this.last.calendar = t
       this.calendarEvents(now)
@@ -128,7 +133,7 @@ export class StockObserver {
     if (t >= open + sch.open_buffer_minutes * MIN && t < close - sch.close_window_minutes * MIN) {
       at({ subject: MARKET_SUBJECT, kind: "session", priority: 2, salience: 50, summary: `The session is open and past its opening buffer: buys are allowed until the close at ${formatTime(s.close)}.` }, "open")
     }
-    if (t >= close - sch.close_window_minutes * MIN && t < close && (await this.d.shadow.open()).length) {
+    if (t >= close - sch.close_window_minutes * MIN && t < close && (await heldSymbols(this.d)).size) {
       at({ subject: BOOK_SUBJECT, kind: "session", priority: 1, salience: 60, summary: `Closing window: the session ends at ${formatTime(s.close)}. Decide what you carry overnight; intraday positions are closed by code ${OVERNIGHT_MINUTES} minutes before the bell.` }, "close")
     }
     if (t >= close + sch.postmarket_delay_minutes * MIN && t < close + 3 * 60 * MIN) {
@@ -154,27 +159,42 @@ export class StockObserver {
 
   private async priceMoves(now: Date) {
     const step = this.d.ctx.settings.current.schedule.trigger_move_pct
-    for (const p of await this.d.shadow.open()) {
+    for (const p of await heldPositions(this.d)) {
       const m = this.d.price(p.symbol)
-      const ref = p.last_review_price ?? p.entry_price
+      const ref = p.reviewPrice ?? p.entry
       if (!m) continue
       const moved = Math.abs(m / ref - 1) * 100
       if (moved < step) continue
-      const key = `${p.last_reviewed_at?.getTime() ?? 0}:${Math.floor(moved / step)}`
-      if (this.moves.get(p._id) === key) continue
-      this.moves.set(p._id, key)
+      const key = `${p.reviewedAt?.getTime() ?? 0}:${Math.floor(moved / step)}`
+      if (this.moves.get(p.id) === key) continue
+      this.moves.set(p.id, key)
       const down = m < ref
       this.observe({
-        id: `move:${p._id}:${key}`,
+        id: `move:${p.id}:${key}`,
         subject: p.symbol,
         kind: "price",
         priority: down ? 0 : 2,
         salience: Math.min(100, Math.round(50 + (10 * moved) / step)),
-        summary: `${p.symbol}, which you hold, moved ${((m / ref - 1) * 100).toFixed(2)}% since your last review at ${ref.toFixed(2)}; stop ${p.stop_price ?? "none"}.`,
-        refs: { position_id: p._id },
+        summary: `${p.symbol}, which you hold, moved ${((m / ref - 1) * 100).toFixed(2)}% since your last review at ${ref.toFixed(2)}; stop ${p.stop ?? "none"}.`,
+        refs: { position_id: p.id },
         at: now,
       })
     }
+  }
+
+  /** Level auto: a stock position the broker closed at its stop or target is worth a look at what's left. */
+  onPositionClosed(e: { symbol: string; asset_class: string; realized_pnl_usd: number | null; return_pct: number | null; reason: string }, now = new Date()) {
+    if (e.reason !== "stop-loss" && e.reason !== "take-profit") return
+    this.observe({
+      id: `fill:${e.symbol}:${now.getTime()}`,
+      subject: e.symbol,
+      kind: "fill",
+      priority: 2,
+      salience: 60,
+      summary: `Your ${e.symbol} position hit its ${e.reason === "stop-loss" ? "stop" : "target"}${e.realized_pnl_usd !== null ? `: ${e.realized_pnl_usd >= 0 ? "+" : "-"}$${Math.abs(e.realized_pnl_usd).toFixed(2)}` : ""}${e.return_pct !== null ? ` (${e.return_pct >= 0 ? "+" : ""}${e.return_pct}%)` : ""}.`,
+      refs: {},
+      at: now,
+    })
   }
 
   /** Never leave an intraday position open overnight (the cycles' overnight rule). */

@@ -1,24 +1,27 @@
 import { llamaChat } from "@mb/agent/client"
 import { checkEntry } from "@mb/agent/envelope"
 import { newsObservations } from "@mb/agent/observations"
-import { Agent, type AgentBot } from "@mb/agent/runtime"
+import { Agent, type AgentBot, type Promotion } from "@mb/agent/runtime"
 import { BOOK_SUBJECT, MARKET_SUBJECT } from "@mb/core/agent"
 import { cryptoAgentAnswerSchema, type CryptoAgentAnswer } from "@mb/crypto-core/agent"
+import type { EventDataMap } from "@mb/crypto-core/events"
 import type { WireCategory, WireItemDoc } from "@mb/crypto-core/wire"
 import type { AiCallLog } from "@mb/engine-kit/ai/call-log"
 import type { HistoryStore } from "@mb/history/store"
 import type { Candidate } from "@mb/wire/trigger"
 import type { EngineContext } from "../orchestrator/context"
 import { actOnCryptoAnswer } from "./act"
-import { createShadowBook, mid, type CryptoAgentDeps } from "./book"
+import { createShadowBook, isLive, type CryptoAgentDeps } from "./book"
 import { cryptoBrief, CryptoMarketView, CryptoObserver } from "./observe"
 import { CRYPTO_AGENT_PROMPT_VERSION, cryptoAgentSystemPrompt } from "./prompts"
 import { cryptoAgentTools } from "./tools"
+import { agentAccount, envelopeHistory, heldPositions } from "./view"
 
 /**
- * The crypto agent (docs/plans/LOCAL-AI.md §8.7): 24/7, the timed cycles' screens as P1
- * observations, and the shadow book at the paper wallet's fees. The engine feeds it news (the wire
- * policy's observe hook and every stored item, for news watches) and asks it for its status.
+ * The crypto agent (docs/plans/LOCAL-AI.md §8.7): 24/7, the screens' setups as P1 observations, and
+ * the shadow book at the paper wallet's fees, or at level auto the paper account itself. The engine
+ * feeds it news (the wire policy's observe hook and every stored item, for news watches), the
+ * positions its protection loop closes, and asks it for its status.
  */
 
 export type CryptoAgent = {
@@ -33,11 +36,20 @@ export const createCryptoAgent = ({
   history,
   calls,
   llmUrl,
+  busy,
+  demote,
+  promotion,
 }: {
   ctx: EngineContext
   history: HistoryStore<WireCategory> | null
   calls: Pick<AiCallLog, "record">
   llmUrl: string | null
+  /** Level auto: why the engine wants no episode to act now (its cycle slot is running a seed or a core review), or null. */
+  busy?: () => string | null
+  /** Level auto: drops the agent to shadow after a breaker trips. */
+  demote?: (reason: string) => Promise<void>
+  /** Level auto: the agent's last promotion, kept in the engine's state. */
+  promotion?: { get: () => Promotion | null; set: (p: Promotion) => Promise<void> }
 }): CryptoAgent => {
   const deps: CryptoAgentDeps = { ctx, shadow: createShadowBook(ctx), history }
   const market = new CryptoMarketView(deps)
@@ -45,7 +57,7 @@ export const createCryptoAgent = ({
   const known = (symbol: string) => symbol === MARKET_SUBJECT || symbol === BOOK_SUBJECT || ctx.hub.universe.includes(symbol)
   const bot: AgentBot<CryptoAgentAnswer> = {
     promptVersion: CRYPTO_AGENT_PROMPT_VERSION,
-    system: cryptoAgentSystemPrompt,
+    system: () => cryptoAgentSystemPrompt(ctx.settings.current.agent.level),
     brief: (wake) => cryptoBrief(deps, market, wake),
     tools: cryptoAgentTools(deps),
     answer: cryptoAgentAnswerSchema,
@@ -54,16 +66,15 @@ export const createCryptoAgent = ({
     tick: (now) => observer!.tick(now),
     // A setup is only an entry idea: not worth an episode while entries are refused.
     skip: async (wake) => {
-      if (!wake.observations.every((o) => o.kind === "setup") || (await deps.shadow.position(wake.subject))) return null
-      if (!ctx.gate().venueOnline) return "Kraken data or the paper wallet is unavailable"
-      const account = await deps.shadow.account(mid(ctx))
-      const e = checkEntry(wake.subject, await deps.shadow.envelopeHistory(account.equity_usd), ctx.settings.current.agent.envelope, Date.now())
+      if (!wake.observations.every((o) => o.kind === "setup")) return null
+      if ((await heldPositions(deps)).some((p) => p.symbol === wake.subject)) return null
+      const gate = ctx.gate()
+      if (!gate.venueOnline) return "Kraken data or the paper wallet is unavailable"
+      if (isLive(deps) && !gate.reconciled) return "the books don't match the paper wallet yet"
+      const e = checkEntry(wake.subject, await envelopeHistory(deps), ctx.settings.current.agent.envelope, Date.now())
       return e.approved ? null : `the envelope refuses entries: ${e.reason}`
     },
-    shadow: async () => {
-      const account = await deps.shadow.account(mid(ctx))
-      return { account, dayPnlPct: account.day_start_equity_usd > 0 ? (account.equity_usd / account.day_start_equity_usd - 1) * 100 : 0 }
-    },
+    account: () => agentAccount(deps),
   }
   const agent = new Agent<CryptoAgentAnswer>({
     col: ctx.col,
@@ -76,23 +87,29 @@ export const createCryptoAgent = ({
     alert: (title, message, key) => ctx.alerts.send("warning", title, message, { key, path: "/agent" }),
     blocked: () => {
       const g = ctx.gate()
-      return g.killSwitch ? "the kill switch is engaged" : g.runStatus !== "running" ? `trading is ${g.runStatus}` : null
+      return g.killSwitch ? "the kill switch is engaged" : g.runStatus !== "running" ? `trading is ${g.runStatus}` : (busy?.() ?? null)
     },
-    price: mid(ctx),
+    price: (symbol) => ctx.hub.quote(symbol)?.mid ?? null,
     bot,
     archive: history,
+    demote,
+    promotion,
     signal: ctx.signal,
   })
   observer = new CryptoObserver(deps, market, (o) => agent.observe(o), () => agent.lastEpisodeAt?.getTime() ?? 0)
   ctx.hub.onBar((bar) => observer?.onBar(bar))
-  const held = async () => new Set((await deps.shadow.open()).map((p) => p.symbol))
+  // Level auto: a stop or target the engine's protection loop hits is the agent's to look at.
+  ctx.bus.subscribe((e) => {
+    if (e.type === "position.closed" && agent.on && isLive(deps)) observer?.onPositionClosed(e.data as EventDataMap["position.closed"])
+  })
   return {
     agent,
     deps,
     onCandidate: (item, c) => {
       if (!agent.on) return
-      void held().then((h) => {
-        for (const o of newsObservations(item, c, { held: h, critical: ctx.settings.current.wire.thresholds.critical })) agent.observe(o)
+      void heldPositions(deps).then((open) => {
+        const held = new Set(open.map((p) => p.symbol))
+        for (const o of newsObservations(item, c, { held, critical: ctx.settings.current.wire.thresholds.critical })) agent.observe(o)
       })
     },
   }

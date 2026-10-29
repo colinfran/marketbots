@@ -585,7 +585,7 @@ const strategyTrackRecord = async (ctx: EngineContext) => {
 
 export type DecisionInput = {
   cycleId: string
-  researchId: string
+  researchId: string | null
   decision: NormalizedCryptoDecision
   candidate: CryptoCandidate | null
   position: PositionDoc | null
@@ -602,6 +602,8 @@ export type DecisionInput = {
   promptVersion?: string
   /** Event decisions: the wire items behind them. */
   wireItemIds?: string[]
+  /** The agent's decisions (level auto): the episode, recorded on the decision, and the most its envelope lets a buy commit. */
+  agent?: { episodeId: string; maxNotionalUsd: number }
 }
 
 /** A stop the seed can use as given: below the price and inside the configured stop range. */
@@ -632,6 +634,7 @@ export const processDecision = async (ctx: EngineContext, i: DecisionInput): Pro
     held: i.position !== null,
     trigger_kind: i.triggerKind,
     ...(i.wireItemIds?.length ? { wire_item_ids: i.wireItemIds } : {}),
+    ...(i.agent ? { agent_episode_id: i.agent.episodeId } : {}),
     ai: {
       conviction: d.conviction,
       uncertainty: d.uncertainty,
@@ -692,18 +695,28 @@ export const processDecision = async (ctx: EngineContext, i: DecisionInput): Pro
           maxPositionPct: settings.kraken.max_position_pct,
           sizePctOfMax: d.size_pct_of_max ?? 50,
         })
-    const qty = roundQty(pair, size.qty)
+    // The agent's envelope can cap what a buy commits below what risk-based sizing would.
+    const capped = i.agent !== undefined && size.qty * limit > i.agent.maxNotionalUsd
+    const qty = roundQty(pair, capped ? i.agent!.maxNotionalUsd / limit : size.qty)
     const walkIn = walkBook(quote.book.asks, qty, limit, "buy")
     const walkOut = walkBook(quote.book.bids, qty, null, "sell")
     const inSlip = walkIn.avgPrice ? slippageBps(walkIn.avgPrice, quote.mid, "buy") - quote.spreadBps / 2 : settings.kraken.max_slippage_bps
     const outSlip = walkOut.avgPrice ? slippageBps(walkOut.avgPrice, quote.mid, "sell") - quote.spreadBps / 2 : settings.kraken.max_slippage_bps
     const roundTrip = roundTripCostBps({ takerFeeBps: i.takerBps, spreadBps: quote.spreadBps, entrySlippageBps: inSlip, exitSlippageBps: outSlip })
     const edge = cryptoEdge({ price: quote.mid, stop, target, pAi: d.p_target_first, shrink: settings.ai.probability_shrink, roundTripBps: roundTrip })
-    doc.costs = { ...doc.costs, slippage_bps: roundTo(inSlip + outSlip, 2), round_trip_bps: roundTo(roundTrip, 2), fee_usd_est: roundTo((2 * size.notional * i.takerBps) / 10_000, 4) }
+    doc.costs = { ...doc.costs, slippage_bps: roundTo(inSlip + outSlip, 2), round_trip_bps: roundTo(roundTrip, 2), fee_usd_est: roundTo((2 * (capped ? qty * limit : size.notional) * i.takerBps) / 10_000, 4) }
     if (edge) {
       doc.ev = { p_prior: roundTo(edge.pPrior, 4), p_adjusted: roundTo(edge.pAdjusted, 4), gross_edge_bps: roundTo(edge.grossEdgeBps, 2), net_edge_bps: roundTo(edge.netEdgeBps, 2) }
     }
-    doc.sizing = { qty, notional_usd: roundTo(qty * limit, 2), risk_usd: roundTo(size.riskUsd, 2), limit_price: limit, stop_price: roundPrice(pair, stop), take_profit_price: roundPrice(pair, target), notes: [] }
+    doc.sizing = {
+      qty,
+      notional_usd: roundTo(qty * limit, 2),
+      risk_usd: roundTo(capped ? qty * Math.max(0, quote.ask - stop) : size.riskUsd, 2),
+      limit_price: limit,
+      stop_price: roundPrice(pair, stop),
+      take_profit_price: roundPrice(pair, target),
+      notes: capped ? [`capped at $${i.agent!.maxNotionalUsd.toFixed(2)} by the agent's envelope`] : [],
+    }
     risk = riskState
       ? evaluateCryptoEntry(
           {

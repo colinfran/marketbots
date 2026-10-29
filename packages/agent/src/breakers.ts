@@ -1,12 +1,13 @@
 import type { AgentActionOutcome, EpisodeStatus } from "@mb/core/agent"
 
 /**
- * Circuit breakers (docs/plans/LOCAL-AI.md §9, ring 4): signs the agent is misbehaving. Above level
- * shadow a trip drops it back to shadow; at level shadow there is nothing lower to go to, so a trip
+ * Circuit breakers (docs/plans/LOCAL-AI.md §9, ring 4): signs the agent is misbehaving. At level
+ * auto a trip drops it back to shadow, except a slow model, which only pauses its entries until
+ * the model is fast again (`slowModel`); at level shadow there is nothing lower to go to, so a trip
  * is recorded, streamed and alerted, and nothing is enforced.
  *
- * Pure: the runtime keeps the recent history (since the engine started) and asks after every
- * episode which breakers are tripped.
+ * Pure: the runtime keeps the recent history (since the engine started, or the agent's promotion
+ * to auto) and asks after every episode which breakers are tripped.
  */
 
 export type BreakerHistory = {
@@ -45,9 +46,14 @@ export const trippedBreakers = (h: BreakerHistory, now: number): Breaker[] => {
   if (h.envelopeBlocksToday >= 3) out.push({ name: "envelope_blocks", detail: `the envelope refused ${h.envelopeBlocksToday} entries today` })
   if (h.dayPnlPct <= -3) out.push({ name: "daily_loss", detail: `the shadow book is down ${h.dayPnlPct.toFixed(2)}% today` })
   if (h.totalPnlPct <= -6) out.push({ name: "total_loss", detail: `the shadow book is down ${h.totalPnlPct.toFixed(2)}% in all` })
-  const recent = h.speeds.slice(-SLOW_STEPS)
-  if (recent.length === SLOW_STEPS && recent.every((s) => s > 0 && s < SLOW_TOKENS_PER_S)) {
-    out.push({ name: "slow_model", detail: `the last ${SLOW_STEPS} steps generated under ${SLOW_TOKENS_PER_S} tokens/s (${recent.map((s) => Math.round(s)).join(", ")})` })
-  }
+  const slow = slowModel(h.speeds)
+  if (slow) out.push(slow)
   return out
+}
+
+/** The model left the GPUs or something is crowding them: the last steps all generated too slowly. */
+export const slowModel = (speeds: readonly number[]): Breaker | null => {
+  const recent = speeds.slice(-SLOW_STEPS)
+  if (recent.length < SLOW_STEPS || !recent.every((s) => s > 0 && s < SLOW_TOKENS_PER_S)) return null
+  return { name: "slow_model", detail: `the last ${SLOW_STEPS} steps generated under ${SLOW_TOKENS_PER_S} tokens/s (${recent.map((s) => Math.round(s)).join(", ")})` }
 }

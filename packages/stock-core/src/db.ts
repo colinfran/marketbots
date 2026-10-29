@@ -208,6 +208,8 @@ export type DecisionDoc = {
   trigger_kind?: CycleKind
   /** Wire items behind an event decision. */
   wire_item_ids?: string[]
+  /** The agent episode that made the decision (level auto); absent on the timed cycles'. */
+  agent_episode_id?: string
   request: Decision
   status: DecisionStatus
   reason: string | null

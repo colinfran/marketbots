@@ -40,6 +40,7 @@ export function SettingsForm({ sections, settings, version }: { sections: Settin
       className="space-y-6"
       onSubmit={(e) => {
         e.preventDefault()
+        for (const f of changed) if (f.confirm && toInput(values[f.path]) === f.confirm.value && !window.confirm(f.confirm.message)) return
         const patch: Record<string, unknown> = {}
         for (const f of changed) setIn(patch, f.path, parseField(f, values[f.path]))
         void send({ type: "settings.update", patch, expected_version: version })

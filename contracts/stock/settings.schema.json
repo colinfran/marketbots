@@ -713,7 +713,8 @@
             "type": "string",
             "enum": [
               "off",
-              "shadow"
+              "shadow",
+              "auto"
             ]
           },
           "model": {
@@ -1655,7 +1656,8 @@
             "type": "string",
             "enum": [
               "off",
-              "shadow"
+              "shadow",
+              "auto"
             ]
           },
           "model": {

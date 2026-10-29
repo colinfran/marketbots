@@ -6,13 +6,18 @@ import type { TokenUsage } from "./db"
  * sees into observations; the attention queue turns observations into wake-ups; each wake-up is an
  * episode, in which the local model looks things up with read-only tools and answers with the
  * bot's decisions, watches and notes. At level "shadow" the decisions go into the shadow book (a
- * simulated account), never to the broker.
+ * simulated account), never to the broker; at level "auto" they trade the paper account.
  *
  * The runtime is @mb/agent; each engine's src/agent/ holds the bot's tools, brief and prompts.
  */
 
-/** off = nothing; shadow = wakes, decides and records into the shadow book. Later levels (propose, auto, full) come with the approval queue (§10). */
-export const AGENT_LEVELS = ["off", "shadow"] as const
+/**
+ * off = nothing (the timed cycles trade); shadow = wakes, decides and records into the shadow book
+ * (the timed cycles trade); auto = the agent trades the paper account through the bot's own risk
+ * checks and execution, inside its envelope, and the timed cycles stop. A tripped breaker drops
+ * auto back to shadow.
+ */
+export const AGENT_LEVELS = ["off", "shadow", "auto"] as const
 export type AgentLevel = (typeof AGENT_LEVELS)[number]
 
 /** 0 = risk to a holding, 1 = an opportunity, 2 = a review, 3 = background. Lower runs first. */
@@ -278,6 +283,8 @@ export type ShadowAccount = {
 /** The heartbeat's agent block (EngineStatusBase.agent). */
 export type AgentStatus = {
   level: AgentLevel
+  /** Which book the agent decides into: its shadow book, or (level auto) the paper account. */
+  book: "shadow" | "live"
   /** off: level off or no model; idle; queued: waiting (the reason is in `blocked`); running. */
   state: "off" | "idle" | "queued" | "running"
   blocked: string | null
@@ -290,7 +297,10 @@ export type AgentStatus = {
   watches: number
   /** The latest step's generation speed, tokens/s. */
   tokens_per_s: number | null
+  /** The account the agent decides into (`book`): the shadow book's, or at level auto the paper account's. */
   shadow: ShadowAccount | null
-  /** Circuit breakers tripped today (recorded; at level shadow nothing is enforced). */
+  /** Circuit breakers tripped today: at level shadow recorded only; at level auto each drops the agent to shadow, except a slow model, which pauses its entries. */
   breakers: string[]
+  /** Why the agent's entries are paused (a slow model), or null. */
+  entries_paused: string | null
 }

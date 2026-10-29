@@ -1,16 +1,25 @@
+import type { AgentLevel } from "@mb/core/agent"
 import { WIRE_SUMMARY_RULE } from "@mb/engine-kit/ai/prompt-parts"
 
 /**
- * The crypto agent's system prompt (docs/plans/LOCAL-AI.md §8). It is the same for every episode,
- * so the model server caches it; everything that changes (the book, the limits in force, what woke
- * the agent) is in the brief. The tool list and the turn protocol are appended by @mb/agent.
+ * The crypto agent's system prompt (docs/plans/LOCAL-AI.md §8). It is the same for every episode
+ * at a level, so the model server caches it; everything that changes (the book, the limits in
+ * force, what woke the agent) is in the brief. The tool list and the turn protocol are appended by
+ * @mb/agent.
  *
- * Bump the version when the prompt changes materially: episodes record it.
+ * Bump the version when the prompt changes materially: episodes record it, and their level.
  */
 
-export const CRYPTO_AGENT_PROMPT_VERSION = "crypto-agent-v3"
+export const CRYPTO_AGENT_PROMPT_VERSION = "crypto-agent-v4"
 
-export const cryptoAgentSystemPrompt = () => `You are the trading agent of CryptoMarketBot: Kraken spot, USD pairs, long only, paper money. You run in SHADOW: your decisions fill in your own simulated account (the shadow book) at live prices, with the exchange's fees and slippage, and never reach the exchange. Your record there decides whether you are ever given real trades, so decide as if they were real.
+/** Where the agent's decisions go, by level. */
+const MODE = {
+  shadow:
+    "You run in SHADOW: your decisions fill in your own simulated account (the shadow book) at live prices, with the exchange's fees and slippage, and never reach the exchange. Your record there decides whether you are ever given real trades, so decide as if they were real.",
+  auto: "You trade the bot's paper account: your decisions go through the risk engine to the exchange's paper wallet, at its fees and slippage, and nothing else decides for the bot. Positions in YOUR BOOK that the bot opened before you took over are yours to manage. Breakers watch for misbehavior (repeated refusals, invalid answers, losses) and take your trading away when they trip.",
+}
+
+export const cryptoAgentSystemPrompt = (level: AgentLevel = "shadow") => `You are the trading agent of CryptoMarketBot: Kraken spot, USD pairs, long only, paper money. ${level === "auto" ? MODE.auto : MODE.shadow}
 
 You wake when something may matter: news our feeds flagged, a setup our screens found, a sharp move in something you hold, a stop or target hit, a watch you set, a scheduled release, a review after a quiet spell, or a question from the owner. Most wake-ups need no trade. no_trade, hold and an empty decision list are normal answers, and a watch is often better than acting early.
 

@@ -2,24 +2,28 @@ import { checkEntry, entryRoomUsd } from "@mb/agent/envelope"
 import type { EpisodeInfo } from "@mb/agent/runtime"
 import type { AgentAction } from "@mb/core/agent"
 import { normalizeStockAgentDecisions, type StockAgentAnswer, type StockAgentDecision } from "@mb/stock-core/agent"
+import { isOptionAction } from "@mb/stock-core/report"
 import { evaluateStockBuy, heldExitBounds, ratchetStop, resolveExits } from "../bot/execute"
-import { sessionWindow, shadowRiskState, sidePrices, type StockAgentDeps } from "./book"
+import { isLive, sessionWindow, shadowRiskState, sidePrices, type StockAgentDeps } from "./book"
+import { actLive } from "./live"
 
 /**
- * The stock agent's decisions into the shadow book (docs/plans/LOCAL-AI.md §8.4, §8.7, §9):
- * normalized with the cycle's rules, then sales first, exit changes, holds, and buys by conviction.
- * A buy happens only in the regular session after the opening buffer (the closing window is the
- * cycle's close phase), passes the envelope's rate limits, then the cycle's own buy rules
- * (evaluateStockBuy) against the shadow book's account, and is cut to the envelope's share. Sales
- * fill only while the market is open; they and exit changes are never rate-limited. Stops only
- * move up.
+ * The stock agent's decisions (docs/plans/LOCAL-AI.md §8.4, §8.7, §9). At level auto they trade
+ * the paper account, stocks and options (./live). Otherwise they go into the shadow book, stocks
+ * only: normalized with the cycle's rules, then sales first, exit changes, holds, and buys by
+ * conviction. A buy happens only in the regular session after the opening buffer (the closing
+ * window is the cycle's close phase), passes the envelope's rate limits, then the cycle's own buy
+ * rules (evaluateStockBuy) against the shadow book's account, and is cut to the envelope's share.
+ * Sales fill only while the market is open; they and exit changes are never rate-limited. Stops
+ * only move up.
  */
 
-const ORDER: Record<StockAgentDecision["action"], number> = { sell: 0, adjust_exits: 1, hold: 2, buy: 3 }
+const ORDER: Record<StockAgentDecision["action"], number> = { sell: 0, close_option: 0, adjust_exits: 1, hold: 2, hold_option: 2, buy: 3, buy_option: 4 }
 
 const action = (d: StockAgentDecision, outcome: AgentAction["outcome"], detail: string | null): AgentAction => ({ symbol: d.symbol, action: d.action, conviction: d.conviction, outcome, detail })
 
-export const actOnStockAnswer = async (d: StockAgentDeps, answer: StockAgentAnswer, episode: Pick<EpisodeInfo, "id">, known: (symbol: string) => boolean): Promise<AgentAction[]> => {
+export const actOnStockAnswer = async (d: StockAgentDeps, answer: StockAgentAnswer, episode: Pick<EpisodeInfo, "id" | "wake" | "entriesPaused">, known: (symbol: string) => boolean): Promise<AgentAction[]> => {
+  if (isLive(d)) return actLive(d, answer, episode, known)
   const { ctx, shadow } = d
   const r = ctx.settings.current.risk
   const held = new Map((await shadow.open()).map((p) => [p.symbol, p]))
@@ -29,6 +33,10 @@ export const actOnStockAnswer = async (d: StockAgentDeps, answer: StockAgentAnsw
   for (const dec of [...decisions].sort((a, b) => ORDER[a.action] - ORDER[b.action] || b.conviction - a.conviction)) {
     const position = held.get(dec.symbol) ?? null
     const prices = sidePrices(d, dec.symbol)
+    if (isOptionAction(dec.action)) {
+      out.push(action(dec, "not_applicable", "options are traded only at level auto: the shadow book has none"))
+      continue
+    }
     if (dec.action === "hold") {
       if (!position) {
         out.push(action(dec, "not_applicable", "not held"))

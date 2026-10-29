@@ -9,15 +9,17 @@ import { classifyRegime, featuresForPrompt, type Features } from "../market/feat
 import { loadFeatures, viableSetup } from "../orchestrator/crypto-cycle"
 import { roundTripCostBps } from "../risk/sizing"
 import { screenCrypto } from "../strategies/registry"
-import { bookText, mid, type CryptoAgentDeps } from "./book"
+import { isLive, mid, type CryptoAgentDeps } from "./book"
+import { bookText, envelopeHistory, heldPositions } from "./view"
 
 /**
  * What wakes the crypto agent besides news (docs/plans/LOCAL-AI.md §8.1), checked by code as the
  * data arrives:
  *
- *   every 3 s    the shadow book's stops and targets against the live bid (a fill is a P2), and a
- *                held pair moving `schedule.trigger_move_atr` 1 h ATRs since your last review
- *                (down: P0, up: P2), again at every further ATR
+ *   every 3 s    the shadow book's stops and targets against the live bid (a fill is a P2; at level
+ *                auto the engine's protection loop runs the paper account's, and a stop or target
+ *                it hits is the P2), and a held pair moving `schedule.trigger_move_atr` 1 h ATRs
+ *                since your last review (down: P0, up: P2), again at every further ATR
  *   bar close    once a minute's bars arrive from Kraken: features, the regime and the screens on
  *                the live quotes, with an interval's candles fetched afresh just after it closes
  *                (1 h, 4 h, daily). The best viable setups on pairs not in the book wake the agent
@@ -85,12 +87,14 @@ export class CryptoObserver {
 
   async tick(now: Date) {
     const t = now.getTime()
+    // The shadow book's stops, targets and marks are the agent's to run; the paper account's are the engine's (protection, marks).
+    const live = isLive(this.d)
     if (t - this.last.exits >= EXITS_MS) {
       this.last.exits = t
-      await this.exits(now)
+      if (!live) await this.exits(now)
       await this.priceMoves(now)
     }
-    if (t - this.last.mark >= MARK_MS) {
+    if (!live && t - this.last.mark >= MARK_MS) {
       this.last.mark = t
       await this.d.shadow.mark(mid(this.d.ctx))
     }
@@ -144,29 +148,44 @@ export class CryptoObserver {
 
   private async priceMoves(now: Date) {
     const s = this.d.ctx.settings.current
-    for (const p of await this.d.shadow.open()) {
+    for (const p of await heldPositions(this.d)) {
       const m = mid(this.d.ctx)(p.symbol)
       const atr = this.market.features.get(p.symbol)?.atr_1h
-      const ref = p.last_review_price ?? p.entry_price
+      const ref = p.reviewPrice ?? p.entry
       if (!m || !atr) continue
       const atrs = Math.abs(m - ref) / atr
       if (atrs < s.schedule.trigger_move_atr) continue
       // Once per review and whole ATR: a further ATR wakes it again.
-      const key = `${p.last_reviewed_at?.getTime() ?? 0}:${Math.floor(atrs)}`
-      if (this.moves.get(p._id) === key) continue
-      this.moves.set(p._id, key)
+      const key = `${p.reviewedAt?.getTime() ?? 0}:${Math.floor(atrs)}`
+      if (this.moves.get(p.id) === key) continue
+      this.moves.set(p.id, key)
       const down = m < ref
       this.observe({
-        id: `move:${p._id}:${key}`,
+        id: `move:${p.id}:${key}`,
         subject: p.symbol,
         kind: "price",
         priority: down ? 0 : 2,
         salience: Math.min(100, Math.round(50 + 10 * atrs)),
-        summary: `${p.symbol}, which you hold, moved ${((m / ref - 1) * 100).toFixed(2)}% (${atrs.toFixed(1)} 1 h ATRs) since your last review at ${ref}; stop ${p.stop_price ?? "none"}.`,
-        refs: { position_id: p._id },
+        summary: `${p.symbol}, which you hold, moved ${((m / ref - 1) * 100).toFixed(2)}% (${atrs.toFixed(1)} 1 h ATRs) since your last review at ${ref}; stop ${p.stop ?? "none"}.`,
+        refs: { position_id: p.id },
         at: now,
       })
     }
+  }
+
+  /** Level auto: a position the engine closed at its stop or target (the protection loop) is worth a look at what's left. */
+  onPositionClosed(e: { position_id: string; instrument: string; realized_pnl_usd: number; return_pct: number | null; exit_reason: string }, now = new Date()) {
+    if (e.exit_reason !== "stop_loss" && e.exit_reason !== "take_profit") return
+    this.observe({
+      id: `fill:${e.position_id}`,
+      subject: e.instrument,
+      kind: "fill",
+      priority: 2,
+      salience: 60,
+      summary: `Your ${e.instrument} position hit its ${e.exit_reason === "stop_loss" ? "stop" : "target"}: ${e.realized_pnl_usd >= 0 ? "+" : "-"}$${Math.abs(e.realized_pnl_usd).toFixed(2)}${e.return_pct !== null ? ` (${e.return_pct >= 0 ? "+" : ""}${e.return_pct.toFixed(2)}%)` : ""}.`,
+      refs: { position_id: e.position_id },
+      at: now,
+    })
   }
 
   /**
@@ -181,9 +200,8 @@ export class CryptoObserver {
     await this.market.refresh()
     const s = this.d.ctx.settings.current
     if (!this.market.regime) return
-    const held = new Set((await this.d.shadow.open()).map((p) => p.symbol))
-    const account = await this.d.shadow.account(mid(this.d.ctx))
-    if (!checkEntry("", await this.d.shadow.envelopeHistory(account.equity_usd), s.agent.envelope, now.getTime()).approved) return
+    const held = new Set((await heldPositions(this.d)).map((p) => p.symbol))
+    if (!checkEntry("", await envelopeHistory(this.d, now.getTime()), s.agent.envelope, now.getTime()).approved) return
     const fresh = [...this.market.features.values()].filter((f) => f.quote_age_s <= s.kraken.max_quote_age_seconds)
     const viable = screenCrypto({ regime: this.market.regime, features: fresh, held, settings: s }).filter((c) => {
       const f = this.market.features.get(c.symbol)!

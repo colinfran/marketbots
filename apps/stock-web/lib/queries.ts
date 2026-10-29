@@ -262,9 +262,18 @@ export const listRecentDecisions = async (limit = 60): Promise<DecisionRow[]> =>
 export const getLatestDecisions = async () => {
   await connection()
   const rows = await (await collections()).decisions
-    .aggregate<{ _id: string; action: DecisionDoc["action"]; status: DecisionDoc["status"]; at: Date; report_id: string }>([
+    .aggregate<{ _id: string; action: DecisionDoc["action"]; status: DecisionDoc["status"]; at: Date; report_id: string; agent_episode_id: string | null }>([
       { $sort: { created_at: -1 } },
-      { $group: { _id: "$symbol", action: { $first: "$action" }, status: { $first: "$status" }, at: { $first: "$created_at" }, report_id: { $first: "$report_id" } } },
+      {
+        $group: {
+          _id: "$symbol",
+          action: { $first: "$action" },
+          status: { $first: "$status" },
+          at: { $first: "$created_at" },
+          report_id: { $first: "$report_id" },
+          agent_episode_id: { $first: { $ifNull: ["$agent_episode_id", null] } },
+        },
+      },
     ])
     .toArray()
   return Object.fromEntries(rows.map((r) => [r._id, r]))
@@ -277,7 +286,7 @@ export const listDailyStats = async () => {
 
 // ─── Fills ───────────────────────────────────────────────────────────────────
 
-export type TradeRow = OrderFill & { rationale: string | null; report_id: string | null }
+export type TradeRow = OrderFill & { rationale: string | null; report_id: string | null; agent_episode_id: string | null }
 
 const loadFills = async (filter: Record<string, unknown> = {}): Promise<OrderFill[]> => {
   const { orders } = await collections()
@@ -291,11 +300,11 @@ const loadFills = async (filter: Record<string, unknown> = {}): Promise<OrderFil
 const withRationale = async (fills: OrderFill[]): Promise<TradeRow[]> => {
   const { decisions } = await collections()
   const ids = [...new Set(fills.map((f) => f.decision_id).filter((id): id is string => !!id))]
-  const docs = ids.length ? await decisions.find({ _id: { $in: ids } }, { projection: { "request.rationale": 1, report_id: 1 } }).toArray() : []
+  const docs = ids.length ? await decisions.find({ _id: { $in: ids } }, { projection: { "request.rationale": 1, report_id: 1, agent_episode_id: 1 } }).toArray() : []
   const byId = new Map(docs.map((d) => [d._id, d]))
   return fills.map((f) => {
     const d = f.decision_id ? byId.get(f.decision_id) : undefined
-    return { ...f, rationale: d?.request.rationale ?? null, report_id: d?.report_id ?? null }
+    return { ...f, rationale: d?.request.rationale ?? null, report_id: d?.report_id ?? null, agent_episode_id: d?.agent_episode_id ?? null }
   })
 }
 

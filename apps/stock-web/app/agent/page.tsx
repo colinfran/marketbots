@@ -24,7 +24,7 @@ export default async function AgentPage() {
     <div className="space-y-8">
       <PageHeader
         title="The agent"
-        description="A local AI model that runs beside the bot's scheduled cycles. Code watches prices, news, the session and its own watches all the time and wakes it when something matters; it looks things up one step at a time and decides. In shadow, its decisions fill in a simulated book at live prices and slippage, never at the broker, so its record can be compared with the bot's."
+        description="A local AI model that decides for the bot. Code watches prices, news, the setup screen, the session and its own watches all the time and wakes it when something matters; it looks things up one step at a time and decides. At level auto it trades stocks and options in the paper account through the bot's risk checks, and the timed cycles are off; in shadow, its decisions fill in a simulated book at live prices and slippage, never at the broker."
         action={<StreamBadge />}
       />
       <AgentStatusCard status={status} online={engine.online} />
@@ -52,7 +52,7 @@ export default async function AgentPage() {
       </div>
       <section>
         <SectionTitle>Shadow book</SectionTitle>
-        <ShadowBook account={status?.shadow ?? null} {...book} />
+        <ShadowBook account={status?.book === "live" ? null : (status?.shadow ?? null)} {...book} />
       </section>
       <section>
         <SectionTitle>Watches and notes</SectionTitle>

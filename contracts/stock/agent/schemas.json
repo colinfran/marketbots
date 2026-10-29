@@ -2,10 +2,27 @@
   "tools": [
     {
       "name": "book",
-      "description": "your shadow book again (positions, cash, P&L), the session and the limits code enforces right now. Args: {}.",
+      "description": "your book again (positions, cash, P&L), the session and the limits code enforces right now. Args: {}.",
       "args": {
         "type": "object",
         "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "option_menu",
+      "description": "the liquid option contracts you may buy on a stock: calls and puts in the allowed expirations, with bid, ask, delta, IV and open interest. A buy_option must copy its contracts from this list. Level auto only. Args: {symbol}.",
+      "args": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "description": "A US ticker in uppercase, e.g. NVDA."
+          }
+        },
+        "required": [
+          "symbol"
+        ],
         "additionalProperties": false
       }
     },
@@ -112,7 +129,7 @@
     },
     {
       "name": "past_decisions",
-      "description": "the bot's last decisions on a stock (the timed cycles' and yours in the shadow book), with what came of them. Args: {symbol}.",
+      "description": "the bot's last decisions on a stock and its options (yours on the paper account, the timed cycles' before you, and yours in the shadow book), with what came of them. Args: {symbol}.",
       "args": {
         "type": "object",
         "properties": {
@@ -207,9 +224,12 @@
                 "buy",
                 "sell",
                 "adjust_exits",
-                "hold"
+                "hold",
+                "buy_option",
+                "close_option",
+                "hold_option"
               ],
-              "description": "Stocks you don't hold: buy (opens a position; never adds). Stocks you hold (YOUR BOOK): sell some or all, adjust_exits (new stop and target), or hold."
+              "description": "Stocks you don't hold: buy (opens a position; never adds). Stocks you hold (YOUR BOOK): sell some or all, adjust_exits (new stop and target), or hold. Options: buy_option opens one from an option_menu result (symbol = the underlying); close_option or hold_option manage an open options position by its structure_id."
             },
             "allocation_pct": {
               "description": "Stock buy only: % of total account equity to commit (e.g. 8 means 8%). null otherwise.",
@@ -280,6 +300,77 @@
             "invalidation": {
               "type": "string",
               "description": "The specific price/event that proves the idea wrong."
+            },
+            "structure_id": {
+              "description": "close_option / hold_option: the id of an options position in YOUR BOOK. null otherwise.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "option": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "strategy": {
+                      "type": "string",
+                      "enum": [
+                        "long_call",
+                        "long_put",
+                        "call_debit_spread",
+                        "put_debit_spread"
+                      ],
+                      "description": "long_call / long_put = buy one contract type. call_debit_spread = buy a call and sell a higher-strike call, same expiration. put_debit_spread = buy a put and sell a lower-strike put, same expiration."
+                    },
+                    "long_leg": {
+                      "type": "string",
+                      "description": "The contract to BUY, copied exactly from an option_menu result in this episode, e.g. NVDA261120C00140000."
+                    },
+                    "short_leg": {
+                      "description": "Spreads only: the contract to SELL, copied exactly from the same option_menu result, same expiration as long_leg. null for long_call / long_put.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "premium_pct": {
+                      "description": "% of account equity to spend on premium (at most the per-position cap in YOUR BOOK's options limits).",
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "stop_loss_pct": {
+                      "description": "Exit when the position is worth this % less than was paid, e.g. 50. null = the default.",
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "take_profit_pct": {
+                      "description": "Take profit when the position is worth this % more than was paid, e.g. 100. null = the default.",
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "strategy",
+                    "long_leg",
+                    "short_leg",
+                    "premium_pct",
+                    "stop_loss_pct",
+                    "take_profit_pct"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "buy_option only: what to buy, from an option_menu result in this episode. null for every other action."
             }
           },
           "required": [
@@ -294,7 +385,9 @@
             "conviction",
             "rationale",
             "evidence",
-            "invalidation"
+            "invalidation",
+            "structure_id",
+            "option"
           ],
           "additionalProperties": false
         },

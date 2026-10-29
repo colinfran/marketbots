@@ -5,7 +5,7 @@ import { silentLogger } from "@mb/engine-kit/log"
 import { describe, expect, it, vi } from "vitest"
 import { z } from "zod"
 import type { ChatFn } from "../src/client"
-import { Agent, type AgentBot, type EpisodeInfo } from "../src/runtime"
+import { Agent, type AgentAccount, type AgentBot, type EpisodeInfo, type Promotion } from "../src/runtime"
 import { defineTool } from "../src/tools"
 import { obs, reply, scriptedChat, SETTINGS, useAgentDb } from "./helpers"
 
@@ -24,6 +24,8 @@ describe("agent runtime", () => {
     prices = { "SOL/USD": 180 },
     skip,
     outcomes,
+    accountOf = () => null,
+    promotion,
   }: {
     chat: ChatFn | null
     settings?: AgentSettings
@@ -32,8 +34,15 @@ describe("agent runtime", () => {
     skip?: AgentBot<Answer>["skip"]
     /** What the bot reports for each decision, in place of "filled". */
     outcomes?: Pick<AgentAction, "outcome" | "detail">[]
+    accountOf?: () => AgentAccount | null
+    promotion?: Promotion | null
   }) => {
     let t = Date.parse("2026-10-28T14:00:00Z")
+    let current = settings
+    let promoted = promotion ?? null
+    const demote = vi.fn(async () => {
+      current = { ...current, level: "shadow" }
+    })
     const events: { type: string; data: unknown; summary: string }[] = []
     const acted: EpisodeInfo[] = []
     const calls = { record: vi.fn(async () => undefined) }
@@ -49,14 +58,14 @@ describe("agent runtime", () => {
         acted.push(episode)
         return a.decisions.map((d, i) => ({ symbol: d.symbol, action: d.action, conviction: 60, outcome: "filled", detail: null, ...outcomes?.[i] }))
       },
-      shadow: async () => null,
+      account: async () => accountOf(),
       skip,
     }
     const agent = new Agent({
       col: db.col,
       bus: { emit: (type, data, meta) => events.push({ type, data, summary: meta.summary }) },
       log: silentLogger,
-      settings: () => settings,
+      settings: () => current,
       settingsVersion: () => 7,
       chat,
       calls,
@@ -65,6 +74,13 @@ describe("agent runtime", () => {
       price: (s) => prices[s] ?? null,
       bot,
       archive,
+      demote,
+      promotion: {
+        get: () => promoted,
+        set: async (p) => {
+          promoted = p
+        },
+      },
       signal: new AbortController().signal,
       now: () => new Date(t),
     })
@@ -72,7 +88,20 @@ describe("agent runtime", () => {
       await agent.tick()
       await agent.current
     }
-    return { agent, events, acted, calls, archive, advance: (ms: number) => (t += ms), at: () => new Date(t), run }
+    return {
+      agent,
+      events,
+      acted,
+      calls,
+      archive,
+      demote,
+      advance: (ms: number) => (t += ms),
+      at: () => new Date(t),
+      run,
+      setLevel: (level: AgentSettings["level"]) => (current = { ...current, level }),
+      level: () => current.level,
+      promoted: () => promoted,
+    }
   }
 
   it("ignores observations while the level is off", async () => {
@@ -172,6 +201,66 @@ describe("agent runtime", () => {
     expect(await run("buys only in the regular session after the opening buffer")).toEqual([])
     await db.col.agentEpisodes.deleteMany({})
     expect(await run("envelope: 2/2 in the last hour")).toEqual(["envelope_blocks"])
+  })
+
+  describe("at level auto", () => {
+    const account = (equity: number, dayPnlPct = 0): AgentAccount => ({
+      account: { starting_usd: 10_000, cash_usd: equity, equity_usd: equity, exposure_usd: 0, realized_pnl_usd: 0, unrealized_pnl_usd: 0, return_pct: (equity / 10_000 - 1) * 100, open_positions: 0, closed_positions: 0 },
+      dayPnlPct,
+    })
+    const AUTO = { ...SETTINGS, level: "auto" as const }
+
+    it("records the promotion's equity, counts the total loss from it, and drops to shadow when a breaker trips", async () => {
+      let equity = 12_000
+      const { chat } = scriptedChat([reply({ kind: "answer", answer: answer({ decisions: [] }) })])
+      const { agent, advance, at, run, events, demote, level, promoted, setLevel } = setup({ chat, settings: SETTINGS, accountOf: () => account(equity) })
+      await run()
+      setLevel("auto")
+      await run()
+      expect(promoted()).toEqual({ at: at(), equity_usd: 12_000 })
+      expect(agent.status()).toMatchObject({ level: "auto", book: "live" })
+      // Down 7% since the promotion, though still up 4% since the account started.
+      equity = 11_160
+      advance(16_000)
+      agent.observe(obs({ subject: "SOL/USD", at: at() }))
+      advance(11_000)
+      await run()
+      expect(demote).toHaveBeenCalledWith(expect.stringMatching(/^total loss: /))
+      expect(level()).toBe("shadow")
+      expect(events.find((e) => e.type === "agent.breaker")?.summary).toMatch(/the agent drops to shadow$/)
+    })
+
+    it("keeps a promotion recorded before a restart", async () => {
+      const before = { at: new Date("2026-10-27T10:00:00Z"), equity_usd: 9_000 }
+      const { run, promoted } = setup({ chat: scriptedChat([]).chat, settings: AUTO, accountOf: () => account(10_000), promotion: before })
+      await run()
+      expect(promoted()).toBe(before)
+    })
+
+    it("pauses entries while the model is slow, without demoting, and tells the bot", async () => {
+      const slow = reply({ kind: "answer", answer: answer({ decisions: [] }) }, { gen_per_s: 20 })
+      const { chat } = scriptedChat(Array.from({ length: 6 }, () => slow))
+      const { agent, advance, at, run, acted, demote } = setup({ chat, settings: AUTO, accountOf: () => account(10_000) })
+      for (let i = 0; i < 6; i++) {
+        agent.observe(obs({ subject: `S${i}/USD`, at: at() }))
+        advance(11_000)
+        await run()
+      }
+      expect(acted.at(-1)?.entriesPaused).toMatch(/^entries paused: the last 5 steps generated under 35 tokens\/s/)
+      expect(agent.status().entries_paused).not.toBeNull()
+      expect(demote).not.toHaveBeenCalled()
+    })
+
+    it("turns the owner's Run now into a review it may act on", async () => {
+      const { chat } = scriptedChat([reply({ kind: "answer", answer: answer() })])
+      const { agent, advance, run, acted } = setup({ chat, settings: AUTO, accountOf: () => account(10_000) })
+      expect(agent.review(["SOL/USD"], "owner@example.com")).toBe("the agent will review SOL/USD now: see the Agent page")
+      advance(6_000)
+      await run()
+      const [doc] = await db.col.agentEpisodes.find().toArray()
+      expect(doc).toMatchObject({ subject: "SOL/USD", priority: 1, question: null })
+      expect(acted[0]).toMatchObject({ readOnly: false })
+    })
   })
 
   it("waits while trading is paused", async () => {

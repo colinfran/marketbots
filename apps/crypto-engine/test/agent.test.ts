@@ -3,38 +3,46 @@ import type { CryptoAgentAnswer } from "@mb/crypto-core/agent"
 import { DEFAULT_SETTINGS, type Settings } from "@mb/crypto-core/settings"
 import { silentLogger } from "@mb/engine-kit/log"
 import { describe, expect, it, vi } from "vitest"
-import { actOnCryptoAnswer, agentStop } from "../src/agent/act"
-import { bookText, createShadowBook, type CryptoAgentDeps } from "../src/agent/book"
+import { actOnCryptoAnswer } from "../src/agent/act"
+import { agentStop, createShadowBook, type CryptoAgentDeps } from "../src/agent/book"
+import { liveEnvelopeHistory } from "../src/agent/live"
 import { cryptoBrief, CryptoMarketView, CryptoObserver } from "../src/agent/observe"
 import { cryptoAgentTools } from "../src/agent/tools"
+import { bookText } from "../src/agent/view"
 import type { AiRunner } from "../src/ai/runner"
 import type { Alerts } from "../src/alerts"
+import { Executor } from "../src/execution/executor"
+import { PaperWalletExecution } from "../src/execution/paper-wallet"
 import type { CandleCache } from "../src/market/candles"
 import type { MarketHub } from "../src/market/hub"
 import type { EngineContext } from "../src/orchestrator/context"
+import { Ledger } from "../src/portfolio/ledger"
 import type { EngineStateStore, SettingsStore } from "../src/state/stores"
 import { useTestDb } from "./helpers/db"
-import { fakeHub, makeBus, quote } from "./helpers/fakes"
+import { fakeHub, FakeWallet, makeBus, quote } from "./helpers/fakes"
 
 const db = useTestDb()
 
-const setup = async (settings: Settings = DEFAULT_SETTINGS, quotes = { "BTC/USD": quote() }) => {
+/** `live`: level auto, with a real ledger and executor on an in-memory paper wallet. */
+const setup = async (settings: Settings = DEFAULT_SETTINGS, quotes = { "BTC/USD": quote() }, { live = false } = {}) => {
   const bus = await makeBus(db.col)
   const hub = { ...fakeHub(quotes), universe: ["BTC/USD"] } as unknown as MarketHub
+  const ledger = new Ledger(db.col, bus)
+  if (live) await ledger.ensureAccount(10_000)
   const ctx: EngineContext = {
     col: db.col,
     log: silentLogger,
     bus,
-    settings: { current: { ...settings, universe: { kraken_symbols: ["BTC/USD"] } }, version: 3 } as unknown as SettingsStore,
+    settings: { current: { ...settings, universe: { kraken_symbols: ["BTC/USD"] }, ...(live ? { agent: { ...settings.agent, level: "auto" } } : {}) }, version: 3 } as unknown as SettingsStore,
     state: { state: { status: "running", kill_switch: { engaged: false } } } as unknown as EngineStateStore,
     hub,
     // No candles: features fall back, as they do before Kraken answers.
     candles: { get: async () => Promise.reject(new Error("no candles in this test")), expire: vi.fn() } as unknown as CandleCache,
-    ledger: {} as never,
-    executor: {} as never,
+    ledger,
+    executor: new Executor(db.col, ledger, new PaperWalletExecution(new FakeWallet().cli(), hub), bus, silentLogger),
     ai: {} as AiRunner,
-    alerts: { send: vi.fn(), success: vi.fn() } as unknown as Alerts,
-    gate: () => ({ runStatus: "running", killSwitch: false, venueOnline: true, reconciled: false }),
+    alerts: { send: vi.fn(), success: vi.fn(async () => undefined) } as unknown as Alerts,
+    gate: () => ({ runStatus: "running", killSwitch: false, venueOnline: true, reconciled: live }),
     feeBps: () => 40,
     setCycleState: () => undefined,
     signal: new AbortController().signal,
@@ -42,6 +50,9 @@ const setup = async (settings: Settings = DEFAULT_SETTINGS, quotes = { "BTC/USD"
   const d: CryptoAgentDeps = { ctx, shadow: createShadowBook(ctx), history: null }
   return { ctx, d, bus }
 }
+
+/** The episode an answer belongs to. */
+const ep = (id: string, urls: Set<string> = new Set(), observations: Observation[] = []) => ({ id, urls, wake: { subject: "BTC/USD", priority: 1 as const, salience: 60, observations }, entriesPaused: null })
 
 const decision = (over: Partial<CryptoAgentAnswer["decisions"][number]> = {}): CryptoAgentAnswer["decisions"][number] => ({
   symbol: "BTC/USD",
@@ -69,7 +80,7 @@ describe("crypto agent decisions", () => {
   it("buys into the shadow book through the envelope and the risk engine, at the envelope's share of the size", async () => {
     const { d } = await setup()
     const urls = new Set(["https://example.com/etf"])
-    const [a] = await actOnCryptoAnswer(d, answer([decision()]), { id: "e1", urls })
+    const [a] = await actOnCryptoAnswer(d, answer([decision()]), ep("e1", urls))
     expect(a).toMatchObject({ symbol: "BTC/USD", action: "buy", outcome: "filled" })
     const [p] = await d.shadow.open()
     // Risk allows the 20% max position ($2,000); the envelope takes half, inside the hour's 10% budget.
@@ -81,19 +92,19 @@ describe("crypto agent decisions", () => {
 
   it("refuses a buy the risk engine rejects, and one the envelope blocks", async () => {
     const { d, ctx } = await setup()
-    const [poor] = await actOnCryptoAnswer(d, answer([decision({ take_profit: 65_500 })]), { id: "e1", urls: new Set() })
+    const [poor] = await actOnCryptoAnswer(d, answer([decision({ take_profit: 65_500 })]), ep("e1", new Set()))
     expect(poor).toMatchObject({ outcome: "rejected", detail: expect.stringContaining("reward:risk") })
     for (const minutes of [10, 20]) {
       await ctx.col.shadowFills.insertOne({ _id: `f${minutes}`, position_id: `p${minutes}`, symbol: `X${minutes}/USD`, side: "buy", qty: 1, price: 10, reference_price: 10, fee_usd: 0, at: new Date(Date.now() - minutes * 60_000), reason: "entry", episode_id: "e0", realized_pnl_usd: null })
     }
-    const [blocked] = await actOnCryptoAnswer(d, answer([decision()]), { id: "e2", urls: new Set() })
+    const [blocked] = await actOnCryptoAnswer(d, answer([decision()]), ep("e2", new Set()))
     expect(blocked).toMatchObject({ outcome: "blocked", detail: "envelope: 2/2 in the last hour" })
   })
 
   it("blocks a buy once the hour's budget can't fund a worthwhile entry, instead of sizing it to dust", async () => {
     const { d, ctx } = await setup()
     await ctx.col.shadowFills.insertOne({ _id: "f1", position_id: "p1", symbol: "ETH/USD", side: "buy", qty: 1, price: 998.5, reference_price: 998.5, fee_usd: 0, at: new Date(Date.now() - 30 * 60_000), reason: "entry", episode_id: "e0", realized_pnl_usd: null })
-    const [a] = await actOnCryptoAnswer(d, answer([decision()]), { id: "e1", urls: new Set() })
+    const [a] = await actOnCryptoAnswer(d, answer([decision()]), ep("e1", new Set()))
     expect(a).toMatchObject({ outcome: "blocked", detail: expect.stringMatching(/^envelope: \$\d+ of this hour's \$\d+ left/) })
     expect(await d.shadow.open()).toEqual([])
   })
@@ -101,7 +112,7 @@ describe("crypto agent decisions", () => {
   it("moves a stop just past either edge of the allowed range inside it rather than refusing the buy", async () => {
     const { d } = await setup()
     // 12.2% below the 65,000 mid; the range is 1-12%.
-    const [wide] = await actOnCryptoAnswer(d, answer([decision({ stop_loss: 57_070, take_profit: 85_000 })]), { id: "e1", urls: new Set() })
+    const [wide] = await actOnCryptoAnswer(d, answer([decision({ stop_loss: 57_070, take_profit: 85_000 })]), ep("e1", new Set()))
     expect(wide).toMatchObject({ outcome: "filled" })
     const [p] = await d.shadow.open()
     expect(p.stop_price!).toBeGreaterThan(65_000 * 0.88)
@@ -113,16 +124,16 @@ describe("crypto agent decisions", () => {
 
   it("raises a held position's stop, closes it once the minimum hold has passed, and drops unknown pairs", async () => {
     const { d, ctx } = await setup()
-    await actOnCryptoAnswer(d, answer([decision()]), { id: "e1", urls: new Set() })
-    const hold = await actOnCryptoAnswer(d, answer([decision({ action: "hold", stop_loss: 64_000, take_profit: null }), decision({ symbol: "DOGE/USD" })]), { id: "e2", urls: new Set() })
+    await actOnCryptoAnswer(d, answer([decision()]), ep("e1", new Set()))
+    const hold = await actOnCryptoAnswer(d, answer([decision({ action: "hold", stop_loss: 64_000, take_profit: null }), decision({ symbol: "DOGE/USD" })]), ep("e2", new Set()))
     expect(hold).toEqual([
       { symbol: "DOGE/USD", action: "unknown", conviction: 0, outcome: "rejected", detail: "DOGE/USD: not in the universe or the shadow book" },
       expect.objectContaining({ action: "hold", outcome: "updated", detail: "stop raised 63000 → 64000" }),
     ])
-    const [early] = await actOnCryptoAnswer(d, answer([decision({ action: "close" })]), { id: "e3", urls: new Set() })
+    const [early] = await actOnCryptoAnswer(d, answer([decision({ action: "close" })]), ep("e3", new Set()))
     expect(early).toMatchObject({ outcome: "rejected", detail: expect.stringContaining("min") })
     await ctx.col.shadowPositions.updateMany({}, { $set: { opened_at: new Date(Date.now() - 2 * 3_600_000) } })
-    const [closed] = await actOnCryptoAnswer(d, answer([decision({ action: "close" })]), { id: "e4", urls: new Set() })
+    const [closed] = await actOnCryptoAnswer(d, answer([decision({ action: "close" })]), ep("e4", new Set()))
     expect(closed).toMatchObject({ outcome: "filled" })
     expect(await d.shadow.open()).toEqual([])
   })
@@ -137,10 +148,54 @@ describe("crypto agent decisions", () => {
   })
 })
 
+describe("crypto agent at level auto", () => {
+  it("buys on the paper account through the cycles' own path, at the envelope's share, and records its episode on the decision", async () => {
+    const { d, ctx } = await setup(DEFAULT_SETTINGS, undefined, { live: true })
+    const [a] = await actOnCryptoAnswer(d, answer([decision()]), ep("e1", new Set(["https://example.com/etf"])))
+    expect(a).toMatchObject({ symbol: "BTC/USD", action: "buy", outcome: "filled", detail: expect.stringMatching(/^bought /) })
+    const [p] = await ctx.ledger.openPositions()
+    // Risk allows the 20% max position ($2,000); the envelope takes half, inside the hour's $1,000.
+    expect(p.qty * p.avg_price).toBeGreaterThan(900)
+    expect(p.qty * p.avg_price).toBeLessThan(1_010)
+    expect(p).toMatchObject({ symbol: "BTC/USD", stop_price: 63_000, take_profit_price: 70_000, strategy_id: "trend" })
+    const [doc] = await ctx.col.decisions.find().toArray()
+    expect(doc).toMatchObject({ cycle_id: "e1", agent_episode_id: "e1", trigger_kind: "agent", research_id: null, model: DEFAULT_SETTINGS.agent.model, execution: { status: "filled" } })
+    expect(await d.shadow.open()).toEqual([])
+    const history = await liveEnvelopeHistory(d, 10_000)
+    expect(history).toMatchObject({ openPositions: 1, entries: [expect.objectContaining({ symbol: "BTC/USD" })] })
+    expect(await bookText(d)).toContain("YOUR BOOK (the paper account: your decisions trade it; started with $10,000)")
+  })
+
+  it("sells what it holds once the minimum hold has passed, and posts the exit to Discord", async () => {
+    const { d, ctx } = await setup(DEFAULT_SETTINGS, undefined, { live: true })
+    await actOnCryptoAnswer(d, answer([decision()]), ep("e1"))
+    const [early] = await actOnCryptoAnswer(d, answer([decision({ action: "close" })]), ep("e2"))
+    expect(early).toMatchObject({ outcome: "rejected", detail: expect.stringContaining("min") })
+    await ctx.col.positions.updateMany({}, { $set: { opened_at: new Date(Date.now() - 2 * 3_600_000) } })
+    const [sold] = await actOnCryptoAnswer(d, answer([decision({ action: "close" })]), ep("e3"))
+    expect(sold).toMatchObject({ outcome: "filled", detail: expect.stringMatching(/^sold /) })
+    expect(await ctx.ledger.openPositions()).toEqual([])
+    expect(ctx.alerts.success).toHaveBeenCalledWith("Agent sold BTC/USD", expect.stringContaining("[paper]"), expect.objectContaining({ path: "/agent/e3" }))
+  })
+
+  it("opens nothing while its entries are paused or its envelope refuses", async () => {
+    const { d, ctx } = await setup(DEFAULT_SETTINGS, undefined, { live: true })
+    const [paused] = await actOnCryptoAnswer(d, answer([decision()]), { ...ep("e1"), entriesPaused: "entries paused: the model is slow" })
+    expect(paused).toMatchObject({ outcome: "blocked", detail: "entries paused: the model is slow" })
+    await actOnCryptoAnswer(d, answer([decision()]), ep("e2"))
+    await ctx.col.positions.updateMany({}, { $set: { opened_at: new Date(Date.now() - 2 * 3_600_000) } })
+    await actOnCryptoAnswer(d, answer([decision({ action: "close" })]), ep("e3"))
+    // Re-entering right after the exit is a flip.
+    const [flip] = await actOnCryptoAnswer(d, answer([decision()]), ep("e4"))
+    expect(flip).toMatchObject({ outcome: "blocked", detail: expect.stringMatching(/^envelope: /) })
+    expect(await ctx.ledger.openPositions()).toEqual([])
+  })
+})
+
 describe("crypto agent observations and tools", () => {
   it("reports a shadow stop hit as a fill observation", async () => {
     const { d } = await setup()
-    await actOnCryptoAnswer(d, answer([decision()]), { id: "e1", urls: new Set() })
+    await actOnCryptoAnswer(d, answer([decision()]), ep("e1", new Set()))
     d.ctx.hub.quote = () => quote({ bid: 62_900, ask: 62_950, mid: 62_925 })
     const seen: Observation[] = []
     const observer = new CryptoObserver(d, new CryptoMarketView(d), (o) => seen.push(o))

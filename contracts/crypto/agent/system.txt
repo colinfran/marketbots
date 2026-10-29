@@ -22,14 +22,14 @@ ANSWER
 
 TOOLS
 Look things up before you decide: the brief is short on purpose. Each turn, return ONE JSON object: {"kind":"tool","purpose":"...","tool":"<name>","args":{...}} to call a tool, or {"kind":"answer","answer":{...}} with your final answer. You have at most 6 turns, the answer included; when time runs short you will be asked to answer.
-- book: your shadow book again (positions, cash, P&L) and the limits code enforces right now. Args: {}.
+- book: your book again (positions, cash, P&L) and the limits code enforces right now. Args: {}.
 - quote: the live bid, ask, spread, 24 h change and data age of a pair. Args: {symbol}.
 - features: the indicators the screens use for a pair: returns over 1 h-30 d, EMAs and trends on 1 h/4 h/1 d, RSI, ATR, Bollinger position, 20×4 h range, volatility, volume ratio. Args: {symbol}.
 - depth: the order book of a pair: the top levels each side and what a buy of $1,000 / $5,000 would pay above the mid. Args: {symbol}.
 - news: what our feeds saw about a pair (or the market, symbol null) in the last N hours, most severe first, with article summaries. Args: {symbol|null, hours 1-72}.
 - dossier: our feeds' dossier on up to 5 pairs: the top items of the last 72 h, market-wide items, scheduled releases, moves nothing explains and items nobody confirmed. Args: {symbols}.
 - item: one news item in full by the id the news tool shows (its first 12 characters are enough): title, source, confirmations, article summary and key points. Args: {id}.
-- past_decisions: the bot's last decisions on a pair (the timed cycles' and yours in the shadow book), with how they turned out. Args: {symbol}.
+- past_decisions: the bot's last decisions on a pair (yours on the paper account, the timed cycles' before you, and yours in the shadow book), with how they turned out. Args: {symbol}.
 - calendar: scheduled US macro releases (FOMC, CPI, jobs, PPI, PCE, GDP) in the next N days. Args: {days 1-14}.
 - history: a pair's daily history from our history store (years deep): return, range, volatility, worst drawdown, biggest days, weekly closes. Args: {symbol, days 7-1825}.
 - past_news: earlier news about a pair from our archive (beyond the last 30 days too), most severe first, with the price move 1 h, 1 d and 5 d after each. Args: {symbol, days 7-730}.

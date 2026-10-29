@@ -2,14 +2,16 @@ import type { Observation } from "@mb/core/agent"
 import type { StockAgentAnswer } from "@mb/stock-core/agent"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { actOnStockAnswer } from "../src/agent/act"
-import { bookText, createShadowBook, type StockAgentDeps } from "../src/agent/book"
+import { createShadowBook, type StockAgentDeps } from "../src/agent/book"
+import { liveEnvelopeHistory } from "../src/agent/live"
 import { StockObserver } from "../src/agent/observe"
 import { stockAgentTools } from "../src/agent/tools"
+import { bookText } from "../src/agent/view"
 import type { Session } from "../src/bot/session"
 import { fakeBroker } from "./helpers/broker"
 import { makeCtx } from "./helpers/ctx"
 import { useTestDb } from "./helpers/db"
-import { afterOpen, beforeClose, OPEN, session } from "./helpers/factories"
+import { afterOpen, beforeClose, NVDA_CALL_150, OPEN, session } from "./helpers/factories"
 
 const db = useTestDb()
 
@@ -27,9 +29,13 @@ const decision = (over: Partial<Dec> = {}): Dec => ({
   rationale: "Broke the 20-day high on volume.",
   evidence: ["20-day high 199.50", "volume 2× average"],
   invalidation: "Back below 198.",
+  structure_id: null,
+  option: null,
   ...over,
 })
 const answer = (decisions: Dec[]): StockAgentAnswer => ({ decisions, watches: [], cancel_watches: [], notes: [], reply: "ok" })
+/** The episode an answer belongs to. */
+const ep = (id: string) => ({ id, wake: { subject: "AAPL", priority: 1 as const, salience: 60, observations: [] }, entriesPaused: null })
 
 describe("stock agent", () => {
   let now: Date
@@ -44,17 +50,24 @@ describe("stock agent", () => {
   })
   afterEach(() => vi.useRealTimers())
 
-  const setup = async () => {
+  /** `live`: level auto, the paper account on the fake broker. */
+  const setup = async ({ live = false } = {}) => {
     const broker = fakeBroker()
-    const { ctx } = await makeCtx(db.col, broker)
-    const d: StockAgentDeps = { ctx, shadow: createShadowBook(ctx), history: null, session: () => current, price: (s) => prices[s] ?? null }
+    const { ctx, alerts } = await makeCtx(db.col, broker, live ? { agent: { level: "auto" } } : {})
+    const snapshot = async () => ({ account: await broker.getAccount(), positions: await broker.getPositions() })
+    let snap = await snapshot()
+    const d: StockAgentDeps = { ctx, shadow: createShadowBook(ctx), history: null, session: () => current, price: (s) => prices[s] ?? null, snapshot: () => snap, offered: new Map(), reviews: new Map() }
     const known = (s: string) => s in prices
-    return { d, ctx, known, broker }
+    /** The engine's 15-second account refresh. */
+    const refresh = async () => {
+      snap = await snapshot()
+    }
+    return { d, ctx, known, broker, alerts, refresh }
   }
 
   it("buys in the regular session through the cycle's buy rules, at the envelope's share", async () => {
     const { d, known } = await setup()
-    const [a] = await actOnStockAnswer(d, answer([decision()]), { id: "e1" }, known)
+    const [a] = await actOnStockAnswer(d, answer([decision()]), ep("e1"), known)
     // 10% of $10,000 buys 5 shares; the envelope's half is $500: 2 shares at the ask plus 5 bps.
     expect(a).toMatchObject({ symbol: "AAPL", action: "buy", outcome: "filled", detail: expect.stringMatching(/^bought 2 at 200\.10/) })
     const [p] = await d.shadow.open()
@@ -64,10 +77,10 @@ describe("stock agent", () => {
   it("buys only in the session, refuses what the cycle's rules refuse, and drops unknown tickers", async () => {
     const { d, known } = await setup()
     current = null
-    const [closed] = await actOnStockAnswer(d, answer([decision()]), { id: "e1" }, known)
+    const [closed] = await actOnStockAnswer(d, answer([decision()]), ep("e1"), known)
     expect(closed).toMatchObject({ outcome: "blocked", detail: expect.stringContaining("outside the regular session") })
     current = session()
-    const out = await actOnStockAnswer(d, answer([decision({ conviction: 4 }), decision({ symbol: "ZZZZ" })]), { id: "e2" }, known)
+    const out = await actOnStockAnswer(d, answer([decision({ conviction: 4 }), decision({ symbol: "ZZZZ" })]), ep("e2"), known)
     expect(out).toEqual([
       { symbol: "ZZZZ", action: "unknown", conviction: 0, outcome: "rejected", detail: "ZZZZ: not a ticker the agent may trade" },
       expect.objectContaining({ symbol: "AAPL", outcome: "rejected", detail: "conviction 4 < 6" }),
@@ -76,21 +89,21 @@ describe("stock agent", () => {
 
   it("moves a held stop up but never down, and sells while the market is open", async () => {
     const { d, known } = await setup()
-    await actOnStockAnswer(d, answer([decision()]), { id: "e1" }, known)
+    await actOnStockAnswer(d, answer([decision()]), ep("e1"), known)
     vi.setSystemTime(afterOpen(120))
-    const [up] = await actOnStockAnswer(d, answer([decision({ action: "adjust_exits", stop_loss: 198, take_profit: 212 })]), { id: "e2" }, known)
+    const [up] = await actOnStockAnswer(d, answer([decision({ action: "adjust_exits", stop_loss: 198, take_profit: 212 })]), ep("e2"), known)
     expect(up).toMatchObject({ outcome: "updated", detail: expect.stringContaining("stop 198, target 212") })
-    const [down] = await actOnStockAnswer(d, answer([decision({ action: "adjust_exits", stop_loss: 190, take_profit: null })]), { id: "e3" }, known)
+    const [down] = await actOnStockAnswer(d, answer([decision({ action: "adjust_exits", stop_loss: 190, take_profit: null })]), ep("e3"), known)
     expect(down.outcome).toBe("updated")
     expect((await d.shadow.open())[0].stop_price).toBe(198)
-    const [sold] = await actOnStockAnswer(d, answer([decision({ action: "sell", sell_pct: 100 })]), { id: "e4" }, known)
+    const [sold] = await actOnStockAnswer(d, answer([decision({ action: "sell", sell_pct: 100 })]), ep("e4"), known)
     expect(sold).toMatchObject({ outcome: "filled", detail: "sold 2 at 199.90" })
     expect(await d.shadow.open()).toEqual([])
   })
 
   it("closes intraday positions before the bell and wakes for the session's phases", async () => {
     const { d, known } = await setup()
-    await actOnStockAnswer(d, answer([decision({ horizon: "intraday" })]), { id: "e1" }, known)
+    await actOnStockAnswer(d, answer([decision({ horizon: "intraday" })]), ep("e1"), known)
     const seen: Observation[] = []
     const observer = new StockObserver(d, (o) => seen.push(o))
     await observer.tick(new Date())
@@ -108,7 +121,7 @@ describe("stock agent", () => {
 
   it("wakes for a minute's setups while buys are allowed, leaving out stocks it holds", async () => {
     const { d, known } = await setup()
-    await actOnStockAnswer(d, answer([decision()]), { id: "e1" }, known)
+    await actOnStockAnswer(d, answer([decision()]), ep("e1"), known)
     const seen: Observation[] = []
     const observer = new StockObserver(d, (o) => seen.push(o))
     const minute = (m: number, close: number, volume: number) => ["AAPL", "NVDA"].map((symbol) => ({ symbol, t: afterOpen(m).getTime(), close, volume }))
@@ -120,6 +133,69 @@ describe("stock agent", () => {
     const quiet = new StockObserver(d, (o) => seen.push(o))
     for (let m = 0; m < 16; m++) await quiet.onBars(minute(m, m === 15 ? 101.5 : m % 2 ? 101 : 100, m === 15 ? 3_000 : 1_000), now)
     expect(seen).toHaveLength(1)
+  })
+
+  describe("at level auto", () => {
+    it("buys on the paper account through the cycles' own path, at the envelope's share, and records its episode", async () => {
+      const { d, ctx, known, broker } = await setup({ live: true })
+      broker.setPrice("AAPL", 200)
+      const [a] = await actOnStockAnswer(d, answer([decision()]), ep("e1"), known)
+      // 10% of $10,000 asked; the envelope's half is 5%: $500 buys 2 shares at 200.
+      expect(a).toMatchObject({ symbol: "AAPL", action: "buy", outcome: "filled", detail: expect.stringMatching(/^bought 2 shares/) })
+      expect(await broker.getPositions()).toEqual([expect.objectContaining({ symbol: "AAPL", qty: "2" })])
+      const docs = await ctx.col.decisions.find().toArray()
+      expect(docs).toEqual([expect.objectContaining({ cycle_id: "e1", agent_episode_id: "e1", trigger_kind: "agent", status: "executed", request: expect.objectContaining({ allocation_pct: 5 }) })])
+      expect(await liveEnvelopeHistory(d, 10_000)).toMatchObject({ openPositions: 1, entries: [expect.objectContaining({ symbol: "AAPL", notionalUsd: 400 })] })
+      expect(await d.shadow.open()).toEqual([])
+    })
+
+    it("sells what it holds and posts the exit, and buys nothing outside the session or while paused", async () => {
+      const { d, known, broker, alerts, refresh } = await setup({ live: true })
+      broker.setPrice("AAPL", 200)
+      await actOnStockAnswer(d, answer([decision()]), ep("e1"), known)
+      await refresh()
+      expect(await bookText(d)).toContain("- AAPL: 2 shares at 200.00")
+      const [sold] = await actOnStockAnswer(d, answer([decision({ action: "sell", sell_pct: 100 })]), ep("e2"), known)
+      expect(sold).toMatchObject({ outcome: "filled", detail: "sold 2 of 2 shares" })
+      expect(alerts.map((x) => [x.title, x.path])).toContainEqual(["Agent sold AAPL", "/agent/e2"])
+      const [paused] = await actOnStockAnswer(d, answer([decision({ symbol: "SPY" })]), { ...ep("e3"), entriesPaused: "entries paused: the model is slow" }, known)
+      expect(paused).toMatchObject({ outcome: "blocked", detail: "entries paused: the model is slow" })
+      current = null
+      const [closed] = await actOnStockAnswer(d, answer([decision({ symbol: "SPY" })]), ep("e4"), known)
+      expect(closed).toMatchObject({ outcome: "blocked", detail: expect.stringContaining("outside the regular session") })
+    })
+
+    it("buys an option only from a menu it loaded in the same episode", async () => {
+      const { d, ctx, known, broker } = await setup({ live: true })
+      prices.NVDA = 142
+      broker.setPrice("NVDA", 142)
+      ctx.prices.onTrade("NVDA", 142, Date.now())
+      broker.listContract(NVDA_CALL_150, { bid: 0.9, ask: 0.96, delta: 0.35 })
+      const buy = decision({
+        symbol: "NVDA",
+        action: "buy_option",
+        allocation_pct: null,
+        conviction: 8,
+        horizon: "multi_day",
+        option: { strategy: "long_call", long_leg: NVDA_CALL_150, short_leg: null, premium_pct: 2, stop_loss_pct: null, take_profit_pct: null },
+      })
+      const [refused] = await actOnStockAnswer(d, answer([buy]), ep("e1"), known)
+      expect(refused).toMatchObject({ outcome: "rejected" })
+      const menu = stockAgentTools(d).find((t) => t.name === "option_menu")!
+      expect(await menu.run({ symbol: "NVDA" } as never, { episodeId: "e2", urls: new Set(), signal: new AbortController().signal })).toContain(NVDA_CALL_150)
+      const [bought] = await actOnStockAnswer(d, answer([buy]), ep("e2"), known)
+      expect(bought).toMatchObject({ outcome: "filled", detail: expect.stringMatching(/^bought 1 contract/) })
+      expect(await ctx.col.optionPositions.countDocuments({ underlying: "NVDA", status: "open" })).toBe(1)
+      // The menu was the episode's alone.
+      expect(d.offered.size).toBe(0)
+    })
+
+    it("keeps options out of the shadow book", async () => {
+      const { d, known } = await setup()
+      const [a] = await actOnStockAnswer(d, answer([decision({ action: "buy_option", option: { strategy: "long_call", long_leg: NVDA_CALL_150, short_leg: null, premium_pct: 2, stop_loss_pct: null, take_profit_pct: null } })]), ep("e1"), known)
+      expect(a).toMatchObject({ outcome: "not_applicable", detail: expect.stringContaining("level auto") })
+      expect(await stockAgentTools(d).find((t) => t.name === "option_menu")!.run({ symbol: "AAPL" } as never, { episodeId: "e1", urls: new Set(), signal: new AbortController().signal })).toMatch(/^options are traded only at level auto/)
+    })
   })
 
   it("answers technicals from Alpaca's bars and quotes from live prices", async () => {

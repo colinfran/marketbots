@@ -356,6 +356,8 @@ export type DecisionDoc = {
   trigger_kind?: CycleKind
   /** Wire items behind an event decision, and items it cited. */
   wire_item_ids?: string[]
+  /** The agent episode that made the decision (level auto); absent on the timed cycles'. */
+  agent_episode_id?: string
   ai: {
     conviction: number
     uncertainty: "low" | "medium" | "high"

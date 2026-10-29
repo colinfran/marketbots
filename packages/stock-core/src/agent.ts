@@ -1,20 +1,31 @@
 import { agentAnswerFields } from "@mb/core/agent"
 import { z } from "zod"
-import { decisionSchema, normalizeDecision, STOCK_ACTIONS, type Decision } from "./report"
+import { ACTIONS, decisionSchema, normalizeDecision, optionOrderSchema, type Decision } from "./report"
 
 /**
- * The stock agent's answer (docs/plans/LOCAL-AI.md §8.4): the cycle's decision schema for stocks
- * (options stay with the timed cycles for now: their menus and quotes aren't in the shadow book),
- * about what the wake-up concerns only, plus the watches, notes and reply both bots' answers have.
- * Normalized with the cycle's own rules (`normalizeDecision`).
+ * The stock agent's answer (docs/plans/LOCAL-AI.md §8.4): the cycle's decision schema, stocks and
+ * options, about what the wake-up concerns only, plus the watches, notes and reply both bots'
+ * answers have. Option entries must use contracts from an option_menu the agent looked up in the
+ * same episode (the cycle's OPTION CHAINS); options trade only at level auto, since the shadow
+ * book has no options. Normalized with the cycle's own rules (`normalizeDecision`).
  */
 
-export const stockAgentDecisionSchema = decisionSchema.omit({ structure_id: true, option: true }).extend({
+const agentOptionOrderSchema = optionOrderSchema.extend({
+  long_leg: z.string().describe("The contract to BUY, copied exactly from an option_menu result in this episode, e.g. NVDA261120C00140000."),
+  short_leg: z.string().nullable().describe("Spreads only: the contract to SELL, copied exactly from the same option_menu result, same expiration as long_leg. null for long_call / long_put."),
+  premium_pct: z.number().nullable().describe("% of account equity to spend on premium (at most the per-position cap in YOUR BOOK's options limits)."),
+})
+
+export const stockAgentDecisionSchema = decisionSchema.extend({
   action: z
-    .enum(STOCK_ACTIONS)
-    .describe("Stocks you don't hold: buy (opens a position; never adds). Stocks you hold (YOUR BOOK): sell some or all, adjust_exits (new stop and target), or hold."),
+    .enum(ACTIONS)
+    .describe(
+      "Stocks you don't hold: buy (opens a position; never adds). Stocks you hold (YOUR BOOK): sell some or all, adjust_exits (new stop and target), or hold. Options: buy_option opens one from an option_menu result (symbol = the underlying); close_option or hold_option manage an open options position by its structure_id.",
+    ),
   rationale: z.string().describe("1-3 sentences: why this, why now. Cite numbers from the brief or your tool results."),
   evidence: z.array(z.string()).describe("2-5 concrete facts with numbers or times, from the brief or your tool results."),
+  structure_id: z.string().nullable().describe("close_option / hold_option: the id of an options position in YOUR BOOK. null otherwise."),
+  option: agentOptionOrderSchema.nullable().describe("buy_option only: what to buy, from an option_menu result in this episode. null for every other action."),
 })
 
 export const stockAgentAnswerSchema = z.object({
@@ -25,21 +36,22 @@ export const stockAgentAnswerSchema = z.object({
 })
 
 export type StockAgentAnswer = z.infer<typeof stockAgentAnswerSchema>
-export type StockAgentDecision = Decision & { action: (typeof STOCK_ACTIONS)[number] }
+export type StockAgentDecision = Decision
 
-/** Keeps decisions on known tickers (the first per ticker, at most three), bounded like the cycle's. */
+/** Keeps decisions on known tickers (the first per ticker and instrument, at most three), bounded like the cycle's. */
 export const normalizeStockAgentDecisions = (decisions: StockAgentAnswer["decisions"], { known }: { known: (symbol: string) => boolean }): { decisions: StockAgentDecision[]; dropped: string[] } => {
   const seen = new Set<string>()
   const out: StockAgentDecision[] = []
   const dropped: string[] = []
   for (const raw of decisions) {
-    const d = normalizeDecision({ ...raw, structure_id: null, option: null }) as StockAgentDecision
-    if (seen.has(d.symbol)) continue
+    const d = normalizeDecision(raw)
+    const key = `${d.symbol}:${d.action.endsWith("_option") ? (d.structure_id ?? d.option?.long_leg ?? "option") : "stock"}`
+    if (seen.has(key)) continue
     if (!known(d.symbol)) {
       dropped.push(`${d.symbol}: not a ticker the agent may trade`)
       continue
     }
-    seen.add(d.symbol)
+    seen.add(key)
     out.push(d)
   }
   if (out.length > 3) dropped.push(...out.slice(3).map((d) => `${d.symbol}: more than three decisions`))

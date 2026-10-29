@@ -1,26 +1,30 @@
 import { llamaChat } from "@mb/agent/client"
 import { checkEntry } from "@mb/agent/envelope"
 import { newsObservations } from "@mb/agent/observations"
-import { Agent, type AgentBot } from "@mb/agent/runtime"
+import { Agent, type AgentBot, type Promotion } from "@mb/agent/runtime"
 import type { AiCallLog } from "@mb/engine-kit/ai/call-log"
 import type { HistoryStore } from "@mb/history/store"
 import { stockAgentAnswerSchema, type StockAgentAnswer } from "@mb/stock-core/agent"
+import type { EventDataMap } from "@mb/stock-core/events"
 import { TICKER_PATTERN } from "@mb/stock-core/settings"
 import type { WireCategory, WireItemDoc } from "@mb/stock-core/wire"
 import type { Candidate } from "@mb/wire/trigger"
 import type { EngineContext } from "../bot/context"
 import type { Session } from "../bot/session"
 import { actOnStockAnswer } from "./act"
-import { createShadowBook, sessionWindow, shadowRiskState, type StockAgentDeps } from "./book"
+import { createShadowBook, isLive, sessionWindow, type StockAgentDeps } from "./book"
 import { stockBrief, StockObserver } from "./observe"
 import { STOCK_AGENT_PROMPT_VERSION, stockAgentSystemPrompt } from "./prompts"
 import { stockAgentTools } from "./tools"
+import { agentAccount, envelopeHistory, heldSymbols } from "./view"
 
 /**
  * The stock agent (docs/plans/LOCAL-AI.md §8.7): awake around the clock, buying only in the regular
- * session (outside it, watches, notes and the owner's questions), stocks only (options stay with the
- * timed cycles). The engine feeds it news (the wire policy's observe hook and every stored item, for
- * news watches) and asks it for its status.
+ * session (outside it, watches, notes and the owner's questions). In its shadow book it trades
+ * stocks only; at level auto it trades the paper account, stocks and options. The engine feeds it
+ * news (the wire policy's observe hook and every stored item, for news watches), the price board's
+ * closed minutes (the setup screen), the positions the broker closes at their stops and targets,
+ * and asks it for its status.
  *
  * It may name any ticker it has a price for (the broker's stream or the news engine's price layers,
  * which track the ~1,500-symbol scan universe), or one its book holds.
@@ -43,6 +47,10 @@ export const createStockAgent = ({
   llmUrl,
   session,
   layerPrice,
+  snapshot,
+  busy,
+  demote,
+  promotion,
 }: {
   ctx: EngineContext
   history: HistoryStore<WireCategory> | null
@@ -51,14 +59,22 @@ export const createStockAgent = ({
   session: () => Session | null
   /** The news engine's price layers (a price no older than `maxAgeMs`, or null). */
   layerPrice: (symbol: string, maxAgeMs: number) => number | null
+  /** The broker's account and positions as the engine last read them. */
+  snapshot: StockAgentDeps["snapshot"]
+  /** Level auto: why the engine wants no episode to act now (its cycle slot is running a seed or a core review), or null. */
+  busy?: () => string | null
+  /** Level auto: drops the agent to shadow after a breaker trips. */
+  demote?: (reason: string) => Promise<void>
+  /** Level auto: the agent's last promotion, kept in the engine's state. */
+  promotion?: { get: () => Promotion | null; set: (p: Promotion) => Promise<void> }
 }): StockAgent => {
   const price = (symbol: string) => ctx.prices.fresh(symbol, MAX_PRICE_AGE_MS) ?? layerPrice(symbol, MAX_PRICE_AGE_MS)
-  const deps: StockAgentDeps = { ctx, shadow: createShadowBook(ctx), history, session, price }
+  const deps: StockAgentDeps = { ctx, shadow: createShadowBook(ctx), history, session, price, snapshot, offered: new Map(), reviews: new Map() }
   let observer: StockObserver | null = null
   const known = (symbol: string) => TICKER_PATTERN.test(symbol) && price(symbol) !== null
   const bot: AgentBot<StockAgentAnswer> = {
     promptVersion: STOCK_AGENT_PROMPT_VERSION,
-    system: stockAgentSystemPrompt,
+    system: () => stockAgentSystemPrompt(ctx.settings.current.agent.level),
     brief: (wake) => stockBrief(deps, wake),
     tools: stockAgentTools(deps),
     answer: stockAgentAnswerSchema,
@@ -70,14 +86,10 @@ export const createStockAgent = ({
       if (!wake.observations.every((o) => o.kind === "setup")) return null
       const window = sessionWindow(deps)
       if (!window.entries) return `no buys now: ${window.reason}`
-      const { history } = await shadowRiskState(deps)
-      const e = checkEntry("", history, ctx.settings.current.agent.envelope, Date.now())
+      const e = checkEntry("", await envelopeHistory(deps), ctx.settings.current.agent.envelope, Date.now())
       return e.approved ? null : `the envelope refuses entries: ${e.reason}`
     },
-    shadow: async () => {
-      const account = await deps.shadow.account(price)
-      return { account, dayPnlPct: account.day_start_equity_usd > 0 ? (account.equity_usd / account.day_start_equity_usd - 1) * 100 : 0 }
-    },
+    account: () => agentAccount(deps),
   }
   const agent = new Agent<StockAgentAnswer>({
     col: ctx.col,
@@ -90,14 +102,22 @@ export const createStockAgent = ({
     alert: (title, message, key) => ctx.alerts.send("warning", title, message, { key, path: "/agent" }),
     blocked: () => {
       const st = ctx.state.state
-      return st.kill_switch.engaged ? "the kill switch is engaged" : st.status !== "running" ? `trading is ${st.status}` : null
+      return st.kill_switch.engaged ? "the kill switch is engaged" : st.status !== "running" ? `trading is ${st.status}` : (busy?.() ?? null)
     },
     price,
     bot,
     archive: history,
+    demote,
+    promotion,
     signal: ctx.signal,
   })
   observer = new StockObserver(deps, (o) => agent.observe(o), () => agent.lastEpisodeAt?.getTime() ?? 0)
+  // Level auto: a stop or target the broker fills is the agent's to look at.
+  ctx.bus.subscribe((e) => {
+    if (e.type !== "position.closed" || !agent.on || !isLive(deps)) return
+    const data = e.data as EventDataMap["position.closed"]
+    if (data.asset_class === "us_equity") observer?.onPositionClosed(data)
+  })
   return {
     agent,
     deps,
@@ -106,8 +126,7 @@ export const createStockAgent = ({
     },
     onCandidate: (item, c) => {
       if (!agent.on) return
-      void deps.shadow.open().then((open) => {
-        const held = new Set(open.map((p) => p.symbol))
+      void heldSymbols(deps).then((held) => {
         for (const o of newsObservations(item, c, { held, critical: ctx.settings.current.wire.thresholds.critical })) agent.observe(o)
       })
     },

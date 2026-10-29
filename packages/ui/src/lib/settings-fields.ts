@@ -17,6 +17,8 @@ export type SettingsField = {
   options?: (string | SelectOption)[]
   none?: string
   step?: number
+  /** Saving this field at `value` asks the owner first, with `message`. */
+  confirm?: { value: string; message: string }
 }
 
 export type SettingsSection = { title: string; fields: SettingsField[] }
@@ -61,10 +63,20 @@ export const AGENT_SETTINGS_SECTIONS: SettingsSection[] = [
   {
     title: "Agent",
     fields: [
-      { path: "agent.level", label: "Level (off, or shadow: decides into its shadow book only)", kind: "select", options: ["off", "shadow"] },
+      {
+        path: "agent.level",
+        label: "Level (off; shadow: decides into its shadow book; auto: trades the paper account, and the timed cycles stop)",
+        kind: "select",
+        options: ["off", "shadow", "auto"],
+        confirm: {
+          value: "auto",
+          message:
+            "At level auto the agent trades the paper account on its own, inside its envelope and the bot's risk checks, and the timed cycles stop. A tripped breaker drops it back to shadow; the kill switch and Agent off still work. Switch to auto?",
+        },
+      },
       { path: "agent.model", label: "Model", kind: "select", options: AI_MODELS },
       { path: "agent.wake_cooldown_minutes", label: "Wake cooldown per subject (min)", kind: "number" },
-      { path: "agent.sweep_minutes", label: "Review sweep every (min)", kind: "number" },
+      { path: "agent.sweep_minutes", label: "Quiet-time review after (min with no wake-up)", kind: "number" },
       { path: "agent.shadow_starting_usd", label: "Shadow book starting cash ($)", kind: "number" },
       { path: "agent.public_thinking", label: "Show its thinking to logged-out viewers", kind: "boolean" },
     ],

@@ -2,45 +2,31 @@ import { checkEntry, entryRoomUsd } from "@mb/agent/envelope"
 import type { EpisodeInfo } from "@mb/agent/runtime"
 import type { AgentAction } from "@mb/core/agent"
 import { normalizeCryptoAgentDecisions, type CryptoAgentAnswer, type NormalizedCryptoAgentDecision } from "@mb/crypto-core/agent"
-import type { Settings } from "@mb/crypto-core/settings"
 import { loadFeatures } from "../orchestrator/crypto-cycle"
 import { correlatedWith, correlationMatrix } from "../risk/correlation"
 import { evaluateCryptoEntry, evaluateExit } from "../risk/engine"
 import { cryptoEdge, cryptoSize, roundTripCostBps, slippageBps, walkBook } from "../risk/sizing"
 import { boundedStop } from "../strategies/types"
 import { minimumViolation, roundPrice, roundQty } from "../venues/kraken/pairs"
-import { shadowGate, shadowRiskState, type CryptoAgentDeps } from "./book"
+import { agentStop, isLive, shadowGate, shadowRiskState, type CryptoAgentDeps } from "./book"
+import { actLive } from "./live"
 
 /**
- * The crypto agent's decisions into the shadow book (docs/plans/LOCAL-AI.md §8.4, §9): normalized
- * with the cycle's own rules, then exits first, holds, and entries by conviction. An entry passes
- * the envelope's rate limits, is sized like a cycle's (risk per trade, max position, the AI's share
- * of the max), cut to the envelope's share and the hour's commitment budget, and then goes through
- * the same risk engine as a cycle's buy, against the shadow book's own account. Exits obey only the
- * minimum hold; they are never rate-limited.
+ * The crypto agent's decisions (docs/plans/LOCAL-AI.md §8.4, §9). At level auto they trade the
+ * paper account (./live). Otherwise they go into the shadow book: normalized with the cycle's own
+ * rules, then exits first, holds, and entries by conviction. An entry passes the envelope's rate
+ * limits, is sized like a cycle's (risk per trade, max position, the AI's share of the max), cut to
+ * the envelope's share and the hour's commitment budget, and then goes through the same risk engine
+ * as a cycle's buy, against the shadow book's own account. Exits obey only the minimum hold; they
+ * are never rate-limited.
  */
 
 const ORDER: Record<NormalizedCryptoAgentDecision["action"], number> = { close: 0, reduce: 1, hold: 2, buy: 3, no_trade: 4 }
 
 const action = (d: NormalizedCryptoAgentDecision, outcome: AgentAction["outcome"], detail: string | null): AgentAction => ({ symbol: d.symbol, action: d.action, conviction: d.conviction, outcome, detail })
 
-/** How far inside the allowed stop range a clamped stop lands, as a share of the range's edge, so rounding and a moving mid can't push it back out. */
-const STOP_MARGIN = 0.02
-
-/**
- * The agent's stop for an entry: its own when it is below the price and within the allowed range;
- * moved just inside the range when it is outside it (the model often lands a hair past an edge);
- * `fallback` when it gave none or one at or above the price.
- */
-export const agentStop = (mid: number, stop: number | null, fallback: number, k: Pick<Settings["kraken"], "min_stop_pct" | "max_stop_pct">) => {
-  if (stop === null || stop >= mid) return fallback
-  const pct = ((mid - stop) / mid) * 100
-  if (pct > k.max_stop_pct) return mid * (1 - (k.max_stop_pct * (1 - STOP_MARGIN)) / 100)
-  if (pct < k.min_stop_pct) return mid * (1 - (k.min_stop_pct * (1 + STOP_MARGIN)) / 100)
-  return stop
-}
-
-export const actOnCryptoAnswer = async (d: CryptoAgentDeps, answer: CryptoAgentAnswer, episode: Pick<EpisodeInfo, "id" | "urls">): Promise<AgentAction[]> => {
+export const actOnCryptoAnswer = async (d: CryptoAgentDeps, answer: CryptoAgentAnswer, episode: Pick<EpisodeInfo, "id" | "urls" | "wake" | "entriesPaused">): Promise<AgentAction[]> => {
+  if (isLive(d)) return actLive(d, answer, episode)
   const { ctx, shadow } = d
   const settings = ctx.settings.current
   const k = settings.kraken

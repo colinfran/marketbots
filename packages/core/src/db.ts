@@ -107,6 +107,8 @@ export type EngineStateDoc = {
   status: "running" | "paused" | "halted"
   pause_reason: string | null
   kill_switch: { engaged: boolean; reason: string | null; at: Date | null; by: string | null; liquidate: boolean }
+  /** When the agent was last promoted to level auto, and the account's equity then (absent until the first promotion). */
+  agent_promotion?: { at: Date; equity_usd: number } | null
   updated_at: Date
 }
 
@@ -228,8 +230,8 @@ export type AiCallDoc = {
   error: string | null
 }
 
-/** What started a cycle (absent on cycles from before it was recorded). core = a review of the long-term core book. */
-export type CycleKind = "scheduled" | "price_move" | "manual" | "event" | "seed" | "core"
+/** What started a cycle (absent on cycles from before it was recorded). core = a review of the long-term core book; agent = an agent episode (its decisions' cycle_id is the episode's id). */
+export type CycleKind = "scheduled" | "price_move" | "manual" | "event" | "seed" | "core" | "agent"
 
 export type CycleStep = { name: string; at: Date; ok: boolean; detail: string | null }
 

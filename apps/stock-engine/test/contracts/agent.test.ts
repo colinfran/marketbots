@@ -19,7 +19,9 @@ import { checkNoOrphans, matchContract, matchJson } from "./snapshot"
 const TOOLS = stockAgentTools({} as StockAgentDeps)
 
 describe("contracts: the agent", () => {
-  it("system message", () => matchContract("agent/system.txt", `${stockAgentSystemPrompt()}\n\n${toolProtocol(TOOLS, DEFAULT_SETTINGS.agent.limits.p1.steps)}\n`))
+  it("system message", () => matchContract("agent/system.txt", `${stockAgentSystemPrompt("shadow")}\n\n${toolProtocol(TOOLS, DEFAULT_SETTINGS.agent.limits.p1.steps)}\n`))
+
+  it("system message at level auto", () => matchContract("agent/system-auto.txt", `${stockAgentSystemPrompt("auto")}\n\n${toolProtocol(TOOLS, DEFAULT_SETTINGS.agent.limits.p1.steps)}\n`))
 
   it("tool and answer schemas", () =>
     matchJson("agent/schemas.json", {
@@ -30,5 +32,5 @@ describe("contracts: the agent", () => {
   it("prompt version and limits", () =>
     matchJson("agent/meta.json", { prompt_version: STOCK_AGENT_PROMPT_VERSION, limits: AGENT_LIMITS, watch_kinds: WATCH_KINDS, watch_priority: WATCH_PRIORITY, priority_label: PRIORITY_LABEL }))
 
-  it("no stale snapshots", () => checkNoOrphans("agent", ["system.txt", "schemas.json", "meta.json"]))
+  it("no stale snapshots", () => checkNoOrphans("agent", ["system.txt", "system-auto.txt", "schemas.json", "meta.json"]))
 })

@@ -154,6 +154,18 @@ describe("Engine", () => {
     expect(await db.col.coreReviews.countDocuments()).toBe(0)
   })
 
+  it("at level auto runs no timed cycles: news triggers and Run now go to the agent, core reviews still go to the core book", async () => {
+    expect(await command({ type: "settings.update", patch: { agent: { level: "auto" } }, expected_version: 1 })).toMatchObject({ status: "done" })
+    const focus = { symbol: "AAPL", rule: "held_negative", action: "review" as const, severity: 70, polarity: -1 as const, item_ids: ["i1"], trigger_id: "t1", headline: "AAPL sued" }
+    expect(engine.requestEventCycle(focus)).toBe("agent")
+    expect(engine.requestEventCycle({ ...focus, symbol: "SPY", rule: "core_negative", trigger_id: "t2" })).toMatch(/^(fired|queued)$/)
+    const internals = engine as unknown as { eventQueue: { keys(): string[] }; schedule: () => Promise<void> }
+    expect(internals.eventQueue.keys()).toEqual([])
+    await internals.schedule()
+    expect(await db.col.cycles.countDocuments({ _id: { $ne: "interrupted" }, kind: { $ne: "core" } })).toBe(0)
+    expect(await command({ type: "cycle.run_now", phase: "postmarket" })).toMatchObject({ status: "failed", error: "the agent needs the model server (LLM_URL)" })
+  })
+
   it("runs a cycle on request (skipped without an AI key) and refuses a second one", async () => {
     expect(await command({ type: "cycle.run_now", phase: "postmarket" })).toMatchObject({ status: "done", result: "postmarket cycle started" })
     await until(async () => (await db.col.cycles.countDocuments({ phase: "postmarket", status: "skipped" })) === 1)

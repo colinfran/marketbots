@@ -76,12 +76,16 @@ export function AgentStatusCard({ status, online }: { status: AgentStatusView | 
       <CardHeader>
         <CardTitle className="flex flex-wrap items-center gap-2 text-base">
           The agent
-          <Badge variant="outline" className={cn("font-mono uppercase", status.level === "shadow" ? OUTCOME_STYLE.updated : "text-muted-foreground")}>
+          <Badge variant="outline" className={cn("font-mono uppercase", status.level === "auto" ? OUTCOME_STYLE.filled : status.level === "shadow" ? OUTCOME_STYLE.updated : "text-muted-foreground")}>
             {status.level}
           </Badge>
         </CardTitle>
         <CardDescription>
-          {status.level === "shadow" ? "Wakes when something matters, looks things up, and decides into its shadow book. Nothing it decides reaches the broker." : "Off: it makes no decisions."}
+          {status.level === "auto"
+            ? "Trades the paper account: wakes when something matters, looks things up, and decides. Its orders go through the bot's risk checks and its envelope; the timed cycles are off."
+            : status.level === "shadow"
+              ? "Wakes when something matters, looks things up, and decides into its shadow book. Nothing it decides reaches the broker."
+              : "Off: it makes no decisions."}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
@@ -122,7 +126,18 @@ export function AgentStatusCard({ status, online }: { status: AgentStatusView | 
             </ul>
           </div>
         )}
-        {status.breakers.length > 0 && <p className="text-amber-700 dark:text-amber-300">Breakers tripped today (recorded, not enforced in shadow): {status.breakers.join(", ").replace(/_/g, " ")}.</p>}
+        {status.level === "auto" && status.shadow && (
+          <p className="text-muted-foreground text-xs">
+            Paper account: equity {usd(status.shadow.equity_usd)} ({status.shadow.return_pct >= 0 ? "+" : ""}
+            {num(status.shadow.return_pct, 2)}% since it started), {status.shadow.open_positions} open positions.
+          </p>
+        )}
+        {status.entries_paused && <p className="text-amber-700 dark:text-amber-300">New entries paused: {status.entries_paused.replace(/^entries paused: /, "")}. Exits carry on.</p>}
+        {status.breakers.length > 0 && (
+          <p className="text-amber-700 dark:text-amber-300">
+            Breakers tripped today{status.level === "auto" ? "" : " (recorded, not enforced in shadow)"}: {status.breakers.join(", ").replace(/_/g, " ")}.
+          </p>
+        )}
       </CardContent>
     </Card>
   )

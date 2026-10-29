@@ -6,7 +6,7 @@ import Link from "next/link"
 import { Badge } from "@mb/ui/components/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mb/ui/components/table"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@mb/ui/components/tooltip"
-import { price, qty, titleCase, usd } from "@/lib/format"
+import { decisionHref, price, qty, titleCase, usd } from "@/lib/format"
 import type { DecisionRow, LiveAccount, ReportSummary, TradeRow } from "@/lib/queries"
 import { ActionBadge, Delta, Empty, PhaseBadge, ResearchModeBadge, StatusBadge, SymbolLink } from "./bits"
 import { CommandButton } from "./command"
@@ -239,7 +239,7 @@ export function DecisionsTable({ decisions, showDay = false }: { decisions: Deci
             return (
               <TableRow key={d._id} className="align-top">
                 <TableCell className="text-muted-foreground whitespace-nowrap">
-                  <Link href={`/research/${d.report_id}`} className="hover:underline">
+                  <Link href={decisionHref(d) ?? `/research/${d.report_id}`} className="hover:underline">
                     {showDay ? formatDateTime(d.created_at) : formatTime(d.created_at)}
                   </Link>
                 </TableCell>
@@ -342,8 +342,8 @@ export function TradesTable({ trades, showDay = true }: { trades: TradeRow[]; sh
                   {t.realized_pnl === null ? <span className="text-muted-foreground">—</span> : <Delta value={t.realized_pnl} percent={t.cost_basis ? ((t.price - t.cost_basis) / t.cost_basis) * 100 * (t.side === "buy" ? -1 : 1) : null} />}
                 </TableCell>
                 <TableCell className="text-muted-foreground text-xs whitespace-normal">
-                  {t.report_id ? (
-                    <Link href={`/research/${t.report_id}`} className="hover:text-foreground hover:underline">
+                  {decisionHref(t) ? (
+                    <Link href={decisionHref(t)!} className="hover:text-foreground hover:underline">
                       {t.rationale}
                     </Link>
                   ) : (

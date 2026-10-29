@@ -5,7 +5,7 @@ import { LivePrice } from "@mb/ui/live"
 import { Badge } from "@mb/ui/components/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mb/ui/components/table"
 import { ActionBadge, Empty, PageHeader, SymbolLink } from "@/components/bits"
-import { ago, price, titleCase } from "@/lib/format"
+import { ago, decisionHref, price, titleCase } from "@/lib/format"
 import { getEngine, getLatestDecisions, getLatestReport, getLiveAccount, getSettings } from "@/lib/queries"
 import { pageMetadata } from "@/lib/site"
 
@@ -107,7 +107,7 @@ export default async function MarketsPage() {
                     <TableCell className="text-right tabular-nums">{w ? `${w.conviction}/10` : "—"}</TableCell>
                     <TableCell className="text-sm">
                       {d ? (
-                        <Link href={`/research/${d.report_id}`} className="inline-flex items-center gap-1.5 hover:underline">
+                        <Link href={decisionHref(d) ?? `/research/${d.report_id}`} className="inline-flex items-center gap-1.5 hover:underline">
                           <ActionBadge action={d.action} /> <span className="text-muted-foreground text-xs">{ago(d.at)}</span>
                         </Link>
                       ) : (
