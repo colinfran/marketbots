@@ -5,6 +5,7 @@ import { cn } from "cn"
 import {
   AppWindowIcon,
   DatabaseIcon,
+  EyeIcon,
   GlobeIcon,
   HistoryIcon,
   LandmarkIcon,
@@ -13,7 +14,6 @@ import {
   NewspaperIcon,
   PauseIcon,
   PlayIcon,
-  RadioIcon,
   ScanTextIcon,
   SearchIcon,
   ShieldCheckIcon,
@@ -40,6 +40,7 @@ import {
   OFFSET,
   phaseAt,
   type Pt,
+  REST,
   route,
   type Route,
   stateAt,
@@ -47,11 +48,11 @@ import {
 } from "@/lib/topology"
 
 /**
- * The runtime chart from the README, live: each bot runs its timed cycle through the stack, then
- * its agent runs an episode in shadow, drawn as a shadow of the cycle's traffic. The diagram is SVG
- * (crisp, themed by the CSS tokens, rendered on the server); the packets, glows and meters are
- * drawn on a canvas over it. Pauses off screen, starts paused for reduced motion, and has a pause
- * button.
+ * The runtime chart from the README, live: code in each engine wakes its bot's agent when something
+ * matters, and the agent looks things up through the stack, decides and trades the paper account.
+ * The diagram is SVG (crisp, themed by the CSS tokens, rendered on the server); the packets, glows
+ * and meters are drawn on a canvas over it. Pauses off screen, starts paused for reduced motion,
+ * and has a pause button.
  */
 
 // ── Content ─────────────────────────────────────────────────────────────────────────────────────
@@ -74,22 +75,12 @@ const NODES: Record<Exclude<NodeId, Bot | "services">, { Icon: LucideIcon; rows:
   atlas: { Icon: DatabaseIcon, rows: [title("MongoDB Atlas"), detail("separate database per bot")] },
   llm: {
     Icon: SparklesIcon,
-    rows: [
-      title("Local LLM"),
-      detail("Qwen 3.6 on two GPUs"),
-      detail(hot("research", "llm:research"), ", ", hot("decisions", "llm:decisions"), ", ", hot("the agents", "llm:agents"), ", ", hot("summaries", "llm:summaries")),
-    ],
-    tall: [
-      title("Local LLM"),
-      detail("Qwen 3.6 on two GPUs"),
-      detail(hot("research", "llm:research"), ", ", hot("decisions", "llm:decisions"), ","),
-      detail(hot("the agents", "llm:agents"), ", ", hot("summaries", "llm:summaries")),
-    ],
+    rows: [title("Local LLM"), detail("Qwen 3.6 on two GPUs"), detail(hot("the agents", "llm:agents"), ", ", hot("summaries", "llm:summaries"), ", research")],
   },
   history: { Icon: HistoryIcon, rows: [title("History store"), detail(hot("price bars", "history:bars"), " and ", hot("news archive", "history:archive"))] },
   search: { Icon: SearchIcon, rows: [title("Web search"), detail("SearXNG")] },
   scraper: { Icon: ScanTextIcon, rows: [title("Shared scraper")] },
-  internet: { Icon: GlobeIcon, rows: [title(hot("Search engines", "internet:search"), " and ", hot("article pages", "internet:articles"))] },
+  internet: { Icon: GlobeIcon, rows: [title("Search engines and ", hot("article pages", "internet:articles"))] },
   news: { Icon: NewspaperIcon, rows: [title(hot("News sources", "news:sources"))] },
 }
 
@@ -104,11 +95,11 @@ const ENGINES: Record<Bot, { name: string; Mark: typeof CryptoMark; tone: string
   stock: { name: "Stock engine", Mark: StockMark, tone: "text-bot-stock" },
 }
 
-/** The loop both bots run, one line each. */
+/** An episode of either bot's agent, one line each. */
 const STEPS = [
-  { Icon: NewspaperIcon, title: "Research", text: "about 150 news sources and live market data" },
-  { Icon: ShieldCheckIcon, title: "Decide", text: "the AI proposes, a risk engine checks every order" },
-  { Icon: RadioIcon, title: "Publish", text: "every decision and trade streams live" },
+  { Icon: EyeIcon, title: "Watch", text: "code reads about 150 news sources and live prices" },
+  { Icon: SearchIcon, title: "Look up", text: "the agent wakes and checks prices, news and history" },
+  { Icon: ShieldCheckIcon, title: "Decide", text: "the agent trades, a risk engine checks every order" },
 ]
 
 /** Names for the screen-reader version of the chart. */
@@ -121,7 +112,7 @@ const NAMES: Record<NodeId, string> = {
   internet: "search engines and article pages",
   crypto: "Crypto engine",
   stock: "Stock engine",
-  llm: "Local LLM, Qwen 3.6 on two GPUs, for research, decisions, the agents and summaries",
+  llm: "Local LLM, Qwen 3.6 on two GPUs, for the agents, news summaries and research",
   search: "Web search, SearXNG",
   scraper: "Shared scraper",
   history: "History store, price bars and news archive",
@@ -320,13 +311,10 @@ function Diagram({ layout, hover, onHover, className }: { layout: Layout; hover:
                 cy={dot.y}
                 r={2.75}
                 strokeWidth={1.3}
-                className={cn(
-                  "fill-muted-foreground/40 transition-[fill] duration-300 data-[on=agent]:fill-card",
-                  bot === "crypto" ? "data-[on=agent]:stroke-bot-crypto data-[on=true]:fill-bot-crypto" : "data-[on=agent]:stroke-bot-stock data-[on=true]:fill-bot-stock",
-                )}
+                className={cn("fill-muted-foreground/40 transition-[fill] duration-300", bot === "crypto" ? "data-[on=true]:fill-bot-crypto" : "data-[on=true]:fill-bot-stock")}
               />
-              <text data-status={bot} x={b.x + 46.5} y={statusY} fontSize={type.detail} className="fill-muted-foreground font-mono transition-[fill] duration-300 data-[on=agent]:fill-foreground data-[on=true]:fill-foreground">
-                Idle
+              <text data-status={bot} x={b.x + 46.5} y={statusY} fontSize={type.detail} className="fill-muted-foreground font-mono transition-[fill] duration-300 data-[on=true]:fill-foreground">
+                {REST}
               </text>
               <ShieldCheckIcon
                 data-check={bot}
@@ -346,7 +334,7 @@ function Diagram({ layout, hover, onHover, className }: { layout: Layout; hover:
   )
 }
 
-/** The three steps, each with a track the bots move along as their cycles run. */
+/** The three steps, each with a track the bots move along as their episodes run. */
 function Steps() {
   return (
     <ol className="grid gap-x-6 gap-y-3 border-t px-4 py-3 sm:grid-cols-3">
@@ -418,14 +406,6 @@ export function Topology() {
               </li>
             )
           })}
-          <li className="flex items-center gap-1.5">
-            {/* The agent's packets as the canvas draws them: a dashed trail, a hollow head. */}
-            <svg viewBox="0 0 22 8" className="h-2 w-[22px]" aria-hidden>
-              <path d="M1 4h11" strokeDasharray="2.5 2" className="stroke-current" />
-              <circle cx={16.5} cy={4} r={2.6} strokeWidth={1.3} className="fill-none stroke-current" />
-            </svg>
-            Agent, in shadow
-          </li>
         </ul>
         <Button variant="ghost" size="icon-sm" className="ml-auto" aria-label={playing ? "Pause the animation" : "Play the animation"} onClick={() => setChoice(!playing)}>
           {playing ? <PauseIcon /> : <PlayIcon />}
@@ -454,8 +434,9 @@ export function Topology() {
           ))}
         </ul>
         <p>
-          Beside its timed cycles, each engine runs an agent in shadow: woken when something matters, it looks things up on the local model, in the history store and
-          in its own database, then decides. Its decisions fill a simulated shadow book in Atlas; nothing it decides reaches the broker.
+          Code in each engine watches the news and live prices all the time and wakes the bot&apos;s agent when something matters. The agent runs on the local model:
+          it looks things up in the paper account, the history store and its own database, then decides. A risk engine checks every order in code before it reaches
+          the paper account, and every step streams live.
         </p>
       </div>
     </section>
@@ -466,11 +447,8 @@ export function Topology() {
 
 type RGB = [number, number, number]
 type Tone = Bot | "ink"
-/**
- * An arrival: a ring around the node reached, or a ripple at the port it came in by (`end`: the
- * callee's end). The agent's are dashed, like its packets.
- */
-type Effect = { t0: number; tone: Tone; major: boolean; agent: boolean } & ({ kind: "ring"; node: NodeId } | { kind: "burst"; edge: EdgeId; end: boolean })
+/** An arrival: a ring around the node reached, or a ripple at the port it came in by (`end`: the callee's end). */
+type Effect = { t0: number; tone: Tone; major: boolean } & ({ kind: "ring"; node: NodeId } | { kind: "burst"; edge: EdgeId; end: boolean })
 
 const hex = (value: string): RGB => {
   const n = parseInt(value.trim().replace("#", ""), 16)
@@ -484,8 +462,8 @@ const easeOut = (u: number) => 1 - (1 - clamp01(u)) ** 3
 /** a < t <= b on the loop, wrapping. */
 const crossed = (t: number, a: number, b: number) => (a <= b ? t > a && t <= b : t > a || t <= b)
 /**
- * Whether a bot's first cycle has begun by `T` seconds into the loops. Stock's starts half a loop
- * in, so the first loop opens with crypto alone instead of stock caught mid-cycle.
+ * Whether a bot's first episode has begun by `T` seconds into the loops. Stock's starts half a loop
+ * in, so the first loop opens with crypto alone instead of stock caught mid-episode.
  */
 const started = (bot: Bot, T: number) => T >= OFFSET[bot] - 1e-3
 
@@ -517,16 +495,14 @@ function animate(root: HTMLElement, live: { playing: boolean; hover: NodeId | nu
   const lit = new Map<HotKey, { bot: Bot; t0: number; dur: number }>()
   const checks = new Map<Bot, number>()
   const busy: Record<Bot, boolean> = { crypto: false, stock: false }
-  const agentAtWork: Record<Bot, boolean> = { crypto: false, stock: false }
   let words: Partial<Record<Layout["id"], Map<HotKey, Pt & { w: number }>>> = {}
 
   const each = (selector: string, fn: (el: Element) => void) => root.querySelectorAll(selector).forEach(fn)
   const setHot = (key: HotKey, on: boolean) => each(`[data-hot="${key}"]`, (el) => el.setAttribute("data-on", String(on)))
-  /** An engine's status line: the cycle's state, or the agent's (its dot hollow) while an episode runs. */
-  const setState = (bot: Bot, label: string, agent = false) => {
-    busy[bot] = label !== "Idle"
-    agentAtWork[bot] = busy[bot] && agent
-    const on = agentAtWork[bot] ? "agent" : String(busy[bot])
+  /** An engine's status line, its dot lit while an episode runs. */
+  const setState = (bot: Bot, label: string) => {
+    busy[bot] = label !== REST
+    const on = String(busy[bot])
     each(`[data-status="${bot}"]`, (el) => {
       if (el.firstChild) el.firstChild.nodeValue = label
       el.setAttribute("data-on", on)
@@ -554,7 +530,7 @@ function animate(root: HTMLElement, live: { playing: boolean; hover: NodeId | nu
   }
 
   const apply = (c: Cue) => {
-    if (c.kind === "state") setState(c.bot, c.label, c.agent)
+    if (c.kind === "state") setState(c.bot, c.label)
     else if (c.kind === "lit") {
       lit.set(c.key, { bot: c.bot, t0: clock, dur: c.dur })
       setHot(c.key, true)
@@ -565,8 +541,8 @@ function animate(root: HTMLElement, live: { playing: boolean; hover: NodeId | nu
   }
   const arrive = (h: Hop) => {
     const { from, to } = EDGES[h.edge]
-    if (h.major) effects.push({ kind: "ring", node: h.back ? from : to, tone: h.bot, major: true, agent: h.agent, t0: clock })
-    effects.push({ kind: "burst", edge: h.edge, end: !h.back, tone: h.bot, major: h.major, agent: h.agent, t0: clock })
+    if (h.major) effects.push({ kind: "ring", node: h.back ? from : to, tone: h.bot, major: true, t0: clock })
+    effects.push({ kind: "burst", edge: h.edge, end: !h.back, tone: h.bot, major: h.major, t0: clock })
   }
 
   /** Advances the cues from the last frame to now. */
@@ -574,15 +550,14 @@ function animate(root: HTMLElement, live: { playing: boolean; hover: NodeId | nu
     if (clock < INTRO) {
       for (const edge of Object.keys(EDGES) as EdgeId[]) {
         const end = DEPTH[edge] * 0.55 + 0.7
-        if (prevClock < end && clock >= end) effects.push({ kind: "burst", edge, end: true, tone: "ink", major: false, agent: false, t0: clock })
+        if (prevClock < end && clock >= end) effects.push({ kind: "burst", edge, end: true, tone: "ink", major: false, t0: clock })
       }
     } else {
       const T = clock - INTRO
       const t = T % LOOP
       if (prev === null) {
         for (const bot of BOTS) {
-          const now = started(bot, T) ? stateAt(bot, t) : null
-          setState(bot, now?.label ?? "Idle", now?.agent)
+          setState(bot, started(bot, T) ? stateAt(bot, t).label : REST)
         }
       }
       else if (t !== prev) {
@@ -606,7 +581,7 @@ function animate(root: HTMLElement, live: { playing: boolean; hover: NodeId | nu
     }
     effects = effects.filter((e) => clock - e.t0 < 0.9)
 
-    // The step tracks: where each bot is in its cycle.
+    // The step tracks: where each bot is in its episode.
     const T = clock - INTRO
     const on = [false, false, false]
     BOTS.forEach((bot, b) => {
@@ -621,7 +596,7 @@ function animate(root: HTMLElement, live: { playing: boolean; hover: NodeId | nu
     steps.forEach((el, i) => el?.setAttribute("data-active", String(on[i])))
   }
 
-  const packet = (ctx: CanvasRenderingContext2D, r: Route, u1: number, back: boolean, rgb: RGB, major: boolean, alpha: number, dur: number, ghost: boolean) => {
+  const packet = (ctx: CanvasRenderingContext2D, r: Route, u1: number, back: boolean, rgb: RGB, major: boolean, alpha: number, dur: number) => {
     const u0 = u1 - TAIL / dur
     if (u0 >= 1 || u1 <= 0) return
     const s1 = sine(u1) * r.len
@@ -641,32 +616,22 @@ function animate(root: HTMLElement, live: { playing: boolean; hover: NodeId | nu
       g.addColorStop(0, rgba(rgb, 0))
       g.addColorStop(1, rgba(rgb, alpha * (major ? 0.95 : 0.6)))
       ctx.strokeStyle = g
-      ctx.lineWidth = major && !ghost ? 2 : 1.4
-      ctx.setLineDash(ghost ? [3, 2.5] : [])
+      ctx.lineWidth = major ? 2 : 1.4
       ctx.stroke()
-      ctx.setLineDash([])
     }
     if (u1 < 1) {
       const radius = major ? 2.6 : 1.8
       const glow = ctx.createRadialGradient(head.x, head.y, 0, head.x, head.y, radius * 5)
-      glow.addColorStop(0, rgba(rgb, alpha * (colors.dark ? 0.6 : 0.32) * (ghost ? 0.5 : 1)))
+      glow.addColorStop(0, rgba(rgb, alpha * (colors.dark ? 0.6 : 0.32)))
       glow.addColorStop(1, rgba(rgb, 0))
       ctx.fillStyle = glow
       ctx.beginPath()
       ctx.arc(head.x, head.y, radius * 5, 0, Math.PI * 2)
       ctx.fill()
-      const core = rgba(colors.dark ? mix(rgb, [255, 255, 255], 0.4) : rgb, alpha)
+      ctx.fillStyle = rgba(colors.dark ? mix(rgb, [255, 255, 255], 0.4) : rgb, alpha)
       ctx.beginPath()
-      if (ghost) {
-        ctx.strokeStyle = core
-        ctx.lineWidth = 1.3
-        ctx.arc(head.x, head.y, radius + 0.3, 0, Math.PI * 2)
-        ctx.stroke()
-      } else {
-        ctx.fillStyle = core
-        ctx.arc(head.x, head.y, radius, 0, Math.PI * 2)
-        ctx.fill()
-      }
+      ctx.arc(head.x, head.y, radius, 0, Math.PI * 2)
+      ctx.fill()
     }
   }
 
@@ -681,15 +646,14 @@ function animate(root: HTMLElement, live: { playing: boolean; hover: NodeId | nu
 
     if (clock < INTRO) {
       ctx.globalCompositeOperation = additive
-      for (const edge of Object.keys(EDGES) as EdgeId[]) packet(ctx, l.routes[edge], (clock - DEPTH[edge] * 0.55) / 0.7, false, colors.ink, false, 0.8 * faded(edge), 0.7, false)
+      for (const edge of Object.keys(EDGES) as EdgeId[]) packet(ctx, l.routes[edge], (clock - DEPTH[edge] * 0.55) / 0.7, false, colors.ink, false, 0.8 * faded(edge), 0.7)
     } else {
       const T = clock - INTRO
       const t = T % LOOP
       const llm = l.nodes.llm
       const thinking = THINKS.flatMap((c) => [t, t + LOOP].filter((tt) => tt >= c.t && tt < c.t + c.dur && started(c.bot, T - (tt - c.t))).map((tt) => ({ c, u: (tt - c.t) / c.dur })))
 
-      // The model at work: a shimmer across it, a comet around its edge (dashed for the agent), its
-      // GPUs busy.
+      // The model at work: a shimmer across it, a comet around its edge, its GPUs busy.
       for (const { c, u } of thinking) {
         const rgb = color(c.bot)
         const env = Math.min(1, u * 6, (1 - u) * 5)
@@ -722,7 +686,7 @@ function animate(root: HTMLElement, live: { playing: boolean; hover: NodeId | nu
             const s1 = (head - span + (span * (i + 1)) / n + 1) % 1
             const p0 = ring.at(s0 * ring.len)
             const p1 = ring.at(s1 * ring.len)
-            if (Math.hypot(p1.x - p0.x, p1.y - p0.y) > 20 || (c.agent && i % 2)) continue
+            if (Math.hypot(p1.x - p0.x, p1.y - p0.y) > 20) continue
             ctx.strokeStyle = rgba(rgb, a * env * fadedNode("llm") * ((i + 1) / n) ** 1.6)
             ctx.lineWidth = width
             ctx.beginPath()
@@ -767,18 +731,16 @@ function animate(root: HTMLElement, live: { playing: boolean; hover: NodeId | nu
         const u = (clock / 1.6 + (bot === "stock" ? 0.5 : 0)) % 1
         ctx.strokeStyle = rgba(color(bot), 0.5 * (1 - u) * fadedNode(bot))
         ctx.lineWidth = 1.2
-        ctx.setLineDash(agentAtWork[bot] ? [2, 2] : [])
         ctx.beginPath()
         ctx.arc(p.x, p.y, 3 + 5 * easeOut(u), 0, Math.PI * 2)
         ctx.stroke()
       }
-      ctx.setLineDash([])
 
       ctx.globalCompositeOperation = additive
       for (const h of TIMELINE.hops) {
         for (const tt of [t, t + LOOP]) {
           if (tt < h.t || tt > h.t + h.dur + TAIL || (h.major && !started(h.bot, T - (tt - h.t)))) continue
-          packet(ctx, l.routes[h.edge], (tt - h.t) / h.dur, h.back, color(h.bot), h.major, faded(h.edge), h.dur, h.agent)
+          packet(ctx, l.routes[h.edge], (tt - h.t) / h.dur, h.back, color(h.bot), h.major, faded(h.edge), h.dur)
         }
       }
     }
@@ -799,10 +761,8 @@ function animate(root: HTMLElement, live: { playing: boolean; hover: NodeId | nu
         const p = e.end ? l.routes[e.edge].end : l.routes[e.edge].at(0)
         ctx.arc(p.x, p.y, 2 + (e.major ? 10 : 6) * easeOut(u), 0, Math.PI * 2)
       }
-      ctx.setLineDash(e.agent ? [3, 3] : [])
       ctx.stroke()
     }
-    ctx.setLineDash([])
     ctx.globalCompositeOperation = "source-over"
   }
 

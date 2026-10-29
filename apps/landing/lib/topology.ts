@@ -1,8 +1,8 @@
 /**
  * The homepage's animated topology, as data: the runtime chart in the README (its nodes, edges and
- * the Docker stack), laid out twice, wide and tall, and what each bot runs through it: a timed
- * cycle, then an episode of its agent in shadow. Pure geometry and timing, no React or DOM:
- * components/topology.tsx draws it.
+ * the Docker stack), laid out twice, wide and tall, and what each bot runs through it: an episode
+ * of its agent, woken by code when something matters, that looks things up, decides and trades the
+ * paper account. Pure geometry and timing, no React or DOM: components/topology.tsx draws it.
  *
  * Both layouts mirror the bots around what they share: crypto on the left, stock on the right, the
  * stack's shared services down the middle, Browser, Vercel and Atlas above, the outside world
@@ -296,51 +296,36 @@ export const DEPTH: Record<EdgeId, number> = Object.fromEntries(
 export type HotKey =
   | "dashboards:crypto"
   | "dashboards:stock"
-  | "llm:research"
-  | "llm:decisions"
   | "llm:agents"
   | "llm:summaries"
   | "history:bars"
   | "history:archive"
-  | "internet:search"
   | "internet:articles"
   | "services:kraken"
   | "services:alpaca"
   | "news:sources"
 
-/**
- * A packet along an edge: forward (caller to callee) or `back`. Minor ones are background traffic;
- * the agent's (`agent`) are drawn as shadows of the cycle's.
- */
-export type Hop = { t: number; dur: number; edge: EdgeId; back: boolean; bot: Bot; major: boolean; agent: boolean }
+/** A packet along an edge: forward (caller to callee) or `back`. Minor ones are background traffic. */
+export type Hop = { t: number; dur: number; edge: EdgeId; back: boolean; bot: Bot; major: boolean }
 
 export type Cue =
-  | { t: number; bot: Bot; kind: "state"; label: string; agent: boolean }
+  | { t: number; bot: Bot; kind: "state"; label: string }
   | { t: number; bot: Bot; kind: "lit"; key: HotKey; dur: number }
-  | { t: number; bot: Bot; kind: "think"; dur: number; agent: boolean }
+  | { t: number; bot: Bot; kind: "think"; dur: number }
   | { t: number; bot: Bot; kind: "check" }
 
-/**
- * Seconds per loop. Each bot runs one timed cycle and then one agent episode per loop, stock half a
- * loop after crypto.
- */
+/** Seconds per loop. Each bot's agent runs one episode per loop, stock half a loop after crypto. */
 export const LOOP = 16
 export const OFFSET: Record<Bot, number> = { crypto: 0, stock: LOOP / 2 }
 
 /** The script below is written at a calm pace and played a little faster. */
-const PACE = 0.8
+const PACE = 0.75
 
-/** Where each step (Research, Decide, Publish) of a timed cycle starts, then where the cycle ends, in seconds. */
-export const PHASES = [0, 5.4, 9.55, 12.1].map((t) => t * PACE)
+/** Where each step (Watch, Look up, Decide) of an episode starts, then where the episode ends, in seconds. */
+export const PHASES = [0, 1.5, 5.7, 10.6].map((t) => t * PACE)
 
-/** When the agent's episode starts, just after the cycle, in the script's seconds. */
-const EPISODE = 12.4
-
-/** Each engine's own state labels, as its dashboard shows them (apps/<bot>-web/components/kit.tsx). */
-const STATES: Record<Bot, { gather: string; decide: string; check: string; order: string; after: string }> = {
-  crypto: { gather: "Screening", decide: "AI evaluating", check: "Risk check", order: "Placing order", after: "Monitoring" },
-  stock: { gather: "Gathering data", decide: "AI deciding", check: "Executing", order: "Executing", after: "Checking stops" },
-}
+/** An engine's status between episodes: the agent sleeps, and code keeps watching. */
+export const REST = "Watching"
 
 /** The duration of the intro's wave, played once before the first loop. */
 export const INTRO = 1.95
@@ -350,120 +335,102 @@ function build() {
   const cues: Cue[] = []
   for (const bot of BOTS) {
     const at = (t: number) => (OFFSET[bot] + t * PACE) % LOOP
-    let agent = false // the cycle's beats first, then the agent's
-    const go = (t: number, edge: EdgeId, dur: number, back = false) => hops.push({ t: at(t), dur: dur * PACE, edge, back, bot, major: true, agent })
-    const say = (t: number, label: string) => cues.push({ t: at(t), bot, kind: "state", label, agent })
+    const go = (t: number, edge: EdgeId, dur: number, back = false) => hops.push({ t: at(t), dur: dur * PACE, edge, back, bot, major: true })
+    const say = (t: number, label: string) => cues.push({ t: at(t), bot, kind: "state", label })
     const lit = (t: number, key: HotKey, dur = 1.1) => cues.push({ t: at(t), bot, kind: "lit", key, dur: dur * PACE })
-    const think = (t: number, dur: number) => cues.push({ t: at(t), bot, kind: "think", dur: dur * PACE, agent })
-    const s = STATES[bot]
+    const think = (t: number, dur: number) => cues.push({ t: at(t), bot, kind: "think", dur: dur * PACE })
     const e = (to: Shared) => `${bot}-${to}` as const
+    const account = bot === "crypto" ? "services:kraken" : "services:alpaca"
 
-    // Research: news and prices arrive, the engine reads its bars, searches the web, fetches the
-    // article pages, then asks the model to summarize and research.
-    say(0, s.gather)
-    go(0, e("news"), 0.8, true)
-    lit(0, "news:sources")
-    go(0.15, e("services"), 0.8, true)
-    go(0.3, e("history"), 0.5)
-    lit(0.8, "history:bars")
-    go(0.85, e("history"), 0.5, true)
-    say(1.15, "Researching")
-    go(1.15, e("search"), 0.5)
-    go(1.65, "search-internet", 0.45)
-    lit(2.1, "internet:search")
-    go(2.2, "search-internet", 0.45, true)
-    go(2.65, e("search"), 0.5, true)
-    go(1.35, e("scraper"), 0.5)
-    go(1.85, "scraper-internet", 0.45)
-    lit(2.3, "internet:articles")
-    go(2.4, "scraper-internet", 0.45, true)
-    go(2.85, e("scraper"), 0.5, true)
-    go(3.4, e("llm"), 0.5)
-    think(3.9, 1)
-    lit(3.9, "llm:summaries", 1)
-    lit(3.9, "llm:research", 1)
-    go(4.9, e("llm"), 0.5, true)
+    // Watch: code in the engine watches everything and wakes the agent when something matters
+    // ("The agent" in docs/CRYPTO.md and docs/STOCK.md). Here crypto's wakes for news that a second
+    // source confirms, stock's for a setup its screen finds in the minute bars from Alpaca.
+    if (bot === "crypto") {
+      go(0, e("news"), 0.8, true)
+      go(0.2, e("news"), 0.8, true)
+      lit(0, "news:sources")
+      say(0.8, "Breaking news")
+    } else {
+      go(0, e("services"), 0.8, true)
+      go(0.2, e("services"), 0.8, true)
+      lit(0, account)
+      say(0.8, "Setup found")
+    }
 
-    // Decide: the model proposes, deterministic code checks, the order goes to the paper account.
-    say(5.4, s.decide)
-    go(5.45, e("llm"), 0.5)
-    think(5.95, 1.25)
-    lit(5.95, "llm:decisions", 1.25)
-    go(7.2, e("llm"), 0.5, true)
-    say(7.7, s.check)
-    cues.push({ t: at(7.7), bot, kind: "check" })
-    say(8.15, s.order)
-    go(8.15, e("services"), 0.6)
-    lit(8.75, bot === "crypto" ? "services:kraken" : "services:alpaca")
-    go(8.95, e("services"), 0.6, true)
+    // Look up: the agent reads its brief on the model, then looks things up a step at a time: a
+    // quote, past news or bars in the history store, its past decisions in its own database. The
+    // labels follow the Agent page's steps (packages/ui/src/agent.tsx), short enough for the phone
+    // layout's engine cards.
+    say(1.5, "Agent woke")
+    go(1.5, e("llm"), 0.35)
+    think(1.85, 0.45)
+    lit(1.85, "llm:agents", 5)
+    go(2.3, e("llm"), 0.35, true)
+    say(2.65, "Looking up")
+    go(2.65, e("services"), 0.35)
+    go(3, e("services"), 0.35, true)
+    go(3.35, e("llm"), 0.3)
+    think(3.65, 0.35)
+    go(4, e("llm"), 0.3, true)
+    go(4.3, e("history"), 0.35)
+    lit(4.65, bot === "crypto" ? "history:archive" : "history:bars", 0.9)
+    go(4.65, e("history"), 0.35, true)
+    go(5, e("atlas"), 0.35)
+    go(5.35, e("atlas"), 0.35, true)
 
-    // Publish: state to Atlas, bars and news to the history store, events down the stream, and a
-    // dashboard reading Atlas.
-    say(9.55, s.after)
-    go(9.55, e("atlas"), 0.65)
-    go(9.6, e("history"), 0.55)
-    lit(10.15, "history:archive")
-    for (const t of [9.6, 9.78, 9.96]) go(t, `browser-${bot}`, 0.85, true)
-    go(10.5, "browser-dashboards", 0.4)
-    lit(10.9, bot === "crypto" ? "dashboards:crypto" : "dashboards:stock")
-    go(10.9, "dashboards-atlas", 0.35)
-    go(11.3, "dashboards-atlas", 0.35, true)
-    go(11.65, "browser-dashboards", 0.4, true)
-    say(12.1, "Idle")
-
-    // The agent, in shadow ("The agent (shadow)" in docs/CRYPTO.md and docs/STOCK.md): news wakes
-    // it; it reads its brief on the model, looks up past news in the history store and past
-    // decisions in its own database, then decides. Its answer passes the envelope and the risk
-    // checks and fills in the shadow book (in Atlas, never at the broker) while the Agent page
-    // streams the episode. The labels follow the Agent page's steps (packages/ui/src/agent.tsx),
-    // short enough for the phone layout's engine cards.
-    const E = EPISODE
-    go(E, e("news"), 0.7, true)
-    lit(E, "news:sources")
-    agent = true
-    say(E + 0.7, "Agent woke")
-    lit(E + 1.1, "llm:agents", 4.4)
-    go(E + 0.75, e("llm"), 0.35)
-    think(E + 1.1, 0.4)
-    go(E + 1.5, e("llm"), 0.35, true)
-    say(E + 1.85, "Looking up")
-    go(E + 1.85, e("history"), 0.35)
-    lit(E + 2.2, "history:archive", 0.9)
-    go(E + 2.2, e("history"), 0.35, true)
-    go(E + 2.55, e("llm"), 0.35)
-    think(E + 2.9, 0.4)
-    go(E + 3.3, e("llm"), 0.35, true)
-    go(E + 3.65, e("atlas"), 0.4)
-    go(E + 4.05, e("atlas"), 0.4, true)
-    say(E + 4.45, "Agent deciding")
-    go(E + 4.45, e("llm"), 0.35)
-    think(E + 4.8, 0.7)
-    go(E + 5.5, e("llm"), 0.35, true)
-    say(E + 5.85, "Shadow fill")
-    cues.push({ t: at(E + 5.85), bot, kind: "check" })
-    go(E + 6.15, e("atlas"), 0.55)
-    for (const t of [6.15, 6.33]) go(E + t, `browser-${bot}`, 0.8, true)
-    say(E + 6.95, "Idle")
+    // Decide: the agent answers, its limits and the risk engine check the order in code, and it goes
+    // to the paper account. The fill is recorded in Atlas and streamed live, and a dashboard reads it.
+    say(5.7, "Agent deciding")
+    go(5.7, e("llm"), 0.35)
+    think(6.05, 0.8)
+    go(6.85, e("llm"), 0.35, true)
+    say(7.2, "Risk check")
+    cues.push({ t: at(7.2), bot, kind: "check" })
+    say(7.6, "Placing order")
+    go(7.6, e("services"), 0.5)
+    lit(8.1, account)
+    go(8.25, e("services"), 0.5, true)
+    say(8.75, "Order filled")
+    go(8.75, e("atlas"), 0.5)
+    for (const t of [8.75, 8.9, 9.05]) go(t, `browser-${bot}`, 0.7, true)
+    go(9.3, "browser-dashboards", 0.35)
+    lit(9.65, bot === "crypto" ? "dashboards:crypto" : "dashboards:stock")
+    go(9.65, "dashboards-atlas", 0.3)
+    go(9.95, "dashboards-atlas", 0.3, true)
+    go(10.25, "browser-dashboards", 0.35, true)
+    say(10.6, REST)
   }
 
   // Background traffic, the same every loop: live prices and events down each stream, market data
-  // from each bot's paper account and news from the sources into each engine.
+  // from each bot's paper account and news from the sources into each engine. And while the other
+  // bot's agent is at work, each news engine fetches an article page through the scraper and has
+  // the model summarize it.
   let seed = 7
   const rand = () => {
     seed = (seed * 16807) % 2147483647
     return seed / 2147483647
   }
   for (const bot of BOTS) {
-    for (let t = rand() * 1.4; t < LOOP - 1; t += 1.4 + rand() * 1.1) hops.push({ t, dur: 0.9, edge: `browser-${bot}`, back: true, bot, major: false, agent: false })
-    for (let t = 0.6 + rand() * 1.5; t < LOOP - 1; t += 2.1 + rand() * 1.3) hops.push({ t, dur: 0.8, edge: `${bot}-services`, back: true, bot, major: false, agent: false })
-    for (let t = 1.2 + rand() * 2; t < LOOP - 1; t += 2.6 + rand() * 1.6) hops.push({ t, dur: 0.85, edge: `${bot}-news`, back: true, bot, major: false, agent: false })
+    for (let t = rand() * 1.4; t < LOOP - 1; t += 1.4 + rand() * 1.1) hops.push({ t, dur: 0.9, edge: `browser-${bot}`, back: true, bot, major: false })
+    for (let t = 0.6 + rand() * 1.5; t < LOOP - 1; t += 2.1 + rand() * 1.3) hops.push({ t, dur: 0.8, edge: `${bot}-services`, back: true, bot, major: false })
+    for (let t = 1.2 + rand() * 2; t < LOOP - 1; t += 2.6 + rand() * 1.6) hops.push({ t, dur: 0.85, edge: `${bot}-news`, back: true, bot, major: false })
+    const t0 = (OFFSET[bot] + LOOP / 2 + 1.6) % LOOP
+    const bg = (t: number, edge: EdgeId, dur: number, back = false) => hops.push({ t: t0 + t, dur, edge, back, bot, major: false })
+    bg(0, `${bot}-scraper`, 0.45)
+    bg(0.45, "scraper-internet", 0.4)
+    bg(0.85, "scraper-internet", 0.4, true)
+    bg(1.25, `${bot}-scraper`, 0.45, true)
+    bg(1.7, `${bot}-llm`, 0.4)
+    bg(2.7, `${bot}-llm`, 0.4, true)
+    cues.push({ t: t0 + 0.85, bot, kind: "lit", key: "internet:articles", dur: 0.8 })
+    cues.push({ t: t0 + 2.1, bot, kind: "lit", key: "llm:summaries", dur: 0.8 })
   }
   return { hops: hops.sort((a, b) => a.t - b.t), cues: cues.sort((a, b) => a.t - b.t) }
 }
 
 export const TIMELINE = build()
 
-/** Which step of its timed cycle a bot is in at loop time `t`, and how far through it; null outside the cycle. */
+/** Which step of its episode a bot is in at loop time `t`, and how far through it; null between episodes. */
 export function phaseAt(bot: Bot, t: number): { step: number; p: number } | null {
   const rel = (t - OFFSET[bot] + LOOP) % LOOP
   for (let i = 0; i < 3; i++) if (rel < PHASES[i + 1]) return { step: i, p: (rel - PHASES[i]) / (PHASES[i + 1] - PHASES[i]) }
