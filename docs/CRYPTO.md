@@ -105,7 +105,7 @@ Beside the timed cycles, an agent runs on the same local model ([plans/LOCAL-AI.
 | Source | Priority |
 | --- | --- |
 | News: every trigger candidate that passes the wire's gates on the item itself (fresh, not old news, confirmed for entries). The hourly and daily caps are the timed cycles' | P0 bad news on a shadow holding (or a critical market review while it holds anything), P1 entry ideas, P2 the rest |
-| The screens, every 10 minutes: a viable setup on a pair it doesn't hold, asked about again after 2 h (daily trend: 24 h), and not while the envelope refuses entries | P1 |
+| The screens, every 10 minutes: a viable setup on a pair it doesn't hold, asked about again after 2 h (daily trend: 24 h), and not while the envelope refuses entries (a queued one is dropped then too) | P1 |
 | A held pair moving `schedule.trigger_move_atr` 1 h ATRs since its last review, again at every further ATR | P0 down, P2 up |
 | A shadow stop or target hit (checked every 3 s against the bid) | P2 |
 | A macro release 15 minutes out | P2 |

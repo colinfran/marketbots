@@ -69,6 +69,8 @@ export type AgentBot<A extends AgentAnswerBase> = {
   act: (answer: A, episode: EpisodeInfo) => Promise<AgentAction[]>
   /** Each second: the bot's own observations (screens, price moves, sessions, the calendar, the sweep). */
   tick?: (now: Date) => Promise<void>
+  /** Why a wake-up isn't worth an episode now (an entry idea while entries are refused), or null to run it. */
+  skip?: (wake: Wake) => Promise<string | null>
   /** The shadow book's account and today's P&L %, for the heartbeat and the breakers. */
   shadow: () => Promise<{ account: ShadowAccount; dayPnlPct: number } | null>
 }
@@ -213,7 +215,13 @@ export class Agent<A extends AgentAnswerBase> {
       this.blockedReason = this.d.blocked()
       if (this.blockedReason) return
       const wake = this.queue.take()
-      if (wake) this.current = this.runWake(wake).finally(() => (this.current = null))
+      if (!wake) return
+      const skip = await this.d.bot.skip?.(wake).catch(() => null)
+      if (skip) {
+        this.d.log.debug("agent skipped a wake-up", { subject: wake.subject, reason: skip })
+        return
+      }
+      this.current = this.runWake(wake).finally(() => (this.current = null))
     } catch (error) {
       this.d.log.warn("agent tick failed", { error: errorMessage(error) })
     } finally {

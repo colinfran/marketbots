@@ -17,7 +17,7 @@ const answer = (a: Partial<Answer> = {}): Answer => ({ decisions: [{ symbol: "SO
 describe("agent runtime", () => {
   const db = useAgentDb()
 
-  const setup = ({ chat, settings = SETTINGS, blocked = null, prices = { "SOL/USD": 180 } }: { chat: ChatFn | null; settings?: AgentSettings; blocked?: string | null; prices?: Record<string, number> }) => {
+  const setup = ({ chat, settings = SETTINGS, blocked = null, prices = { "SOL/USD": 180 }, skip }: { chat: ChatFn | null; settings?: AgentSettings; blocked?: string | null; prices?: Record<string, number>; skip?: AgentBot<Answer>["skip"] }) => {
     let t = Date.parse("2026-10-28T14:00:00Z")
     const events: { type: string; data: unknown; summary: string }[] = []
     const acted: EpisodeInfo[] = []
@@ -35,6 +35,7 @@ describe("agent runtime", () => {
         return a.decisions.map((d) => ({ symbol: d.symbol, action: d.action, conviction: 60, outcome: "filled", detail: null }))
       },
       shadow: async () => null,
+      skip,
     }
     const agent = new Agent({
       col: db.col,
@@ -132,6 +133,15 @@ describe("agent runtime", () => {
     expect(docs).toHaveLength(2)
     expect(docs[1].observations[0]).toMatchObject({ kind: "watch", urgent: true })
     expect(events.filter((e) => e.type === "agent.watch").map((e) => (e.data as { status: string }).status)).toEqual(["set", "fired"])
+  })
+
+  it("drops a wake-up the bot says isn't worth an episode", async () => {
+    const { agent, advance, at, run } = setup({ chat: scriptedChat([]).chat, skip: async (wake) => (wake.subject === "SOL/USD" ? "the envelope refuses entries" : null) })
+    agent.observe(obs({ subject: "SOL/USD", kind: "setup", priority: 1, at: at() }))
+    advance(6_000)
+    await run()
+    expect(await db.col.agentEpisodes.countDocuments()).toBe(0)
+    expect(agent.queue.size).toBe(0)
   })
 
   it("waits while trading is paused", async () => {

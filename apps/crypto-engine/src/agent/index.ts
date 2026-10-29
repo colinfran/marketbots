@@ -1,4 +1,5 @@
 import { llamaChat } from "@mb/agent/client"
+import { checkEntry } from "@mb/agent/envelope"
 import { newsObservations } from "@mb/agent/observations"
 import { Agent, type AgentBot } from "@mb/agent/runtime"
 import { BOOK_SUBJECT, MARKET_SUBJECT } from "@mb/core/agent"
@@ -51,6 +52,14 @@ export const createCryptoAgent = ({
     known: (s) => known(s) && s !== MARKET_SUBJECT && s !== BOOK_SUBJECT,
     act: (answer, episode) => actOnCryptoAnswer(deps, answer, episode),
     tick: (now) => observer!.tick(now),
+    // A setup is only an entry idea: not worth an episode while entries are refused.
+    skip: async (wake) => {
+      if (!wake.observations.every((o) => o.kind === "setup") || (await deps.shadow.position(wake.subject))) return null
+      if (!ctx.gate().venueOnline) return "Kraken data or the paper wallet is unavailable"
+      const account = await deps.shadow.account(mid(ctx))
+      const e = checkEntry(wake.subject, await deps.shadow.envelopeHistory(account.equity_usd), ctx.settings.current.agent.envelope, Date.now())
+      return e.approved ? null : `the envelope refuses entries: ${e.reason}`
+    },
     shadow: async () => {
       const account = await deps.shadow.account(mid(ctx))
       return { account, dayPnlPct: account.day_start_equity_usd > 0 ? (account.equity_usd / account.day_start_equity_usd - 1) * 100 : 0 }
