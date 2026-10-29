@@ -77,6 +77,11 @@ const NODES: Record<Exclude<NodeId, Bot | "services">, { Icon: LucideIcon; rows:
     rows: [
       title("Local LLM"),
       detail("Qwen 3.6 on two GPUs"),
+      detail(hot("research", "llm:research"), ", ", hot("decisions", "llm:decisions"), ", ", hot("the agents", "llm:agents"), ", ", hot("summaries", "llm:summaries")),
+    ],
+    tall: [
+      title("Local LLM"),
+      detail("Qwen 3.6 on two GPUs"),
       detail(hot("research", "llm:research"), ", ", hot("decisions", "llm:decisions"), ","),
       detail(hot("the agents", "llm:agents"), ", ", hot("summaries", "llm:summaries")),
     ],
@@ -240,8 +245,9 @@ function Diagram({ layout, hover, onHover, className }: { layout: Layout; hover:
           </filter>
         </defs>
 
-        {/* The Docker stack */}
+        {/* The Docker stack; a legend on its border masks the border behind it (46 mono characters wide). */}
         <rect x={server.x} y={server.y} width={server.w} height={server.h} rx={14} strokeDasharray="4 4" className="fill-foreground/[0.025] stroke-foreground/20" />
+        {legend.border && <rect x={legend.x - 23 * 0.6 * (type.label + 0.5) - 8} y={server.y - 8} width={46 * 0.6 * (type.label + 0.5) + 16} height={16} className="fill-background" />}
         <text x={legend.x} y={legend.y} textAnchor="middle" fontSize={type.label + 0.5} className="fill-muted-foreground font-mono">
           <tspan className="fill-foreground">marketbots</tspan> Docker stack, on the owner&apos;s server
         </text>
@@ -343,10 +349,10 @@ function Diagram({ layout, hover, onHover, className }: { layout: Layout; hover:
 /** The three steps, each with a track the bots move along as their cycles run. */
 function Steps() {
   return (
-    <ol className="grid gap-x-6 gap-y-4 border-t px-4 py-4 sm:grid-cols-3">
+    <ol className="grid gap-x-6 gap-y-3 border-t px-4 py-3 sm:grid-cols-3">
       {STEPS.map(({ Icon, title, text }, i) => (
         <li key={title} data-step={i} className="group">
-          <div className="bg-border relative mb-3 h-px">
+          <div className="bg-border relative mb-2.5 h-px">
             {BOTS.map((bot) => (
               <span key={bot} data-pip={`${bot}-${i}`} className="absolute top-0 left-0 opacity-0 transition-opacity duration-300">
                 <span className={cn("absolute top-0 right-0 h-px w-10 bg-linear-to-r from-transparent", bot === "crypto" ? "to-bot-crypto" : "to-bot-stock")} />
@@ -425,7 +431,7 @@ export function Topology() {
           {playing ? <PauseIcon /> : <PlayIcon />}
         </Button>
       </header>
-      <div className="@container relative px-4 py-5">
+      <div className="@container relative px-4 py-3">
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 [background-image:radial-gradient(color-mix(in_oklab,var(--foreground)_14%,transparent)_1px,transparent_1px)] [background-size:16px_16px] [mask-image:radial-gradient(ellipse_at_center,black_35%,transparent_80%)]"
