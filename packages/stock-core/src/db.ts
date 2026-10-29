@@ -21,6 +21,7 @@ import type { Phase, Settings } from "./settings"
 import type { DossierRow } from "./wire"
 
 export { utcDay } from "@mb/core/db"
+export type { AgentEpisodeDoc, AgentNoteDoc, AgentWatchDoc, ShadowFillDoc, ShadowPositionDoc } from "@mb/core/agent"
 export type {
   AiCallDoc,
   AiTask,

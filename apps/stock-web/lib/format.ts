@@ -18,4 +18,4 @@ const WIRE_SOURCE_LABEL: Record<string, string> = { alpaca_news: "Benzinga via A
 export const wireSource = (source: string, domain?: string | null) => WIRE_SOURCE_LABEL[source] ?? domain ?? source
 
 /** "10:30:15 AM" in New York time (for live feeds). */
-export const { time } = zonedFormat(MARKET_TZ)
+export const { time, dateTime } = zonedFormat(MARKET_TZ)

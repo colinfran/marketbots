@@ -19,6 +19,7 @@ import type { DossierRow } from "./wire"
 import type { AccountId, Mode, Venue } from "./venues"
 
 export { utcDay } from "@mb/core/db"
+export type { AgentEpisodeDoc, AgentNoteDoc, AgentWatchDoc, ShadowFillDoc, ShadowPositionDoc } from "@mb/core/agent"
 export type {
   AiCallDoc,
   AiTask,

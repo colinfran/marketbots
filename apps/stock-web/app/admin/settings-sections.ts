@@ -1,4 +1,4 @@
-import { AI_MODEL_FIELDS, type SettingsSection } from "@mb/ui/lib/settings-fields"
+import { AGENT_SETTINGS_SECTIONS, AI_MODEL_FIELDS, type SettingsSection } from "@mb/ui/lib/settings-fields"
 
 /**
  * Every tunable setting on the Admin page, grouped. The shared form (@mb/ui/settings-form) sends
@@ -154,4 +154,5 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
       { path: "account.starting_capital", label: "Starting capital ($), for total return", kind: "number" },
     ],
   },
+  ...AGENT_SETTINGS_SECTIONS,
 ]

@@ -2,6 +2,7 @@
 
 import type { EngineEvent, EventDataMap } from "@mb/stock-core/events"
 import { formatDateTime } from "@mb/stock-core/time"
+import { AGENT_ICONS, agentDetail, agentLinks, isAgentEvent } from "@mb/ui/agent-events"
 import type { BotKit } from "@mb/ui/kit"
 import {
   ActivityIcon,
@@ -80,12 +81,14 @@ const ICONS: Partial<Record<string, LucideIcon>> = {
   "wire.dossier": NewspaperIcon,
   "core.review.started": LandmarkIcon,
   "core.review.completed": LandmarkIcon,
+  ...AGENT_ICONS,
 }
 
 const NOTABLE_WHY: Record<string, string> = { triggered: "it started a review", held: "it names a holding", focus: "it's on the radar", market: "market-wide", cited: "cited by the AI" }
 
 /** Extra line under an event: the decision rationale, risk reasons, a source link, the memo as it's written. */
 const detail = (e: EngineEvent): React.ReactNode => {
+  if (isAgentEvent(e)) return agentDetail(e)
   const d = e.data as Record<string, unknown>
   if (e.type === "ai.decision.proposed") return [d.detail, d.rationale].filter(Boolean).join(" · ")
   if (e.type === "risk.checked" && !d.approved) return (d.reasons as string[] | undefined)?.join(" · ")
@@ -121,6 +124,7 @@ const detail = (e: EngineEvent): React.ReactNode => {
 
 /** Under an event: its symbol and, for a finished cycle or core review, its report. */
 const links = (e: EngineEvent): React.ReactNode => {
+  if (isAgentEvent(e)) return agentLinks(e)
   const reportId = e.type === "cycle.completed" ? String((e.data as { report_id?: string }).report_id ?? "") : e.type === "core.review.completed" ? String((e.data as { review_id?: string }).review_id ?? "") : ""
   if (!e.instrument && !reportId) return null
   return (
@@ -167,7 +171,7 @@ export const kit: BotKit<EngineEvent> = {
     stateLabels: STATE_LABEL,
     icons: ICONS,
     filters: {
-      ai: (e) => /^(research|ai|cycle|context|options|decision|core)\b/.test(e.type) || e.type === "wire.dossier",
+      ai: (e) => /^(research|ai|cycle|context|options|decision|core)\b/.test(e.type) || e.type === "wire.dossier" || isAgentEvent(e),
       news: (e) => e.type === "wire.item" || e.type === "wire.notable" || e.type === "wire.trigger",
       trades: (e) => /^(order|position|protection|risk|decision)\./.test(e.type),
       system: (e) => /^(engine|broker|market|budget|command|alert|error|summary|daily)/.test(e.type),
@@ -187,6 +191,8 @@ export const kit: BotKit<EngineEvent> = {
       "summary.periodic",
       "daily.stats",
       "market.session",
+      "agent.answered",
+      "agent.shadow",
     ]),
     // Thinking-trail events that are worth showing even though they're logged at debug level.
     feedDebug: new Set(["research.query", "research.source", "research.progress", "ai.reasoning", "ai.decision.progress"]),

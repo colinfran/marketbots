@@ -142,6 +142,23 @@ export type AgentWatchDoc = {
   purge_at: Date
 }
 
+/** "SOL/USD above 182": one line for briefs, events and the dashboard. */
+export const describeWatch = (w: Pick<AgentWatchDoc, "kind" | "symbol" | "level" | "ref_price" | "at">) => {
+  const subject = w.symbol ?? "the market"
+  switch (w.kind) {
+    case "price_above":
+      return `${subject} above ${w.level}`
+    case "price_below":
+      return `${subject} below ${w.level}`
+    case "move_pct":
+      return `${subject} moves ${w.level}% from ${w.ref_price}`
+    case "news":
+      return `news on ${subject} at severity ${w.level}+`
+    case "time":
+      return `at ${w.at?.toISOString().slice(0, 16)}Z`
+  }
+}
+
 /** The agent's working memory about a subject: shown in every brief on it. */
 export type AgentNoteDoc = { _id: string; episode_id: string; subject: string; text: string; created_at: Date; expires_at: Date }
 

@@ -34,6 +34,7 @@ const SECTIONS: Section[] = [
     label: "Research",
     pages: [
       { href: "/research", label: "AI research", also: ["/decisions"] },
+      { href: "/agent", label: "Agent" },
       { href: "/news", label: "News" },
       { href: "/markets", label: "Markets" },
     ],

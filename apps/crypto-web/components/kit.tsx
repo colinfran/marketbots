@@ -1,6 +1,7 @@
 "use client"
 
 import type { EngineEvent, EventDataMap } from "@mb/crypto-core/events"
+import { AGENT_ICONS, agentDetail, agentLinks, isAgentEvent } from "@mb/ui/agent-events"
 import type { BotKit } from "@mb/ui/kit"
 import {
   ActivityIcon,
@@ -68,10 +69,12 @@ const ICONS: Partial<Record<string, LucideIcon>> = {
   "wire.notable": NewspaperIcon,
   "wire.trigger": ZapIcon,
   "wire.dossier": NewspaperIcon,
+  ...AGENT_ICONS,
 }
 
 /** Extra line under an event: the decision thesis, risk reasons, a source link, the memo and reasoning as they're written. */
 const detail = (e: EngineEvent): React.ReactNode => {
+  if (isAgentEvent(e)) return agentDetail(e)
   const d = e.data as Record<string, unknown>
   if (e.type === "ai.decision.proposed") return String(d.thesis ?? "")
   if (e.type === "risk.checked" && !d.approved) return (d.reasons as string[] | undefined)?.join(" · ")
@@ -115,7 +118,7 @@ const summary = (e: EngineEvent): React.ReactNode => (
 const workText = (e: EngineEvent) => (e.type === "ai.reasoning" ? `${e.summary}: …${String((e.data as { excerpt?: string }).excerpt ?? "").slice(-120)}` : e.summary)
 
 const links = (e: EngineEvent): React.ReactNode =>
-  e.cycle_id && (e.type === "cycle.completed" || e.type === "ai.decision.completed") ? (
+  isAgentEvent(e) ? agentLinks(e) : e.cycle_id && (e.type === "cycle.completed" || e.type === "ai.decision.completed") ? (
     <Link href={`/research/${e.cycle_id}`} className="text-muted-foreground hover:text-foreground text-xs underline underline-offset-2">
       View cycle
     </Link>
@@ -142,12 +145,12 @@ export const kit: BotKit<EngineEvent> = {
     stateLabels: STATE_LABEL,
     icons: ICONS,
     filters: {
-      ai: (e) => /^(research|ai|screen|cycle)\./.test(e.type) || e.type === "wire.dossier",
+      ai: (e) => /^(research|ai|screen|cycle)\./.test(e.type) || e.type === "wire.dossier" || isAgentEvent(e),
       news: (e) => e.type === "wire.item" || e.type === "wire.notable" || e.type === "wire.trigger",
       trades: (e) => /^(order|position|protection|risk)\./.test(e.type),
       system: (e) => /^(engine|venue|market|budget|command|alert|error|summary)/.test(e.type),
     },
-    refreshOn: new Set(["order.filled", "position.opened", "position.closed", "position.updated", "cycle.completed", "cycle.skipped", "engine.status", "command.completed", "command.failed", "backtest.completed", "summary.periodic", "engine.reconciled"]),
+    refreshOn: new Set(["order.filled", "position.opened", "position.closed", "position.updated", "cycle.completed", "cycle.skipped", "engine.status", "command.completed", "command.failed", "backtest.completed", "summary.periodic", "engine.reconciled", "agent.answered", "agent.shadow"]),
     // Thinking-trail events that are worth showing even though they're logged at debug level.
     feedDebug: new Set(["research.query", "research.source", "research.progress", "ai.reasoning", "ai.decision.progress"]),
     // Decision progress shows in the current work and the live trail, not as feed lines.

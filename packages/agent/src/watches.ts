@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto"
 import {
   AGENT_LIMITS,
   BOOK_SUBJECT,
+  describeWatch,
   MARKET_SUBJECT,
   WATCH_PRIORITY,
   type AgentNoteDoc,
@@ -11,6 +12,8 @@ import {
   type WatchRequest,
 } from "@mb/core/agent"
 import { cleanLine } from "@mb/engine-kit/util/text"
+
+export { describeWatch }
 
 /**
  * Watches and notes (docs/plans/LOCAL-AI.md §8.5). A watch is how the agent acts in real time
@@ -41,23 +44,6 @@ export type WatchEnv = {
 }
 
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v))
-
-/** "SOL/USD above 182": one line for briefs, events and the dashboard. */
-export const describeWatch = (w: Pick<AgentWatchDoc, "kind" | "symbol" | "level" | "ref_price" | "at">) => {
-  const subject = w.symbol ?? "the market"
-  switch (w.kind) {
-    case "price_above":
-      return `${subject} above ${w.level}`
-    case "price_below":
-      return `${subject} below ${w.level}`
-    case "move_pct":
-      return `${subject} moves ${w.level}% from ${w.ref_price}`
-    case "news":
-      return `news on ${subject} at severity ${w.level}+`
-    case "time":
-      return `at ${w.at?.toISOString().slice(0, 16)}Z`
-  }
-}
 
 /** Turns one requested watch into a stored one, or says why not. */
 export const normalizeWatch = (w: WatchRequest, episodeId: string, env: WatchEnv): { watch: AgentWatchDoc } | { rejected: string } => {

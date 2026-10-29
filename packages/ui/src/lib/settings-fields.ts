@@ -55,3 +55,39 @@ export const AI_MODEL_FIELDS: SettingsField[] = [
   { path: "ai.models.research", label: "Research model", kind: "select", options: AI_MODELS },
   { path: "ai.models.decision", label: "Decision model", kind: "select", options: AI_MODELS },
 ]
+
+/** The agent's settings (docs/plans/LOCAL-AI.md §8–§10), the same in both bots. */
+export const AGENT_SETTINGS_SECTIONS: SettingsSection[] = [
+  {
+    title: "Agent",
+    fields: [
+      { path: "agent.level", label: "Level (off, or shadow: decides into its shadow book only)", kind: "select", options: ["off", "shadow"] },
+      { path: "agent.model", label: "Model", kind: "select", options: AI_MODELS },
+      { path: "agent.wake_cooldown_minutes", label: "Wake cooldown per subject (min)", kind: "number" },
+      { path: "agent.sweep_minutes", label: "Review sweep every (min)", kind: "number" },
+      { path: "agent.shadow_starting_usd", label: "Shadow book starting cash ($)", kind: "number" },
+      { path: "agent.public_thinking", label: "Show its thinking to logged-out viewers", kind: "boolean" },
+    ],
+  },
+  {
+    title: "Agent envelope (limits on what it does)",
+    fields: [
+      { path: "agent.envelope.entries_per_day", label: "Entries per 24 h", kind: "number" },
+      { path: "agent.envelope.entries_per_hour", label: "Entries per hour", kind: "number" },
+      { path: "agent.envelope.commit_per_hour_pct", label: "Committed per hour (% of equity)", kind: "number" },
+      { path: "agent.envelope.size_pct", label: "Entry size (% of what risk allows)", kind: "number" },
+      { path: "agent.envelope.max_open_positions", label: "Max open positions", kind: "number" },
+      { path: "agent.envelope.symbol_action_minutes", label: "One action per symbol every (min)", kind: "number" },
+      { path: "agent.envelope.reentry_after_stop_hours", label: "No re-entry after a stop-out for (h)", kind: "number" },
+      { path: "agent.envelope.flip_hours", label: "No re-entry after an exit for (h)", kind: "number" },
+    ],
+  },
+  {
+    title: "Agent episode limits (steps · seconds · thinking tokens, 0 = none)",
+    fields: (["p0", "p1", "p2", "p3"] as const).flatMap((p, i) => [
+      { path: `agent.limits.${p}.steps`, label: `P${i} ${["risk", "opportunity", "review", "background"][i]}: steps`, kind: "number" as const },
+      { path: `agent.limits.${p}.seconds`, label: `P${i}: time limit (s)`, kind: "number" as const },
+      { path: `agent.limits.${p}.thinking_tokens`, label: `P${i}: thinking (tokens)`, kind: "number" as const },
+    ]),
+  },
+]
