@@ -5,9 +5,32 @@ Two autonomous, AI-driven paper-trading bots in one pnpm monorepo:
 - **CryptoMarketBot** trades Kraken spot pairs 24/7 in a Kraken CLI paper wallet. Dashboard: [cryptomarketbot.app](https://cryptomarketbot.app).
 - **StockMarketBot** trades US stocks and defined-risk options on market days in an Alpaca paper account. Dashboard: [stockmarketbot.app](https://stockmarketbot.app).
 
-In both, a local model (Qwen 3.6 35B-A3B, on the server's two GPUs) researches through our own web search and decides, and deterministic code sizes and checks every order. Beside those scheduled cycles, each bot runs an agent on the same model: code wakes it when something matters, it looks things up step by step, and, in shadow, its decisions fill in a simulated book so its record can be compared with the bot's. Each bot has its own always-on engine, its own Next.js dashboard on Vercel with its own owner sign-in, and its own database on MongoDB Atlas. One Docker stack, `marketbots`, runs on the owner's Windows server: both engines, the local model server, a web search service (SearXNG), a shared headless scraper and the history store (Postgres with TimescaleDB: price bars and the news archive).
+Both run on a local model (Qwen 3.6 35B-A3B, on the server's two GPUs), and in both, deterministic code sizes and checks every order. Each bot has its own always-on engine, its own Next.js dashboard on Vercel with its own owner sign-in, and its own database on MongoDB Atlas. One Docker stack, `marketbots`, runs on the owner's Windows server: both engines, the local model server, a web search service (SearXNG), a shared headless scraper and the history store (Postgres with TimescaleDB: price bars and the news archive).
 
 **Paper trading only.** Neither engine has a live-trading code path.
+
+## How the bots decide
+
+Each bot decides in two ways, side by side:
+
+- **Scheduled cycles** trade the paper account. On a timer (and when news or a sharp move calls for one), the model reads what the bot's news engine found (and searches the web, through our own search service, where it left gaps), then writes one structured decision; the risk checks approve, resize or reject each order.
+- **The agent** runs in shadow. Code watches prices, the news, the screens, the market session and the agent's own watches all the time, and wakes it when something matters. In each wake-up it looks things up one step at a time (quotes, technicals, the order book, news, years of history, its past decisions), then decides. Its decisions go through its own limits (the envelope) and the same risk checks, and fill in a simulated account, the **shadow book**, at live prices with fees and slippage. Nothing it decides reaches the broker, so its record can be compared with the scheduled cycles' before it is given real trades. Each dashboard's Research → Agent page shows it at work.
+
+```mermaid
+flowchart LR
+    signals[Prices, news, screens,<br/>the session, its watches]
+    queue[Attention queue<br/>groups bursts, ranks risk first]
+    episode[Episode on the local model<br/>look up, look up, decide]
+    checks[Envelope, then<br/>the bot's risk checks]
+    shadow[(Shadow book)]
+    memory[Watches and notes]
+
+    signals --> queue --> episode --> checks --> shadow
+    episode --> memory
+    memory -.->|wakes it again| queue
+```
+
+The plan behind the agent, and how it earns more authority, is [docs/plans/LOCAL-AI.md](docs/plans/LOCAL-AI.md).
 
 ## Architecture
 
@@ -24,7 +47,7 @@ flowchart LR
     subgraph server["marketbots Docker stack, on the owner's server"]
         crypto[Crypto engine]
         stock[Stock engine]
-        llm[Local LLM, Qwen 3.6 on two GPUs<br/>research, decisions, summaries]
+        llm[Local LLM, Qwen 3.6 on two GPUs<br/>research, decisions, the agents, summaries]
         search[Web search<br/>SearXNG]
         scraper[Shared scraper]
         history[(History store<br/>price bars and news archive)]
@@ -57,6 +80,7 @@ packages/core/          pure shared schemas and helpers, no I/O
 packages/engine-kit/    engine runtime shared by both engines
 packages/wire/          the news engine, shared by both engines
 packages/history/       the history store client (Postgres): bars and news archive, shared by both engines
+packages/agent/         the agent runtime: attention queue, episodes, tools, watches, envelope, shadow book
 packages/ui/            client-safe React shared by both dashboards
 packages/web-kit/       server-only dashboard helpers
 packages/crypto-core/   crypto schemas and types
@@ -92,6 +116,7 @@ pnpm backtest -- --symbols BTC/USD,ETH/USD,SOL/USD --strategies trend,momentum -
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): the platform: topology, layout, what is shared and what stays per bot.
 - [docs/CRYPTO.md](docs/CRYPTO.md), [docs/STOCK.md](docs/STOCK.md): each bot's design.
 - [docs/SERVER.md](docs/SERVER.md): the server, the Docker stack, env files, deploys, Vercel, troubleshooting.
+- [docs/plans/LOCAL-AI.md](docs/plans/LOCAL-AI.md): the local model, the history store and the agent: the plan, the measurements behind it, and what was built.
 - [AGENTS.md](AGENTS.md): conventions for changing this repo (package boundaries, shared code, safety rules).
 
 Paper trading with simulated money for research. Not financial advice; nothing here guarantees profits, and options can lose their entire value.
