@@ -143,33 +143,36 @@ const isUrl = (value: string | null) => !!value && /^https?:\/\//i.test(value)
 const decisionKey = (d: Decision) =>
   d.action === "buy_option" ? `open:${d.symbol}:${d.option?.long_leg ?? ""}` : d.action === "close_option" || d.action === "hold_option" ? `opt:${d.structure_id ?? d.symbol}` : `stock:${d.symbol}`
 
+/** One decision, bounded: a clean ticker, sizes and levels clamped, option fields only where they apply. */
+export const normalizeDecision = (d: Decision): Decision => ({
+  ...d,
+  symbol: cleanTicker(d.symbol),
+  allocation_pct: d.action === "buy" && d.allocation_pct !== null ? round2(clamp(d.allocation_pct, 0, 100)) : null,
+  sell_pct: d.action === "sell" ? round2(clamp(d.sell_pct ?? 100, 1, 100)) : null,
+  stop_loss: cleanPrice(d.stop_loss),
+  take_profit: cleanPrice(d.take_profit),
+  conviction: clamp(Math.round(d.conviction), 1, 10),
+  evidence: d.evidence.slice(0, 5),
+  structure_id: d.action === "close_option" || d.action === "hold_option" ? (d.structure_id?.trim() || null) : null,
+  option:
+    d.action === "buy_option" && d.option
+      ? {
+          ...d.option,
+          long_leg: cleanContract(d.option.long_leg),
+          short_leg: d.option.short_leg ? cleanContract(d.option.short_leg) : null,
+          premium_pct: cleanPct(d.option.premium_pct, 0.05, 100),
+          stop_loss_pct: cleanPct(d.option.stop_loss_pct, 5, 95),
+          take_profit_pct: cleanPct(d.option.take_profit_pct, 5, 2_000),
+        }
+      : null,
+})
+
 /** Applies the bounds the schema describes but does not enforce, so stored data is always consistent. */
 export const normalizeReport = (report: BotReport, { allowDecisions }: { allowDecisions: boolean }): BotReport => {
   const seen = new Set<string>()
   const decisions = allowDecisions
     ? report.decisions
-        .map((d) => ({
-          ...d,
-          symbol: cleanTicker(d.symbol),
-          allocation_pct: d.action === "buy" && d.allocation_pct !== null ? round2(clamp(d.allocation_pct, 0, 100)) : null,
-          sell_pct: d.action === "sell" ? round2(clamp(d.sell_pct ?? 100, 1, 100)) : null,
-          stop_loss: cleanPrice(d.stop_loss),
-          take_profit: cleanPrice(d.take_profit),
-          conviction: clamp(Math.round(d.conviction), 1, 10),
-          evidence: d.evidence.slice(0, 5),
-          structure_id: d.action === "close_option" || d.action === "hold_option" ? (d.structure_id?.trim() || null) : null,
-          option:
-            d.action === "buy_option" && d.option
-              ? {
-                  ...d.option,
-                  long_leg: cleanContract(d.option.long_leg),
-                  short_leg: d.option.short_leg ? cleanContract(d.option.short_leg) : null,
-                  premium_pct: cleanPct(d.option.premium_pct, 0.05, 100),
-                  stop_loss_pct: cleanPct(d.option.stop_loss_pct, 5, 95),
-                  take_profit_pct: cleanPct(d.option.take_profit_pct, 5, 2_000),
-                }
-              : null,
-        }))
+        .map(normalizeDecision)
         .filter((d) => (seen.has(decisionKey(d)) ? false : (seen.add(decisionKey(d)), true)))
     : []
 

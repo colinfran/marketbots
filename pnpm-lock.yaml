@@ -405,6 +405,9 @@ importers:
       '@mb/engine-kit':
         specifier: workspace:*
         version: link:../engine-kit
+      '@mb/wire':
+        specifier: workspace:*
+        version: link:../wire
       mongodb:
         specifier: ^7.7.0
         version: 7.7.0(socks@2.8.10)

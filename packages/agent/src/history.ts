@@ -8,8 +8,8 @@ import { cleanLine, fenceUntrusted } from "@mb/engine-kit/util/text"
 /** "+1.23%" from a fraction; "n/a" for nothing. */
 export const signedPct = (v: number | null | undefined, digits = 2) => (v === null || v === undefined || !Number.isFinite(v) ? "n/a" : `${v >= 0 ? "+" : ""}${(v * 100).toFixed(digits)}%`)
 
-/** A run of daily bars described: return, range, volatility, worst drawdown, the biggest days, weekly closes. */
-export const describeDailyBars = (symbol: string, bars: readonly { day: string; high: number; low: number; close: number }[]) => {
+/** A run of daily bars described: return, range, volatility, worst drawdown, the biggest days, weekly closes (`barsPerWeek`: 7 for crypto, 5 for stocks). */
+export const describeDailyBars = (symbol: string, bars: readonly { day: string; high: number; low: number; close: number }[], barsPerWeek = 5) => {
   if (bars.length < 2) return `${symbol}: not enough daily bars in the history store`
   const first = bars[0].close
   const last = bars.at(-1)!.close
@@ -28,11 +28,11 @@ export const describeDailyBars = (symbol: string, bars: readonly { day: string; 
     .map((r, i) => ({ r, day: bars[i + 1].day }))
     .sort((a, b) => Math.abs(b.r) - Math.abs(a.r))
     .slice(0, 5)
-  const weekly = bars.filter((_, i) => i % 5 === 0 || i === bars.length - 1).slice(-12)
+  const weekly = bars.filter((_, i) => (bars.length - 1 - i) % barsPerWeek === 0).slice(-12)
   return [
     `${symbol}, ${bars[0].day} to ${bars.at(-1)!.day} (${bars.length} daily bars): ${signedPct(last / first - 1)}; high ${high.high} on ${high.day}, low ${low.low} on ${low.day}; daily volatility ${(vol * 100).toFixed(2)}%; worst drawdown ${signedPct(worst)}; now ${signedPct(last / high.high - 1)} from the high.`,
     `Biggest days: ${days.map((x) => `${x.day} ${signedPct(x.r)}`).join(", ")}.`,
-    `Closes about weekly: ${weekly.map((b) => `${b.day.slice(5)} ${b.close}`).join(", ")}.`,
+    `Weekly closes: ${weekly.map((b) => `${b.day.slice(5)} ${b.close}`).join(", ")}.`,
   ].join("\n")
 }
 

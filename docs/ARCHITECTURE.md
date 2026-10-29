@@ -95,7 +95,7 @@ Both bots were moved in from their old repos unchanged and then refactored onto 
 | `@mb/engine-kit` | Engine runtime, generic over each bot's settings, events and commands: log, lease, heartbeat, bus, stream server, command processor, Mongo connect, state stores, alerts, AI call log/repair/runner (the local model server)/prompt parts, `ControlPlane`, `StatusReporter`, `EventCycleQueue`, bootstrap, env base, test helpers | both engines |
 | `@mb/wire` | The news engine: the formerly mirrored files, shared source helpers, `sharedCatalog()`, a `makeLexicon()` skeleton, `enrich/` for article summaries, and `research/` for local research (web search, then the local model) | both engines |
 | `@mb/history` | The history store ([plans/LOCAL-AI.md §6](plans/LOCAL-AI.md#6-the-history-store-history)): the Postgres client (node-postgres; PGlite in tests), the migrations, the 1-minute bar writer, the news archive (wire items and triggers copied from MongoDB before their TTL), the moves after each news item, the job runner the backfills use, `HistoryStore`. `docker/initdb.sh` creates each bot's database and role | both engines |
-| `@mb/agent` | The agent runtime ([plans/LOCAL-AI.md §8](plans/LOCAL-AI.md#8-the-agent)), generic over each bot's tools, brief and answer: the attention queue, the episode loop and its llama.cpp client, the tool registry, watches and notes, the envelope and circuit breakers (pure functions), the shadow book, the journal, `Agent`. The types and settings both bots share are in `@mb/core/agent` and `@mb/core/settings` | both engines |
+| `@mb/agent` | The agent runtime ([plans/LOCAL-AI.md §8](plans/LOCAL-AI.md#8-the-agent)), generic over each bot's tools, brief and answer: the attention queue, the episode loop and its llama.cpp client, the tool registry and the tools both bots share (news, the dossier, an item, the calendar, history, past news), watches and notes, the envelope and circuit breakers (pure functions), the shadow book, the journal, `Agent`. The types and settings both bots share are in `@mb/core/agent` and `@mb/core/settings` | both engines |
 | `@mb/ui` | Client-safe React: the shadcn primitives, design tokens (`styles.css`), app-shell components (including the navigation, below), the live-UI shell driven by a per-bot event catalog, shared page sections, the charts (`@mb/ui/charts`) | both dashboards |
 | `@mb/web-kit` | Server-only dashboard helpers: auth factory, database, command routes, shared queries, formatting, metadata, error reporting | both dashboards |
 
@@ -124,7 +124,7 @@ Each piece of information has one page; others link to it. The equity and daily 
 | `@mb/engine-kit` | `@mb/core` |
 | `@mb/wire` | `@mb/core`, `@mb/engine-kit` |
 | `@mb/history` | `@mb/core`, `@mb/engine-kit` |
-| `@mb/agent` | `@mb/core`, `@mb/engine-kit` |
+| `@mb/agent` | `@mb/core`, `@mb/engine-kit`, `@mb/wire` |
 | `@mb/ui`, `@mb/web-kit` | `@mb/core` |
 | `crypto-core`, `crypto-engine`, `crypto-web` | shared packages and crypto packages; never a stock package |
 | `stock-core`, `stock-engine`, `stock-web` | shared packages and stock packages; never a crypto package |

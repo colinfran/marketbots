@@ -1,24 +1,20 @@
-import { describeDailyBars, pastNewsText } from "@mb/agent/history"
 import { defineTool, type AgentTool } from "@mb/agent/tools"
+import { calendarTool, historyTools, wireTools, type WireToolsDeps } from "@mb/agent/wire-tools"
 import { roundTo } from "@mb/crypto-core/math"
-import type { WireItemDoc } from "@mb/crypto-core/wire"
-import { cleanLine, fenceUntrusted } from "@mb/engine-kit/util/text"
-import { upcomingMacro } from "@mb/wire/calendar"
-import { renderLine, summaryLine } from "@mb/wire/dossier"
+import type { WireCategory } from "@mb/crypto-core/wire"
+import { cleanLine } from "@mb/engine-kit/util/text"
 import { z } from "zod"
 import { featuresForPrompt } from "../market/features"
 import { loadFeatures } from "../orchestrator/crypto-cycle"
 import { walkBook } from "../risk/sizing"
-import { buildDossier } from "../wire/dossier"
 import { bookText, type CryptoAgentDeps } from "./book"
 
 /**
- * The crypto agent's tools (docs/plans/LOCAL-AI.md §8.3), all read-only. News comes back fenced as
- * untrusted, and every URL a tool shows is added to the episode's seen URLs (evidence may cite only
- * those). The history tools answer from the history store, years deep, or say it isn't available.
+ * The crypto agent's tools (docs/plans/LOCAL-AI.md §8.3), all read-only: its own (the book, quotes,
+ * features, depth, past decisions) and the ones both bots share (@mb/agent/wire-tools: news, the
+ * dossier, an item, the calendar, history and past news).
  */
 
-const HOUR = 3_600_000
 const utcTime = (d: Date) => `${d.toISOString().slice(5, 16).replace("T", " ")}Z`
 const symbolArg = z.string().describe("A pair exactly as listed, e.g. SOL/USD.")
 
@@ -26,8 +22,21 @@ const known = (d: CryptoAgentDeps, symbol: string) => d.ctx.hub.universe.include
 
 export const cryptoAgentTools = (d: CryptoAgentDeps): AgentTool[] => {
   const { ctx } = d
-  const price = (s: string) => ctx.hub.quote(s)?.mid ?? null
-  const itemLine = (i: WireItemDoc) => [renderLine(i, { price, timeLabel: utcTime }), ...(i.article?.status === "ok" && i.article.summary ? [summaryLine(i)] : [])].join("\n")
+  const wire: WireToolsDeps<WireCategory> = {
+    // Read when a tool runs: the contract test builds the tools without an engine.
+    get col() {
+      return ctx.col
+    },
+    price: (s) => ctx.hub.quote(s)?.mid ?? null,
+    timeLabel: utcTime,
+    dossierTime: (t) => `${t.toISOString().slice(11, 16)}Z`,
+    thresholds: () => ctx.settings.current.wire.thresholds,
+    get history() {
+      return d.history
+    },
+    noun: { one: "pair", many: "pairs" },
+    symbolArg,
+  }
 
   return [
     defineTool({
@@ -74,54 +83,7 @@ export const cryptoAgentTools = (d: CryptoAgentDeps): AgentTool[] => {
         return `${symbol} asks: ${levels(q.book.asks)}\nbids: ${levels(q.book.bids)}\nbuying $1,000 pays ${cost(1_000)} over the mid; $5,000 pays ${cost(5_000)}.`
       },
     }),
-    defineTool({
-      name: "news",
-      description: "what our feeds saw about a pair (or the market, symbol null) in the last N hours, most severe first, with article summaries. Args: {symbol|null, hours 1-72}.",
-      args: z.object({ symbol: symbolArg.nullable(), hours: z.number().describe("1-72") }),
-      run: async ({ symbol, hours }, tc) => {
-        const since = new Date(Date.now() - Math.min(72, Math.max(1, hours)) * HOUR)
-        const items = await ctx.col.wireItems
-          .find({ ...(symbol ? { symbols: symbol } : { symbols: { $size: 0 } }), first_seen_at: { $gte: since }, severity: { $gte: ctx.settings.current.wire.thresholds.annotate } })
-          .sort({ severity: -1, first_seen_at: -1 })
-          .limit(10)
-          .toArray()
-        for (const i of items) if (i.url) tc.urls.add(i.url)
-        if (!items.length) return `no items about ${symbol ?? "the market"} in the last ${hours} h`
-        return fenceUntrusted("wire", items.map((i) => `${i._id.slice(0, 12)} ${itemLine(i)}`).join("\n"))
-      },
-    }),
-    defineTool({
-      name: "dossier",
-      description: "our feeds' dossier on up to 5 pairs: the top items of the last 72 h, market-wide items, scheduled releases, moves nothing explains and items nobody confirmed. Args: {symbols}.",
-      args: z.object({ symbols: z.array(symbolArg).describe("1-5 pairs") }),
-      run: async ({ symbols }, tc) => {
-        const dossier = await buildDossier(ctx.col, {
-          symbols: symbols.slice(0, 5),
-          since: new Date(Date.now() - 72 * HOUR),
-          now: new Date(),
-          price,
-          timeLabel: (t) => `${t.toISOString().slice(11, 16)}Z`,
-          reviewThreshold: ctx.settings.current.wire.thresholds.review,
-        })
-        for (const u of dossier.urls) tc.urls.add(u)
-        return dossier.text || "nothing relevant in our feeds"
-      },
-    }),
-    defineTool({
-      name: "item",
-      description: "one news item in full by the id the news tool shows (its first 12 characters are enough): title, source, confirmations, article summary and key points. Args: {id}.",
-      args: z.object({ id: z.string().describe("The item id, or its first 12 characters.") }),
-      run: async ({ id }, tc) => {
-        const clean = id.trim().replace(/[^a-f0-9]/gi, "").slice(0, 64)
-        if (clean.length < 8) return "give at least 8 characters of the id"
-        const i = await ctx.col.wireItems.findOne({ _id: { $regex: `^${clean}` } })
-        if (!i) return `no item ${clean}`
-        if (i.url) tc.urls.add(i.url)
-        const confirmations = i.confirmations.map((c) => `${c.domain} ${utcTime(c.at)}`).join(", ") || "none"
-        const points = i.article?.key_points?.length ? `\nkey points: ${i.article.key_points.join("; ")}` : ""
-        return fenceUntrusted("wire", `${itemLine(i)}\nsymbols ${i.symbols.join(", ") || "market-wide"} · confirmations: ${confirmations}${i.summary ? `\nsource summary: ${cleanLine(i.summary, 600)}` : ""}${points}`)
-      },
-    }),
+    ...wireTools(wire),
     defineTool({
       name: "past_decisions",
       description: "the bot's last decisions on a pair (the timed cycles' and yours in the shadow book), with how they turned out. Args: {symbol}.",
@@ -139,35 +101,7 @@ export const cryptoAgentTools = (d: CryptoAgentDeps): AgentTool[] => {
         return [...a, ...b].join("\n") || `no decisions on ${symbol} yet`
       },
     }),
-    defineTool({
-      name: "calendar",
-      description: "scheduled US macro releases (FOMC, CPI, jobs, PPI, PCE, GDP) in the next N days. Args: {days 1-14}.",
-      args: z.object({ days: z.number().describe("1-14") }),
-      run: async ({ days }) => {
-        const events = upcomingMacro(new Date(), Math.min(14, Math.max(1, days)) * 24)
-        return events.length ? events.map((e) => `- ${utcTime(e.at)} ${e.title}`).join("\n") : `no scheduled releases in the next ${days} days`
-      },
-    }),
-    defineTool({
-      name: "history",
-      description: "a pair's daily history from our history store (years deep): return, range, volatility, worst drawdown, biggest days, weekly closes. Args: {symbol, days 7-1825}.",
-      args: z.object({ symbol: symbolArg, days: z.number().describe("7-1825") }),
-      run: async ({ symbol, days }) => {
-        const bars = await d.history?.dailyBars(symbol, Math.min(1_825, Math.max(7, days)))
-        return bars ? describeDailyBars(symbol, bars) : "the history store is not available"
-      },
-    }),
-    defineTool({
-      name: "past_news",
-      description: "earlier news about a pair from our archive (beyond the last 30 days too), most severe first, with the price move 1 h, 1 d and 5 d after each. Args: {symbol, days 7-730}.",
-      args: z.object({ symbol: symbolArg, days: z.number().describe("7-730") }),
-      run: async ({ symbol, days }, tc) => {
-        const rows = await d.history?.newsWithMoves(symbol, { days: Math.min(730, Math.max(7, days)), minSeverity: ctx.settings.current.wire.thresholds.review, limit: 10 })
-        if (!rows) return "the history store is not available"
-        if (!rows.length) return `no archived items about ${symbol} at review severity in the last ${days} days`
-        for (const r of rows) if (r.url) tc.urls.add(r.url)
-        return pastNewsText(rows)
-      },
-    }),
+    calendarTool(utcTime),
+    ...historyTools(wire, 7),
   ]
 }

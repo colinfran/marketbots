@@ -17,6 +17,7 @@ import type { EventFocus, WireCategory, WireItemDoc } from "@mb/stock-core/wire"
 import { marketDay, minutesBetween } from "@mb/stock-core/time"
 import type { HistoryStore } from "@mb/history/store"
 import { coverageGaps } from "@mb/wire/calendar"
+import { createStockAgent, type StockAgent } from "./agent"
 import { eventSection } from "./ai/prompts"
 import type { Alerts } from "./alerts"
 import type { Alpaca, RestHealth } from "./alpaca/client"
@@ -91,8 +92,8 @@ export type EngineDeps = {
   alerts: Alerts
   stream: StreamServer
   wire: Wire
-  /** The news engine's price layers (scan universe, Yahoo, Finnhub…): told what we hold and watch. */
-  coverage: Pick<PriceCoverage, "setSymbols">
+  /** The news engine's price layers (scan universe, Yahoo, Finnhub…): told what we hold and watch; the agent reads their prices. */
+  coverage: Pick<PriceCoverage, "setSymbols" | "price">
   /** The history store; absent or null while HISTORY_URL is unset. */
   history?: HistoryStore<WireCategory> | null
 }
@@ -111,6 +112,7 @@ const EVENT_QUEUE_MAX_MS = 30 * MIN
  *   every 60s   maintenance: order sync, stock protection, overnight fallback, options reconciliation
  *   every ~15s  options exits (value stop, take profit, underlying levels, time stop)
  *   periodic    equity history and chart bars for the website
+ *   every 1s    the agent (./agent): its observations, watches and the next episode
  *
  * Fills arrive instantly over Alpaca's trade_updates stream. Stocks keep their stops at the broker
  * (bracket/OCO orders), so they stay protected even if the engine is down; options exits need the
@@ -129,6 +131,8 @@ export class Engine {
   readonly policy: WirePolicy
   /** The core book's daily ranking (built from the premarket window on; display only until the core review uses it). */
   readonly coreRanking: CoreRankingStore
+  /** The agent (docs/plans/LOCAL-AI.md §8), deciding into its shadow book. */
+  readonly agent: StockAgent
 
   private readonly abort = new AbortController()
   private stops: (() => void)[] = []
@@ -185,6 +189,7 @@ export class Engine {
       signal: this.abort.signal,
       wire: d.wire,
     }
+    this.agent = createStockAgent({ ctx: this.ctx, history: d.history ?? null, calls: d.calls, llmUrl: d.env.LLM_URL ?? null, session: () => this.session, layerPrice: (s, ms) => d.coverage.price(s, ms) })
     this.commands = new CommandProcessor(d.db.col, d.bus, d.log.child({ component: "commands" }), (c, doc) => this.handleCommand(c, doc))
     this.coreRanking = new CoreRankingStore({ col: d.db.col, alpaca: d.alpaca, settings: () => d.settings.current, log: d.log.child({ component: "core-book" }), held: () => this.heldSymbols })
     this.eventQueue = new EventCycleQueue({
@@ -223,6 +228,7 @@ export class Engine {
       markNotable: (ids, reason) => d.wire.markNotable(ids, reason),
       emergency: (symbol) => this.emergencyAction(symbol),
       alert: (title, message) => d.alerts.send("warning", title, message, { path: "/news" }),
+      observe: (item, c) => this.agent.onCandidate(item, c),
     })
     this.control = new ControlPlane<EngineRunStatus, WireItemDoc>({
       col: d.db.col,
@@ -233,6 +239,7 @@ export class Engine {
       policy: this.policy,
       liquidate: async () => [...(await liquidateOptions(this.ctx, "kill_switch")), ...(await flattenStocks(this.ctx, " (kill switch)"))],
       wording: WORDING,
+      agent: this.agent.agent,
     })
     this.reporter = new StatusReporter<EngineStatusDoc>({
       col: d.db.col,
@@ -273,10 +280,13 @@ export class Engine {
           last_cycle: this.lastCycle,
           ...p.health,
           ...(d.history ? { history: d.history.status() } : {}),
+          agent: this.agent.agent.status(),
         }
       },
     })
     d.wire.onItem((e) => this.policy.onItem(e))
+    // News watches fire on fresh items only: a source's first poll after a restart is old news.
+    d.wire.onItem((e) => (e.backfill ? undefined : this.agent.agent.onItem(e.item)))
   }
 
   /** The run status (owned by the control plane). */
@@ -379,6 +389,7 @@ export class Engine {
     // The news engine fails open: if it can't start, trading carries on exactly as before.
     void this.d.wire.start().catch((e) => log.warn("news engine failed to start", { error: errorMessage(e) }))
     this.stops.push(every(86_400_000, () => this.checkCalendar(), onError("calendar check"), { immediate: true }))
+    await this.agent.agent.start().catch((e) => log.warn("agent failed to start", { error: errorMessage(e) }))
   }
 
   // ─── Market session ──────────────────────────────────────────────────────
@@ -812,9 +823,11 @@ export class Engine {
     this.eventQueue.stop()
     this.coreQueue.stop()
     if (this.accountRefresh) clearTimeout(this.accountRefresh)
+    this.agent.agent.stop()
     // Abort in-flight AI calls; an order already sent to the broker still completes.
     this.abort.abort()
     if (this.cycle) await withTimeout(this.cycle, 20_000, "cycle shutdown").catch(() => undefined)
+    if (this.agent.agent.current) await withTimeout(this.agent.agent.current, 20_000, "agent shutdown").catch(() => undefined)
     await this.reporter.write().catch(() => undefined)
   }
 }

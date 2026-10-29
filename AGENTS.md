@@ -23,7 +23,8 @@ Dependency direction:
 
 ```
 @mb/core ◀── @mb/crypto-core, @mb/stock-core
-@mb/core ◀── @mb/engine-kit ◀── @mb/wire, @mb/history, @mb/agent
+@mb/core ◀── @mb/engine-kit ◀── @mb/wire, @mb/history
+@mb/wire ◀── @mb/agent
 @mb/core ◀── @mb/ui, @mb/web-kit
 ```
 

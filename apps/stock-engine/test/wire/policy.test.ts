@@ -46,7 +46,7 @@ const item = (overrides: Partial<WireItemDoc> = {}): WireItemDoc => {
   }
 }
 
-const setup = async ({ held = ["NVDA"], open = true, settings = DEFAULT_SETTINGS, core = new Set<string>() }: { held?: string[]; open?: boolean; settings?: Settings; core?: Set<string> } = {}) => {
+const setup = async ({ held = ["NVDA"], open = true, settings = DEFAULT_SETTINGS, core = new Set<string>(), observe }: { held?: string[]; open?: boolean; settings?: Settings; core?: Set<string>; observe?: (item: unknown, c: { rule: string }) => void } = {}) => {
   const bus = await makeBus(db.col)
   const request = vi.fn<(f: EventFocus) => "fired" | "queued">(() => "fired")
   const alert = vi.fn(async () => undefined)
@@ -65,6 +65,7 @@ const setup = async ({ held = ["NVDA"], open = true, settings = DEFAULT_SETTINGS
     markNotable: async () => undefined,
     emergency,
     alert,
+    observe,
     now: () => NOW,
   })
   return { policy, request, alert, emergency, bus }
@@ -72,6 +73,15 @@ const setup = async ({ held = ["NVDA"], open = true, settings = DEFAULT_SETTINGS
 const triggers = () => db.col.wireTriggers.find({}).toArray()
 
 describe("stock policy", () => {
+  it("lets the agent observe news while the market is closed", async () => {
+    const observe = vi.fn()
+    const a = await setup({ open: false, observe })
+    await a.policy.onItem({ item: item({ category: "restatement", severity: 90, title: "NVDA 8-K: 4.02 Non-Reliance" }), backfill: false, confirmation: false })
+    expect(a.request).not.toHaveBeenCalled()
+    expect(observe).toHaveBeenCalledWith(expect.objectContaining({ title: "NVDA 8-K: 4.02 Non-Reliance" }), expect.objectContaining({ rule: "held_negative", symbols: ["NVDA"] }))
+    await a.bus.stop()
+  })
+
   it("reviews a holding on a negative filing in session, and alerts instead when the market is closed", async () => {
     const a = await setup()
     await a.policy.onItem({ item: item({ category: "restatement", severity: 90, title: "NVDA 8-K: 4.02 Non-Reliance" }), backfill: false, confirmation: false })

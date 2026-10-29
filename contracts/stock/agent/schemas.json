@@ -1,0 +1,414 @@
+{
+  "tools": [
+    {
+      "name": "book",
+      "description": "your shadow book again (positions, cash, P&L), the session and the limits code enforces right now. Args: {}.",
+      "args": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "quote",
+      "description": "the live price of a stock, its bid and ask when the broker streams it, and the day's change. Args: {symbol}.",
+      "args": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "description": "A US ticker in uppercase, e.g. NVDA."
+          }
+        },
+        "required": [
+          "symbol"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "technicals",
+      "description": "a stock's technicals from Alpaca's bars: daily (20/50/200-day averages, 52-week high, 5/20-day returns, ATR, RSI, 20-day range) and today's 5-minute (VWAP, opening range, RSI, EMA trend). Args: {symbol}.",
+      "args": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "description": "A US ticker in uppercase, e.g. NVDA."
+          }
+        },
+        "required": [
+          "symbol"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "news",
+      "description": "what our feeds saw about a stock (or the market, symbol null) in the last N hours, most severe first, with article summaries. Args: {symbol|null, hours 1-72}.",
+      "args": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A US ticker in uppercase, e.g. NVDA."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "hours": {
+            "type": "number",
+            "description": "1-72"
+          }
+        },
+        "required": [
+          "symbol",
+          "hours"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "dossier",
+      "description": "our feeds' dossier on up to 5 stocks: the top items of the last 72 h, market-wide items, scheduled releases, moves nothing explains and items nobody confirmed. Args: {symbols}.",
+      "args": {
+        "type": "object",
+        "properties": {
+          "symbols": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A US ticker in uppercase, e.g. NVDA."
+            },
+            "description": "1-5 stocks"
+          }
+        },
+        "required": [
+          "symbols"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "item",
+      "description": "one news item in full by the id the news tool shows (its first 12 characters are enough): title, source, confirmations, article summary and key points. Args: {id}.",
+      "args": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The item id, or its first 12 characters."
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "past_decisions",
+      "description": "the bot's last decisions on a stock (the timed cycles' and yours in the shadow book), with what came of them. Args: {symbol}.",
+      "args": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "description": "A US ticker in uppercase, e.g. NVDA."
+          }
+        },
+        "required": [
+          "symbol"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "calendar",
+      "description": "scheduled US macro releases (FOMC, CPI, jobs, PPI, PCE, GDP) in the next N days. Args: {days 1-14}.",
+      "args": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "number",
+            "description": "1-14"
+          }
+        },
+        "required": [
+          "days"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "history",
+      "description": "a stock's daily history from our history store (years deep): return, range, volatility, worst drawdown, biggest days, weekly closes. Args: {symbol, days 7-1825}.",
+      "args": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "description": "A US ticker in uppercase, e.g. NVDA."
+          },
+          "days": {
+            "type": "number",
+            "description": "7-1825"
+          }
+        },
+        "required": [
+          "symbol",
+          "days"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "past_news",
+      "description": "earlier news about a stock from our archive (beyond the last 30 days too), most severe first, with the price move 1 h, 1 d and 5 d after each. Args: {symbol, days 7-730}.",
+      "args": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "description": "A US ticker in uppercase, e.g. NVDA."
+          },
+          "days": {
+            "type": "number",
+            "description": "7-730"
+          }
+        },
+        "required": [
+          "symbol",
+          "days"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ],
+  "answer": {
+    "type": "object",
+    "properties": {
+      "decisions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "symbol": {
+              "type": "string",
+              "description": "The stock, or the option's UNDERLYING stock for option actions."
+            },
+            "action": {
+              "type": "string",
+              "enum": [
+                "buy",
+                "sell",
+                "adjust_exits",
+                "hold"
+              ],
+              "description": "Stocks you don't hold: buy (opens a position; never adds). Stocks you hold (YOUR BOOK): sell some or all, adjust_exits (new stop and target), or hold."
+            },
+            "allocation_pct": {
+              "description": "Stock buy only: % of total account equity to commit (e.g. 8 means 8%). null otherwise.",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "sell_pct": {
+              "description": "Stock sell only: % of the currently held shares to sell, 1-100 (100 = close the position). null otherwise.",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "stop_loss": {
+              "description": "Stocks (buy, adjust_exits): stop-loss trigger in dollars, BELOW the current price. Options: the UNDERLYING price that proves the trade wrong (below the current price for calls and call spreads, above it for puts and put spreads); the position is closed when the stock crosses it. null = none.",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "take_profit": {
+              "description": "Stocks (buy, adjust_exits): take-profit limit in dollars, ABOVE the current price. Options: the UNDERLYING price at which to take profit (above for calls, below for puts). null = none.",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "horizon": {
+              "type": "string",
+              "enum": [
+                "intraday",
+                "overnight",
+                "multi_day"
+              ],
+              "description": "intraday = flat by the close. overnight = may carry to tomorrow. multi_day = swing position (every options position is multi_day)."
+            },
+            "setup": {
+              "type": "string",
+              "enum": [
+                "momentum",
+                "breakout",
+                "pullback",
+                "vwap_reclaim",
+                "mean_reversion",
+                "catalyst",
+                "gap_and_go",
+                "hedge",
+                "other"
+              ]
+            },
+            "conviction": {
+              "type": "number",
+              "description": "1-10. Below the minimum in CONTEXT means do not open a trade."
+            },
+            "rationale": {
+              "type": "string",
+              "description": "1-3 sentences: why this, why now. Cite numbers from the brief or your tool results."
+            },
+            "evidence": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "2-5 concrete facts with numbers or times, from the brief or your tool results."
+            },
+            "invalidation": {
+              "type": "string",
+              "description": "The specific price/event that proves the idea wrong."
+            }
+          },
+          "required": [
+            "symbol",
+            "action",
+            "allocation_pct",
+            "sell_pct",
+            "stop_loss",
+            "take_profit",
+            "horizon",
+            "setup",
+            "conviction",
+            "rationale",
+            "evidence",
+            "invalidation"
+          ],
+          "additionalProperties": false
+        },
+        "description": "0-3 decisions, only about what woke you and what you hold. An empty list is a normal answer: watch instead of acting early."
+      },
+      "watches": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "price_above",
+                "price_below",
+                "move_pct",
+                "news",
+                "time"
+              ],
+              "description": "price_above / price_below: wake when the symbol trades above / below `level`. move_pct: wake when it moves `level` % either way from now. news: wake when an item about the symbol (null = market-wide) reaches severity `level` (0-100). time: wake at `at`."
+            },
+            "symbol": {
+              "description": "The symbol exactly as listed. null only for news and time watches about the whole market.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "level": {
+              "description": "The price, the % move or the minimum severity, as `kind` says. null for time watches.",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "at": {
+              "description": "time watches only: when to wake, as an ISO date-time with its offset. null otherwise.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hours": {
+              "type": "number",
+              "description": "How long the watch lasts, 1-168 hours."
+            },
+            "priority": {
+              "type": "string",
+              "enum": [
+                "risk",
+                "opportunity",
+                "review"
+              ],
+              "description": "risk = something you hold is in danger; opportunity = a possible entry; review = anything else."
+            },
+            "note": {
+              "type": "string",
+              "description": "At most 300 characters: what to check when it fires. You will see it then."
+            }
+          },
+          "required": [
+            "kind",
+            "symbol",
+            "level",
+            "at",
+            "hours",
+            "priority",
+            "note"
+          ],
+          "additionalProperties": false
+        },
+        "description": "0-5 conditions to wake you on. Prefer a watch to deciding early."
+      },
+      "cancel_watches": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Ids of your own watches (from YOUR WATCHES) that no longer matter."
+      },
+      "notes": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "subject": {
+              "type": "string",
+              "description": "A symbol exactly as listed, MARKET or BOOK."
+            },
+            "text": {
+              "type": "string",
+              "description": "At most 500 characters you want to see in your next brief on this subject (kept 14 days)."
+            }
+          },
+          "required": [
+            "subject",
+            "text"
+          ],
+          "additionalProperties": false
+        },
+        "description": "0-3 notes for later: a level that matters, what you are waiting for, what you learned."
+      },
+      "reply": {
+        "type": "string",
+        "description": "1-3 sentences in plain English: what you saw and what you did about it. To an owner's question: the answer."
+      }
+    },
+    "required": [
+      "decisions",
+      "watches",
+      "cancel_watches",
+      "notes",
+      "reply"
+    ],
+    "additionalProperties": false
+  }
+}

@@ -87,7 +87,7 @@ beforeEach(async () => {
       healthy: () => false,
       health: () => ({ mode: "live", sources: [], items_last_hour: 0, triggers_today: 0, event_queue: [] }),
     } as unknown as Wire,
-    coverage: { setSymbols: () => undefined },
+    coverage: { setSymbols: () => undefined, price: () => null },
   })
   await engine.start()
 })
@@ -206,7 +206,14 @@ describe("Engine", () => {
       "last_cycle",
       "errors_last_hour",
       "wire",
+      "agent",
     ])
+  })
+
+  it("runs the agent in shadow by default, and says why it can't answer without the model server", async () => {
+    expect((await db.col.settings.findOne({ _id: "current" }))!.settings.agent.level).toBe("shadow")
+    expect(engine.agent.agent.status()).toMatchObject({ level: "shadow", state: "off", blocked: "no model server (LLM_URL not set)" })
+    expect(await command({ type: "agent.ask", question: "What do you hold?" })).toMatchObject({ status: "failed", error: "the agent needs the model server (LLM_URL)" })
   })
 
   it("words its control results for stocks and options", async () => {
