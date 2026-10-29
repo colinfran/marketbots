@@ -76,6 +76,12 @@ export const COLLECTIONS = {
   dailyStats: "daily_stats",
   cache: "cache",
   loginAttempts: "login_attempts",
+  // The agent (docs/plans/LOCAL-AI.md §8): its episodes, watches and notes, and the shadow book.
+  agentEpisodes: "agent_episodes",
+  agentWatches: "agent_watches",
+  agentNotes: "agent_notes",
+  shadowPositions: "shadow_positions",
+  shadowFills: "shadow_fills",
   // Owner sign-in (Better Auth magic links), written only by the dashboard.
   authUsers: "auth_users",
   authSessions: "auth_sessions",
@@ -466,6 +472,11 @@ export const INDEXES: Partial<Record<(typeof COLLECTIONS)[keyof typeof COLLECTIO
   wire_items: BASE_INDEXES.wire_items,
   wire_triggers: BASE_INDEXES.wire_triggers,
   login_attempts: BASE_INDEXES.login_attempts,
+  agent_episodes: BASE_INDEXES.agent_episodes,
+  agent_watches: BASE_INDEXES.agent_watches,
+  agent_notes: BASE_INDEXES.agent_notes,
+  shadow_positions: BASE_INDEXES.shadow_positions,
+  shadow_fills: BASE_INDEXES.shadow_fills,
   auth_sessions: BASE_INDEXES.auth_sessions,
   auth_verifications: BASE_INDEXES.auth_verifications,
 }

@@ -451,6 +451,83 @@
       ]
     },
     {
+      "type": "agent.woke",
+      "data_keys": [
+        "episode_id",
+        "priority",
+        "subject",
+        "kinds",
+        "observations",
+        "reasons"
+      ]
+    },
+    {
+      "type": "agent.step",
+      "data_keys": [
+        "episode_id",
+        "step",
+        "kind",
+        "tool",
+        "purpose",
+        "result",
+        "ms",
+        "tokens_per_s"
+      ]
+    },
+    {
+      "type": "agent.thinking",
+      "data_keys": [
+        "episode_id",
+        "step",
+        "chars",
+        "excerpt"
+      ]
+    },
+    {
+      "type": "agent.answered",
+      "data_keys": [
+        "episode_id",
+        "status",
+        "subject",
+        "priority",
+        "reply",
+        "actions",
+        "watches",
+        "notes",
+        "steps",
+        "duration_ms"
+      ]
+    },
+    {
+      "type": "agent.watch",
+      "data_keys": [
+        "watch_id",
+        "status",
+        "kind",
+        "symbol",
+        "note"
+      ]
+    },
+    {
+      "type": "agent.shadow",
+      "data_keys": [
+        "position_id",
+        "symbol",
+        "side",
+        "qty",
+        "price",
+        "reason",
+        "realized_pnl_usd"
+      ]
+    },
+    {
+      "type": "agent.breaker",
+      "data_keys": [
+        "name",
+        "detail"
+      ]
+    },
+    {
       "type": "error",
       "data_keys": [
         "scope",
@@ -478,7 +555,8 @@
     "engine.heartbeat",
     "research.progress",
     "ai.decision.progress",
-    "ai.reasoning"
+    "ai.reasoning",
+    "agent.thinking"
   ],
   "envelope_schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",

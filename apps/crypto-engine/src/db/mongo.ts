@@ -21,6 +21,7 @@ import type {
   SettingsDoc,
   SnapshotDoc,
 } from "@mb/crypto-core/db"
+import type { AgentEpisodeDoc, AgentNoteDoc, AgentWatchDoc, ShadowFillDoc, ShadowPositionDoc } from "@mb/core/agent"
 import type { WireItemDoc, WireTriggerDoc } from "@mb/crypto-core/wire"
 import { connectMongo, type Database as DatabaseOf } from "@mb/engine-kit/db"
 import type { Logger } from "@mb/engine-kit/log"
@@ -55,6 +56,11 @@ export type Collections = {
   seedRuns: Collection<SeedRunDoc>
   wireItems: Collection<WireItemDoc>
   wireTriggers: Collection<WireTriggerDoc>
+  agentEpisodes: Collection<AgentEpisodeDoc>
+  agentWatches: Collection<AgentWatchDoc>
+  agentNotes: Collection<AgentNoteDoc>
+  shadowPositions: Collection<ShadowPositionDoc>
+  shadowFills: Collection<ShadowFillDoc>
 }
 
 export type Database = DatabaseOf<Collections>
@@ -82,6 +88,11 @@ export const collectionsFor = (db: Db): Collections => ({
   seedRuns: db.collection<SeedRunDoc>(COLLECTIONS.seedRuns),
   wireItems: db.collection<WireItemDoc>(COLLECTIONS.wireItems),
   wireTriggers: db.collection<WireTriggerDoc>(COLLECTIONS.wireTriggers),
+  agentEpisodes: db.collection<AgentEpisodeDoc>(COLLECTIONS.agentEpisodes),
+  agentWatches: db.collection<AgentWatchDoc>(COLLECTIONS.agentWatches),
+  agentNotes: db.collection<AgentNoteDoc>(COLLECTIONS.agentNotes),
+  shadowPositions: db.collection<ShadowPositionDoc>(COLLECTIONS.shadowPositions),
+  shadowFills: db.collection<ShadowFillDoc>(COLLECTIONS.shadowFills),
 })
 
 /** Connects to crypto's database (@mb/engine-kit/db: indexes ensured, retried until it works). */

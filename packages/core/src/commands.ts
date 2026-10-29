@@ -47,6 +47,9 @@ export const seedCancelCommand = z.object({ type: z.literal("seed.cancel") })
 /** Runs a stored news item through the trigger policy and reports what it would do. Never starts a cycle. */
 export const wireReplayCommand = z.object({ type: z.literal("wire.replay"), item_id: z.string().min(8).max(64) })
 
+/** A question for the agent (docs/plans/LOCAL-AI.md §11): a read-only episode whose reply shows on the Agent page. Nothing it decides is acted on. */
+export const agentAskCommand = z.object({ type: z.literal("agent.ask"), question: z.string().trim().min(3).max(500) })
+
 export type BaseCommand = z.infer<
   | typeof pauseCommand
   | typeof resumeCommand
@@ -56,6 +59,7 @@ export type BaseCommand = z.infer<
   | typeof seedScheduleCommand
   | typeof seedCancelCommand
   | typeof wireReplayCommand
+  | typeof agentAskCommand
 >
 export type BaseCommandType = BaseCommand["type"]
 
@@ -68,4 +72,5 @@ export const BASE_COMMAND_LABEL: Record<BaseCommandType, string> = {
   "seed.schedule": "Schedule seed buy",
   "seed.cancel": "Cancel seed buy",
   "wire.replay": "Replay news item",
+  "agent.ask": "Ask the agent",
 }

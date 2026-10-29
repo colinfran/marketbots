@@ -148,6 +148,13 @@ export type EventDataMap = {
   "wire.source": Shared["wire.source"]
   "seed.started": Shared["seed.started"]
   "seed.completed": Shared["seed.completed"]
+  "agent.woke": Shared["agent.woke"]
+  "agent.step": Shared["agent.step"]
+  "agent.thinking": Shared["agent.thinking"]
+  "agent.answered": Shared["agent.answered"]
+  "agent.watch": Shared["agent.watch"]
+  "agent.shadow": Shared["agent.shadow"]
+  "agent.breaker": Shared["agent.breaker"]
   "core.review.started": { review_id: string; cycle_id: string; kind: "weekly" | "holding"; trigger: string; symbol: string | null; dry_run: boolean }
   "core.review.completed": {
     review_id: string
@@ -173,7 +180,7 @@ export type EngineEvent<T extends EventType = EventType> = EngineEventOf<EventDa
 export const OWNER_ONLY_EVENTS: ReadonlySet<EventType> = new Set<EventType>(["command.received", "command.completed", "command.failed", "error", "broker.error"])
 
 /** High-frequency events that are streamed but not stored. */
-export const EPHEMERAL_EVENTS: ReadonlySet<EventType> = new Set<EventType>(["market.ticker", "engine.heartbeat", "research.progress", "ai.decision.progress", "ai.reasoning"])
+export const EPHEMERAL_EVENTS: ReadonlySet<EventType> = new Set<EventType>(["market.ticker", "engine.heartbeat", "research.progress", "ai.decision.progress", "ai.reasoning", "agent.thinking"])
 
 /**
  * Whether a viewer may see an event. Everything is paper money, so public viewers see amounts;

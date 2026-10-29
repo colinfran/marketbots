@@ -1,4 +1,5 @@
 import {
+  agentAskCommand,
   BASE_COMMAND_LABEL,
   killSwitchEngageCommand,
   killSwitchReleaseCommand,
@@ -42,6 +43,7 @@ export const commandSchema = z.discriminatedUnion("type", [
   seedScheduleCommand,
   seedCancelCommand,
   wireReplayCommand,
+  agentAskCommand,
   /**
    * Runs the core book's weekly review now (it then counts as this week's). A dry run plans the
    * trades without placing them, and works while the core book is off, so its first review can be
@@ -68,5 +70,6 @@ export const COMMAND_LABEL: Record<CommandType, string> = {
   "seed.schedule": base["seed.schedule"],
   "seed.cancel": base["seed.cancel"],
   "wire.replay": base["wire.replay"],
+  "agent.ask": base["agent.ask"],
   "core.review": "Run core review",
 }

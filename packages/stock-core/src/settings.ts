@@ -1,4 +1,5 @@
 import {
+  agentSettingsBase,
   aiSettingsBase,
   applySettingsPatch as sharedApplySettingsPatch,
   type DeepPartial,
@@ -247,6 +248,8 @@ export const settingsSchema = z
     }),
     wire: wireSettingsSchema,
     core: coreSettingsSchema,
+    /** The agent (docs/plans/LOCAL-AI.md §8), the same in both bots. */
+    agent: agentSettingsBase,
   })
   .superRefine((s, ctx) => {
     const issue = (path: string[], message: string) => ctx.addIssue({ code: "custom", path, message })
@@ -383,6 +386,30 @@ export const DEFAULT_SETTINGS: Settings = {
     review_time_et: "10:15",
     universe_size: 100,
     themes: [],
+  },
+  agent: {
+    level: "shadow",
+    model: "local/qwen3.6-35b-a3b-q2",
+    limits: {
+      p0: { steps: 4, seconds: 60, thinking_tokens: 0 },
+      p1: { steps: 6, seconds: 120, thinking_tokens: 0 },
+      p2: { steps: 8, seconds: 240, thinking_tokens: 1_024 },
+      p3: { steps: 12, seconds: 600, thinking_tokens: 2_048 },
+    },
+    wake_cooldown_minutes: 5,
+    sweep_minutes: 120,
+    envelope: {
+      entries_per_day: 4,
+      entries_per_hour: 2,
+      commit_per_hour_pct: 10,
+      size_pct: 50,
+      max_open_positions: 4,
+      symbol_action_minutes: 30,
+      reentry_after_stop_hours: 24,
+      flip_hours: 6,
+    },
+    shadow_starting_usd: 10_000,
+    public_thinking: false,
   },
 }
 

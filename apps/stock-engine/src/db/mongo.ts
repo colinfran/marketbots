@@ -22,6 +22,7 @@ import type {
   ReportDoc,
   SettingsDoc,
 } from "@mb/stock-core/db"
+import type { AgentEpisodeDoc, AgentNoteDoc, AgentWatchDoc, ShadowFillDoc, ShadowPositionDoc } from "@mb/core/agent"
 import type { WireItemDoc, WireTriggerDoc } from "@mb/stock-core/wire"
 import type { Collection, Db } from "mongodb"
 
@@ -43,6 +44,11 @@ export type Collections = {
   seedRuns: Collection<SeedRunDoc>
   wireItems: Collection<WireItemDoc>
   wireTriggers: Collection<WireTriggerDoc>
+  agentEpisodes: Collection<AgentEpisodeDoc>
+  agentWatches: Collection<AgentWatchDoc>
+  agentNotes: Collection<AgentNoteDoc>
+  shadowPositions: Collection<ShadowPositionDoc>
+  shadowFills: Collection<ShadowFillDoc>
   aiCalls: Collection<AiCallDoc>
   cycles: Collection<CycleDoc>
   reports: Collection<ReportDoc>
@@ -69,6 +75,11 @@ export const collectionsFor = (db: Db): Collections => ({
   seedRuns: db.collection<SeedRunDoc>(COLLECTIONS.seedRuns),
   wireItems: db.collection<WireItemDoc>(COLLECTIONS.wireItems),
   wireTriggers: db.collection<WireTriggerDoc>(COLLECTIONS.wireTriggers),
+  agentEpisodes: db.collection<AgentEpisodeDoc>(COLLECTIONS.agentEpisodes),
+  agentWatches: db.collection<AgentWatchDoc>(COLLECTIONS.agentWatches),
+  agentNotes: db.collection<AgentNoteDoc>(COLLECTIONS.agentNotes),
+  shadowPositions: db.collection<ShadowPositionDoc>(COLLECTIONS.shadowPositions),
+  shadowFills: db.collection<ShadowFillDoc>(COLLECTIONS.shadowFills),
   aiCalls: db.collection<AiCallDoc>(COLLECTIONS.aiCalls),
   cycles: db.collection<CycleDoc>(COLLECTIONS.cycles),
   reports: db.collection<ReportDoc>(COLLECTIONS.reports),

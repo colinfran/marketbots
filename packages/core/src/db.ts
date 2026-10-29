@@ -1,3 +1,4 @@
+import type { AgentStatus } from "./agent"
 import type { AiSettingsBase } from "./settings"
 import type { WireStatus } from "./wire"
 
@@ -24,6 +25,12 @@ export const BASE_COLLECTIONS = {
   wireItems: "wire_items",
   wireTriggers: "wire_triggers",
   loginAttempts: "login_attempts",
+  // The agent (docs/plans/LOCAL-AI.md §8): its episodes, watches and notes, and the shadow book.
+  agentEpisodes: "agent_episodes",
+  agentWatches: "agent_watches",
+  agentNotes: "agent_notes",
+  shadowPositions: "shadow_positions",
+  shadowFills: "shadow_fills",
   // Owner sign-in (Better Auth magic links), written only by the dashboard.
   authUsers: "auth_users",
   authSessions: "auth_sessions",
@@ -68,6 +75,15 @@ export const BASE_INDEXES = indexes({
   ],
   wire_triggers: [{ key: { at: -1 } }, { key: { status: 1, at: -1 } }, { key: { expires_at: 1 }, expireAfterSeconds: 0 }],
   login_attempts: [{ key: { expires_at: 1 }, expireAfterSeconds: 0 }],
+  agent_episodes: [{ key: { started_at: -1 } }, { key: { subject: 1, started_at: -1 } }, { key: { expires_at: 1 }, expireAfterSeconds: 0 }],
+  agent_watches: [{ key: { status: 1 } }, { key: { purge_at: 1 }, expireAfterSeconds: 0 }],
+  agent_notes: [{ key: { subject: 1, created_at: -1 } }, { key: { expires_at: 1 }, expireAfterSeconds: 0 }],
+  shadow_positions: [
+    { key: { status: 1 } },
+    { key: { symbol: 1 }, name: "one_open_shadow_position_per_symbol", unique: true, partialFilterExpression: { status: "open" } },
+    { key: { closed_at: -1 } },
+  ],
+  shadow_fills: [{ key: { at: -1 } }, { key: { position_id: 1 } }],
   // Better Auth's own field names (camelCase).
   auth_sessions: [{ key: { token: 1 } }, { key: { expiresAt: 1 }, expireAfterSeconds: 0 }],
   auth_verifications: [{ key: { identifier: 1 } }, { key: { expiresAt: 1 }, expireAfterSeconds: 0 }],
@@ -115,6 +131,8 @@ export type EngineStatusBase<RunStatus extends string, CycleState extends string
   wire?: WireStatus
   /** The history store (absent while HISTORY_URL is unset). */
   history?: HistoryStatus
+  /** The agent (absent before it shipped). */
+  agent?: AgentStatus
 }
 
 /** The history store's health in the heartbeat (docs/plans/LOCAL-AI.md §6). */

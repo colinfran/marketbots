@@ -8,7 +8,7 @@ import * as seeds from "../state/seed-runs"
 
 /**
  * The owner's controls, the same in both bots: pause and resume, the kill switch, settings
- * changes, the one-time seed's lifecycle and news replays. It owns the engine's run status and
+ * changes, the one-time seed's lifecycle, news replays and questions for the agent. It owns the engine's run status and
  * emits `engine.status` whenever the owner (or the engine's own safety halt) changes it.
  *
  * The engine dispatches the shared commands to `handle` and runs its own (a cycle, closing a
@@ -51,6 +51,8 @@ export type ControlPlaneDeps<S extends string, Item extends { title: string; sev
   /** Closes every position for a liquidating kill switch; returns what it did, one note per position. */
   liquidate: () => Promise<string[]>
   wording: ControlWording
+  /** The agent, for `agent.ask` (absent where there is none). */
+  agent?: { ask(question: string, by: string): string } | null
 }
 
 export class ControlPlane<S extends string, Item extends { title: string; severity: number }> {
@@ -119,6 +121,9 @@ export class ControlPlane<S extends string, Item extends { title: string; severi
         if (!item) throw new Error("no wire item with that id")
         return `${item.title.slice(0, 120)} (severity ${item.severity}): ${await this.d.policy.replay(item)}`
       }
+      case "agent.ask":
+        if (!this.d.agent) throw new Error("this engine has no agent")
+        return this.d.agent.ask(command.question, by)
     }
   }
 
