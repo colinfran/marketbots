@@ -58,6 +58,10 @@ type Internals = {
   eventQueue: Map<string, { severity: number; item_ids: string[]; trigger_id: string }>
   /** The 30-second scheduler tick: after a resume, the first one drains the event queue. */
   schedule: () => Promise<void>
+  cyclesStopped: boolean
+  /** What the agent runtime calls when a breaker trips at level auto, and when it records a promotion. */
+  demoteAgent: (reason: string) => Promise<void>
+  promoteAgent: (p: { at: Date; equity_usd: number }) => Promise<void>
 }
 const internals = () => engine as unknown as Internals
 
@@ -165,6 +169,24 @@ describe("Engine", () => {
     expect(await command({ type: "cycle.run_now", symbols: ["BTC/USD"] })).toMatchObject({ status: "failed", error: "the agent needs the model server (LLM_URL)" })
     await until(async () => (await db.col.engineStatus.findOne({ _id: "engine" }))?.agent?.level === "auto")
     expect((await db.col.engineStatus.findOne({ _id: "engine" }))!.next_cycle_at).toBeNull()
+  })
+
+  it("keeps the timed cycles stopped after a breaker drops the agent to shadow, until the next promotion", async () => {
+    expect(await command({ type: "settings.update", patch: { agent: { level: "auto" } }, expected_version: 1 })).toMatchObject({ status: "done" })
+    await internals().demoteAgent("risk_rejections: the risk checks rejected 5 entries in a row")
+    expect((await db.col.settings.findOne({ _id: "current" }))!.settings.agent.level).toBe("shadow")
+    expect(await db.col.engineState.findOne({ _id: "engine" })).toMatchObject({ agent_demotion: { reason: "risk_rejections: the risk checks rejected 5 entries in a row" } })
+    expect(await db.col.audit.findOne({ action: "agent.demoted" })).toMatchObject({ actor: "engine:agent-breaker" })
+    expect(engine.requestEventCycle(focus)).toBe("agent")
+    await internals().schedule()
+    expect(await db.col.cycles.countDocuments({ _id: { $ne: "interrupted" } })).toBe(0)
+
+    // The owner promotes it again: the demotion ends, and a later shadow is the owner's own, with the cycles back.
+    expect(await command({ type: "settings.update", patch: { agent: { level: "auto" } }, expected_version: 3 })).toMatchObject({ status: "done" })
+    await internals().promoteAgent({ at: new Date(), equity_usd: 10_000 })
+    expect((await db.col.engineState.findOne({ _id: "engine" }))!.agent_demotion).toBeNull()
+    expect(await command({ type: "settings.update", patch: { agent: { level: "shadow" } }, expected_version: 4 })).toMatchObject({ status: "done" })
+    expect(internals().cyclesStopped).toBe(false)
   })
 
   it("pauses, resumes and applies settings from audited commands", async () => {

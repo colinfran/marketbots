@@ -166,6 +166,33 @@ describe("Engine", () => {
     expect(await command({ type: "cycle.run_now", phase: "postmarket" })).toMatchObject({ status: "failed", error: "the agent needs the model server (LLM_URL)" })
   })
 
+  it("keeps the timed cycles stopped after a breaker drops the agent to shadow, until the next promotion", async () => {
+    const internals = engine as unknown as {
+      schedule: () => Promise<void>
+      plan: { reason: string }
+      cyclesStopped: boolean
+      demoteAgent: (reason: string) => Promise<void>
+      promoteAgent: (p: { at: Date; equity_usd: number }) => Promise<void>
+    }
+    expect(await command({ type: "settings.update", patch: { agent: { level: "auto" } }, expected_version: 1 })).toMatchObject({ status: "done" })
+    await internals.demoteAgent("daily_loss: the account is down 3.10% today")
+    expect((await db.col.settings.findOne({ _id: "current" }))!.settings.agent.level).toBe("shadow")
+    expect(await db.col.engineState.findOne({ _id: "engine" })).toMatchObject({ agent_demotion: { reason: "daily_loss: the account is down 3.10% today" } })
+    const focus = { symbol: "AAPL", rule: "held_negative", action: "review" as const, severity: 70, polarity: -1 as const, item_ids: ["i1"], trigger_id: "t1", headline: "AAPL sued" }
+    expect(engine.requestEventCycle(focus)).toBe("agent")
+    await internals.schedule()
+    expect(internals.plan.reason).toBe("A circuit breaker dropped the agent to shadow: no timed cycles until the owner promotes it again.")
+    expect(await db.col.cycles.countDocuments({ _id: { $ne: "interrupted" }, kind: { $ne: "core" } })).toBe(0)
+    expect(await command({ type: "cycle.run_now", phase: "postmarket" })).toMatchObject({ status: "failed", error: "the agent needs the model server (LLM_URL)" })
+
+    // The owner promotes it again: the demotion ends, and a later shadow is the owner's own, with the cycles back.
+    expect(await command({ type: "settings.update", patch: { agent: { level: "auto" } }, expected_version: 3 })).toMatchObject({ status: "done" })
+    await internals.promoteAgent({ at: new Date(), equity_usd: 10_000 })
+    expect((await db.col.engineState.findOne({ _id: "engine" }))!.agent_demotion).toBeNull()
+    expect(await command({ type: "settings.update", patch: { agent: { level: "shadow" } }, expected_version: 4 })).toMatchObject({ status: "done" })
+    expect(internals.cyclesStopped).toBe(false)
+  })
+
   it("runs a cycle on request (skipped without an AI key) and refuses a second one", async () => {
     expect(await command({ type: "cycle.run_now", phase: "postmarket" })).toMatchObject({ status: "done", result: "postmarket cycle started" })
     await until(async () => (await db.col.cycles.countDocuments({ phase: "postmarket", status: "skipped" })) === 1)

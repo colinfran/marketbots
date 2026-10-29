@@ -171,13 +171,14 @@ export const enforceOvernightRules = async (ctx: TradingContext): Promise<string
 
 /**
  * The regular upkeep. `closeCycleDone` tells it whether today's closing cycle succeeded, so the
- * overnight fallback only runs when it didn't. At level auto (`agentTrades`) there is no closing
- * cycle: the overnight rules are simply how the day ends, not a fallback.
+ * overnight fallback only runs when it didn't. While the timed cycles are stopped (`cyclesStopped`:
+ * level auto, or after a breaker's demotion) there is no closing cycle: the overnight rules are
+ * simply how the day ends, not a fallback.
  */
 export const maintain = async (
   ctx: TradingContext,
   session: Session,
-  { now = new Date(), closeCycleDone, agentTrades = false }: { now?: Date; closeCycleDone: () => Promise<boolean>; agentTrades?: boolean },
+  { now = new Date(), closeCycleDone, cyclesStopped = false }: { now?: Date; closeCycleDone: () => Promise<boolean>; cyclesStopped?: boolean },
 ): Promise<string[]> => {
   const { alpaca, col, settings, alerts } = ctx
   const notes: string[] = []
@@ -212,7 +213,7 @@ export const maintain = async (
     const flattened = await enforceOvernightRules(ctx)
     notes.push(...flattened)
     if (flattened.length) {
-      if (agentTrades) await alerts.send("info", "Overnight rules: sold the day's intraday positions", flattened.join("\n"), { path: `/journal/${session.day}` })
+      if (cyclesStopped) await alerts.send("info", "Overnight rules: sold the day's intraday positions", flattened.join("\n"), { path: `/journal/${session.day}` })
       else await alerts.send("warning", "Closing cycle didn't run: sold intraday positions as a fallback", flattened.join("\n"), { path: `/journal/${session.day}` })
     }
   }

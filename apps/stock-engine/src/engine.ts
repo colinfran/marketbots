@@ -201,14 +201,10 @@ export class Engine {
       snapshot: () => this.snapshot,
       // At level auto the cycle slot runs only the one-time seed and the core book's reviews: the agent waits for them, so they never spend the same cash.
       busy: () => (this.agentTrades && this.cycle ? "a core review or the one-time seed is running" : null),
-      demote: async (reason) => {
-        const r = await d.settings.apply({ agent: { level: "shadow" } } as SettingsPatch, "engine:agent-breaker", null)
-        if (!r.ok) throw new Error(r.error)
-        d.log.warn("agent dropped to shadow", { reason })
-      },
+      demote: (reason) => this.demoteAgent(reason),
       promotion: {
         get: () => d.state.state.agent_promotion ?? null,
-        set: (p) => d.state.update({ agent_promotion: p }, "engine", "agent.promoted", {}),
+        set: (p) => this.promoteAgent(p),
       },
     })
     this.commands = new CommandProcessor(d.db.col, d.bus, d.log.child({ component: "commands" }), (c, doc) => this.handleCommand(c, doc))
@@ -515,8 +511,11 @@ export class Engine {
     const now = new Date()
     const session = await this.refreshSession(now)
     const settings = this.d.settings.current
-    // At level auto the agent decides on its own events: no session phases, intraday, price-move or event cycles.
-    this.plan = this.agentTrades ? { phase: null, reason: "The agent trades (level auto): no timed cycles." } : await planPhase(this.d.db.col, settings, session, now)
+    // At level auto (and after a breaker's demotion) the agent decides on its own events: no session
+    // phases, intraday, price-move or event cycles.
+    this.plan = this.cyclesStopped
+      ? { phase: null, reason: this.agentTrades ? "The agent trades (level auto): no timed cycles." : "A circuit breaker dropped the agent to shadow: no timed cycles until the owner promotes it again." }
+      : await planPhase(this.d.db.col, settings, session, now)
     // In the background: a few REST calls once a day, never blocking a cycle.
     void this.coreRanking.refresh(session, now)
     if (this.cycle) return
@@ -535,9 +534,9 @@ export class Engine {
       if (core.due) return this.startCoreReview(session, "schedule", { dryRun: false })
     }
     // News events go before scheduled intraday cycles (the planner's other phases still come first).
-    if ((!this.plan.phase || this.plan.phase === "intraday") && (this.coreQueue.drain() || (!this.agentTrades && this.eventQueue.drain()))) return
+    if ((!this.plan.phase || this.plan.phase === "intraday") && (this.coreQueue.drain() || (!this.cyclesStopped && this.eventQueue.drain()))) return
     if (this.plan.phase) return this.startCycle(this.plan.phase, session, "schedule", { kind: "scheduled" })
-    if (this.agentTrades) return
+    if (this.cyclesStopped) return
 
     // Between scheduled intraday cycles, a held stock or option underlying moving sharply triggers an early one.
     const s = settings.schedule
@@ -675,14 +674,39 @@ export class Engine {
   requestEventCycle(focus: EventFocus): "fired" | "queued" | "agent" {
     // Bad news about a core holding goes to the core book's single-holding review, not an event cycle.
     if (focus.rule === CORE_REVIEW_RULE) return this.coreQueue.request(focus)
-    // At level auto the agent trades: it has already seen the trigger's candidate.
-    if (this.agentTrades) return "agent"
+    // While the timed cycles are stopped the trigger is the agent's: it has already seen its candidate.
+    if (this.cyclesStopped) return "agent"
     return this.eventQueue.request(focus)
   }
 
   /** Level auto: the agent decides and the timed cycles stop (the core book's reviews carry on). */
   private get agentTrades() {
     return this.d.settings.current.agent.level === "auto"
+  }
+
+  /**
+   * The timed cycles stop at level auto, and stay stopped after a circuit breaker drops the agent
+   * to shadow, until the owner promotes it again.
+   */
+  private get cyclesStopped() {
+    return this.agentTrades || !!this.d.state.state.agent_demotion
+  }
+
+  /**
+   * A circuit breaker drops the agent to shadow (an audited settings change). The demotion is kept
+   * first, so no scheduler tick sees shadow without it and starts a timed cycle.
+   */
+  private async demoteAgent(reason: string) {
+    const { settings, state, log } = this.d
+    await state.update({ agent_demotion: { at: new Date(), reason } }, "engine:agent-breaker", "agent.demoted", {})
+    const r = await settings.apply({ agent: { level: "shadow" } } as SettingsPatch, "engine:agent-breaker", null)
+    if (!r.ok) throw new Error(r.error)
+    log.warn("agent dropped to shadow", { reason })
+  }
+
+  /** A promotion to auto: its time and equity, for the total-loss breaker. It ends any demotion. */
+  private async promoteAgent(p: { at: Date; equity_usd: number }) {
+    await this.d.state.update({ agent_promotion: p, agent_demotion: null }, "engine", "agent.promoted", {})
   }
 
   /** Drops triggers that waited too long (the queue does this on every drain; tests call it with a later clock). */
@@ -744,9 +768,9 @@ export class Engine {
     }
     const notes = await maintain(this.ctx, session, {
       now,
-      // At level auto there is no closing cycle: the overnight rules always run in the last minutes.
-      closeCycleDone: async () => !this.agentTrades && (await this.d.db.col.cycles.countDocuments({ trading_day: session.day, phase: "close", status: { $in: ["succeeded", "running"] } })) > 0,
-      agentTrades: this.agentTrades,
+      // While the timed cycles are stopped there is no closing cycle: the overnight rules always run in the last minutes.
+      closeCycleDone: async () => !this.cyclesStopped && (await this.d.db.col.cycles.countDocuments({ trading_day: session.day, phase: "close", status: { $in: ["succeeded", "running"] } })) > 0,
+      cyclesStopped: this.cyclesStopped,
     })
     if (notes.length) this.d.log.info("maintenance", { notes })
   }
@@ -793,8 +817,8 @@ export class Engine {
     const by = doc.created_by
     switch (command.type) {
       case "cycle.run_now": {
-        // At level auto there are no cycles: the agent reviews what was asked, and may act on it.
-        if (this.agentTrades) return this.agent.agent.review(command.symbols ?? [], by)
+        // While the timed cycles are stopped the agent reviews what was asked, and at level auto may act on it.
+        if (this.cyclesStopped) return this.agent.agent.review(command.symbols ?? [], by)
         if (this.cycle) throw new Error("a cycle is already running")
         if (state.state.status !== "running" || state.state.kill_switch.engaged) throw new Error(`engine is ${this.status}`)
         const session = await this.refreshSession()

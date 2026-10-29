@@ -66,7 +66,7 @@ When a scheduled phase fails (usually its decision), the scheduler retries it (i
 
 An agent runs on the same local model ([plans/LOCAL-AI.md §8](plans/LOCAL-AI.md#8-the-agent), `@mb/agent` and `src/agent/`). Code watches the session, prices, the setup screen and the news all the time and wakes it when something matters; in each wake-up (an *episode*) it looks things up one step at a time and decides. Its level is `agent.level` in Admin:
 
-- **shadow** (the default): its decisions fill only in its own simulated account, the **shadow book** (stocks only), and the timed cycles keep trading the Alpaca paper account.
+- **shadow** (the default): its decisions fill only in its own simulated account, the **shadow book** (stocks only), and the timed cycles keep trading the Alpaca paper account (unless a circuit breaker put it there: below).
 - **auto**: it trades the paper account itself, **stocks and options**, through the cycles' own execution path, and **the timed cycles stop** (premarket, intraday, closing and postmarket cycles, price-move and news event cycles). News triggers are recorded as "handed to the agent", and the owner's *Run now* becomes a review it may act on. Stops and targets rest at the broker as before, the options monitor and maintenance run as before, and the overnight rules always run in the last 7 minutes (the day's end now, not a fallback). The core book's weekly and single-holding reviews and the one-time seed still run in the cycle slot, and the agent waits for them, so they never spend the same cash.
 
 **What wakes it** (observations, scored in code and queued per subject: a burst waits 2–10 s to become one wake-up, risk before opportunity before review, and a subject that woke it waits `agent.wake_cooldown_minutes` unless its salience rises 15 points, a P0, its own watch or the owner):
@@ -93,7 +93,7 @@ An agent runs on the same local model ([plans/LOCAL-AI.md §8](plans/LOCAL-AI.md
 
 Exits are never rate-limited and stops only move up, at either level.
 
-**Circuit breakers** as in crypto: recorded at level shadow; at level auto each drops it back to shadow and the timed cycles don't come back, and a slow model only pauses its entries. **Where to see it**: Research → Agent, the decisions and trades tables (an agent decision links its episode), and the heartbeat's `agent` block.
+**Circuit breakers** as in crypto: recorded at level shadow; at level auto each drops it back to shadow and the timed cycles don't come back until the owner promotes it again (the engine's state keeps the demotion, `agent_demotion`; the overnight rules still end each day), and a slow model only pauses its entries. **Where to see it**: Research → Agent, the decisions and trades tables (an agent decision links its episode), and the heartbeat's `agent` block.
 
 ## News engine (the wire)
 
@@ -246,7 +246,7 @@ Events are typed (`packages/core/src/events.ts`) and carry a strictly increasing
 
 | Collection | Contents |
 | --- | --- |
-| `settings`, `engine_state` | the versioned settings document; desired state (running/paused/halted, kill switch) |
+| `settings`, `engine_state` | the versioned settings document; desired state (running/paused/halted, kill switch, the agent's last promotion and any breaker demotion) |
 | `engine_status`, `engine_lease` | heartbeat (health of everything, schedule, live prices, AI calls today); single-instance lease |
 | `events` | persisted stream events (replay, report trails) |
 | `commands`, `audit_log` | owner commands and results; every control and settings change |

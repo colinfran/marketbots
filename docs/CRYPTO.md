@@ -49,7 +49,7 @@ Safety: browser `Origin` allowlist, max clients and max connections per IP, 4KB 
 | Collection | Contents | Retention |
 | --- | --- | --- |
 | `settings` | The single versioned settings document (risk, AI, schedule, strategies, universe) | permanent |
-| `engine_state` | Desired state: running/paused/halted, kill switch | permanent |
+| `engine_state` | Desired state: running/paused/halted, kill switch; the agent's last promotion and any breaker demotion | permanent |
 | `engine_status` | Heartbeat: health of every dependency, data freshness, AI calls today, resources | overwritten every 5s |
 | `engine_lease` | Single-instance lease | 30s TTL |
 | `events` | Persisted stream events (replay + history) | TTL, default 30 days |
@@ -103,7 +103,7 @@ features (code) → screens (code) → research (local model + web search, strea
 
 An agent runs on the same local model ([plans/LOCAL-AI.md §8](plans/LOCAL-AI.md#8-the-agent), `@mb/agent` and `src/agent/`). Code watches everything all the time and wakes it when something matters; in each wake-up (an *episode*) it looks things up one step at a time and decides. Its level is `agent.level` in Admin:
 
-- **shadow** (the default): its decisions fill only in its own simulated account, the **shadow book**, and the timed cycles keep trading the paper wallet.
+- **shadow** (the default): its decisions fill only in its own simulated account, the **shadow book**, and the timed cycles keep trading the paper wallet (unless a circuit breaker put it there: below).
 - **auto**: it trades the paper wallet itself, through the cycles' own execution path, and **the timed cycles stop** (scheduled scans, price-move reviews, news event cycles). News triggers are recorded as "handed to the agent", and the owner's *Run now* becomes a review it may act on. Protection (stops and targets every 3 s), marks, reconciliation, the drawdown halt and outcome scoring run as before. The owner's one-time seed still runs, and the agent waits for it.
 
 **What wakes it** (observations, scored in code and queued per subject: a burst waits 2–10 s to become one wake-up, risk before opportunity before review, and a subject that woke it waits `agent.wake_cooldown_minutes` unless its salience rises 15 points, a P0, its own watch or the owner):
@@ -129,7 +129,7 @@ An agent runs on the same local model ([plans/LOCAL-AI.md §8](plans/LOCAL-AI.md
 
 Exits obey only the minimum hold, and stops only move up, at either level.
 
-**Circuit breakers** (5 risk rejections in a row, most entries refused in an hour, over 10% invalid answers, 3 envelope refusals a day, its book down 3% in a day or 6% in all, a slow model): at level shadow they are recorded, streamed and alerted. At level auto each drops the agent back to shadow (an audited settings change by `engine:agent-breaker`, with an alert), and the timed cycles don't come back: positions keep their stops and the owner promotes it again. A slow model only pauses its entries until the model is fast again. At auto, "in all" counts from its promotion, whose time and equity are kept in the engine's state (`agent_promotion`) across restarts.
+**Circuit breakers** (5 risk rejections in a row, most entries refused in an hour, over 10% invalid answers, 3 envelope refusals a day, its book down 3% in a day or 6% in all, a slow model): at level shadow they are recorded, streamed and alerted. At level auto each drops the agent back to shadow (an audited settings change by `engine:agent-breaker`, with an alert), and the timed cycles don't come back: positions keep their stops and the owner promotes it again. The engine's state keeps the demotion (`agent_demotion`, set before the level changes, so no scheduler tick sees shadow without it) until the next promotion; meanwhile news triggers are handed to the agent and *Run now* is its review, as at auto, and its decisions fill only the shadow book. A slow model only pauses its entries until the model is fast again. At auto, "in all" counts from its promotion, whose time and equity are kept in the engine's state (`agent_promotion`) across restarts.
 
 **Where to see it**: Research → Agent (the episode as it runs, its book, watches and notes, every episode, and the owner's *Ask the agent*), the decision pages (an agent decision links its episode), and the heartbeat's `agent` block. Thinking streams to the owner only, unless `agent.public_thinking`.
 

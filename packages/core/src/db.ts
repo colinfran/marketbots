@@ -109,6 +109,11 @@ export type EngineStateDoc = {
   kill_switch: { engaged: boolean; reason: string | null; at: Date | null; by: string | null; liquidate: boolean }
   /** When the agent was last promoted to level auto, and the account's equity then (absent until the first promotion). */
   agent_promotion?: { at: Date; equity_usd: number } | null
+  /**
+   * When a circuit breaker last dropped the agent from auto to shadow, and why; the next promotion
+   * clears it. While it is set the timed cycles stay stopped, as at auto.
+   */
+  agent_demotion?: { at: Date; reason: string } | null
   updated_at: Date
 }
 

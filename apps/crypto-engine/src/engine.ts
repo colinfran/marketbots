@@ -166,14 +166,10 @@ export class Engine {
       llmUrl: d.env.LLM_URL ?? null,
       // At level auto the cycle slot runs only the owner's one-time seed: the agent waits for it.
       busy: () => (this.agentTrades && this.cycle ? "the one-time seed is running" : null),
-      demote: async (reason) => {
-        const r = await d.settings.apply({ agent: { level: "shadow" } } as SettingsPatch, "engine:agent-breaker", null)
-        if (!r.ok) throw new Error(r.error)
-        d.log.warn("agent dropped to shadow", { reason })
-      },
+      demote: (reason) => this.demoteAgent(reason),
       promotion: {
         get: () => d.state.state.agent_promotion ?? null,
-        set: (p) => d.state.update({ agent_promotion: p }, "engine", "agent.promoted", {}),
+        set: (p) => this.promoteAgent(p),
       },
     })
     this.commands = new CommandProcessor(d.db.col, d.bus, d.log.child({ component: "commands" }), (c, doc) => this.handleCommand(c, doc))
@@ -240,7 +236,7 @@ export class Engine {
         symbols: d.hub.symbolHealth(),
         ...p.usage,
         last_cycle: this.lastCycle,
-        next_cycle_at: this.agentTrades ? null : this.lastCycleStartedAt ? new Date(this.lastCycleStartedAt + d.settings.current.schedule.crypto_scan_minutes * 60_000) : new Date(),
+        next_cycle_at: this.cyclesStopped ? null : this.lastCycleStartedAt ? new Date(this.lastCycleStartedAt + d.settings.current.schedule.crypto_scan_minutes * 60_000) : new Date(),
         reconciliation: this.reconciliation ? { ok: this.reconciliation.ok, at: this.reconciliation.at, issues: this.reconciliation.issues.slice(0, 20) } : null,
         ...p.health,
         ...(d.history ? { history: d.history.status() } : {}),
@@ -268,14 +264,39 @@ export class Engine {
    * it has waited 30 minutes.
    */
   requestEventCycle(focus: EventFocus): "fired" | "queued" | "agent" {
-    // At level auto the agent trades: it has already seen the trigger's candidate.
-    if (this.agentTrades) return "agent"
+    // While the timed cycles are stopped the trigger is the agent's: it has already seen its candidate.
+    if (this.cyclesStopped) return "agent"
     return this.eventQueue.request(focus)
   }
 
   /** Level auto: the agent decides and the timed cycles stop. */
   private get agentTrades() {
     return this.d.settings.current.agent.level === "auto"
+  }
+
+  /**
+   * The timed cycles stop at level auto, and stay stopped after a circuit breaker drops the agent
+   * to shadow, until the owner promotes it again.
+   */
+  private get cyclesStopped() {
+    return this.agentTrades || !!this.d.state.state.agent_demotion
+  }
+
+  /**
+   * A circuit breaker drops the agent to shadow (an audited settings change). The demotion is kept
+   * first, so no scheduler tick sees shadow without it and starts a timed cycle.
+   */
+  private async demoteAgent(reason: string) {
+    const { settings, state, log } = this.d
+    await state.update({ agent_demotion: { at: new Date(), reason } }, "engine:agent-breaker", "agent.demoted", {})
+    const r = await settings.apply({ agent: { level: "shadow" } } as SettingsPatch, "engine:agent-breaker", null)
+    if (!r.ok) throw new Error(r.error)
+    log.warn("agent dropped to shadow", { reason })
+  }
+
+  /** A promotion to auto: its time and equity, for the total-loss breaker. It ends any demotion. */
+  private async promoteAgent(p: { at: Date; equity_usd: number }) {
+    await this.d.state.update({ agent_promotion: p, agent_demotion: null }, "engine", "agent.promoted", {})
   }
 
   /** The owner's emergency action for a held position hit by a critical, confirmed, negative event. */
@@ -422,8 +443,9 @@ export class Engine {
     if (state.state.status !== "running" || state.state.kill_switch.engaged) return
     const seed = await claimDueSeed(db.col)
     if (seed) return this.runSeed(seed)
-    // At level auto the agent decides on its own events: no scans, reviews or event cycles.
-    if (this.agentTrades) return
+    // At level auto (and after a breaker's demotion) the agent decides on its own events: no scans,
+    // reviews or event cycles.
+    if (this.cyclesStopped) return
     // News events go before scheduled scans.
     if (this.eventQueue.drain()) return
     const s = settings.current.schedule
@@ -533,8 +555,8 @@ export class Engine {
         return `${command.strategy} ${command.enabled ? "enabled" : "disabled"}`
       }
       case "cycle.run_now":
-        // At level auto there are no cycles: the agent reviews what was asked, and may act on it.
-        if (this.agentTrades) return this.agent.agent.review(command.symbols ?? [], by)
+        // While the timed cycles are stopped the agent reviews what was asked, and at level auto may act on it.
+        if (this.cyclesStopped) return this.agent.agent.review(command.symbols ?? [], by)
         if (this.cycle) throw new Error("a cycle is already running")
         if (state.state.status !== "running" || state.state.kill_switch.engaged) throw new Error(`engine is ${this.status}`)
         this.runCycle({ kind: "manual", trigger: command.symbols?.length ? `manual: evaluate ${command.symbols.join(", ")}` : "manual", requested: command.symbols ?? [] })
