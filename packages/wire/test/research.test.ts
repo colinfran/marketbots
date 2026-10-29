@@ -45,17 +45,29 @@ const fakeServices = ({
   extract,
   tavilyUsage = () => json({ key: { usage: 0, limit: null }, account: { current_plan: "Researcher", plan_usage: 0, plan_limit: 1_000 } }),
   tavilySearch = () => json({ query: "", results: TAVILY_RESULTS, response_time: 0.8, usage: { credits: 1 } }),
-}: { search?: (q: string, engines: string) => Response; extract?: (url: string) => Response; tavilyUsage?: () => Response; tavilySearch?: (query: string) => Response } = {}) => {
+  exaSearch = () => json({ results: [], costDollars: { total: 0.007 } }),
+  brightData = () => json({ organic: [] }),
+}: {
+  search?: (q: string, engines: string) => Response
+  extract?: (url: string) => Response
+  tavilyUsage?: () => Response
+  tavilySearch?: (query: string) => Response
+  exaSearch?: () => Response
+  brightData?: () => Response
+} = {}) => {
   const calls: Call[] = []
+  const hosts: Record<string, string> = { "api.tavily.com": "tavily", "api.exa.ai": "exa", "api.brightdata.com": "brightdata" }
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: string | URL, init: RequestInit = {}) => {
       const url = new URL(String(input))
       const body = init.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {}
-      const tavily = url.host === "api.tavily.com"
-      calls.push({ path: `${tavily ? "tavily" : ""}${url.pathname}`, body, url, headers: (init.headers ?? {}) as Record<string, string> })
-      if (tavily && url.pathname === "/usage") return tavilyUsage()
-      if (tavily && url.pathname === "/search") return tavilySearch(String(body.query))
+      const host = hosts[url.host] ?? ""
+      calls.push({ path: `${host}${url.pathname}`, body, url, headers: (init.headers ?? {}) as Record<string, string> })
+      if (host === "tavily" && url.pathname === "/usage") return tavilyUsage()
+      if (host === "tavily" && url.pathname === "/search") return tavilySearch(String(body.query))
+      if (host === "exa") return exaSearch()
+      if (host === "brightdata") return brightData()
       if (url.pathname === "/search") return search(url.searchParams.get("q") ?? "", url.searchParams.get("engines") ?? "")
       if (url.pathname === "/extract") {
         const target = String(body.url)
@@ -271,6 +283,26 @@ describe("local research", () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it("asks the metered providers in turn, Tavily, Exa, then Bright Data, only while a search is still short", async () => {
+    const ALL = { ...TAVILY_ENV, EXA_API_KEY: "exa-key-0123456789", BRIGHTDATA_API_KEY: "bd-key-0123456789" }
+    const one = (url: string) => ({ title: "One result", url, highlights: ["A highlight."], publishedDate: hoursAgo(1) })
+    const empty = () => json({ results: [], unresponsive_engines: [] })
+    // Tavily has no allowance left and Exa finds one result: Bright Data is asked too, on the default zone.
+    let http = fakeServices({
+      search: empty,
+      tavilyUsage: () => json({ account: { plan_usage: 1_000, plan_limit: 1_000 } }),
+      exaSearch: () => json({ results: [one("https://exa.example/1")], costDollars: { total: 0.007 } }),
+      brightData: () => json({ organic: [{ link: "https://bd.example/1", title: "Google's", description: "From Google.", extensions: [{ type: "text", text: "2 hours ago" }] }] }),
+    })
+    expect((await researcher(ALL)(job())).error).toBeNull()
+    expect([http.of("tavily/search").length, http.of("exa/search").length, http.of("brightdata/request").length]).toEqual([0, 2, 2])
+    expect(http.of("brightdata/request")[0].body.zone).toBe("serp_api1")
+    // Tavily finds enough: neither Exa nor Bright Data is asked.
+    http = fakeServices({ search: empty })
+    expect((await researcher(ALL)(job())).error).toBeNull()
+    expect([http.of("tavily/search").length, http.of("exa/search").length, http.of("brightdata/request").length]).toEqual([2, 0, 0])
   })
 
   it("stops searching Tavily after it refuses for lack of credits", async () => {

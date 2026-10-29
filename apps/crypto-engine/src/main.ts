@@ -62,7 +62,15 @@ void bootstrap({
       // Research for local/… models: our search service and scraper, read by the local model.
       localResearch: localResearcher({
         request: httpClient(env.SEC_USER_AGENT ?? DEFAULT_USER_AGENT).requestText,
-        env: { LLM_URL: env.LLM_URL, SEARCH_URL: env.SEARCH_URL, SCRAPER_URL: env.SCRAPER_URL, TAVILY_API_KEY: env.TAVILY_API_KEY },
+        env: {
+          LLM_URL: env.LLM_URL,
+          SEARCH_URL: env.SEARCH_URL,
+          SCRAPER_URL: env.SCRAPER_URL,
+          TAVILY_API_KEY: env.TAVILY_API_KEY,
+          EXA_API_KEY: env.EXA_API_KEY,
+          BRIGHTDATA_API_KEY: env.BRIGHTDATA_API_KEY,
+          BRIGHTDATA_ZONE: env.BRIGHTDATA_ZONE,
+        },
         client: "crypto",
         log: log.child({ component: "research" }),
         meter: mongoSearchMeter(db.col.searchUsage),

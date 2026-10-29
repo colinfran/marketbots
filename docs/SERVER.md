@@ -230,10 +230,13 @@ HISTORY_URL=postgres://crypto_history:<CRYPTO_HISTORY_PASSWORD>@history:5432/cry
 | --- | --- | --- |
 | `SEARCH_PROXY_URL` | `search` | The residential proxy (Evomi) for the paid search engine: `http://<user>:<password>_country-US@core-residential.evomi.com:1000`. Evomi's dashboard shows `host:port:user:password`, which doesn't work here. `_country-US` (an Evomi option, after the password) keeps the exits in the US. Percent-encode special characters in the password. Without it, the paid engine goes direct, and our IP is blocked by it. |
 | `TAVILY_API_KEY` | both engines | Tavily's search API, one key for both bots. Without it, research skips Tavily. |
+| `EXA_API_KEY` | both engines | Exa's search API, likewise. |
+| `BRIGHTDATA_API_KEY` | both engines | Bright Data's API key, likewise. |
+| `BRIGHTDATA_ZONE` | both engines | Bright Data's SERP zone; unset, `serp_api1`. |
 
-- The proxy is billed per GB, and Tavily's free plan has 1,000 credits a month, so research uses both sparingly (§9).
+- The proxy is billed per GB, and the search APIs have monthly allowances, so research uses them sparingly and paces them (§9).
 - At start, `packages/wire/docker/searxng-start.sh` writes the proxy URL into a copy of the settings in the container's `/tmp`; the committed `searxng.yml` holds only a placeholder.
-- After changing the file, recreate whatever reads the variable you changed: `docker compose up -d search` for the proxy, `docker compose up -d crypto-engine stock-engine` for Tavily.
+- After changing the file, recreate whatever reads the variable you changed: `docker compose up -d search` for the proxy, `docker compose up -d crypto-engine stock-engine` for the search APIs.
 
 ---
 
@@ -693,10 +696,14 @@ A run takes about a minute, and costs nothing (`ai_calls`: `cost_source: "local"
 
 | Provider | Free allowance | A search | Per day, both bots (31-day month) | Per bot |
 | --- | --- | --- | --- | --- |
-| Tavily | 1,000 credits a calendar month | 1 credit (basic, up to 8 results, dated) | 32 | 16 |
+| Tavily | 1,000 credits a calendar month | 1 credit (basic, up to 8 results, dated); ~1.5 s | 32 | 16 |
+| Exa | $10 of credit a calendar month | ~$0.007 (`auto`, up to 8 results with highlights, dated); ~1.3 s | $0.32 | $0.16 (~23 searches) |
+| Bright Data | 5,000 requests a calendar month (SERP zone `serp_api1`) | 1 request (Google, ~9 results, dated relatively); 10–14 s, sometimes failing | 161 | 80 |
 
 - **Pacing:** each day of a UTC month adds an equal share of the month's allowance (rounded down for whole searches), and a share left unused carries over to later days. Both bots use the same accounts, so each keeps to half the allowance so far by its own spend. Each bot stores that spend in its `search_usage` collection (one document a month), so a restart doesn't reset it.
 - **Tavily** also checks Tavily's own count of the account (its usage endpoint, read at most every 5 minutes), which covers both bots and any other use of the key. That count lags by minutes or more (still 0 seven minutes after a search on 2026-10-29), so a new reading never lowers the count below an engine's own. A refusal for lack of credits (432) stops Tavily until the next reading.
+- **Exa** is paced in dollars: a search is reserved at $0.007 and settled at the cost Exa reports (`costDollars`).
+- **Bright Data** asks Google for the research's window (`tbs=qdr:d/w/m`) through the SERP zone (`BRIGHTDATA_ZONE`, default `serp_api1`; the free MCP zone `mcp_unlocker` isn't on the account). It comes last because it's slow: on 2026-10-29 searches took 10–14 s, and some failed after 2–25 s ("redirect location was rejected"; Bright Data answers those 200, with the reason in `x-brd-error`). Google dates its results relatively ("9 hours ago"), and research turns those into times.
 - **Logs:** each search is logged as `local research: a metered search`, with the provider and this bot's spend on it this month.
 
 **The speed guard:** llama.cpp doesn't report where its tensors sit, so the engines judge by speed. A summary written slower than 20 tokens/s pauses summaries for 30 minutes. Normal is 40–50 tokens/s, less per request while other slots run. A model spilled into system RAM writes 15–20.

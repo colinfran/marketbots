@@ -57,6 +57,9 @@ const envSchema = z.object({
   LLM_URL: base.LLM_URL,
   SEARCH_URL: base.SEARCH_URL,
   TAVILY_API_KEY: base.TAVILY_API_KEY,
+  EXA_API_KEY: base.EXA_API_KEY,
+  BRIGHTDATA_API_KEY: base.BRIGHTDATA_API_KEY,
+  BRIGHTDATA_ZONE: base.BRIGHTDATA_ZONE,
   HISTORY_URL: base.HISTORY_URL,
 })
 
@@ -85,6 +88,8 @@ export const secretValues = (env: Env): string[] =>
     env.ETHERSCAN_API_KEY,
     env.COINALYZE_API_KEY,
     env.TAVILY_API_KEY,
+    env.EXA_API_KEY,
+    env.BRIGHTDATA_API_KEY,
   ].filter(
     (v): v is string => typeof v === "string" && v.length >= 8,
   )

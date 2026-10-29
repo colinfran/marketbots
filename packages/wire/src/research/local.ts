@@ -5,6 +5,8 @@ import type { SearchMeter } from "@mb/engine-kit/state/search-usage"
 import { cleanLine, cleanText, domainOf, fenceUntrusted } from "@mb/engine-kit/util/text"
 import { extractArticle } from "../enrich/article"
 import type { RequestText } from "../fetch"
+import { BRIGHT_DATA_ZONE, brightDataProvider } from "./brightdata"
+import { exaProvider } from "./exa"
 import { spendLedger, type MeteredSearch } from "./metered"
 import { FREE_ENGINES, PAID_ENGINES, searchWeb, type SearchEngine, type SearchRange, type SearchResult } from "./search"
 import { tavilyProvider } from "./tavily"
@@ -110,7 +112,7 @@ const PICK_SCHEMA = {
 
 export type LocalResearchDeps = {
   request: RequestText
-  /** LLM_URL, SEARCH_URL, SCRAPER_URL, and the metered providers' keys (TAVILY_API_KEY). */
+  /** LLM_URL, SEARCH_URL, SCRAPER_URL, and the metered providers' keys (TAVILY_API_KEY, EXA_API_KEY, BRIGHTDATA_API_KEY and BRIGHTDATA_ZONE). */
   env: Readonly<Record<string, string | null | undefined>>
   /** Sent to the scraper as `X-Client` (its per-caller queue share): "crypto", "stock". */
   client: string
@@ -193,10 +195,12 @@ export const localResearcher = (d: LocalResearchDeps): LocalResearch => {
     return true
   }
 
-  /** The metered providers, in the order they're asked. */
+  /** The metered providers, in the order they're asked: the fast ones first (Bright Data takes 10–14 s). */
   const ledger = spendLedger(d.meter, d.log)
   const metered: MeteredSearch[] = []
   if (d.env.TAVILY_API_KEY) metered.push(tavilyProvider(d.request, d.env.TAVILY_API_KEY, ledger))
+  if (d.env.EXA_API_KEY) metered.push(exaProvider(d.request, d.env.EXA_API_KEY, ledger))
+  if (d.env.BRIGHTDATA_API_KEY) metered.push(brightDataProvider(d.request, d.env.BRIGHTDATA_API_KEY, d.env.BRIGHTDATA_ZONE || BRIGHT_DATA_ZONE, ledger))
 
   return async ({ model, prompt, fromDate, timeoutMs, progress }) => {
     const started = Date.now()

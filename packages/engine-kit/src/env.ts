@@ -64,8 +64,12 @@ export const envFields = ({ dbName, streamPort }: { dbName: string; streamPort: 
   LLM_URL: optional,
   /** The search service (SearXNG) for local research, e.g. http://search:8080 inside docker compose. Unset: local models can't research. */
   SEARCH_URL: optional,
-  /** Tavily's search API, for research's thin searches (in .env.search, shared by both bots). Unset: no Tavily. */
+  /** Research's metered search providers (in .env.search, shared by both bots). A provider whose key is unset isn't asked. */
   TAVILY_API_KEY: optional,
+  EXA_API_KEY: optional,
+  BRIGHTDATA_API_KEY: optional,
+  /** Bright Data's SERP zone. Unset: serp_api1. */
+  BRIGHTDATA_ZONE: optional,
   /** The bot's own history database (postgres://…@history:5432/<bot>_history), a secret. Unset: no history is kept. */
   HISTORY_URL: optional,
 })
