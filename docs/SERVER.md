@@ -326,7 +326,7 @@ The Docker VM has 15.5 GiB and the other stacks use ~3.5 GiB of it. Every servic
 | `crypto-engine` | 1 GB | ~0.35 GB |
 | `stock-engine` | 1 GB (was 768 MB: headroom at the open with ~1,500 tracked symbols) | 0.3–0.5 GB |
 | `scraper` | 1 GB | 0.15 GB idle, up to 0.5 GB while rendering |
-| `llm` | 6 GB RAM, 6 CPUs | ~2.5 GB; ~6.8 GB of GPU memory on each card, always (§9) |
+| `llm` | 6 GB RAM, 6 CPUs | ~2.5 GB at start, up to ~4.5 GB with its prompt cache (capped at 2 GB); ~6.8 GB of GPU memory on each card, always (§9) |
 | `llm-model` | 256 MB | not running: only when you fetch a model file (§9), and removed when done |
 | `search` | 512 MB | ~0.2 GB |
 | `history` | 2 GB (`shared_buffers` 512 MB, tuned for that) | 0.6–1.2 GB, mostly cache |
@@ -630,7 +630,8 @@ nvidia-smi                                                  # ~6.8 GB used on ea
 - **Cold starts:** the first start compiles the CUDA kernels (2–3 minutes) and keeps them in the `llm-cache` volume. Later starts take ~1 minute.
 
 **Caps:**
-- **Container:** `mem_limit: 6g` (it holds ~2.5 GB), `cpus: 6`. llama.cpp's 6 threads spin while they wait, so a 4-CPU cap throttled them: 36–40 tokens/s against 45–46 at 6. Idle, it uses next to no CPU.
+- **Container:** `mem_limit: 6g` (it holds ~2.5 GB, plus up to 2 GB of prompt cache), `cpus: 6`. llama.cpp's 6 threads spin while they wait, so a 4-CPU cap throttled them: 36–40 tokens/s against 45–46 at 6. Idle, it uses next to no CPU.
+- **Prompt cache:** `--cache-ram 2048`. llama.cpp keeps recent prompts in RAM so a new request can reuse their start, 8 GB by default: more than the container's 6 GB. At the default, the container sat at its cap and swapped 3.6 GB (all of the Docker VM's swap), and the whole VM froze for seconds when a request needed it back: other containers stalled too (the system monitor showed gaps), and a request was cancelled. Keep the cache well under the container's cap.
 - **GPU:** ~6.8 GB on each card.
 - **Power:** the 2080 SUPER is capped at 180 W (§2).
 
