@@ -3,8 +3,11 @@ import { json } from "@mb/engine-kit/testing/fetch"
 import { httpClient } from "@mb/engine-kit/util/http"
 import { describe, expect, it, vi } from "vitest"
 import { localResearcher, MEMO_SYSTEM, memoBudget, PICK_SYSTEM, PLAN_SYSTEM, rangeFor } from "../src/research/local"
+import type { RequestText } from "../src/fetch"
+import { tavilyAllowance, tavilyPacer } from "../src/research/tavily"
 
 const ENV = { LLM_URL: "http://llm:8080", SEARCH_URL: "http://search:8080", SCRAPER_URL: "http://scraper:8790" }
+const TAVILY_ENV = { ...ENV, TAVILY_API_KEY: "tvly-test-key-0123456789" }
 const MODEL = "local/qwen3.6-35b-a3b-q2"
 const PROMPT = "You are the research desk. Use your live tools (x_search first, web_search to confirm) for these gaps:\n- HYPE/USD [candidate]: unexplained -6% in 4 h"
 const yesterday = () => new Date(Date.now() - 86_400_000).toISOString().slice(0, 10)
@@ -28,15 +31,29 @@ const completion = (content: string, usage = { prompt_tokens: 1_000, completion_
 
 type Call = { path: string; body: Record<string, unknown>; url: URL; headers: Record<string, string> }
 
-/** A fake model server, search service and scraper behind global fetch. */
-const fakeServices = ({ search = () => json({ results: RESULTS, unresponsive_engines: [["bing news", "parsing error"]] }), extract }: { search?: (q: string, engines: string) => Response; extract?: (url: string) => Response } = {}) => {
+const TAVILY_RESULTS = [
+  { title: "HYPE unlock schedule", url: "https://hyperliquid.xyz/blog/unlock", content: "The official unlock schedule.", score: 0.9, published_date: hoursAgo(3) },
+  { title: "Hyperliquid governance", url: "https://forum.hyperliquid.xyz/t/1", content: "A proposal on the unlock.", score: 0.8, published_date: null },
+  { title: "HYPE explained", url: "https://www.theblock.co/post/2/hype", content: "What the unlock means.", score: 0.7 },
+]
+
+/** A fake model server, search service, scraper and Tavily (its paths prefixed "tavily") behind global fetch. */
+const fakeServices = ({
+  search = () => json({ results: RESULTS, unresponsive_engines: [["bing news", "parsing error"]] }),
+  extract,
+  tavilyUsage = () => json({ key: { usage: 0, limit: null }, account: { current_plan: "Researcher", plan_usage: 0, plan_limit: 1_000 } }),
+  tavilySearch = () => json({ query: "", results: TAVILY_RESULTS, response_time: 0.8, usage: { credits: 1 } }),
+}: { search?: (q: string, engines: string) => Response; extract?: (url: string) => Response; tavilyUsage?: () => Response; tavilySearch?: (query: string) => Response } = {}) => {
   const calls: Call[] = []
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: string | URL, init: RequestInit = {}) => {
       const url = new URL(String(input))
       const body = init.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {}
-      calls.push({ path: url.pathname, body, url, headers: (init.headers ?? {}) as Record<string, string> })
+      const tavily = url.host === "api.tavily.com"
+      calls.push({ path: `${tavily ? "tavily" : ""}${url.pathname}`, body, url, headers: (init.headers ?? {}) as Record<string, string> })
+      if (tavily && url.pathname === "/usage") return tavilyUsage()
+      if (tavily && url.pathname === "/search") return tavilySearch(String(body.query))
       if (url.pathname === "/search") return search(url.searchParams.get("q") ?? "", url.searchParams.get("engines") ?? "")
       if (url.pathname === "/extract") {
         const target = String(body.url)
@@ -143,6 +160,82 @@ describe("local research", () => {
     await research(job())
     // Two runs of two queries the free engines found nothing for: one paid search in all.
     expect(http.of("/search").filter((c) => c.url.searchParams.get("engines") === PAID)).toHaveLength(1)
+  })
+
+  it("splits Tavily's month evenly over its days", () => {
+    expect([1, 31].map((day) => tavilyAllowance(1_000, new Date(Date.UTC(2026, 9, day, 12))))).toEqual([32, 992])
+    expect(tavilyAllowance(1_000, new Date(Date.UTC(2026, 10, 30, 23, 59)))).toBe(990)
+    expect(tavilyAllowance(1_000, new Date(Date.UTC(2027, 1, 28)))).toBe(980)
+  })
+
+  it("asks Tavily before the paid engine for a query the free ones found too little for, reading the month's usage once", async () => {
+    const http = fakeServices({ search: () => json({ results: [], unresponsive_engines: [] }) })
+    const r = await researcher(TAVILY_ENV)(job())
+    expect(r.error).toBeNull()
+    const asked = http.of("tavily/search")
+    expect(asked.map((c) => c.body)).toEqual(
+      expect.arrayContaining(
+        ["Hyperliquid HYPE news", "HYPE token unlock"].map((query) => ({ query, search_depth: "basic", topic: "general", time_range: "day", max_results: 8, include_published_date: true, include_answer: false, include_raw_content: false, include_images: false })),
+      ),
+    )
+    expect(asked[0].headers.authorization).toBe("Bearer tvly-test-key-0123456789")
+    expect(http.of("tavily/usage")).toHaveLength(1)
+    // Tavily found enough: the proxy isn't used.
+    expect(http.of("/search").filter((c) => c.url.searchParams.get("engines") === PAID)).toHaveLength(0)
+    const listing = (http.of("/v1/chat/completions")[1].body.messages as { content: string }[])[1].content
+    expect(listing).toContain("https://hyperliquid.xyz/blog/unlock")
+  })
+
+  it("doesn't search Tavily past the month's even split so far, or when its usage can't be read: the paid engine does", async () => {
+    for (const tavilyUsage of [
+      () => json({ account: { plan_usage: tavilyAllowance(1_000, new Date()), plan_limit: 1_000 } }),
+      () => new Response("down", { status: 500 }),
+    ]) {
+      const http = fakeServices({ search: () => json({ results: [], unresponsive_engines: [] }), tavilyUsage })
+      expect((await researcher(TAVILY_ENV)(job())).error).toBeNull()
+      expect(http.of("tavily/search")).toHaveLength(0)
+      expect(http.of("/search").filter((c) => c.url.searchParams.get("engines") === PAID)).toHaveLength(2)
+    }
+  })
+
+  it("keeps counting its own Tavily searches while Tavily's count lags, and starts over with the month", async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: Date.UTC(2026, 9, 1, 0, 30) })
+    try {
+      const reads: number[] = []
+      const request = (async () => {
+        reads.push(Date.now())
+        return { status: 200, text: JSON.stringify({ account: { plan_usage: 0, plan_limit: 1_000 } }), headers: new Headers() }
+      }) as unknown as RequestText
+      const pacer = tavilyPacer(request, "tvly-test-key-0123456789")
+      const day = async (searches: number) => {
+        let taken = 0
+        for (let i = 0; i < searches; i++) {
+          if (await pacer.take()) taken++
+          vi.setSystemTime(Date.now() + 60_000) // a minute apart: a new reading every five
+        }
+        return taken
+      }
+      // Oct 1: 32 credits, though Tavily still says 0 after every search.
+      expect(await day(40)).toBe(32)
+      expect(reads.length).toBeGreaterThan(5)
+      // Oct 2: the next 32.
+      vi.setSystemTime(Date.UTC(2026, 9, 2, 1))
+      expect(await day(40)).toBe(32)
+      // Nov 1: a new month, a new count (Tavily's 0 is believed again).
+      vi.setSystemTime(Date.UTC(2026, 10, 1, 1))
+      expect(await day(40)).toBe(33)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("stops searching Tavily after it refuses for lack of credits", async () => {
+    const http = fakeServices({ search: () => json({ results: [], unresponsive_engines: [] }), tavilySearch: () => json({ detail: { error: "This request exceeds your plan's set usage limit." } }, { status: 432 }) })
+    const research = researcher(TAVILY_ENV)
+    await research(job())
+    await research(job())
+    // The first run's two searches were refused; the second run doesn't try.
+    expect(http.of("tavily/search")).toHaveLength(2)
   })
 
   it("keeps what one free request found when the other fails", async () => {

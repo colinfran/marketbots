@@ -35,7 +35,11 @@ services:
       dockerfile: apps/crypto-engine/Dockerfile
     image: marketbots-crypto-engine:latest
     container_name: marketbots-crypto-engine
-    env_file: .env.crypto
+    env_file:
+      - path: .env.crypto
+      # TAVILY_API_KEY for research (docs/SERVER.md §3.7); optional.
+      - path: .env.search
+        required: false
     environment:
       STREAM_HOST: 0.0.0.0
       STREAM_PORT: 8787
@@ -70,7 +74,11 @@ services:
       dockerfile: apps/stock-engine/Dockerfile
     image: marketbots-stock-engine:latest
     container_name: marketbots-stock-engine
-    env_file: .env.stock
+    env_file:
+      - path: .env.stock
+      # TAVILY_API_KEY for research (docs/SERVER.md §3.7); optional.
+      - path: .env.search
+        required: false
     environment:
       STREAM_HOST: 0.0.0.0
       STREAM_PORT: 8788

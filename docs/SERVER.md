@@ -224,13 +224,16 @@ HISTORY_URL=postgres://crypto_history:<CRYPTO_HISTORY_PASSWORD>@history:5432/cry
 
 ### 3.7 The search service's file
 
-`.env.search` (git-ignored; template `.env.search.example`) holds the residential proxy (Evomi) for the paid search engines (§9). compose loads it into `search` only, and only if it exists: without it, the paid engines go direct, and our IP is blocked by most of them.
+`.env.search` (git-ignored; template `.env.search.example`) holds research's search accounts (§9). compose loads it, if it exists, into `search` and both engines; each reads only its own variable.
 
-| Variable | What |
-| --- | --- |
-| `SEARCH_PROXY_URL` | `http://<user>:<password>_country-US@core-residential.evomi.com:1000`: Evomi's dashboard shows `host:port:user:password`, which doesn't work here. `_country-US` (an Evomi option, after the password) keeps the exits in the US. Percent-encode special characters in the password. |
+| Variable | Read by | What |
+| --- | --- | --- |
+| `SEARCH_PROXY_URL` | `search` | The residential proxy (Evomi) for the paid search engine: `http://<user>:<password>_country-US@core-residential.evomi.com:1000`. Evomi's dashboard shows `host:port:user:password`, which doesn't work here. `_country-US` (an Evomi option, after the password) keeps the exits in the US. Percent-encode special characters in the password. Without it, the paid engine goes direct, and our IP is blocked by it. |
+| `TAVILY_API_KEY` | both engines | Tavily's search API, one key for both bots. Without it, research skips Tavily. |
 
-The proxy is billed per GB, so research uses it sparingly (§9). At start, `packages/wire/docker/searxng-start.sh` writes the URL into a copy of the settings in the container's `/tmp`; the committed `searxng.yml` holds only a placeholder. After changing it, run `docker compose up -d search`.
+- The proxy is billed per GB, and Tavily's free plan has 1,000 credits a month, so research uses both sparingly (§9).
+- At start, `packages/wire/docker/searxng-start.sh` writes the proxy URL into a copy of the settings in the container's `/tmp`; the committed `searxng.yml` holds only a placeholder.
+- After changing the file, recreate whatever reads the variable you changed: `docker compose up -d search` for the proxy, `docker compose up -d crypto-engine stock-engine` for Tavily.
 
 ---
 
@@ -667,7 +670,7 @@ nvidia-smi                                                  # ~6.8 GB used on ea
 
 **Research** (`@mb/wire/research/local`; the *Research model* in Admin): the model can't browse, so the engine does the browsing for it, from the bot's research prompt:
 1. The model reads the request and writes up to 6 web searches (no thinking).
-2. The `search` service runs them, two at a time, for results from the last day (gap fills and event checks) or week (full research): first on the free news engines, then on the paid web engine for any search the free ones found fewer than 3 results for (below).
+2. They run two at a time, for results from the last day (gap fills and event checks) or week (full research): first on the `search` service's free news engines. A search those find fewer than 3 results for goes to Tavily, and if it's still short, to the paid web engine (below).
 3. The model picks up to 5 results to read in full, and the scraper fetches them (paywalled sites are refused, as for summaries).
 4. The model writes the memo from the results and articles alone, citing their URLs.
 
@@ -682,6 +685,7 @@ A run takes about a minute, and costs nothing (`ai_calls`: `cost_source: "local"
 - **The paid engine**, Google CSE, blocks our IP ("unusual traffic"), so it goes through the residential proxy (Evomi, US home IPs). The proxy is billed per GB, so the engine is disabled in SearXNG (only a request that names it runs it), and research names it only for a search the free engines found fewer than 3 results for: at most 100 a UTC day per engine (`PAID_SEARCHES_PER_DAY`). It's asked for 8 results, all research reads. Each paid search is logged (`local research: a paid search`).
 - **Its cost**, measured through the proxy on 2026-10-29: ~11 KB a search, plus ~8 KB for Google's search token at most once an hour, and ~5 KB to open a new tunnel. Even at the cap on both engines (200 a day) that's under 4 MB a day, ~110 MB a month. Evomi's dashboard shows the real use.
 - **Blocks:** SearXNG suspends a blocked engine for 3–30 minutes (`suspended_times`), not the hours or days of its defaults: the proxy's next tunnel leaves from another IP.
+- **Tavily** (`@mb/wire/research/tavily`, `TAVILY_API_KEY`, §3.7) comes before the paid engine: its free plan has 1,000 credits a calendar month (reset on the 1st), and a basic search costs one. The engines call it directly, not through `search`. Each day of the month adds an equal share, 1,000 ÷ the month's days rounded down (32 a day in a 31-day month), and a search is made only while the month's usage is under the shares of the days so far. The count comes from Tavily's usage endpoint (read at most every 5 minutes), so it covers both bots and survives restarts. It lags our searches by minutes or more (still 0 two minutes after a search on 2026-10-29), so an engine never counts fewer than its own searches; the other bot's show up once Tavily's count catches up. A day's unused share carries over to later days, and usage can't get ahead of the even split by more than that lag. A refusal for lack of credits (432) stops Tavily until the next reading. Each search is logged (`local research: a Tavily search`, with the month's usage).
 - **Not used:** Brave (rate-limited even through the proxy, and its refusal page is 81 KB), DuckDuckGo's web search (CAPTCHAs after two searches through one exit), Mojeek and Startpage (proof-of-work CAPTCHAs, off upstream), Google News and Qwant (access denied), Reuters (401).
 - **Check it:** `docker compose ps search`, and `docker logs marketbots-search` for engines that fail.
 - **When research runs:** Admin's *Web research* (auto: only when our feeds leave a gap) and *Event research* (*web check*: a quick search before an event decision; stored as `x_verify`).

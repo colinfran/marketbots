@@ -56,6 +56,7 @@ const envSchema = z.object({
   SCRAPER_URL: base.SCRAPER_URL,
   LLM_URL: base.LLM_URL,
   SEARCH_URL: base.SEARCH_URL,
+  TAVILY_API_KEY: base.TAVILY_API_KEY,
   HISTORY_URL: base.HISTORY_URL,
 })
 
@@ -83,6 +84,7 @@ export const secretValues = (env: Env): string[] =>
     env.COINGECKO_API_KEY,
     env.ETHERSCAN_API_KEY,
     env.COINALYZE_API_KEY,
+    env.TAVILY_API_KEY,
   ].filter(
     (v): v is string => typeof v === "string" && v.length >= 8,
   )
