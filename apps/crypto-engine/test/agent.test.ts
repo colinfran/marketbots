@@ -3,9 +3,9 @@ import type { CryptoAgentAnswer } from "@mb/crypto-core/agent"
 import { DEFAULT_SETTINGS, type Settings } from "@mb/crypto-core/settings"
 import { silentLogger } from "@mb/engine-kit/log"
 import { describe, expect, it, vi } from "vitest"
-import { actOnCryptoAnswer } from "../src/agent/act"
+import { actOnCryptoAnswer, agentStop } from "../src/agent/act"
 import { bookText, createShadowBook, type CryptoAgentDeps } from "../src/agent/book"
-import { CryptoMarketView, CryptoObserver } from "../src/agent/observe"
+import { cryptoBrief, CryptoMarketView, CryptoObserver } from "../src/agent/observe"
 import { cryptoAgentTools } from "../src/agent/tools"
 import type { AiRunner } from "../src/ai/runner"
 import type { Alerts } from "../src/alerts"
@@ -81,13 +81,34 @@ describe("crypto agent decisions", () => {
 
   it("refuses a buy the risk engine rejects, and one the envelope blocks", async () => {
     const { d, ctx } = await setup()
-    const [tight] = await actOnCryptoAnswer(d, answer([decision({ stop_loss: 64_900 })]), { id: "e1", urls: new Set() })
-    expect(tight).toMatchObject({ outcome: "rejected", detail: expect.stringContaining("stop") })
+    const [poor] = await actOnCryptoAnswer(d, answer([decision({ take_profit: 65_500 })]), { id: "e1", urls: new Set() })
+    expect(poor).toMatchObject({ outcome: "rejected", detail: expect.stringContaining("reward:risk") })
     for (const minutes of [10, 20]) {
       await ctx.col.shadowFills.insertOne({ _id: `f${minutes}`, position_id: `p${minutes}`, symbol: `X${minutes}/USD`, side: "buy", qty: 1, price: 10, reference_price: 10, fee_usd: 0, at: new Date(Date.now() - minutes * 60_000), reason: "entry", episode_id: "e0", realized_pnl_usd: null })
     }
     const [blocked] = await actOnCryptoAnswer(d, answer([decision()]), { id: "e2", urls: new Set() })
     expect(blocked).toMatchObject({ outcome: "blocked", detail: "envelope: 2/2 in the last hour" })
+  })
+
+  it("blocks a buy once the hour's budget can't fund a worthwhile entry, instead of sizing it to dust", async () => {
+    const { d, ctx } = await setup()
+    await ctx.col.shadowFills.insertOne({ _id: "f1", position_id: "p1", symbol: "ETH/USD", side: "buy", qty: 1, price: 998.5, reference_price: 998.5, fee_usd: 0, at: new Date(Date.now() - 30 * 60_000), reason: "entry", episode_id: "e0", realized_pnl_usd: null })
+    const [a] = await actOnCryptoAnswer(d, answer([decision()]), { id: "e1", urls: new Set() })
+    expect(a).toMatchObject({ outcome: "blocked", detail: expect.stringMatching(/^envelope: \$\d+ of this hour's \$\d+ left/) })
+    expect(await d.shadow.open()).toEqual([])
+  })
+
+  it("moves a stop just past either edge of the allowed range inside it rather than refusing the buy", async () => {
+    const { d } = await setup()
+    // 12.2% below the 65,000 mid; the range is 1-12%.
+    const [wide] = await actOnCryptoAnswer(d, answer([decision({ stop_loss: 57_070, take_profit: 85_000 })]), { id: "e1", urls: new Set() })
+    expect(wide).toMatchObject({ outcome: "filled" })
+    const [p] = await d.shadow.open()
+    expect(p.stop_price!).toBeGreaterThan(65_000 * 0.88)
+    expect(p.stop_price!).toBeLessThan(57_400)
+    expect(agentStop(65_000, 64_900, 60_000, DEFAULT_SETTINGS.kraken)).toBeCloseTo(65_000 * (1 - 0.0102), 6)
+    expect(agentStop(65_000, 63_000, 60_000, DEFAULT_SETTINGS.kraken)).toBe(63_000)
+    expect(agentStop(65_000, null, 60_000, DEFAULT_SETTINGS.kraken)).toBe(60_000)
   })
 
   it("raises a held position's stop, closes it once the minimum hold has passed, and drops unknown pairs", async () => {
@@ -126,6 +147,15 @@ describe("crypto agent observations and tools", () => {
     await observer.tick(new Date())
     expect(seen.find((o) => o.kind === "fill")).toMatchObject({ subject: "BTC/USD", priority: 2, summary: expect.stringContaining("hit its stop") })
     expect(await d.shadow.open()).toEqual([])
+  })
+
+  it("briefs each pair of a market-wide wake-up's setups", async () => {
+    const { d } = await setup()
+    const setupObs = (symbol: string): Observation => ({ id: `setup:${symbol}`, subject: "MARKET", kind: "setup", priority: 1, salience: 70, summary: `${symbol} trend setup`, refs: { symbol }, at: new Date() })
+    const { text } = await cryptoBrief(d, new CryptoMarketView(d), { subject: "MARKET", priority: 1, salience: 70, observations: [setupObs("BTC/USD"), setupObs("DOGE/USD")] })
+    expect(text).toContain("SUBJECT BTC/USD\n- bid 64990, ask 65010")
+    // Only universe pairs get a section.
+    expect(text).not.toContain("SUBJECT DOGE/USD")
   })
 
   it("fences news as untrusted and adds its URLs to the episode's", async () => {

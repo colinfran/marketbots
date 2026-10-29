@@ -31,6 +31,8 @@ const MARK_MS = 15_000
 const EXITS_MS = 3_000
 const CALENDAR_LEAD_MS = 15 * 60_000
 const REASK_MS = { daily_trend: 24 * 3_600_000, other: 2 * 3_600_000 }
+/** The most setups one wake-up lists. */
+const MAX_SETUPS = 5
 
 export class CryptoMarketView {
   regime: RegimeSnapshot | null = null
@@ -134,6 +136,10 @@ export class CryptoObserver {
     }
   }
 
+  /**
+   * The screens' viable setups, best first, as one market-wide wake-up: the agent compares them
+   * and picks, instead of being asked about each on its own. None while the envelope refuses entries.
+   */
   private async screens(now: Date) {
     await this.market.refresh()
     const s = this.d.ctx.settings.current
@@ -142,21 +148,23 @@ export class CryptoObserver {
     const account = await this.d.shadow.account(mid(this.d.ctx))
     if (!checkEntry("", await this.d.shadow.envelopeHistory(account.equity_usd), s.agent.envelope, now.getTime()).approved) return
     const fresh = [...this.market.features.values()].filter((f) => f.quote_age_s <= s.kraken.max_quote_age_seconds)
-    for (const c of screenCrypto({ regime: this.market.regime, features: fresh, held, settings: s })) {
+    const viable = screenCrypto({ regime: this.market.regime, features: fresh, held, settings: s }).filter((c) => {
       const f = this.market.features.get(c.symbol)!
       const roundTrip = roundTripCostBps({ takerFeeBps: this.d.ctx.feeBps(), spreadBps: f.spread_bps, entrySlippageBps: 3, exitSlippageBps: 3 })
-      if (!viableSetup(c, f.price, roundTrip, s.kraken)) continue
+      if (!viableSetup(c, f.price, roundTrip, s.kraken)) return false
+      return now.getTime() - (this.setups.get(`${c.symbol} ${c.strategy}`) ?? 0) >= (c.strategy === "daily_trend" ? REASK_MS.daily_trend : REASK_MS.other)
+    })
+    for (const c of viable.sort((a, b) => b.score - a.score).slice(0, MAX_SETUPS)) {
       const key = `${c.symbol} ${c.strategy}`
-      if (now.getTime() - (this.setups.get(key) ?? 0) < (c.strategy === "daily_trend" ? REASK_MS.daily_trend : REASK_MS.other)) continue
       this.setups.set(key, now.getTime())
       this.observe({
         id: `setup:${key}:${now.getTime()}`,
-        subject: c.symbol,
+        subject: MARKET_SUBJECT,
         kind: "setup",
         priority: 1,
         salience: c.score,
-        summary: `${c.strategy.replace("_", " ")} setup (score ${c.score}): ${c.signal} Levels from the screen: stop ${roundTo(c.stop_hint, 6)}, target ${roundTo(c.target_hint, 6)}.`,
-        refs: {},
+        summary: `${c.symbol} ${c.strategy.replace("_", " ")} setup (score ${c.score}): ${c.signal} Levels from the screen: stop ${roundTo(c.stop_hint, 6)}, target ${roundTo(c.target_hint, 6)}.`,
+        refs: { symbol: c.symbol },
         at: now,
       })
     }
@@ -184,12 +192,14 @@ export const cryptoBrief = async (d: CryptoAgentDeps, market: CryptoMarketView, 
     await bookText(d),
     `MARKET\n- regime ${r?.label ?? "unknown"}; BTC daily trend ${r?.btc_trend ?? "n/a"}; BTC 30 d volatility ${r?.btc_vol_pct ?? "n/a"}%${r?.notes.length ? `; ${r.notes.join("; ")}` : ""}\n- universe (the only pairs you may buy): ${universe.join(", ")}`,
   ]
-  const f = market.features.get(wake.subject)
-  if (d.ctx.hub.universe.includes(wake.subject)) {
-    const q = d.ctx.hub.quote(wake.subject)
+  // The pair that woke the agent, or each pair of a market-wide wake-up's setups.
+  const subjects = [wake.subject, ...wake.observations.map((o) => o.refs.symbol)].filter((s): s is string => !!s && d.ctx.hub.universe.includes(s))
+  for (const symbol of [...new Set(subjects)]) {
+    const f = market.features.get(symbol)
+    const q = d.ctx.hub.quote(symbol)
     const shown = f ? Object.entries(featuresForPrompt(f)).filter(([k]) => /^(ret_|trend_|rsi14|atr_pct|bb_pct|breakout|vol_30d|volume_ratio|move_z)/.test(k)) : []
     sections.push(
-      `SUBJECT ${wake.subject}\n- ${q ? `bid ${q.bid}, ask ${q.ask}, spread ${q.spreadBps.toFixed(1)} bps` : "no live quote"}\n- ${shown.length ? shown.map(([k, v]) => `${k} ${typeof v === "number" ? roundTo(v, 4) : v}`).join(", ") : "no features yet: use the features tool"}`,
+      `SUBJECT ${symbol}\n- ${q ? `bid ${q.bid}, ask ${q.ask}, spread ${q.spreadBps.toFixed(1)} bps` : "no live quote"}\n- ${shown.length ? shown.map(([k, v]) => `${k} ${typeof v === "number" ? roundTo(v, 4) : v}`).join(", ") : "no features yet: use the features tool"}`,
     )
   }
   return { text: sections.join("\n\n"), urls: [] }

@@ -28,8 +28,16 @@ export type EnvelopeHistory = {
 }
 
 const HOUR = 3_600_000
+/** An entry smaller than this share of equity isn't worth its costs: a budget with less left counts as used up. */
+export const MIN_ENTRY_PCT = 1
 
 const minutesAgo = (now: number, at: number) => Math.round((now - at) / 60_000)
+
+/** What is left of the hour's commitment budget, in $. */
+const hourRoomUsd = (h: EnvelopeHistory, e: Envelope, now: number) => {
+  const committed = h.entries.filter((x) => now - x.at < HOUR).reduce((s, x) => s + x.notionalUsd, 0)
+  return Math.max(0, (h.equityUsd * e.commit_per_hour_pct) / 100 - committed)
+}
 
 /** Every rule a new agent entry must pass, in order. The first failure is the reason. */
 export const checkEntry = (symbol: string, h: EnvelopeHistory, e: Envelope, now: number): { approved: boolean; checks: EnvelopeCheck[]; reason: string | null } => {
@@ -39,6 +47,9 @@ export const checkEntry = (symbol: string, h: EnvelopeHistory, e: Envelope, now:
   const lastDay = h.entries.filter((x) => now - x.at < 24 * HOUR).length
   check("agent entries per day", lastDay < e.entries_per_day, `${lastDay}/${e.entries_per_day} in the last 24 h`)
   check("agent entries per hour", lastHour < e.entries_per_hour, `${lastHour}/${e.entries_per_hour} in the last hour`)
+  const room = hourRoomUsd(h, e, now)
+  const least = (h.equityUsd * MIN_ENTRY_PCT) / 100
+  check("this hour's budget", room >= least, `$${room.toFixed(0)} of this hour's $${((h.equityUsd * e.commit_per_hour_pct) / 100).toFixed(0)} left (an entry needs at least $${least.toFixed(0)})`)
   check("agent open positions", h.openPositions < e.max_open_positions, `${h.openPositions}/${e.max_open_positions} open`)
   const last = h.lastAction.get(symbol)
   check("one action per symbol", last === undefined || now - last >= e.symbol_action_minutes * 60_000, last === undefined ? "no recent action" : `last action ${minutesAgo(now, last)} min ago (min ${e.symbol_action_minutes})`)
@@ -54,8 +65,4 @@ export const checkEntry = (symbol: string, h: EnvelopeHistory, e: Envelope, now:
  * The most an agent entry may commit now, in $: its share of what the risk checks allowed, and
  * whatever is left of the hour's commitment budget. 0 means no room.
  */
-export const entryRoomUsd = (riskAllowedUsd: number, h: EnvelopeHistory, e: Envelope, now: number) => {
-  const committed = h.entries.filter((x) => now - x.at < HOUR).reduce((s, x) => s + x.notionalUsd, 0)
-  const hourRoom = Math.max(0, (h.equityUsd * e.commit_per_hour_pct) / 100 - committed)
-  return Math.max(0, Math.min((riskAllowedUsd * e.size_pct) / 100, hourRoom))
-}
+export const entryRoomUsd = (riskAllowedUsd: number, h: EnvelopeHistory, e: Envelope, now: number) => Math.max(0, Math.min((riskAllowedUsd * e.size_pct) / 100, hourRoomUsd(h, e, now)))

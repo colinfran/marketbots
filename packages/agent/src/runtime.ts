@@ -460,8 +460,10 @@ export class Agent<A extends AgentAnswerBase> {
     const t = this.now().getTime()
     const b = this.breakers
     if (doc.status !== "running") b.episodes = [...b.episodes.filter((e) => t - e.at < HOUR), { at: t, status: doc.status }]
-    for (const a of doc.actions.filter((x) => x.action === "buy")) b.entries = [...b.entries, { at: t, outcome: a.outcome }].slice(-50)
-    this.today.envelopeBlocks += doc.actions.filter((a) => a.action === "buy" && a.outcome === "blocked").length
+    // A buy refused because of when it came (outside the session, entries paused) says nothing about the agent; one its envelope refused does.
+    const envelopeBlock = (a: AgentAction) => a.outcome === "blocked" && !!a.detail?.startsWith("envelope")
+    for (const a of doc.actions.filter((x) => x.action === "buy" && (x.outcome !== "blocked" || envelopeBlock(x)))) b.entries = [...b.entries, { at: t, outcome: a.outcome }].slice(-50)
+    this.today.envelopeBlocks += doc.actions.filter((a) => a.action === "buy" && envelopeBlock(a)).length
     const shadow = this.shadowCache.value ?? (await this.d.bot.shadow().catch(() => null))
     const tripped = trippedBreakers(
       { ...b, envelopeBlocksToday: this.today.envelopeBlocks, dayPnlPct: shadow?.dayPnlPct ?? 0, totalPnlPct: shadow?.account.return_pct ?? 0 },

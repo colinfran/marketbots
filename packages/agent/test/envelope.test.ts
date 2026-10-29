@@ -12,7 +12,15 @@ describe("agent envelope", () => {
   it("approves a first entry and records every check", () => {
     const r = checkEntry("SOL/USD", history(), e, now)
     expect(r.approved).toBe(true)
-    expect(r.checks.map((c) => c.name)).toEqual(["agent entries per day", "agent entries per hour", "agent open positions", "one action per symbol", "no re-entry after a stop-out", "no flips"])
+    expect(r.checks.map((c) => c.name)).toEqual(["agent entries per day", "agent entries per hour", "this hour's budget", "agent open positions", "one action per symbol", "no re-entry after a stop-out", "no flips"])
+  })
+
+  it("counts the hour's budget as used up when what is left can't fund a worthwhile entry", () => {
+    // $1,000 an hour on $10,000; an entry needs at least 1% of equity ($100).
+    const spent = (usd: number) => history({ entries: [{ symbol: "X", at: now - 30 * MIN, notionalUsd: usd }] })
+    expect(checkEntry("SOL/USD", spent(998.5), e, now).reason).toBe("$2 of this hour's $1000 left (an entry needs at least $100)")
+    expect(checkEntry("SOL/USD", spent(900), e, now).approved).toBe(true)
+    expect(checkEntry("SOL/USD", history({ entries: [{ symbol: "X", at: now - 61 * MIN, notionalUsd: 998.5 }] }), e, now).approved).toBe(true)
   })
 
   it("rate-limits entries per hour and per day, and caps open positions", () => {

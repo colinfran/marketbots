@@ -1,5 +1,5 @@
 {
-  "prompt_version": "crypto-agent-v2",
+  "prompt_version": "crypto-agent-v3",
   "limits": {
     "watches_per_symbol": 5,
     "watches_total": 40,

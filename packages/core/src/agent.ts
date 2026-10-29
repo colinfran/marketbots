@@ -43,7 +43,8 @@ export type Observation = {
   untrusted?: boolean
   /** Wakes the agent even inside the subject's cooldown: the agent asked for it (a watch) or the owner did. */
   urgent?: boolean
-  refs: { item_ids?: string[]; trigger_id?: string; watch_id?: string; position_id?: string }
+  /** `symbol`: the pair or ticker a market-wide observation is about (a setup among several). */
+  refs: { item_ids?: string[]; trigger_id?: string; watch_id?: string; position_id?: string; symbol?: string }
   at: Date
 }
 

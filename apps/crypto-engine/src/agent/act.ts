@@ -2,6 +2,7 @@ import { checkEntry, entryRoomUsd } from "@mb/agent/envelope"
 import type { EpisodeInfo } from "@mb/agent/runtime"
 import type { AgentAction } from "@mb/core/agent"
 import { normalizeCryptoAgentDecisions, type CryptoAgentAnswer, type NormalizedCryptoAgentDecision } from "@mb/crypto-core/agent"
+import type { Settings } from "@mb/crypto-core/settings"
 import { loadFeatures } from "../orchestrator/crypto-cycle"
 import { correlatedWith, correlationMatrix } from "../risk/correlation"
 import { evaluateCryptoEntry, evaluateExit } from "../risk/engine"
@@ -22,6 +23,22 @@ import { shadowGate, shadowRiskState, type CryptoAgentDeps } from "./book"
 const ORDER: Record<NormalizedCryptoAgentDecision["action"], number> = { close: 0, reduce: 1, hold: 2, buy: 3, no_trade: 4 }
 
 const action = (d: NormalizedCryptoAgentDecision, outcome: AgentAction["outcome"], detail: string | null): AgentAction => ({ symbol: d.symbol, action: d.action, conviction: d.conviction, outcome, detail })
+
+/** How far inside the allowed stop range a clamped stop lands, as a share of the range's edge, so rounding and a moving mid can't push it back out. */
+const STOP_MARGIN = 0.02
+
+/**
+ * The agent's stop for an entry: its own when it is below the price and within the allowed range;
+ * moved just inside the range when it is outside it (the model often lands a hair past an edge);
+ * `fallback` when it gave none or one at or above the price.
+ */
+export const agentStop = (mid: number, stop: number | null, fallback: number, k: Pick<Settings["kraken"], "min_stop_pct" | "max_stop_pct">) => {
+  if (stop === null || stop >= mid) return fallback
+  const pct = ((mid - stop) / mid) * 100
+  if (pct > k.max_stop_pct) return mid * (1 - (k.max_stop_pct * (1 - STOP_MARGIN)) / 100)
+  if (pct < k.min_stop_pct) return mid * (1 - (k.min_stop_pct * (1 + STOP_MARGIN)) / 100)
+  return stop
+}
 
 export const actOnCryptoAnswer = async (d: CryptoAgentDeps, answer: CryptoAgentAnswer, episode: Pick<EpisodeInfo, "id" | "urls">): Promise<AgentAction[]> => {
   const { ctx, shadow } = d
@@ -81,7 +98,7 @@ const buy = async (d: CryptoAgentDeps, dec: NormalizedCryptoAgentDecision, episo
 
   const { features } = await loadFeatures(ctx, [...new Set([dec.symbol, ...open.map((p) => p.symbol)])])
   const f = features.find((x) => x.symbol === dec.symbol)
-  const stop = dec.stop_loss !== null && dec.stop_loss < q.mid ? dec.stop_loss : boundedStop(q.mid, 2 * (f?.atr_1h ?? q.mid * 0.015), settings)
+  const stop = agentStop(q.mid, dec.stop_loss, boundedStop(q.mid, 2 * (f?.atr_1h ?? q.mid * 0.015), settings), k)
   const target = dec.take_profit !== null && dec.take_profit > q.mid ? dec.take_profit : q.mid + 2.5 * (q.mid - stop)
   const limit = roundPrice(pair, q.ask * (1 + k.max_slippage_bps / 10_000))
   const size = cryptoSize({ equity: state.equityUsd, price: q.ask, stop, riskPct: k.risk_per_trade_pct, maxPositionPct: k.max_position_pct, sizePctOfMax: dec.size_pct_of_max ?? 50 })

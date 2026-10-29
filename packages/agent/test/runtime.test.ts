@@ -17,7 +17,22 @@ const answer = (a: Partial<Answer> = {}): Answer => ({ decisions: [{ symbol: "SO
 describe("agent runtime", () => {
   const db = useAgentDb()
 
-  const setup = ({ chat, settings = SETTINGS, blocked = null, prices = { "SOL/USD": 180 }, skip }: { chat: ChatFn | null; settings?: AgentSettings; blocked?: string | null; prices?: Record<string, number>; skip?: AgentBot<Answer>["skip"] }) => {
+  const setup = ({
+    chat,
+    settings = SETTINGS,
+    blocked = null,
+    prices = { "SOL/USD": 180 },
+    skip,
+    outcomes,
+  }: {
+    chat: ChatFn | null
+    settings?: AgentSettings
+    blocked?: string | null
+    prices?: Record<string, number>
+    skip?: AgentBot<Answer>["skip"]
+    /** What the bot reports for each decision, in place of "filled". */
+    outcomes?: Pick<AgentAction, "outcome" | "detail">[]
+  }) => {
     let t = Date.parse("2026-10-28T14:00:00Z")
     const events: { type: string; data: unknown; summary: string }[] = []
     const acted: EpisodeInfo[] = []
@@ -32,7 +47,7 @@ describe("agent runtime", () => {
       known: (s) => s in prices,
       act: async (a, episode): Promise<AgentAction[]> => {
         acted.push(episode)
-        return a.decisions.map((d) => ({ symbol: d.symbol, action: d.action, conviction: 60, outcome: "filled", detail: null }))
+        return a.decisions.map((d, i) => ({ symbol: d.symbol, action: d.action, conviction: 60, outcome: "filled", detail: null, ...outcomes?.[i] }))
       },
       shadow: async () => null,
       skip,
@@ -142,6 +157,21 @@ describe("agent runtime", () => {
     await run()
     expect(await db.col.agentEpisodes.countDocuments()).toBe(0)
     expect(agent.queue.size).toBe(0)
+  })
+
+  it("counts buys its envelope refused toward the envelope breaker, but not buys refused for their timing", async () => {
+    const buys = answer({ decisions: ["A", "B", "C"].map((s) => ({ symbol: `${s}/USD`, action: "buy" as const })) })
+    const run = async (detail: string) => {
+      const { chat } = scriptedChat([reply({ kind: "answer", answer: buys })])
+      const { agent, advance, at, run, events } = setup({ chat, outcomes: Array.from({ length: 3 }, () => ({ outcome: "blocked" as const, detail })) })
+      agent.observe(obs({ subject: "SOL/USD", at: at() }))
+      advance(11_000)
+      await run()
+      return events.filter((e) => e.type === "agent.breaker").map((e) => (e.data as { name: string }).name)
+    }
+    expect(await run("buys only in the regular session after the opening buffer")).toEqual([])
+    await db.col.agentEpisodes.deleteMany({})
+    expect(await run("envelope: 2/2 in the last hour")).toEqual(["envelope_blocks"])
   })
 
   it("waits while trading is paused", async () => {
