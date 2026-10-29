@@ -301,6 +301,11 @@ services:
       - q8_0
       - --cache-type-v
       - q8_0
+      # Recent prompts kept in RAM, so a new request can reuse their start. llama.cpp's default is
+      # 8 GB, more than the container's 6: at the default it sat at the cap, swapped 3.6 GB and froze
+      # the Docker VM for seconds at a time.
+      - --cache-ram
+      - "2048"
       # Layers (and experts, if it must) placed to leave 512 MB free on the 2080 SUPER and 1 GB
       # on the 3070, for the display and Jellyfin's transcodes.
       - --fit
