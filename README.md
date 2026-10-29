@@ -11,10 +11,9 @@ Both run on a local model (Qwen 3.6 35B-A3B, on the server's two GPUs), and in b
 
 ## How the bots decide
 
-Each bot decides in two ways, side by side:
+In both bots **the agent** trades the paper account (agent level `auto`, set in Admin). Code watches prices, the news, the screens, the market session and the agent's own watches all the time, and wakes it when something matters. In each wake-up (an *episode*) it looks things up one step at a time (quotes, technicals, the order book, news, years of history, its past decisions), then decides. Its decisions go through its own limits (the envelope) and the bot's risk checks, which approve, resize or reject each order before it reaches the paper account. Circuit breakers drop it back to **shadow**, where its decisions fill only a simulated account, the **shadow book**, until the owner promotes it again. Each dashboard's Research → Agent page shows it at work.
 
-- **Scheduled cycles** trade the paper account. On a timer (and when news or a sharp move calls for one), the model reads what the bot's news engine found (and searches the web, through our own search service, where it left gaps), then writes one structured decision; the risk checks approve, resize or reject each order.
-- **The agent** runs in shadow. Code watches prices, the news, the screens, the market session and the agent's own watches all the time, and wakes it when something matters. In each wake-up it looks things up one step at a time (quotes, technicals, the order book, news, years of history, its past decisions), then decides. Its decisions go through its own limits (the envelope) and the same risk checks, and fill in a simulated account, the **shadow book**, at live prices with fees and slippage. Nothing it decides reaches the broker, so its record can be compared with the scheduled cycles' before it is given real trades. Each dashboard's Research → Agent page shows it at work.
+The **scheduled cycles** that traded before it (on a timer, the model read what the news engine found, searched the web through our own search service where it left gaps, and wrote one structured decision) stop at level `auto`. The owner's one-time seed buy, and stock's weekly core-book review, still run that way.
 
 ```mermaid
 flowchart LR
@@ -22,10 +21,10 @@ flowchart LR
     queue[Attention queue<br/>groups bursts, ranks risk first]
     episode[Episode on the local model<br/>look up, look up, decide]
     checks[Envelope, then<br/>the bot's risk checks]
-    shadow[(Shadow book)]
+    account[(Paper account<br/>Kraken or Alpaca)]
     memory[Watches and notes]
 
-    signals --> queue --> episode --> checks --> shadow
+    signals --> queue --> episode --> checks --> account
     episode --> memory
     memory -.->|wakes it again| queue
 ```
@@ -47,7 +46,7 @@ flowchart LR
     subgraph server["marketbots Docker stack, on the owner's server"]
         crypto[Crypto engine]
         stock[Stock engine]
-        llm[Local LLM, Qwen 3.6 on two GPUs<br/>research, decisions, the agents, summaries]
+        llm[Local LLM, Qwen 3.6 on two GPUs<br/>the agents, summaries, research]
         search[Web search<br/>SearXNG]
         scraper[Shared scraper]
         history[(History store<br/>price bars and news archive)]
