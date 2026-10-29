@@ -96,8 +96,8 @@ Both bots were moved in from their old repos unchanged and then refactored onto 
 | `@mb/wire` | The news engine: the formerly mirrored files, shared source helpers, `sharedCatalog()`, a `makeLexicon()` skeleton, `enrich/` for article summaries, and `research/` for local research (web search, then the local model) | both engines |
 | `@mb/history` | The history store ([plans/LOCAL-AI.md §6](plans/LOCAL-AI.md#6-the-history-store-history)): the Postgres client (node-postgres; PGlite in tests), the migrations, the 1-minute bar writer, the news archive (wire items and triggers copied from MongoDB before their TTL), the moves after each news item, the job runner the backfills use, `HistoryStore`. `docker/initdb.sh` creates each bot's database and role | both engines |
 | `@mb/agent` | The agent runtime ([plans/LOCAL-AI.md §8](plans/LOCAL-AI.md#8-the-agent)), generic over each bot's tools, brief and answer: the attention queue, the episode loop and its llama.cpp client, the tool registry and the tools both bots share (news, the dossier, an item, the calendar, history, past news), watches and notes, the envelope and circuit breakers (pure functions), the shadow book, the journal, `Agent`. The types and settings both bots share are in `@mb/core/agent` and `@mb/core/settings` | both engines |
-| `@mb/ui` | Client-safe React: the shadcn primitives, design tokens (`styles.css`), app-shell components (including the navigation, below), the live-UI shell driven by a per-bot event catalog, shared page sections, the charts (`@mb/ui/charts`) | both dashboards |
-| `@mb/web-kit` | Server-only dashboard helpers: auth factory, database, command routes, shared queries, formatting, metadata, error reporting | both dashboards |
+| `@mb/ui` | Client-safe React: the shadcn primitives, design tokens (`styles.css`), app-shell components (including the navigation, below), the live-UI shell driven by a per-bot event catalog, shared page sections (the Agent page's included: `agent`, `agent-events`), the charts (`@mb/ui/charts`) | both dashboards |
+| `@mb/web-kit` | Server-only dashboard helpers: auth factory, database, command routes, shared queries (the agent's in `agent`), formatting, metadata, error reporting | both dashboards |
 
 ### The dashboards' navigation
 
@@ -107,7 +107,7 @@ Both dashboards have the same pages under the same URLs, in five sections (`pack
 | --- | --- |
 | Live | `/`: the account at a glance, the latest cycle as it runs, the engine card and the activity feed |
 | Portfolio | Holdings (with the owner's sell and close buttons), Trades, and on stock the Core book (`/core`) |
-| Research | AI research (`/research`: cycles or reports, and decisions), News (`/news`: the news engine, its sources and triggers), Markets |
+| Research | AI research (`/research`: cycles or reports, and decisions), Agent (`/agent`: the agent's episodes as they run, its shadow book, watches and notes, the owner's questions; `/agent/<id>`: one episode), News (`/news`: the news engine, its sources and triggers), Markets |
 | Performance | Analytics, Strategies (each strategy's or setup's results beside why it should work), Journal |
 | About | How it works |
 | Admin | Owner only |

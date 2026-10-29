@@ -590,7 +590,7 @@ Vercel's instant rollback (*Deployments* → a previous deployment → *Instant 
 `llm` is llama.cpp's server running **Qwen 3.6 35B-A3B at 2-bit**: Unsloth's `UD-Q2_K_XL`, 12.3 GB. It is split across both GPUs and loaded at all times. [LOCAL-AI.md §5.1](plans/LOCAL-AI.md#51-step-0-results-2026-102728) has the measurements behind the choice.
 
 - **Access:** both engines reach it at `LLM_URL=http://llm:8080`, an OpenAI-compatible API, over the `ai` network. It has no host port and no internet.
-- **Work:** every AI call: the research memos and decisions of both bots (below), and the article summaries.
+- **Work:** every AI call: the research memos and decisions of both bots (below), each bot's agent (one episode at a time per bot, a few short steps each: [plans/LOCAL-AI.md §8](plans/LOCAL-AI.md#8-the-agent)), and the article summaries.
 - **When it's down:** the engines keep protecting positions (stops and targets run in code), but make no new decisions: research and decisions fail. The summaries stop too, and the source `enrich:summaries` turns degraded on the dashboard.
 
 **The model file:** `llm-model` fetches it, and runs only when you ask (it's in the `setup` profile, so `docker compose up` skips it and no stopped container sits in the stack):

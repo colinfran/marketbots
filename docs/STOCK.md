@@ -1,6 +1,6 @@
 # Architecture
 
-How StockMarketBot is built and why: the deployment boundaries, the live stream, the trading cycle, the news engine and its price layers, the one-time seed buy, options, the data model, and the known limitations. The design follows CryptoMarketBot's (an always-on engine and a read-only dashboard); the trading logic is StockMarketBot's own.
+How StockMarketBot is built and why: the deployment boundaries, the live stream, the trading cycle, the agent, the news engine and its price layers, the one-time seed buy, options, the data model, and the known limitations. The design follows CryptoMarketBot's (an always-on engine and a read-only dashboard); the trading logic is StockMarketBot's own.
 
 ## Scope decisions
 
@@ -42,6 +42,7 @@ Browser ──https──▶ Vercel (Next.js dashboard) ──▶ MongoDB Atlas 
 | 60 s (15 min off-hours) | maintenance: order sync, the daily loss limit, stock protection, the overnight fallback, options reconciliation |
 | 5 / 60 min | equity history and chart bars for the website |
 | continuous | the news engine: each source on its own interval or stream (below) |
+| 1 s | the agent: its observations, watches and the next episode (below) |
 | daily, before premarket | the scan universe for the news engine's price layers |
 | daily, from the premarket window | the core book's ranking (below) |
 
@@ -58,6 +59,29 @@ Fills arrive instantly over Alpaca's `trade_updates` stream (binary JSON frames 
 Every AI call runs on our own model server, so there is no AI budget: nothing caps how many cycles run. When the AI is disabled (no `LLM_URL`), cycles are skipped and the closing rules still run in code.
 
 When a scheduled phase fails (usually its decision), the scheduler retries it (intraday after 4 minutes, up to twice; the other phases right away, up to `schedule.max_phase_attempts` attempts). The failed cycle keeps its research, and the retry reuses it when it's under 20 minutes old and of the same mode instead of paying for it again; the report names the attempt it came from (`research.reused_from`).
+
+## The agent (shadow)
+
+Beside the timed cycles, an agent runs on the same local model ([plans/LOCAL-AI.md §8](plans/LOCAL-AI.md#8-the-agent), `@mb/agent` and `src/agent/`). Code watches the session, prices and the news all the time and wakes it when something matters; in each wake-up (an *episode*) it looks things up one step at a time and decides. At level **shadow** (the default, `agent.level` in Admin) its decisions fill only in its own simulated account, the **shadow book**. The timed cycles keep trading the Alpaca paper account exactly as before, so the two records can be compared.
+
+**What wakes it** (observations, scored in code and queued per subject: a burst waits 2–10 s to become one wake-up, risk before opportunity before review, and a subject that woke it waits `agent.wake_cooldown_minutes` unless its salience rises 15 points, a P0, its own watch or the owner):
+
+| Source | Priority |
+| --- | --- |
+| News, around the clock: every trigger candidate that passes the wire's gates on the item itself (fresh, not old news, confirmed for entries). The session gate and the caps are the timed cycles' | P0 bad news on a shadow holding (or a critical market review while it holds anything), P1 entry ideas, P2 the rest |
+| The session: premarket (plan; watches and notes only), the open after its buffer, the closing window while it holds anything, after the close | P2, P2, P1, P3 |
+| A held stock moving `schedule.trigger_move_pct` since its last review, again at every further step | P0 down, P2 up |
+| A shadow stop or target hit (every 5 s in session, against the bid or last price) | P2 |
+| A macro release 15 minutes out | P2 |
+| Its own watches (price above or below, a % move, news at a severity, a time) | the watch's |
+| A sweep every `agent.sweep_minutes` (2 h) in session | P2 |
+| The owner's question (Agent page) | P2, read-only |
+
+**An episode**: a short brief (why it woke, the shadow book, the session and the limits in force, the benchmarks, the subject, its notes and watches), then steps. Each step is one JSON object under a grammar: a call to one of 11 read-only tools (`book`, `quote`, `technicals` from Alpaca's daily and 5-minute bars, `news`, `dossier`, `item`, `past_decisions`, `calendar`, and from the history store `history` and `past_news`), or the answer: the cycle's stock decision schema (buy, sell, adjust_exits, hold) plus watches, notes and a reply. Limits per priority as in crypto (`agent.limits`). It may name any ticker it has a price for (the broker's stream or the price layers, which track the scan universe) or holds.
+
+**Its decisions**, in the shadow book, stocks only (options stay with the timed cycles): normalized with the cycle's rules (`normalizeDecision`), sales first. A buy happens only in the regular session after the opening buffer (the closing window counts as the close phase: overnight or multi-day buys with conviction 8 or more), passes the **envelope** (as in crypto), then the cycle's own `evaluateStockBuy` against the shadow book's account (`computeRiskState` from its equity and cash), and is cut to the envelope's share. Fills are at the ask or bid (the last price where there is no quote) plus 5 bps, commission-free, whole shares. Sales fill only while the market is open; exits are never rate-limited; stops only move up; intraday positions are closed by code 3 minutes before the bell. Its decisions are not written to `decisions`; the shadow book is its record.
+
+**Circuit breakers** are recorded, streamed and alerted, as in crypto; at level shadow nothing is enforced. **Where to see it**: Research → Agent, and the heartbeat's `agent` block.
 
 ## News engine (the wire)
 
@@ -226,6 +250,9 @@ Events are typed (`packages/core/src/events.ts`) and carry a strictly increasing
 | `wire_items` | every stored news item: normalized text, tickers, category, tier, severity and its parts, cluster, confirmations, price when first seen, notable reasons (TTL `wire.retention_days`, 30) |
 | `wire_triggers` | every trigger candidate the policy produced, with the gate that passed or stopped it and why (TTL `wire.retention_days`) |
 | `seed_runs` | the owner's one-time seed buys: schedule, status, allocations, orders, error |
+| `agent_episodes` | each agent episode: what woke it, the brief, every step (tool, arguments, result, thinking, tokens), the answer and what became of it; long text capped (the history store keeps it all); 14-day TTL, kept for good once it changed the shadow book |
+| `agent_watches`, `agent_notes` | the agent's watches and its notes per subject (TTL) |
+| `shadow_positions`, `shadow_fills` | the agent's shadow book: what it would hold, and every simulated fill |
 | `ai_calls`, `notifications`, `login_attempts` | every AI call (research calls also count their searches; costs are 0 since the local model), alerts, sign-in rate limits |
 | `auth_*` | owner sign-in (Better Auth magic links, or emailed codes in the Home Screen app; only `OWNER_EMAIL`), written by the dashboard |
 
@@ -237,6 +264,8 @@ Engine (in-memory MongoDB, a fake Alpaca broker that fills stocks, single legs a
 
 - **Not yet run against Alpaca's live paper APIs.** The REST shapes and WebSocket protocols follow Alpaca's documentation and are tested against fakes; the first market day on the server is the real test. Things to watch: options order rejections (price increments, levels), and the paper trade stream's message format.
 - **Options exits need the engine.** If the container is down, options positions aren't monitored. Docker restarts it automatically, and the most any position can lose is what was paid.
+- **The agent shares the model server** with the timed cycles, the crypto bot and the article summaries (three slots). Busy hours slow every call; the Agent page shows its speed, and a slow model trips a recorded breaker.
+- **The agent trades stocks only**, in its shadow book; options stay with the timed cycles until their menus and quotes are simulated too.
 - **Indicative options data.** The free feed's quotes can lag or differ from OPRA. Paper fills follow Alpaca's own simulation, so paper results can be better than live trading would be.
 - **IEX data.** Stock prices are real, but IEX sees only a slice of volume, and quieter names can have stale last trades (the quote midpoint is used when it's tight and newer).
 - **Free plan limits.** One market data connection and 30 streamed symbols; anything beyond that is priced from REST snapshots each cycle.

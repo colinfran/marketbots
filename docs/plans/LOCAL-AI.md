@@ -1,6 +1,6 @@
 # Plan: a local AI agent for both bots
 
-Status: **decisions taken on 2026-10-27**: every recommendation in §15, and no Grok at all once the agent takes over (decision 1). Step 0 of §14, the measurement spike, is done: its results and a recommendation are in [§5.1](#51-step-0-results-2026-102728). Its second round found that Qwen 3.6 at 2-bit fits both cards and runs as fast as gpt-oss-20b, and the owner picked it (2026-10-28). Step 3 is deployed (2026-10-28): llama.cpp serves it on both GPUs in place of Ollama, the article summaries run on it, and `AiRunner` takes `local/<alias>` models ([SERVER.md §9](../SERVER.md#9-the-local-model-server-llm)). Its 48-hour soak, in production, runs to 2026-10-30. Step 1 (the history store and the news archive) was built beside it on 2026-10-27, since it doesn't depend on the model: `@mb/history`, the `history` and `history-backup` services ([SERVER.md §3.6, §6.4](../SERVER.md#64-the-history-stores-volume-and-backups)). Step 2's bars are built and running: crypto's from Kraken's files, the gap since them rebuilt from trades, and a daily refresh ([SERVER.md §6.5](../SERVER.md#65-krakens-history-files-crypto-backfill)); stock's from Alpaca's SIP history since 2016 ([§6.6](../SERVER.md#66-alpacas-history-stock-backfill)). So are the moves after each news item (1 h, 1 d and 5 d, in `news_moves`). The news backfills (GDELT, EDGAR) and the embeddings are next. Nothing that trades has changed.
+Status: **decisions taken on 2026-10-27**: every recommendation in §15, and no Grok at all once the agent takes over (decision 1). Step 0 of §14, the measurement spike, is done: its results and a recommendation are in [§5.1](#51-step-0-results-2026-102728). Its second round found that Qwen 3.6 at 2-bit fits both cards and runs as fast as gpt-oss-20b, and the owner picked it (2026-10-28). Step 3 is deployed (2026-10-28): llama.cpp serves it on both GPUs in place of Ollama, the article summaries run on it, and `AiRunner` takes `local/<alias>` models ([SERVER.md §9](../SERVER.md#9-the-local-model-server-llm)). Its 48-hour soak, in production, runs to 2026-10-30. Step 1 (the history store and the news archive) was built beside it on 2026-10-27, since it doesn't depend on the model: `@mb/history`, the `history` and `history-backup` services ([SERVER.md §3.6, §6.4](../SERVER.md#64-the-history-stores-volume-and-backups)). Step 2's bars are built and running: crypto's from Kraken's files, the gap since them rebuilt from trades, and a daily refresh ([SERVER.md §6.5](../SERVER.md#65-krakens-history-files-crypto-backfill)); stock's from Alpaca's SIP history since 2016 ([§6.6](../SERVER.md#66-alpacas-history-stock-backfill)). So are the moves after each news item (1 h, 1 d and 5 d, in `news_moves`). The news backfills (GDELT, EDGAR) and the embeddings are next. **Step 8 is built for both bots at once (2026-10-28)** and ships at level shadow, as the owner asked: [§8.9](#89-as-built-2026-10-28) has what was built and where it differs from this plan. Grok was removed (2026-10-28) before step 4 ran, so the dual decision is dropped: the agent's shadow book is compared with the timed cycles, which now run on the local model too, and with holding BTC or SPY. The timed cycles still trade; the agent trades nothing.
 
 Both bots, crypto first. Paper trading only, as always.
 
@@ -368,6 +368,23 @@ Grok sends at most a summary of its reasoning. A local model's thinking is plain
 - **It costs time**: at 40–80 tokens/s, 1,000 tokens of thinking takes 15–25 s, which is why the amount follows the priority (§8.2).
 - **Step 0 checks** that the grammar forcing valid JSON applies only to the answer, after the thinking. Otherwise the model would be made to answer without thinking.
 
+### 8.9 As built (2026-10-28)
+
+Step 8 shipped for both bots in one go, at level shadow by default (the owner's call): the engine fills the new `agent` settings section from the defaults on its first boot, as the wire did. Where it differs from §8.1–§8.8:
+
+- **Levels** are named: `off` and `shadow` (`agent.level`). Propose, auto and full come with the approval queue (step 9).
+- **News** reaches the agent through the wire policy's `observe` hook: every candidate that passes the item's own gates (`itemGate`: fresh, not old news, confirmed for entries), once per item and rule. The session gate, cooldown and caps are the timed cycles'.
+- **Limits per priority** (`agent.limits`): P0 4 steps / 60 s and P1 6 / 120 s without thinking; P2 8 / 240 s with 1,024 tokens of thinking, P3 12 / 600 s with 2,048. P0's 20 s was too short for even one lookup (step 0: ~40 s for three). Tool calls stop at 60% of the time, so the answer gets the rest.
+- **No forced lookups.** A live check against the production server (2026-10-28) found a P1 episode without thinking called `quote` and `features` before answering (26 s, the brief read from the prompt cache), and a P2 episode with thinking answered at once (70 s). It also found the model writing `size_pct_of_max` as a fraction (0.5 for 50%); the agent's schema spells it out now, and its normalization reads 1 or less as a fraction.
+- **Tools** (§8.3), per bot 11: `book`, `quote`, `features` and `depth` (crypto) or `technicals` (stock), `news`, `dossier`, `item` (a wire item's article summary, in place of `read_article`), `past_decisions`, `calendar`, `history` (daily bars from the history store) and `past_news` (archived news with the moves after it). `event_study`, `analogs` and `forecast` wait for steps 6–7; `option_menu` and `core_book` for options in the shadow book.
+- **Stock trades stocks only** in the shadow book: options stay with the timed cycles until their menus and quotes are simulated.
+- **Watch kinds**: price above or below, a % move, news at a severity, a time. Feature and market-series watches are later.
+- **The shadow book** is an account derived from its fills (`shadow_positions`, `shadow_fills`), starting at `agent.shadow_starting_usd`; its day start and peak are kept in memory. Crypto fills at the paper wallet's fee and slippage, stock at the quote plus 5 bps, commission-free. The agent's decisions are not written to `decisions`, so the timed cycles' re-ask filter and Analytics are untouched.
+- **The envelope's windows** are rolling (the last hour, the last 24 hours) in both bots.
+- **Breakers** are recorded, streamed and alerted (once per day each), never enforced at level shadow. The model-hash breaker isn't built: llama.cpp doesn't report a file hash. A slow-model breaker (5 steps under 35 tokens/s) stands in for the GPU guard.
+- **The journal**: MongoDB keeps a capped copy for 14 days, not 30 (the Atlas tier may be the free one), and for good once an episode changed the shadow book; the history store keeps every episode in full (`agent_episodes`, migration 5).
+- **The dashboard**: Research → Agent (`/agent`, `/agent/<id>`) instead of the Live page's cycle panel, with *Ask the agent* on it; the Agent settings in Admin.
+
 ## 9. Boundaries
 
 Six rings, outermost first. Rings 1, 2 and 5 exist today and don't change; rings 3, 4 and 6 are new or extended.
@@ -488,7 +505,7 @@ Each step is one commit, gated (`pnpm typecheck && pnpm test && pnpm lint && pnp
 
 **B. Measure on today's pipeline**
 
-4. **Dual decision** (§10), crypto then stock.
+4. **Dual decision** (§10), crypto then stock. *Dropped: Grok was removed first (2026-10-28).*
 5. **Perception**: every item read, its severity part shown but not counted. Counting it is a small behavior change for the owner to approve after a week of looking at it.
 
 **C. Quant**
@@ -498,7 +515,7 @@ Each step is one commit, gated (`pnpm typecheck && pnpm test && pnpm lint && pnp
 
 **D. The agent, in shadow**
 
-8. **`@mb/agent` and crypto's agent at level 1**, the shadow book, the breakers (recorded, not yet enforced) and the agent on the Live page; then **stock's**.
+8. **`@mb/agent` and crypto's agent at level 1**, the shadow book, the breakers (recorded, not yet enforced) and the agent on the Live page; then **stock's**. *Built for both bots at once, 2026-10-28 (§8.9).*
 9. **The approval queue** and its Discord messages, ready for level 2.
 10. **The shadow period**: ≥ 3 weeks per bot, with a weekly comparison in Analytics.
 

@@ -1,6 +1,6 @@
 # Architecture
 
-This document explains how CryptoMarketBot is built and why: the deployment boundaries, data model, live stream, AI workflow, news engine, the one-time seed buy, risk model, evaluation, and the known limitations.
+This document explains how CryptoMarketBot is built and why: the deployment boundaries, data model, live stream, AI workflow, the agent, news engine, the one-time seed buy, risk model, evaluation, and the known limitations.
 
 ## Scope decisions
 
@@ -62,6 +62,9 @@ Safety: browser `Origin` allowlist, max clients and max connections per IP, 4KB 
 | `wire_items` | Every stored news item: normalized text, symbols, category, tier, severity and its parts, cluster, confirmations, price when first seen, notable reasons | TTL, `wire.retention_days` (30) |
 | `wire_triggers` | Every trigger candidate the policy produced, with the gate that passed or stopped it and why | TTL, `wire.retention_days` |
 | `seed_runs` | The owner's one-time seed buys: schedule, status, allocations, orders, error | permanent |
+| `agent_episodes` | Each agent episode: what woke it, the brief, every step (tool, arguments, result, thinking, tokens), the answer and what became of each decision, watch and note. Long text is capped here; the history store keeps the full record | 14 days (TTL); kept for good once it changed the shadow book |
+| `agent_watches` / `agent_notes` | The agent's watches (active until they fire or expire) and its notes per subject | removed 30 days after a watch ends; notes 14 days (TTL) |
+| `shadow_positions` / `shadow_fills` | The agent's shadow book: what it would hold, and every simulated fill | permanent |
 | `notifications`, `login_attempts` | Alerts for the dashboard; sign-in rate limits (hashed IPs) | TTL |
 | `auth_users` / `auth_sessions` / `auth_accounts` / `auth_verifications` | Owner sign-in (Better Auth magic links, or emailed codes in the Home Screen app; only `OWNER_EMAIL`); written by the dashboard | sessions 12h, links and codes 5 min (TTL) |
 
@@ -92,6 +95,31 @@ features (code) → screens (code) → research (local model + web search, strea
 - **Calibration humility**: the AI gives `p_target_first`; code shrinks it halfway (configurable) toward the random-walk prior `stop / (stop + target)`, where the gross edge is exactly zero, then subtracts round-trip costs. Conviction is treated as a ranking, not a probability.
 - **Defaults to no trade** when data is stale, research failed or the response can't be validated. Every AI call runs on our own model server, so there is no AI budget: nothing caps how many cycles run.
 - **Visibility without chain-of-thought**: the dashboard shows search queries, sources, memo progress, structured decisions and risk checks, never hidden model reasoning.
+
+## The agent (shadow)
+
+Beside the timed cycles, an agent runs on the same local model ([plans/LOCAL-AI.md §8](plans/LOCAL-AI.md#8-the-agent), `@mb/agent` and `src/agent/`). Code watches everything all the time and wakes it when something matters; in each wake-up (an *episode*) it looks things up one step at a time and decides. At level **shadow** (the default, `agent.level` in Admin) its decisions fill only in its own simulated account, the **shadow book**. The timed cycles keep trading the paper wallet exactly as before, so the two records can be compared.
+
+**What wakes it** (observations, scored in code and queued per subject: a burst waits 2–10 s to become one wake-up, risk before opportunity before review, and a subject that woke it waits `agent.wake_cooldown_minutes` unless its salience rises 15 points, a P0, its own watch or the owner):
+
+| Source | Priority |
+| --- | --- |
+| News: every trigger candidate that passes the wire's gates on the item itself (fresh, not old news, confirmed for entries). The hourly and daily caps are the timed cycles' | P0 bad news on a shadow holding (or a critical market review while it holds anything), P1 entry ideas, P2 the rest |
+| The screens, every 10 minutes: a viable setup on a pair it doesn't hold, asked about again after 2 h (daily trend: 24 h), and not while the envelope refuses entries | P1 |
+| A held pair moving `schedule.trigger_move_atr` 1 h ATRs since its last review, again at every further ATR | P0 down, P2 up |
+| A shadow stop or target hit (checked every 3 s against the bid) | P2 |
+| A macro release 15 minutes out | P2 |
+| Its own watches (price above or below, a % move, news at a severity, a time) | the watch's |
+| A sweep every `agent.sweep_minutes` (2 h) | P2 |
+| The owner's question (Agent page) | P2, read-only |
+
+**An episode**: a short brief (why it woke, the shadow book and the limits in force, the market, the subject, its notes and watches), then steps. Each step is one JSON object under a grammar: a call to one of 11 read-only tools (`book`, `quote`, `features`, `depth`, `news`, `dossier`, `item`, `past_decisions`, `calendar`, and from the history store `history` and `past_news`), or the answer: the cycle's decision schema plus the entry's strategy, watches, notes and a reply. Limits per priority (`agent.limits`): P0 4 steps / 60 s, P1 6 / 120 s, both without thinking; P2 8 / 240 s and P3 12 / 600 s with 1k and 2k tokens of thinking. Tool calls stop at 60% of the time; the last step may only answer. One episode runs at a time; a P0 aborts a running P1–P3.
+
+**Its decisions**, in the shadow book: normalized with the cycle's rules (`normalizeCryptoDecision`), exits first. An entry passes the **envelope** (`agent.envelope`: 4 entries a day, 2 an hour, 4 open, one action per pair per 30 min, no re-entry 24 h after a stop-out or 6 h after an exit), is sized like a cycle's buy and cut to the envelope's share (50%) and the hour's commitment budget (10% of equity), then goes through `evaluateCryptoEntry` against the shadow book's own account. Fills are at the ask or bid with the paper wallet's fee and slippage. Exits obey only the minimum hold. Stops only move up, and the 3-second loop fills stops and targets. Its decisions are not written to `decisions`, so the cycles' re-ask filter and Analytics are untouched; the shadow book is its record.
+
+**Circuit breakers** (5 risk rejections in a row, most entries rejected in an hour, over 10% invalid answers, 3 envelope refusals a day, the shadow book down 3% in a day or 6% in all, a slow model) are recorded, streamed and alerted; at level shadow nothing is enforced.
+
+**Where to see it**: Research → Agent (the episode as it runs, the shadow book, watches and notes, every episode, and the owner's *Ask the agent*), and the heartbeat's `agent` block. Thinking streams to the owner only, unless `agent.public_thinking`.
 
 ## News engine (the wire)
 
@@ -185,4 +213,6 @@ Automated tests (173 in the engine alone): core schemas and metrics; the news en
 - **Stops depend on the engine running.** If the container is down, positions aren't monitored (the CLI has no resting stops). Docker restarts it automatically; extended downtime is the risk.
 - **Kraken's 720-candle limit** caps backtest history (30 days of 1h, 120 days of 4h, ~2 years of daily) unless you supply Kraken's downloadable OHLCVT CSVs.
 - **LLM behavior can change** with model updates; that's why decisions record model and prompt versions, and why the AI never bypasses the risk engine.
+- **The agent shares the model server** with the timed cycles, the stock bot and the article summaries (three slots). Busy hours slow every call; the Agent page shows its speed, and a slow model trips a recorded breaker.
+- **The shadow book's day and peak** are kept in memory: a restart starts the day over at the current equity.
 - **Free news sources can change or vanish.** Several are unofficial (ForexFactory's calendar, Telegram channel previews, scraped pages), and some rate-limit the shared IP (GDELT answers 429 most of the time and runs degraded). Each failure only degrades that source, and the heartbeat shows it, but coverage can thin out without any code change.
