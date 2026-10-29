@@ -40,24 +40,48 @@ export type WireToolsDeps<C extends string> = {
 
 const HOUR = 3_600_000
 
+type LineDeps = Pick<WireToolsDeps<string>, "price" | "timeLabel">
+
+/** One item as the news tool shows it: its line, and the article's summary when there is one. */
+const itemLine = <C extends string>(d: LineDeps, i: WireItemDoc<C>) => [renderLine(i, { price: d.price, timeLabel: d.timeLabel }), ...(i.article?.status === "ok" && i.article.summary ? [summaryLine(i)] : [])].join("\n")
+
+/**
+ * What our feeds saw about a symbol (or the market, null) in the last `hours`, most severe first: the
+ * news tool's answer, and what a brief shows under each subject so the agent sees a move's catalyst
+ * (or that there is none) without having to look. `lines` are untrusted text: fence them.
+ */
+export const recentNews = async <C extends string>(d: Pick<WireToolsDeps<C>, "col" | "price" | "timeLabel" | "thresholds">, symbol: string | null, { hours, limit }: { hours: number; limit: number }) => {
+  const since = new Date(Date.now() - hours * HOUR)
+  const items = await d.col.wireItems
+    .find({ ...(symbol ? { symbols: symbol } : { symbols: { $size: 0 } }), first_seen_at: { $gte: since }, severity: { $gte: d.thresholds().annotate } })
+    .sort({ severity: -1, first_seen_at: -1 })
+    .limit(limit)
+    .toArray()
+  return { lines: items.map((i) => `${i._id.slice(0, 12)} ${itemLine(d, i as WireItemDoc<C>)}`), urls: items.map((i) => i.url).filter((u): u is string => !!u) }
+}
+
+/** Brief subjects show this many of their latest items, from this far back. */
+export const BRIEF_NEWS = { hours: 24, limit: 3 }
+
+/** A brief's news for one subject: its latest items, fenced, or a line saying our feeds have none (a big move with no news behind it is worth knowing about too). */
+export const briefNews = async <C extends string>(d: Pick<WireToolsDeps<C>, "col" | "price" | "timeLabel" | "thresholds">, symbol: string) => {
+  const news = await recentNews(d, symbol, BRIEF_NEWS)
+  const text = news.lines.length ? `- news in our feeds, last ${BRIEF_NEWS.hours} h, most severe first:\n${fenceUntrusted("wire", news.lines.join("\n"))}` : `- news: nothing in our feeds about it in the last ${BRIEF_NEWS.hours} h`
+  return { text, urls: news.urls }
+}
+
 /** news, dossier and item. */
 export const wireTools = <C extends string>(d: WireToolsDeps<C>): AgentTool[] => {
-  const itemLine = (i: WireItemDoc<C>) => [renderLine(i, { price: d.price, timeLabel: d.timeLabel }), ...(i.article?.status === "ok" && i.article.summary ? [summaryLine(i)] : [])].join("\n")
   return [
     defineTool({
       name: "news",
       description: `what our feeds saw about a ${d.noun.one} (or the market, symbol null) in the last N hours, most severe first, with article summaries. Args: {symbol|null, hours 1-72}.`,
       args: z.object({ symbol: d.symbolArg.nullable(), hours: z.number().describe("1-72") }),
       run: async ({ symbol, hours }, tc) => {
-        const since = new Date(Date.now() - Math.min(72, Math.max(1, hours)) * HOUR)
-        const items = await d.col.wireItems
-          .find({ ...(symbol ? { symbols: symbol } : { symbols: { $size: 0 } }), first_seen_at: { $gte: since }, severity: { $gte: d.thresholds().annotate } })
-          .sort({ severity: -1, first_seen_at: -1 })
-          .limit(10)
-          .toArray()
-        for (const i of items) if (i.url) tc.urls.add(i.url)
-        if (!items.length) return `no items about ${symbol ?? "the market"} in the last ${hours} h`
-        return fenceUntrusted("wire", items.map((i) => `${i._id.slice(0, 12)} ${itemLine(i as WireItemDoc<C>)}`).join("\n"))
+        const news = await recentNews(d, symbol, { hours: Math.min(72, Math.max(1, hours)), limit: 10 })
+        for (const u of news.urls) tc.urls.add(u)
+        if (!news.lines.length) return `no items about ${symbol ?? "the market"} in the last ${hours} h`
+        return fenceUntrusted("wire", news.lines.join("\n"))
       },
     }),
     defineTool({
@@ -89,7 +113,7 @@ export const wireTools = <C extends string>(d: WireToolsDeps<C>): AgentTool[] =>
         if (i.url) tc.urls.add(i.url)
         const confirmations = i.confirmations.map((c) => `${c.domain} ${d.timeLabel(c.at)}`).join(", ") || "none"
         const points = i.article?.key_points?.length ? `\nkey points: ${i.article.key_points.join("; ")}` : ""
-        return fenceUntrusted("wire", `${itemLine(i)}\nsymbols ${i.symbols.join(", ") || "market-wide"} · confirmations: ${confirmations}${i.summary ? `\nsource summary: ${cleanLine(i.summary, 600)}` : ""}${points}`)
+        return fenceUntrusted("wire", `${itemLine(d, i)}\nsymbols ${i.symbols.join(", ") || "market-wide"} · confirmations: ${confirmations}${i.summary ? `\nsource summary: ${cleanLine(i.summary, 600)}` : ""}${points}`)
       },
     }),
   ]

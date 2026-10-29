@@ -1,11 +1,13 @@
 import { checkEntry } from "@mb/agent/envelope"
 import type { Wake } from "@mb/agent/queue"
+import { briefNews } from "@mb/agent/wire-tools"
 import { BOOK_SUBJECT, MARKET_SUBJECT, type Observation } from "@mb/core/agent"
 import { errorMessage } from "@mb/engine-kit/log"
 import { formatTime, marketDay } from "@mb/stock-core/time"
 import { upcomingMacro } from "@mb/wire/calendar"
 import { isLive, sessionWindow, sidePrices, type StockAgentDeps } from "./book"
 import { StockScreen } from "./screen"
+import { stockWireDeps } from "./tools"
 import { bookText, envelopeHistory, heldPositions, heldSymbols } from "./view"
 
 /**
@@ -215,7 +217,7 @@ export class StockObserver {
   }
 }
 
-/** The bot's part of the brief: the book and its limits, the market, the subject. */
+/** The bot's part of the brief: the book and its limits, the market, each subject with its latest news (whose URLs count as seen). */
 export const stockBrief = async (d: StockAgentDeps, wake: Wake) => {
   const benchmarks = d.ctx.settings.current.universe.benchmarks.slice(0, 6).map((s) => {
     const live = d.ctx.prices.get(s)
@@ -223,12 +225,19 @@ export const stockBrief = async (d: StockAgentDeps, wake: Wake) => {
     return p === null ? `${s} n/a` : `${s} ${p}${live?.change_pct !== null && live?.change_pct !== undefined ? ` (${live.change_pct >= 0 ? "+" : ""}${live.change_pct}%)` : ""}`
   })
   const sections = [await bookText(d), `MARKET\n- ${benchmarks.join(", ")}`]
-  // The stock that woke the agent, or each stock of a market-wide wake-up's setups.
+  // The stock that woke the agent, or each stock of a market-wide wake-up's setups, with what our
+  // feeds say about it: a move's catalyst, or that nothing explains it, is in front of the agent either way.
+  const urls: string[] = []
+  const wire = stockWireDeps(d)
   for (const symbol of new Set([wake.subject, ...wake.observations.map((o) => o.refs.symbol).filter((s): s is string => !!s)])) {
     const p = sidePrices(d, symbol)
     if (!p) continue
     const live = d.ctx.prices.get(symbol)
-    sections.push(`SUBJECT ${symbol}\n- ${p.last}${live?.bid && live.ask ? ` (bid ${live.bid}, ask ${live.ask})` : ""}${live?.change_pct !== null && live?.change_pct !== undefined ? `, ${live.change_pct >= 0 ? "+" : ""}${live.change_pct}% today` : ""}; technicals and news: use the tools`)
+    const news = await briefNews(wire, symbol)
+    urls.push(...news.urls)
+    sections.push(
+      `SUBJECT ${symbol}\n- ${p.last}${live?.bid && live.ask ? ` (bid ${live.bid}, ask ${live.ask})` : ""}${live?.change_pct !== null && live?.change_pct !== undefined ? `, ${live.change_pct >= 0 ? "+" : ""}${live.change_pct}% today` : ""}; technicals: use the tools\n${news.text}`,
+    )
   }
-  return { text: sections.join("\n\n"), urls: [] }
+  return { text: sections.join("\n\n"), urls }
 }

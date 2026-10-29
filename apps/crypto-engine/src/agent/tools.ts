@@ -21,23 +21,26 @@ const symbolArg = z.string().describe("A pair exactly as listed, e.g. SOL/USD.")
 
 const known = (d: CryptoAgentDeps, symbol: string) => d.ctx.hub.universe.includes(symbol) || d.ctx.hub.pairs.has(symbol)
 
+/** What the shared news and history tools (and the brief's news) read, from the crypto engine. */
+export const cryptoWireDeps = (d: CryptoAgentDeps): WireToolsDeps<WireCategory> => ({
+  // Read when a tool runs: the contract test builds the tools without an engine.
+  get col() {
+    return d.ctx.col
+  },
+  price: (s) => d.ctx.hub.quote(s)?.mid ?? null,
+  timeLabel: utcTime,
+  dossierTime: (t) => `${t.toISOString().slice(11, 16)}Z`,
+  thresholds: () => d.ctx.settings.current.wire.thresholds,
+  get history() {
+    return d.history
+  },
+  noun: { one: "pair", many: "pairs" },
+  symbolArg,
+})
+
 export const cryptoAgentTools = (d: CryptoAgentDeps): AgentTool[] => {
   const { ctx } = d
-  const wire: WireToolsDeps<WireCategory> = {
-    // Read when a tool runs: the contract test builds the tools without an engine.
-    get col() {
-      return ctx.col
-    },
-    price: (s) => ctx.hub.quote(s)?.mid ?? null,
-    timeLabel: utcTime,
-    dossierTime: (t) => `${t.toISOString().slice(11, 16)}Z`,
-    thresholds: () => ctx.settings.current.wire.thresholds,
-    get history() {
-      return d.history
-    },
-    noun: { one: "pair", many: "pairs" },
-    symbolArg,
-  }
+  const wire = cryptoWireDeps(d)
 
   return [
     defineTool({

@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { actOnStockAnswer } from "../src/agent/act"
 import { createShadowBook, type StockAgentDeps } from "../src/agent/book"
 import { liveEnvelopeHistory } from "../src/agent/live"
-import { StockObserver } from "../src/agent/observe"
+import { stockBrief, StockObserver } from "../src/agent/observe"
 import { stockAgentTools } from "../src/agent/tools"
 import { bookText } from "../src/agent/view"
 import type { Session } from "../src/bot/session"
@@ -196,6 +196,39 @@ describe("stock agent", () => {
       expect(a).toMatchObject({ outcome: "not_applicable", detail: expect.stringContaining("level auto") })
       expect(await stockAgentTools(d).find((t) => t.name === "option_menu")!.run({ symbol: "AAPL" } as never, { episodeId: "e1", urls: new Set(), signal: new AbortController().signal })).toMatch(/^options are traded only at level auto/)
     })
+  })
+
+  it("puts each subject's latest news in the brief, fenced, or says there is none", async () => {
+    const { d, ctx } = await setup()
+    const wake = { subject: "AAPL", priority: 1 as const, salience: 70, observations: [] }
+    expect((await stockBrief(d, wake)).text).toContain("- news: nothing in our feeds about it in the last 24 h")
+    await ctx.col.wireItems.insertOne({
+      _id: "beef0000beef0000",
+      cluster_id: "beef0000beef0000",
+      source: "rss:businesswire",
+      tier: 1,
+      kind: "news",
+      category: "earnings",
+      title: "Apple beats on services revenue",
+      summary: null,
+      url: "https://www.businesswire.com/apple",
+      domain: "businesswire.com",
+      symbols: ["AAPL"],
+      published_at: new Date(),
+      first_seen_at: new Date(),
+      polarity: 1,
+      severity: 64,
+      severity_parts: {},
+      confirmations: [],
+      price_at_seen: {},
+      meta: {},
+      notable: false,
+      notable_reasons: [],
+      expires_at: new Date(Date.now() + 86_400_000),
+    })
+    const { text, urls } = await stockBrief(d, wake)
+    expect(text).toMatch(/SUBJECT AAPL\n- 200; technicals: use the tools\n- news in our feeds, last 24 h, most severe first:\n<untrusted source="wire">\nbeef0000beef .*Apple beats on services revenue/)
+    expect(urls).toEqual(["https://www.businesswire.com/apple"])
   })
 
   it("answers technicals from Alpaca's bars and quotes from live prices", async () => {

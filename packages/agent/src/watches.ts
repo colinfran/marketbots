@@ -79,6 +79,9 @@ export const normalizeWatch = (w: WatchRequest, episodeId: string, env: WatchEnv
     at = new Date(t)
     expires = t + TIME_GRACE_MS
   }
+  // The same condition twice only fills the per-symbol slots (the model tends to set it again each episode).
+  const same = active.find((a) => a.kind === w.kind && a.symbol === symbol && a.level === level && (a.at?.getTime() ?? null) === (at?.getTime() ?? null))
+  if (same) return { rejected: `already watching: ${describeWatch(same)}` }
   const note = cleanLine(w.note, AGENT_LIMITS.watch_note_chars)
   const created = env.now
   return {

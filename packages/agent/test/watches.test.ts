@@ -33,6 +33,14 @@ describe("watches", () => {
     expect(why({ kind: "time", symbol: null, at: "2026-11-20T13:00:00Z" })).toMatch(/more than 168 hours/)
   })
 
+  it("refuses a watch identical to one already active, but not one with another level", () => {
+    const existing = make({ kind: "price_below", level: 170, priority: "risk" })
+    const again = normalizeWatch(req({ kind: "price_below", level: 170, priority: "review", note: "reassess" }), "e2", { ...env, active: [existing] })
+    expect("rejected" in again && again.rejected).toBe("already watching: SOL/USD below 170")
+    expect("watch" in normalizeWatch(req({ kind: "price_below", level: 165 }), "e2", { ...env, active: [existing] })).toBe(true)
+    expect("watch" in normalizeWatch(req({ kind: "price_below", level: 170 }), "e2", { ...env, active: [{ ...existing, status: "fired" }] })).toBe(true)
+  })
+
   it("enforces the per-symbol and total limits", () => {
     const five = Array.from({ length: 5 }, () => make({}))
     const r = normalizeWatch(req({}), "e1", { ...env, active: five })

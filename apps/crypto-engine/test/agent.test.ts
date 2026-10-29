@@ -250,6 +250,41 @@ describe("crypto agent observations and tools", () => {
     expect(text).not.toContain("SUBJECT DOGE/USD")
   })
 
+  it("puts each subject's latest news in the brief, fenced, or says there is none", async () => {
+    const { d, ctx } = await setup()
+    const wake = { subject: "BTC/USD", priority: 1 as const, salience: 70, observations: [] }
+    const quiet = await cryptoBrief(d, new CryptoMarketView(d), wake)
+    expect(quiet.text).toContain("- news: nothing in our feeds about it in the last 24 h")
+    expect(quiet.urls).toEqual([])
+    await ctx.col.wireItems.insertOne({
+      _id: "c0ffee00c0ffee00",
+      cluster_id: "c0ffee00c0ffee00",
+      source: "rss:coindesk",
+      tier: 2,
+      kind: "news",
+      category: "listing_major",
+      title: "Major exchange lists bitcoin perpetuals",
+      summary: null,
+      url: "https://coindesk.com/listing",
+      domain: "coindesk.com",
+      symbols: ["BTC/USD"],
+      published_at: new Date(),
+      first_seen_at: new Date(),
+      polarity: 1,
+      severity: 62,
+      severity_parts: {},
+      confirmations: [],
+      price_at_seen: {},
+      meta: {},
+      notable: false,
+      notable_reasons: [],
+      expires_at: new Date(Date.now() + 86_400_000),
+    })
+    const { text, urls } = await cryptoBrief(d, new CryptoMarketView(d), wake)
+    expect(text).toMatch(/- news in our feeds, last 24 h, most severe first:\n<untrusted source="wire">\nc0ffee00c0ff .*Major exchange lists bitcoin perpetuals/)
+    expect(urls).toEqual(["https://coindesk.com/listing"])
+  })
+
   it("fences news as untrusted and adds its URLs to the episode's", async () => {
     const { d, ctx } = await setup()
     await ctx.col.wireItems.insertOne({

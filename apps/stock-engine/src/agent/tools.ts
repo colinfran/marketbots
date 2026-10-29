@@ -30,24 +30,27 @@ const TECHNICALS_MS = 2 * 60_000
 
 const round = (v: number | null | undefined, digits = 2) => (v === null || v === undefined || !Number.isFinite(v) ? "n/a" : String(Math.round(v * 10 ** digits) / 10 ** digits))
 
+/** What the shared news and history tools (and the brief's news) read, from the stock engine. */
+export const stockWireDeps = (d: StockAgentDeps): WireToolsDeps<WireCategory> => ({
+  // Read when a tool runs: the contract test builds the tools without an engine.
+  get col() {
+    return d.ctx.col
+  },
+  price: (s) => d.price(s),
+  timeLabel: (t) => formatDateTime(t),
+  dossierTime: (t) => formatTime(t),
+  thresholds: () => d.ctx.settings.current.wire.thresholds,
+  get history() {
+    return d.history
+  },
+  noun: { one: "stock", many: "stocks" },
+  symbolArg,
+})
+
 export const stockAgentTools = (d: StockAgentDeps): AgentTool[] => {
   const { ctx } = d
   const cache = new Map<string, { at: number; text: string }>()
-  const wire: WireToolsDeps<WireCategory> = {
-    // Read when a tool runs: the contract test builds the tools without an engine.
-    get col() {
-      return ctx.col
-    },
-    price: (s) => d.price(s),
-    timeLabel: (t) => formatDateTime(t),
-    dossierTime: (t) => formatTime(t),
-    thresholds: () => ctx.settings.current.wire.thresholds,
-    get history() {
-      return d.history
-    },
-    noun: { one: "stock", many: "stocks" },
-    symbolArg,
-  }
+  const wire = stockWireDeps(d)
   const valid = (symbol: string) => TICKER_PATTERN.test(symbol)
 
   return [

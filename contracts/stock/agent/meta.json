@@ -1,5 +1,5 @@
 {
-  "prompt_version": "stock-agent-v4",
+  "prompt_version": "stock-agent-v5",
   "limits": {
     "watches_per_symbol": 5,
     "watches_total": 40,

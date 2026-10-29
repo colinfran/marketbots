@@ -1,5 +1,6 @@
 import { checkEntry } from "@mb/agent/envelope"
 import type { Wake } from "@mb/agent/queue"
+import { briefNews } from "@mb/agent/wire-tools"
 import { MARKET_SUBJECT, type Observation } from "@mb/core/agent"
 import type { RegimeSnapshot } from "@mb/crypto-core/db"
 import { roundTo } from "@mb/crypto-core/math"
@@ -10,6 +11,7 @@ import { loadFeatures, viableSetup } from "../orchestrator/crypto-cycle"
 import { roundTripCostBps } from "../risk/sizing"
 import { screenCrypto } from "../strategies/registry"
 import { isLive, mid, type CryptoAgentDeps } from "./book"
+import { cryptoWireDeps } from "./tools"
 import { bookText, envelopeHistory, heldPositions } from "./view"
 
 /**
@@ -235,7 +237,7 @@ export class CryptoObserver {
   }
 }
 
-/** The bot's part of the brief: the book and its limits, the market, the subject. */
+/** The bot's part of the brief: the book and its limits, the market, each subject with its latest news (whose URLs count as seen). */
 export const cryptoBrief = async (d: CryptoAgentDeps, market: CryptoMarketView, wake: Wake) => {
   if (Date.now() - market.at > FALLBACK_SCREEN_MS) await market.refresh().catch(() => undefined)
   const r = market.regime
@@ -247,15 +249,20 @@ export const cryptoBrief = async (d: CryptoAgentDeps, market: CryptoMarketView, 
     await bookText(d),
     `MARKET\n- regime ${r?.label ?? "unknown"}; BTC daily trend ${r?.btc_trend ?? "n/a"}; BTC 30 d volatility ${r?.btc_vol_pct ?? "n/a"}%${r?.notes.length ? `; ${r.notes.join("; ")}` : ""}\n- universe (the only pairs you may buy): ${universe.join(", ")}`,
   ]
-  // The pair that woke the agent, or each pair of a market-wide wake-up's setups.
+  // The pair that woke the agent, or each pair of a market-wide wake-up's setups, with what our feeds
+  // say about it: a move's catalyst, or that nothing explains it, is in front of the agent either way.
   const subjects = [wake.subject, ...wake.observations.map((o) => o.refs.symbol)].filter((s): s is string => !!s && d.ctx.hub.universe.includes(s))
+  const urls: string[] = []
+  const wire = cryptoWireDeps(d)
   for (const symbol of [...new Set(subjects)]) {
     const f = market.features.get(symbol)
     const q = d.ctx.hub.quote(symbol)
     const shown = f ? Object.entries(featuresForPrompt(f)).filter(([k]) => /^(ret_|trend_|rsi14|atr_pct|bb_pct|breakout|vol_30d|volume_ratio|move_z)/.test(k)) : []
+    const news = await briefNews(wire, symbol)
+    urls.push(...news.urls)
     sections.push(
-      `SUBJECT ${symbol}\n- ${q ? `bid ${q.bid}, ask ${q.ask}, spread ${q.spreadBps.toFixed(1)} bps` : "no live quote"}\n- ${shown.length ? shown.map(([k, v]) => `${k} ${typeof v === "number" ? roundTo(v, 4) : v}`).join(", ") : "no features yet: use the features tool"}`,
+      `SUBJECT ${symbol}\n- ${q ? `bid ${q.bid}, ask ${q.ask}, spread ${q.spreadBps.toFixed(1)} bps` : "no live quote"}\n- ${shown.length ? shown.map(([k, v]) => `${k} ${typeof v === "number" ? roundTo(v, 4) : v}`).join(", ") : "no features yet: use the features tool"}\n${news.text}`,
     )
   }
-  return { text: sections.join("\n\n"), urls: [] }
+  return { text: sections.join("\n\n"), urls }
 }
