@@ -254,6 +254,7 @@ Events are typed (`packages/core/src/events.ts`) and carry a strictly increasing
 | `agent_watches`, `agent_notes` | the agent's watches and its notes per subject (TTL) |
 | `shadow_positions`, `shadow_fills` | the agent's shadow book: what it would hold, and every simulated fill |
 | `ai_calls`, `notifications`, `login_attempts` | every AI call (research calls also count their searches; costs are 0 since the local model), alerts, sign-in rate limits |
+| `search_usage` | what research's metered search providers cost this bot each UTC month (one document a month), for their pacing ([SERVER.md §9](SERVER.md#9-the-local-model-server-llm)) |
 | `auth_*` | owner sign-in (Better Auth magic links, or emailed codes in the Home Screen app; only `OWNER_EMAIL`), written by the dashboard |
 
 ## Testing

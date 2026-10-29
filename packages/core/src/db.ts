@@ -20,6 +20,7 @@ export const BASE_COLLECTIONS = {
   audit: "audit_log",
   cycles: "cycles",
   aiCalls: "ai_calls",
+  searchUsage: "search_usage",
   notifications: "notifications",
   seedRuns: "seed_runs",
   wireItems: "wire_items",
@@ -92,6 +93,13 @@ export const BASE_INDEXES = indexes({
 export type TokenUsage = { input: number; output: number; total: number }
 
 export type SettingsDoc<S> = { _id: "current"; settings: S; version: number; updated_at: Date; updated_by: string }
+
+/**
+ * What research's metered search providers cost this bot in a UTC month (docs/SERVER.md §9): one
+ * document a month, `_id` "YYYY-MM", each provider's spend in its own unit (searches; dollars for
+ * Exa). Research paces each provider against it, so the counts survive restarts.
+ */
+export type SearchUsageDoc = { _id: string; spent: Record<string, number>; updated_at: Date }
 
 /** Desired state, changed only by commands (or the engine's own risk halt). Survives restarts. */
 export type EngineStateDoc = {

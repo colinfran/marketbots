@@ -670,7 +670,7 @@ nvidia-smi                                                  # ~6.8 GB used on ea
 
 **Research** (`@mb/wire/research/local`; the *Research model* in Admin): the model can't browse, so the engine does the browsing for it, from the bot's research prompt:
 1. The model reads the request and writes up to 6 web searches (no thinking).
-2. They run two at a time, for results from the last day (gap fills and event checks) or week (full research): first on the `search` service's free news engines. A search those find fewer than 3 results for goes to Tavily, and if it's still short, to the paid web engine (below).
+2. They run two at a time, for results from the last day (gap fills and event checks) or week (full research): first on the `search` service's free news engines. A search those find fewer than 3 results for goes to the metered providers in turn, and if it's still short, to the paid web engine (below).
 3. The model picks up to 5 results to read in full, and the scraper fetches them (paywalled sites are refused, as for summaries).
 4. The model writes the memo from the results and articles alone, citing their URLs.
 
@@ -685,10 +685,19 @@ A run takes about a minute, and costs nothing (`ai_calls`: `cost_source: "local"
 - **The paid engine**, Google CSE, blocks our IP ("unusual traffic"), so it goes through the residential proxy (Evomi, US home IPs). The proxy is billed per GB, so the engine is disabled in SearXNG (only a request that names it runs it), and research names it only for a search the free engines found fewer than 3 results for: at most 100 a UTC day per engine (`PAID_SEARCHES_PER_DAY`). It's asked for 8 results, all research reads. Each paid search is logged (`local research: a paid search`).
 - **Its cost**, measured through the proxy on 2026-10-29: ~11 KB a search, plus ~8 KB for Google's search token at most once an hour, and ~5 KB to open a new tunnel. Even at the cap on both engines (200 a day) that's under 4 MB a day, ~110 MB a month. Evomi's dashboard shows the real use.
 - **Blocks:** SearXNG suspends a blocked engine for 3–30 minutes (`suspended_times`), not the hours or days of its defaults: the proxy's next tunnel leaves from another IP.
-- **Tavily** (`@mb/wire/research/tavily`, `TAVILY_API_KEY`, §3.7) comes before the paid engine: its free plan has 1,000 credits a calendar month (reset on the 1st), and a basic search costs one. The engines call it directly, not through `search`. Each day of the month adds an equal share, 1,000 ÷ the month's days rounded down (32 a day in a 31-day month), and a search is made only while the month's usage is under the shares of the days so far. The count comes from Tavily's usage endpoint (read at most every 5 minutes), so it covers both bots and survives restarts. It lags our searches by minutes or more (still 0 seven minutes after a search on 2026-10-29), so an engine never counts fewer than its own searches, and each engine also keeps to half the allowance so far by its own count (16 a day in a 31-day month). Together the two can't get ahead of the even split, however long Tavily's count lags; Tavily's count still caps them after a restart. A day's unused share carries over to later days. A refusal for lack of credits (432) stops Tavily until the next reading. Each search is logged (`local research: a Tavily search`, with the month's usage).
 - **Not used:** Brave (rate-limited even through the proxy, and its refusal page is 81 KB), DuckDuckGo's web search (CAPTCHAs after two searches through one exit), Mojeek and Startpage (proof-of-work CAPTCHAs, off upstream), Google News and Qwant (access denied), Reuters (401).
 - **Check it:** `docker compose ps search`, and `docker logs marketbots-search` for engines that fail.
 - **When research runs:** Admin's *Web research* (auto: only when our feeds leave a gap) and *Event research* (*web check*: a quick search before an event decision; stored as `x_verify`).
+
+**Metered providers** (`@mb/wire/research/metered`; keys in `.env.search`, §3.7): search APIs with a free monthly allowance. The engines call them directly, not through `search`, in this order, for a search still short of 3 results:
+
+| Provider | Free allowance | A search | Per day, both bots (31-day month) | Per bot |
+| --- | --- | --- | --- | --- |
+| Tavily | 1,000 credits a calendar month | 1 credit (basic, up to 8 results, dated) | 32 | 16 |
+
+- **Pacing:** each day of a UTC month adds an equal share of the month's allowance (rounded down for whole searches), and a share left unused carries over to later days. Both bots use the same accounts, so each keeps to half the allowance so far by its own spend. Each bot stores that spend in its `search_usage` collection (one document a month), so a restart doesn't reset it.
+- **Tavily** also checks Tavily's own count of the account (its usage endpoint, read at most every 5 minutes), which covers both bots and any other use of the key. That count lags by minutes or more (still 0 seven minutes after a search on 2026-10-29), so a new reading never lowers the count below an engine's own. A refusal for lack of credits (432) stops Tavily until the next reading.
+- **Logs:** each search is logged as `local research: a metered search`, with the provider and this bot's spend on it this month.
 
 **The speed guard:** llama.cpp doesn't report where its tensors sit, so the engines judge by speed. A summary written slower than 20 tokens/s pauses summaries for 30 minutes. Normal is 40–50 tokens/s, less per request while other slots run. A model spilled into system RAM writes 15–20.
 

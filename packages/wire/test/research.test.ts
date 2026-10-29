@@ -3,8 +3,10 @@ import { json } from "@mb/engine-kit/testing/fetch"
 import { httpClient } from "@mb/engine-kit/util/http"
 import { describe, expect, it, vi } from "vitest"
 import { localResearcher, MEMO_SYSTEM, memoBudget, PICK_SYSTEM, PLAN_SYSTEM, rangeFor } from "../src/research/local"
+import type { SearchMeter } from "@mb/engine-kit/state/search-usage"
 import type { RequestText } from "../src/fetch"
-import { tavilyAllowance, tavilyPacer } from "../src/research/tavily"
+import { spendLedger } from "../src/research/metered"
+import { tavilyAllowance, tavilyProvider } from "../src/research/tavily"
 
 const ENV = { LLM_URL: "http://llm:8080", SEARCH_URL: "http://search:8080", SCRAPER_URL: "http://scraper:8790" }
 const TAVILY_ENV = { ...ENV, TAVILY_API_KEY: "tvly-test-key-0123456789" }
@@ -69,6 +71,34 @@ const fakeServices = ({
     }),
   )
   return { calls, of: (path: string) => calls.filter((c) => c.path === path) }
+}
+
+const SEARCH_OPTS = { range: "day" as const, since: "2026-09-30", maxResults: 8, timeoutMs: 5_000 }
+
+/** A meter in memory, by month. */
+const memoryMeter = () => {
+  const months: Record<string, Record<string, number>> = {}
+  const meter: SearchMeter = {
+    load: async (month) => ({ ...months[month] }),
+    add: async (month, provider, amount) => {
+      months[month] = { ...months[month], [provider]: (months[month]?.[provider] ?? 0) + amount }
+    },
+  }
+  return Object.assign(meter, { months })
+}
+
+/** Tavily behind a RequestText: its usage says `used()`, each search finds one result. */
+const fakeTavily = (used: () => number) => {
+  const calls = { usage: 0, search: 0 }
+  const request = (async (url: string) => {
+    if (url.endsWith("/usage")) {
+      calls.usage++
+      return { status: 200, text: JSON.stringify({ account: { plan_usage: used(), plan_limit: 1_000 } }), headers: new Headers() }
+    }
+    calls.search++
+    return { status: 200, text: JSON.stringify({ results: [{ title: "A result", url: `https://example.com/${calls.search}`, content: "Text." }] }), headers: new Headers() }
+  }) as unknown as RequestText
+  return { request, calls }
 }
 
 const researcher = (env: Record<string, string | undefined> = ENV, paidSearchesPerDay?: number) => localResearcher({ request: httpClient("test").requestText, env, client: "crypto", log: silentLogger, paidSearchesPerDay })
@@ -198,32 +228,33 @@ describe("local research", () => {
     }
   })
 
-  it("keeps counting its own Tavily searches while Tavily's count lags, and starts over with the month", async () => {
+  it("keeps to this engine's half of Tavily's even split while Tavily's count lags, across restarts, and starts over with the month", async () => {
     vi.useFakeTimers({ toFake: ["Date"], now: Date.UTC(2026, 9, 1, 0, 30) })
     try {
-      const reads: number[] = []
-      const request = (async () => {
-        reads.push(Date.now())
-        return { status: 200, text: JSON.stringify({ account: { plan_usage: 0, plan_limit: 1_000 } }), headers: new Headers() }
-      }) as unknown as RequestText
-      const pacer = tavilyPacer(request, "tvly-test-key-0123456789")
+      const tavily = fakeTavily(() => 0)
+      const meter = memoryMeter()
+      let provider = tavilyProvider(tavily.request, "tvly-test-key-0123456789", spendLedger(meter, silentLogger))
       const day = async (searches: number) => {
         let taken = 0
         for (let i = 0; i < searches; i++) {
-          if (await pacer.take()) taken++
+          if (await provider.search("q", SEARCH_OPTS)) taken++
           vi.setSystemTime(Date.now() + 60_000) // a minute apart: a new reading every five
         }
         return taken
       }
-      // Oct 1: this engine's half of 32 credits, though Tavily still says 0 after every search.
+      // Oct 1: half of 32 credits, though Tavily still says 0 after every search.
       expect(await day(40)).toBe(16)
-      expect(reads.length).toBeGreaterThan(5)
+      expect(tavily.calls.usage).toBeGreaterThan(5)
+      // A restart on Oct 1: the count comes back from the meter, so nothing more today.
+      provider = tavilyProvider(tavily.request, "tvly-test-key-0123456789", spendLedger(meter, silentLogger))
+      expect(await day(10)).toBe(0)
       // Oct 2: the next 16.
       vi.setSystemTime(Date.UTC(2026, 9, 2, 1))
       expect(await day(40)).toBe(16)
-      // Nov 1: a new month, a new count (Tavily's 0 is believed again): half of 33.
+      // Nov 1: a new month, a new count: half of 33.
       vi.setSystemTime(Date.UTC(2026, 10, 1, 1))
       expect(await day(40)).toBe(16)
+      expect(meter.months).toEqual({ "2026-10": { tavily: 32 }, "2026-11": { tavily: 16 } })
     } finally {
       vi.useRealTimers()
     }
@@ -233,10 +264,9 @@ describe("local research", () => {
     vi.useFakeTimers({ toFake: ["Date"], now: Date.UTC(2026, 9, 1, 12) })
     try {
       // Tavily counts 20 of Oct 1's 32 credits spent elsewhere: this engine gets the 12 left, under its own 16.
-      const request = (async () => ({ status: 200, text: JSON.stringify({ account: { plan_usage: 20, plan_limit: 1_000 } }), headers: new Headers() })) as unknown as RequestText
-      const pacer = tavilyPacer(request, "tvly-test-key-0123456789")
+      const provider = tavilyProvider(fakeTavily(() => 20).request, "tvly-test-key-0123456789", spendLedger(undefined, silentLogger))
       let taken = 0
-      for (let i = 0; i < 40; i++) if (await pacer.take()) taken++
+      for (let i = 0; i < 40; i++) if (await provider.search("q", SEARCH_OPTS)) taken++
       expect(taken).toBe(12)
     } finally {
       vi.useRealTimers()

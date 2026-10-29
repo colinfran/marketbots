@@ -22,6 +22,7 @@ import type {
   SnapshotDoc,
 } from "@mb/crypto-core/db"
 import type { AgentEpisodeDoc, AgentNoteDoc, AgentWatchDoc, ShadowFillDoc, ShadowPositionDoc } from "@mb/core/agent"
+import type { SearchUsageDoc } from "@mb/core/db"
 import type { WireItemDoc, WireTriggerDoc } from "@mb/crypto-core/wire"
 import { connectMongo, type Database as DatabaseOf } from "@mb/engine-kit/db"
 import type { Logger } from "@mb/engine-kit/log"
@@ -51,6 +52,7 @@ export type Collections = {
   snapshots: Collection<SnapshotDoc>
   dailyStats: Collection<DailyStatsDoc>
   aiCalls: Collection<AiCallDoc>
+  searchUsage: Collection<SearchUsageDoc>
   backtests: Collection<BacktestDoc>
   notifications: Collection<NotificationDoc>
   seedRuns: Collection<SeedRunDoc>
@@ -83,6 +85,7 @@ export const collectionsFor = (db: Db): Collections => ({
   snapshots: db.collection<SnapshotDoc>(COLLECTIONS.snapshots),
   dailyStats: db.collection<DailyStatsDoc>(COLLECTIONS.dailyStats),
   aiCalls: db.collection<AiCallDoc>(COLLECTIONS.aiCalls),
+  searchUsage: db.collection<SearchUsageDoc>(COLLECTIONS.searchUsage),
   backtests: db.collection<BacktestDoc>(COLLECTIONS.backtests),
   notifications: db.collection<NotificationDoc>(COLLECTIONS.notifications),
   seedRuns: db.collection<SeedRunDoc>(COLLECTIONS.seedRuns),

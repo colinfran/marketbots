@@ -67,6 +67,7 @@ export const COLLECTIONS = {
   snapshots: "portfolio_snapshots",
   dailyStats: "daily_stats",
   aiCalls: "ai_calls",
+  searchUsage: "search_usage",
   backtests: "backtests",
   notifications: "notifications",
   seedRuns: "seed_runs",

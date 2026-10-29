@@ -67,6 +67,7 @@ export const COLLECTIONS = {
   wireItems: "wire_items",
   wireTriggers: "wire_triggers",
   aiCalls: "ai_calls",
+  searchUsage: "search_usage",
   cycles: "cycles",
   reports: "reports",
   decisions: "decisions",

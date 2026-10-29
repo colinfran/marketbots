@@ -1,21 +1,22 @@
 import type { TokenUsage } from "@mb/core/db"
 import type { LocalResearch, ResearchSource } from "@mb/engine-kit/ai/runner"
 import { errorMessage, type Logger } from "@mb/engine-kit/log"
-import { HttpError } from "@mb/engine-kit/util/http"
+import type { SearchMeter } from "@mb/engine-kit/state/search-usage"
 import { cleanLine, cleanText, domainOf, fenceUntrusted } from "@mb/engine-kit/util/text"
 import { extractArticle } from "../enrich/article"
 import type { RequestText } from "../fetch"
+import { spendLedger, type MeteredSearch } from "./metered"
 import { FREE_ENGINES, PAID_ENGINES, searchWeb, type SearchEngine, type SearchRange, type SearchResult } from "./search"
-import { tavilyPacer, tavilySearch } from "./tavily"
+import { tavilyProvider } from "./tavily"
 
 /**
  * Research on our own machines (docs/SERVER.md §9). The
  * bot's research prompt is unchanged; the local model can't browse, so the browsing is done for it:
  *   1. the model reads the request and writes up to MAX_QUERIES web searches;
  *   2. they run two at a time: on the search service's free news engines first. A query those
- *      find fewer than ENOUGH_FREE_RESULTS for goes to Tavily (free credits, paced through the
- *      month), and if it's still short, to the paid web engine (the residential proxy, billed per
- *      GB), up to PAID_SEARCHES_PER_DAY;
+ *      find fewer than ENOUGH_FREE_RESULTS for goes to the metered providers in turn (free
+ *      monthly allowances, paced through the month: ./metered), and if it's still short, to the
+ *      paid web engine (the residential proxy, billed per GB), up to PAID_SEARCHES_PER_DAY;
  *   3. the model picks up to MAX_ARTICLES results worth reading, and the scraper fetches them;
  *   4. the model writes the memo from the results and articles alone, citing their URLs, thinking
  *      only as the time left allows (memoBudget).
@@ -28,7 +29,7 @@ export const MAX_QUERIES = 6
 export const MAX_ARTICLES = 5
 /** Per query: the results the model may pick from. */
 const RESULTS_PER_QUERY = 8
-/** A query the free engines find fewer results for than this is searched on Tavily, then the paid engines, too. */
+/** A query the free engines find fewer results for than this is searched on the metered providers, then the paid engines, too. */
 const ENOUGH_FREE_RESULTS = 3
 /** Paid searches a UTC day, at most, per engine (the proxy's data is limited). */
 export const PAID_SEARCHES_PER_DAY = 100
@@ -109,11 +110,13 @@ const PICK_SCHEMA = {
 
 export type LocalResearchDeps = {
   request: RequestText
-  /** LLM_URL, SEARCH_URL, SCRAPER_URL and TAVILY_API_KEY. */
+  /** LLM_URL, SEARCH_URL, SCRAPER_URL, and the metered providers' keys (TAVILY_API_KEY). */
   env: Readonly<Record<string, string | null | undefined>>
   /** Sent to the scraper as `X-Client` (its per-caller queue share): "crypto", "stock". */
   client: string
   log: Logger
+  /** This bot's spend on the metered providers (`search_usage`). Unset: counted in memory only. */
+  meter?: SearchMeter
   /** Default PAID_SEARCHES_PER_DAY. */
   paidSearchesPerDay?: number
 }
@@ -190,8 +193,10 @@ export const localResearcher = (d: LocalResearchDeps): LocalResearch => {
     return true
   }
 
-  const tavilyKey = d.env.TAVILY_API_KEY
-  const tavily = tavilyKey ? tavilyPacer(d.request, tavilyKey) : null
+  /** The metered providers, in the order they're asked. */
+  const ledger = spendLedger(d.meter, d.log)
+  const metered: MeteredSearch[] = []
+  if (d.env.TAVILY_API_KEY) metered.push(tavilyProvider(d.request, d.env.TAVILY_API_KEY, ledger))
 
   return async ({ model, prompt, fromDate, timeoutMs, progress }) => {
     const started = Date.now()
@@ -217,7 +222,7 @@ export const localResearcher = (d: LocalResearchDeps): LocalResearch => {
       }
       if (!queries.length) return failed("the local model planned no searches")
 
-      // 2. Running them: on the free engines, then Tavily, then the paid engines while too little is found.
+      // 2. Running them: on the free engines, then the metered providers, then the paid engines while too little is found.
       const range = rangeFor(fromDate, new Date())
       let reached = false
       const found = await pool(queries, SEARCH_CONCURRENCY, async (q) => {
@@ -231,16 +236,15 @@ export const localResearcher = (d: LocalResearchDeps): LocalResearch => {
           d.log.warn("local research: a search failed", { query: q, error: errorMessage(error) })
           return []
         }
-        if (results.length < ENOUGH_FREE_RESULTS && tavily && tavilyKey) {
+        for (const provider of metered) {
+          if (results.length >= ENOUGH_FREE_RESULTS) break
           try {
-            if (await tavily.take()) {
-              const more = await tavilySearch(d.request, tavilyKey, q, { range, maxResults: RESULTS_PER_QUERY, timeoutMs: slice(1 / 4, 20_000) })
-              d.log.info("local research: a Tavily search", { query: q, free: results.length, tavily: more.length, month: tavily.state() })
-              add(more)
-            }
+            const more = await provider.search(q, { range, since: fromDate, maxResults: RESULTS_PER_QUERY, timeoutMs: slice(1 / 4, 20_000) })
+            if (!more) continue
+            d.log.info("local research: a metered search", { provider: provider.name, query: q, found: results.length, more: more.length, spent_this_month: ledger.spent(provider.name) })
+            add(more)
           } catch (error) {
-            if (error instanceof HttpError && error.status === 432) tavily.exhausted()
-            d.log.warn("local research: a Tavily search failed", { query: q, error: errorMessage(error) })
+            d.log.warn("local research: a metered search failed", { provider: provider.name, query: q, error: errorMessage(error) })
           }
         }
         if (results.length < ENOUGH_FREE_RESULTS && takePaidSearch()) {

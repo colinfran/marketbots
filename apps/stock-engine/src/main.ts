@@ -3,6 +3,7 @@ import { AiRunner } from "@mb/engine-kit/ai/runner"
 import { bootstrap } from "@mb/engine-kit/bootstrap"
 import { newsMovesJob } from "@mb/history/moves"
 import { HistoryStore } from "@mb/history/store"
+import { mongoSearchMeter } from "@mb/engine-kit/state/search-usage"
 import { httpClient } from "@mb/engine-kit/util/http"
 import { localResearcher } from "@mb/wire/research/local"
 import { CORE_INDEX_ETFS } from "@mb/stock-core/settings"
@@ -99,6 +100,7 @@ void bootstrap({
         env: { LLM_URL: env.LLM_URL, SEARCH_URL: env.SEARCH_URL, SCRAPER_URL: env.SCRAPER_URL, TAVILY_API_KEY: env.TAVILY_API_KEY },
         client: "stock",
         log: log.child({ component: "research" }),
+        meter: mongoSearchMeter(db.col.searchUsage),
       }),
     })
 

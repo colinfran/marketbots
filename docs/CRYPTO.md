@@ -58,6 +58,7 @@ Safety: browser `Origin` allowlist, max clients and max connections per IP, 4KB 
 | `cycles` / `research` / `decisions` | Each cycle, its research memo + sources + queries, and every decision with evidence, costs, edge, size, all risk checks, execution, and later its scored outcome | permanent |
 | `portfolio_snapshots` / `daily_stats` | Equity every 5 minutes; per-UTC-day P&L | 1 year / permanent |
 | `ai_calls` | Every model call: task, model, tokens, time and outcome; research calls also count their searches. Costs are 0 since the local model (before 2026-10-28, Grok's billed cost) | permanent |
+| `search_usage` | What research's metered search providers cost this bot each UTC month (one document a month), for their pacing ([SERVER.md §9](SERVER.md#9-the-local-model-server-llm)) | permanent |
 | `backtests` | Backtest runs and results | permanent |
 | `wire_items` | Every stored news item: normalized text, symbols, category, tier, severity and its parts, cluster, confirmations, price when first seen, notable reasons | TTL, `wire.retention_days` (30) |
 | `wire_triggers` | Every trigger candidate the policy produced, with the gate that passed or stopped it and why | TTL, `wire.retention_days` |
