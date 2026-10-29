@@ -215,15 +215,29 @@ describe("local research", () => {
         }
         return taken
       }
-      // Oct 1: 32 credits, though Tavily still says 0 after every search.
-      expect(await day(40)).toBe(32)
+      // Oct 1: this engine's half of 32 credits, though Tavily still says 0 after every search.
+      expect(await day(40)).toBe(16)
       expect(reads.length).toBeGreaterThan(5)
-      // Oct 2: the next 32.
+      // Oct 2: the next 16.
       vi.setSystemTime(Date.UTC(2026, 9, 2, 1))
-      expect(await day(40)).toBe(32)
-      // Nov 1: a new month, a new count (Tavily's 0 is believed again).
+      expect(await day(40)).toBe(16)
+      // Nov 1: a new month, a new count (Tavily's 0 is believed again): half of 33.
       vi.setSystemTime(Date.UTC(2026, 10, 1, 1))
-      expect(await day(40)).toBe(33)
+      expect(await day(40)).toBe(16)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("stops at the account's allowance when Tavily's count shows the other engine's searches", async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: Date.UTC(2026, 9, 1, 12) })
+    try {
+      // Tavily counts 20 of Oct 1's 32 credits spent elsewhere: this engine gets the 12 left, under its own 16.
+      const request = (async () => ({ status: 200, text: JSON.stringify({ account: { plan_usage: 20, plan_limit: 1_000 } }), headers: new Headers() })) as unknown as RequestText
+      const pacer = tavilyPacer(request, "tvly-test-key-0123456789")
+      let taken = 0
+      for (let i = 0; i < 40; i++) if (await pacer.take()) taken++
+      expect(taken).toBe(12)
     } finally {
       vi.useRealTimers()
     }

@@ -16,6 +16,8 @@ import type { SearchRange, SearchResult } from "./search"
 const API = "https://api.tavily.com"
 /** How long a usage reading is trusted; our own searches since are added to it. */
 const USAGE_TTL_MS = 5 * 60_000
+/** The engines sharing the key (both bots): each may spend its share of the allowance by its own count, whatever Tavily's lagging count says. */
+const SHARING_ENGINES = 2
 
 type Json = Record<string, unknown>
 
@@ -51,11 +53,14 @@ export const tavilySearch = async (request: RequestText, apiKey: string, query: 
 /**
  * The pacer: `take()` is true when one more search fits the month's allowance so far, and counts
  * it. Tavily's count lags our searches by minutes or more, so a new reading never lowers the
- * month's count below what this engine has already counted.
+ * month's count below what this engine has already counted, and each engine also keeps to its
+ * share of the allowance (1 / SHARING_ENGINES) by its own count, so two engines can't each spend
+ * the whole allowance before Tavily's count shows the other's searches.
  */
 export const tavilyPacer = (request: RequestText, apiKey: string, now: () => Date = () => new Date()) => {
   let reading: { used: number; limit: number; at: number; month: string } | null = null
   let spentSince = 0
+  let own = { month: "", count: 0 }
   let refreshing: Promise<void> | null = null
 
   /** The account's credits used this month and its monthly limit, from Tavily's usage endpoint. */
@@ -79,15 +84,19 @@ export const tavilyPacer = (request: RequestText, apiKey: string, now: () => Dat
     take: async (): Promise<boolean> => {
       if (!reading || Date.now() - reading.at > USAGE_TTL_MS) await refresh()
       const r = reading!
-      if (r.used + spentSince >= tavilyAllowance(r.limit, now())) return false
+      const month = now().toISOString().slice(0, 7)
+      if (own.month !== month) own = { month, count: 0 }
+      const allowed = tavilyAllowance(r.limit, now())
+      if (r.used + spentSince >= allowed || own.count >= Math.floor(allowed / SHARING_ENGINES)) return false
       spentSince++
+      own.count++
       return true
     },
     /** Tavily refused for lack of credits (432): none until the next reading. */
     exhausted: () => {
       if (reading) spentSince = reading.limit
     },
-    /** For the log: the month's usage as last read plus our searches since, and the allowance so far. */
-    state: () => (reading ? { used: reading.used + spentSince, allowed: tavilyAllowance(reading.limit, now()), limit: reading.limit } : null),
+    /** For the log: the month's usage as last read plus our searches since, this engine's own, and the allowance so far. */
+    state: () => (reading ? { used: reading.used + spentSince, own: own.count, allowed: tavilyAllowance(reading.limit, now()), limit: reading.limit } : null),
   }
 }
