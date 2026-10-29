@@ -2,3 +2,22 @@
 
 /* The shared components: Tailwind v4 doesn't scan workspace packages by itself. */
 @source "../../../packages/ui/src";
+
+/*
+ * One color per bot for the topology animation: slots 2 and 1 of the validated categorical palette
+ * (the blue is the dashboards' --series-1), stepped for each theme. Hex, because the canvas reads them.
+ */
+@theme inline {
+  --color-bot-crypto: var(--bot-crypto);
+  --color-bot-stock: var(--bot-stock);
+}
+
+:root {
+  --bot-crypto: #eb6834;
+  --bot-stock: #2a78d6;
+}
+
+.dark {
+  --bot-crypto: #d95926;
+  --bot-stock: #3987e5;
+}

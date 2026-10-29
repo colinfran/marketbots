@@ -1,8 +1,9 @@
 import { Badge } from "@mb/ui/components/badge"
 import { Button } from "@mb/ui/components/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@mb/ui/components/card"
-import { ArrowRightIcon, NewspaperIcon, RadioIcon, ShieldCheckIcon } from "lucide-react"
+import { ArrowRightIcon } from "lucide-react"
 import { CryptoMark, StockMark } from "@/components/marks"
+import { Topology } from "@/components/topology"
 
 const BOTS = [
   {
@@ -22,13 +23,6 @@ const BOTS = [
     facts: ["US stocks", "Defined-risk options", "Alpaca paper account"],
   },
 ] as const
-
-/** The loop both bots run, one line each. */
-const STEPS = [
-  { Icon: NewspaperIcon, title: "Research", text: "about 150 news sources and live market data" },
-  { Icon: ShieldCheckIcon, title: "Decide", text: "the AI proposes, a risk engine checks every order" },
-  { Icon: RadioIcon, title: "Publish", text: "every decision and trade streams live" },
-]
 
 export default function Home() {
   return (
@@ -75,18 +69,7 @@ export default function Home() {
         ))}
       </section>
 
-      <section aria-label="How they work">
-        <ol className="text-muted-foreground grid gap-3 text-sm sm:grid-cols-3">
-          {STEPS.map(({ Icon, title, text }) => (
-            <li key={title} className="flex items-start gap-2">
-              <Icon className="mt-0.5 size-4 shrink-0" aria-hidden />
-              <span>
-                <span className="text-foreground font-medium">{title}:</span> {text}
-              </span>
-            </li>
-          ))}
-        </ol>
-      </section>
+      <Topology />
     </div>
   )
 }
