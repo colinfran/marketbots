@@ -657,9 +657,10 @@ nvidia-smi                                                  # ~6.8 GB used on ea
 1. The model reads the request and writes up to 6 web searches (no thinking).
 2. The `search` service runs them, two at a time, for news and web results from the last day (gap fills and event checks) or week (full research).
 3. The model picks up to 5 results to read in full, and the scraper fetches them (paywalled sites are refused, as for summaries).
-4. The model writes the memo from the results and articles alone (1,024 tokens of thinking), citing their URLs.
+4. The model writes the memo from the results and articles alone, citing their URLs.
 
 A run takes about a minute, and costs nothing (`ai_calls`: `cost_source: "local"`, the searches counted). Its limits:
+- **Time:** the memo gets what the research timeout leaves (~40 s of 60 s). It keeps ~40 s for reading and writing (~1,200 tokens), thinks only with the rest (up to 1,024 tokens, which needs ~66 s), and is capped at what the time left can write at 40 tokens/s. A short timeout gets a shorter memo without thinking, not a timeout. For a memo that thinks, keep *Research timeout* and *Event research timeout* at 90 s or more.
 - **No X.** The memo says so, rather than guessing at sentiment.
 - **No paywalled articles.** Their search snippets can still be cited.
 - **A search that finds nothing** is reported in the memo, and the cycle decides from our feeds. Only an unreachable search service or model fails the research.

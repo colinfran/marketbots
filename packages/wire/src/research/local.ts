@@ -12,7 +12,8 @@ import { searchWeb, type SearchRange, type SearchResult } from "./search"
  *   1. the model reads the request and writes up to MAX_QUERIES web searches;
  *   2. the search service (SearXNG) runs them, two at a time, for news and web results;
  *   3. the model picks up to MAX_ARTICLES results worth reading, and the scraper fetches them;
- *   4. the model writes the memo from the results and articles alone, citing their URLs.
+ *   4. the model writes the memo from the results and articles alone, citing their URLs, thinking
+ *      only as the time left allows (memoBudget).
  * Results and articles are untrusted data, fenced as such. A search that finds nothing is reported
  * in the memo, not as a failure, so the cycle decides from our feeds; only an unreachable service
  * or a failing model is an error. There are no X posts: the memo says so instead of guessing.
@@ -26,9 +27,28 @@ const RESULTS_PER_QUERY = 8
 const ARTICLE_CHARS = 5_000
 const SEARCH_CONCURRENCY = 2
 const EXTRACT_CONCURRENCY = 3
-/** The memo's thinking, and its length. */
+/** The memo's thinking, and its length (thinking included), at most. */
 const MEMO_THINKING_TOKENS = 1_024
 const MEMO_MAX_TOKENS = 3_000
+/** The server's speed, a little under the 44–46 tokens/s it writes on its own. */
+const TOKENS_PER_S = 40
+/** What the memo keeps for reading its prompt (up to ~10k tokens) and writing itself (~1,200 tokens). */
+const MEMO_READ_S = 10
+const MEMO_WRITE_S = 30
+
+/**
+ * The memo's thinking and length within its timeout: it thinks only with what reading and writing
+ * leave (none under 256 tokens), and is capped at what the time can write, so a short budget gets
+ * a shorter memo rather than a timeout. Full thinking needs ~66 s.
+ */
+export const memoBudget = (timeoutMs: number) => {
+  const s = timeoutMs / 1000
+  const spare = Math.round((s - MEMO_READ_S - MEMO_WRITE_S) * TOKENS_PER_S)
+  return {
+    think: spare >= 256 ? Math.min(MEMO_THINKING_TOKENS, spare) : 0,
+    maxTokens: Math.round(Math.min(MEMO_MAX_TOKENS, Math.max(256, (s - MEMO_READ_S) * TOKENS_PER_S))),
+  }
+}
 
 export const PLAN_SYSTEM = [
   "You plan web searches for a trading bot's research desk. Read the research request and write the searches that would answer it.",
@@ -220,15 +240,15 @@ export const localResearcher = (d: LocalResearchDeps): LocalResearch => {
 
       // 4. The memo.
       const read = articles.map((a) => fenceUntrusted("article", `${a.title}\n${a.result.url}\nPublished: ${a.published ?? "unknown"}\n\n${a.text}`)).join("\n\n")
+      const memoTimeoutMs = slice(1, Number.MAX_SAFE_INTEGER) - 1_000
       const memo = cleanText(
         await ask(
           {
             model: alias,
             system: MEMO_SYSTEM,
             user: `RESEARCH REQUEST\n${prompt}\n\nSEARCHES RUN\n${queries.map((q) => `- ${q}`).join("\n")}\n\nSEARCH RESULTS\n${fenceUntrusted("search results", listing)}\n\nARTICLES READ IN FULL\n${read || "(none could be read)"}\n\nWrite the research memo.`,
-            think: MEMO_THINKING_TOKENS,
-            maxTokens: MEMO_MAX_TOKENS,
-            timeoutMs: slice(1, Number.MAX_SAFE_INTEGER) - 1_000,
+            ...memoBudget(memoTimeoutMs),
+            timeoutMs: memoTimeoutMs,
           },
           usage,
         ),

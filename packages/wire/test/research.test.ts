@@ -2,7 +2,7 @@ import { silentLogger } from "@mb/engine-kit/log"
 import { json } from "@mb/engine-kit/testing/fetch"
 import { httpClient } from "@mb/engine-kit/util/http"
 import { describe, expect, it, vi } from "vitest"
-import { localResearcher, MEMO_SYSTEM, PICK_SYSTEM, PLAN_SYSTEM, rangeFor } from "../src/research/local"
+import { localResearcher, MEMO_SYSTEM, memoBudget, PICK_SYSTEM, PLAN_SYSTEM, rangeFor } from "../src/research/local"
 
 const ENV = { LLM_URL: "http://llm:8080", SEARCH_URL: "http://search:8080", SCRAPER_URL: "http://scraper:8790" }
 const MODEL = "local/qwen3.6-35b-a3b-q2"
@@ -112,6 +112,21 @@ describe("local research", () => {
     })
     expect(await researcher()(job())).toMatchObject({ memo: "", error: "the search service is unreachable", queries: ["Hyperliquid HYPE news", "HYPE token unlock"] })
     expect(await researcher({ ...ENV, SEARCH_URL: undefined })(job())).toMatchObject({ memo: "", error: "local research needs LLM_URL and SEARCH_URL" })
+  })
+
+  it("thinks over the memo only with the time writing it leaves, and keeps it to what that time can write", async () => {
+    expect([memoBudget(160_000), memoBudget(66_000), memoBudget(40_000), memoBudget(20_000)]).toEqual([
+      { think: 1_024, maxTokens: 3_000 },
+      { think: 1_024, maxTokens: 2_240 },
+      { think: 0, maxTokens: 1_200 },
+      { think: 0, maxTokens: 400 },
+    ])
+    // A 60 s gap fill reaches its memo with ~40 s left: a memo without thinking, not a timeout.
+    const http = fakeServices()
+    expect((await researcher()(job({ timeoutMs: 41_000 }))).error).toBeNull()
+    const memo = http.of("/v1/chat/completions")[2].body
+    expect(memo).toMatchObject({ chat_template_kwargs: { enable_thinking: false }, reasoning_effort: "none" })
+    expect(memo.max_tokens).toBeLessThanOrEqual(1_200)
   })
 
   it("searches the last day for yesterday's research, the last week for a few days'", () => {
