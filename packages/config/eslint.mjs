@@ -8,7 +8,7 @@ import tseslint from "typescript-eslint"
  * in AGENTS.md:
  *
  *   @mb/core ← @mb/crypto-core / @mb/stock-core
- *   @mb/core ← @mb/engine-kit ← @mb/wire
+ *   @mb/core ← @mb/engine-kit ← @mb/wire, @mb/history, @mb/agent
  *   @mb/core ← @mb/ui, @mb/web-kit
  *   apps depend on packages; packages never import apps; crypto never imports stock, or the reverse;
  *   the landing page imports only @mb/ui and @mb/web-kit.
@@ -18,6 +18,7 @@ import tseslint from "typescript-eslint"
 const SHARED = {
   core: [],
   "engine-kit": ["core"],
+  agent: ["core", "engine-kit"],
   history: ["core", "engine-kit"],
   wire: ["core", "engine-kit"],
   ui: ["core"],

@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { AGENT_LEVELS } from "./agent"
 
 /**
  * Runtime settings: the pieces both bots share. Settings live in MongoDB, are edited only from the
@@ -103,6 +104,52 @@ export const wireSettingsBase = z.object({
   summaries: wireSummariesSettings,
 })
 export type WireSettingsBase = z.infer<typeof wireSettingsBase>
+
+/** What one priority's episodes may spend (docs/plans/LOCAL-AI.md §8.2). */
+export const agentPriorityLimits = z.object({
+  /** Steps per episode, the answer included: the last one may only answer. */
+  steps: int(1, 30),
+  /** The hard stop. Tool calls end at 60% of it, so the answer has the rest. */
+  seconds: z.number().min(10).max(1_800),
+  /** The model's thinking per step, in tokens; 0 = no thinking. */
+  thinking_tokens: int(0, 8_000),
+})
+
+/**
+ * The agent (docs/plans/LOCAL-AI.md §8–§10), the same in both bots. At `level` shadow it wakes on
+ * what code observes, looks things up, and puts its decisions into the shadow book; nothing reaches
+ * the broker. The envelope limits what the agent does, tighter than the bot's own risk caps;
+ * risk-reducing actions are never rate-limited.
+ */
+export const agentSettingsBase = z.object({
+  level: z.enum(AGENT_LEVELS),
+  model: modelId,
+  limits: z.object({ p0: agentPriorityLimits, p1: agentPriorityLimits, p2: agentPriorityLimits, p3: agentPriorityLimits }),
+  /** A subject that woke the agent doesn't wake it again for this long, unless its salience rises 15 points, a P0, a watch or the owner. */
+  wake_cooldown_minutes: z.number().min(0).max(240),
+  /** A review of the whole book and market after this long without one: the safety net for what nothing triggered. */
+  sweep_minutes: z.number().min(15).max(1_440),
+  envelope: z.object({
+    entries_per_day: int(0, 50),
+    entries_per_hour: int(0, 20),
+    /** Money committed to new entries in any hour, % of equity. */
+    commit_per_hour_pct: pct(0, 100),
+    /** An agent entry's size, % of what the risk checks allow. */
+    size_pct: pct(1, 100),
+    max_open_positions: int(0, 30),
+    /** One action per symbol this often (tightening a stop is exempt). */
+    symbol_action_minutes: z.number().min(0).max(1_440),
+    /** No re-entry in a symbol this long after a stop-out. */
+    reentry_after_stop_hours: z.number().min(0).max(168),
+    /** Re-entering a symbol this soon after exiting it is refused. */
+    flip_hours: z.number().min(0).max(72),
+  }),
+  /** The shadow book's starting cash. */
+  shadow_starting_usd: z.number().min(100).max(10_000_000),
+  /** Stream the model's thinking to logged-out viewers too (it quotes untrusted news text). */
+  public_thinking: z.boolean(),
+})
+export type AgentSettings = z.infer<typeof agentSettingsBase>
 
 /** The first refinement of every bot's settings: the wire thresholds must ascend. */
 export const refineWireThresholds = (settings: { wire: Pick<WireSettingsBase, "thresholds"> }, ctx: z.RefinementCtx) => {

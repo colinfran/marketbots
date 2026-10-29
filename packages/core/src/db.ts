@@ -180,8 +180,8 @@ export type NotificationDoc = {
   expires_at: Date
 }
 
-/** research_gap = the short web research that only fills gaps the wire dossier leaves. */
-export type AiTask = "research" | "decision" | "research_gap"
+/** research_gap = the short web research that only fills gaps the wire dossier leaves; agent = one agent episode, every step. */
+export type AiTask = "research" | "decision" | "research_gap" | "agent"
 
 export type AiCallDoc = {
   _id: string

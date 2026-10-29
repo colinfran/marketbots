@@ -1,4 +1,5 @@
 import { z } from "zod"
+import type { AgentActionOutcome, AgentStepKind, EpisodeStatus, ObservationKind, Priority, WatchKind } from "./agent"
 import type { DossierRow, NotableReason, WireKind, WireSourceState, WireTier, WireTriggerAction, WireTriggerStatus } from "./wire"
 
 /**
@@ -76,9 +77,37 @@ export type BaseEventDataMap<Category extends string, RunStatus extends string, 
     executed: number
     error: string | null
   }
+  /** The agent woke on a subject (docs/plans/LOCAL-AI.md §8). */
+  "agent.woke": { episode_id: string; priority: Priority; subject: string; kinds: ObservationKind[]; observations: number; reasons: string[] }
+  /** One step of an episode: a tool call (its purpose and result, capped) or the answer. */
+  "agent.step": { episode_id: string; step: number; kind: AgentStepKind; tool: string | null; purpose: string | null; result: string | null; ms: number; tokens_per_s: number | null }
+  /** The latest ~240 characters of the model's thinking, at most every 1.5 s while it streams (owner-only unless agent.public_thinking). */
+  "agent.thinking": { episode_id: string; step: number; chars: number; excerpt: string }
+  "agent.answered": {
+    episode_id: string
+    status: EpisodeStatus
+    subject: string
+    priority: Priority
+    reply: string | null
+    actions: { symbol: string; action: string; outcome: AgentActionOutcome }[]
+    watches: number
+    notes: number
+    steps: number
+    duration_ms: number
+  }
+  "agent.watch": { watch_id: string; status: "set" | "fired" | "expired" | "canceled"; kind: WatchKind; symbol: string | null; note: string }
+  /** A fill in the shadow book: what the agent would have traded. */
+  "agent.shadow": { position_id: string; symbol: string; side: "buy" | "sell"; qty: number; price: number; reason: string; realized_pnl_usd: number | null }
+  /** A circuit breaker tripped (recorded; at level shadow nothing is enforced). */
+  "agent.breaker": { name: string; detail: string }
   error: { scope: string; message: string }
   alert: { level: "info" | "warning" | "error" | "critical"; title: string; message: string }
 }
+
+/** The agent's events: the same in both bots. */
+export const AGENT_EVENT_TYPES = ["agent.woke", "agent.step", "agent.thinking", "agent.answered", "agent.watch", "agent.shadow", "agent.breaker"] as const
+export type AgentEventType = (typeof AGENT_EVENT_TYPES)[number]
+export type AgentEventDataMap = Pick<BaseEventDataMap<string, string, string>, AgentEventType>
 
 export type EventLevel = "debug" | "info" | "warn" | "error"
 export type EventVisibility = "public" | "owner"

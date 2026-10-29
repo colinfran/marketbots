@@ -23,7 +23,7 @@ Dependency direction:
 
 ```
 @mb/core ◀── @mb/crypto-core, @mb/stock-core
-@mb/core ◀── @mb/engine-kit ◀── @mb/wire, @mb/history
+@mb/core ◀── @mb/engine-kit ◀── @mb/wire, @mb/history, @mb/agent
 @mb/core ◀── @mb/ui, @mb/web-kit
 ```
 
@@ -32,7 +32,7 @@ Dependency direction:
 ESLint enforces this with `no-restricted-imports`, built by `boundaries(owner)` in [packages/config/eslint.mjs](packages/config/eslint.mjs). Each package's `eslint.config.mjs` names its owner:
 
 - `nodeConfig("crypto")` / `nodeConfig("stock")` for engines and bot core packages, `nextConfig("crypto")` / `nextConfig("stock")` for dashboards. Bot code may not import an app, or any `@mb/<other bot>-*` package.
-- `nodeConfig("<name>")` for a shared package (`core`, `engine-kit`, `wire`, `history`, `ui`, `web-kit`). It may import only itself, `@mb/config` and its entry in the `SHARED` map in `eslint.mjs`.
+- `nodeConfig("<name>")` for a shared package (`core`, `engine-kit`, `wire`, `history`, `agent`, `ui`, `web-kit`). It may import only itself, `@mb/config` and its entry in the `SHARED` map in `eslint.mjs`.
 
 Beyond what the rule checks:
 
@@ -42,9 +42,9 @@ Beyond what the rule checks:
 
 ## Adding shared code
 
-The shared packages are `packages/config`, `packages/core`, `packages/engine-kit`, `packages/wire`, `packages/history`, `packages/ui` and `packages/web-kit` ([docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#shared-code)).
+The shared packages are `packages/config`, `packages/core`, `packages/engine-kit`, `packages/wire`, `packages/history`, `packages/agent`, `packages/ui` and `packages/web-kit` ([docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#shared-code)).
 
-1. **Pick the package**: `core` (pure, no I/O), `engine-kit` (engine runtime), `wire` (news engine), `history` (the history store), `ui` (client-safe React), `web-kit` (server-only dashboard helpers).
+1. **Pick the package**: `core` (pure, no I/O), `engine-kit` (engine runtime), `wire` (news engine), `history` (the history store), `agent` (the agent runtime), `ui` (client-safe React), `web-kit` (server-only dashboard helpers).
 2. **Share only what both bots mean the same thing by.** If sharing would need a flag that switches between two behaviors, keep the code per bot. Pass what genuinely differs (a constant, an HMAC prefix, a time zone, a Discord username) in as a parameter; no `if (bot === "crypto")` in shared code, and no bot-specific constants.
 3. **A new package** `packages/<name>/` (copy `packages/crypto-core` as the template):
    - `package.json`: `"name": "@mb/<name>"`, `"private": true`, `"type": "module"`, `"exports": { "./*": "./src/*.ts" }`, `test` / `typecheck` / `lint` scripts, and `"@mb/config": "workspace:*"` in devDependencies.
