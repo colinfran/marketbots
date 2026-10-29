@@ -28,7 +28,8 @@ import { isOwnerEmail } from "./owner"
 
 export type Viewer = { owner: boolean }
 
-const SESSION_TTL_SECONDS = 12 * 3_600
+/** A fixed 30 days from sign-in: never extended by use. */
+const SESSION_TTL_SECONDS = 30 * 86_400
 /** How long a sign-in link or code works. */
 const SIGN_IN_TTL_SECONDS = 5 * 60
 
@@ -81,7 +82,7 @@ export const createAuth = ({
         modelName: BASE_COLLECTIONS.authUsers,
         validateUserInfo: ({ user }) => (isOwnerEmail(user.email, env.ownerEmail()) ? undefined : { error: "not_owner" }),
       },
-      session: { modelName: BASE_COLLECTIONS.authSessions, expiresIn: SESSION_TTL_SECONDS },
+      session: { modelName: BASE_COLLECTIONS.authSessions, expiresIn: SESSION_TTL_SECONDS, disableSessionRefresh: true },
       account: { modelName: BASE_COLLECTIONS.authAccounts },
       verification: { modelName: BASE_COLLECTIONS.authVerifications },
       disabledPaths: UNUSED_OTP_PATHS,

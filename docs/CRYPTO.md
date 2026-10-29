@@ -67,7 +67,7 @@ Safety: browser `Origin` allowlist, max clients and max connections per IP, 4KB 
 | `agent_watches` / `agent_notes` | The agent's watches (active until they fire or expire) and its notes per subject | removed 30 days after a watch ends; notes 14 days (TTL) |
 | `shadow_positions` / `shadow_fills` | The agent's shadow book: what it would hold, and every simulated fill | permanent |
 | `notifications`, `login_attempts` | Alerts for the dashboard; sign-in rate limits (hashed IPs) | TTL |
-| `auth_users` / `auth_sessions` / `auth_accounts` / `auth_verifications` | Owner sign-in (Better Auth magic links, or emailed codes in the Home Screen app; only `OWNER_EMAIL`); written by the dashboard | sessions 12h, links and codes 5 min (TTL) |
+| `auth_users` / `auth_sessions` / `auth_accounts` / `auth_verifications` | Owner sign-in (Better Auth magic links, or emailed codes in the Home Screen app; only `OWNER_EMAIL`); written by the dashboard | sessions 30 days, links and codes 5 min (TTL) |
 
 Raw market data is not stored: candles come from Kraken on demand (720 per interval) and only compact feature summaries reach MongoDB. Index definitions live in `packages/core/src/db.ts` and are created by the engine on boot.
 
