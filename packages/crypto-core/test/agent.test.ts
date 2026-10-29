@@ -38,12 +38,24 @@ describe("crypto agent decisions", () => {
     expect(d.notes).toContain("size_pct_of_max 0.5 read as 50%")
   })
 
-  it("keeps known pairs only, the first per pair, at most three, and fits actions to the book", () => {
+  it("keeps known pairs only, the first per pair, and fits actions to the book", () => {
     const r = normalizeCryptoAgentDecisions([decision({ symbol: "DOGE/USD" }), decision(), decision(), decision({ symbol: "BTC/USD", action: "buy" })], opts)
     expect(r.decisions.map((d) => [d.symbol, d.action, d.strategy])).toEqual([
       ["SOL/USD", "buy", "discretionary"],
       ["BTC/USD", "hold", null],
     ])
-    expect(r.dropped).toEqual(["DOGE/USD: not in the universe or the shadow book"])
+    expect(r.dropped).toEqual(["DOGE/USD: not in the universe or the book"])
+  })
+
+  it("keeps a decision for every held pair, and at most three about pairs not held", () => {
+    const pairs = ["A", "B", "C", "D", "E", "F"].map((s) => `${s}/USD`)
+    const many = { ...opts, universe: new Set(pairs), held: new Set(pairs.slice(0, 4)) }
+    // Four holdings reviewed first, then two new pairs: nothing is cut.
+    expect(normalizeCryptoAgentDecisions(pairs.map((symbol) => decision({ symbol, action: "hold" })), many).decisions).toHaveLength(6)
+    // Five new pairs: the first three are kept, and a holding after them still is.
+    const fresh = { ...opts, universe: new Set([...pairs, "G/USD", "H/USD", "I/USD"]), held: new Set(["A/USD"]) }
+    const r = normalizeCryptoAgentDecisions([..."BCDEF"].map((s) => decision({ symbol: `${s}/USD` })).concat(decision({ symbol: "A/USD", action: "close" })), fresh)
+    expect(r.decisions.map((d) => d.symbol)).toEqual(["B/USD", "C/USD", "D/USD", "A/USD"])
+    expect(r.dropped).toEqual(["E/USD: more than 3 pairs not held", "F/USD: more than 3 pairs not held"])
   })
 })

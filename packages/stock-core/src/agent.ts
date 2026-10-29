@@ -28,21 +28,31 @@ export const stockAgentDecisionSchema = decisionSchema.extend({
   option: agentOptionOrderSchema.nullable().describe("buy_option only: what to buy, from an option_menu result in this episode. null for every other action."),
 })
 
+/** At most this many new entries (buys and option buys) per answer; anything held may get a decision too. */
+export const MAX_NEW_ENTRIES = 3
+
 export const stockAgentAnswerSchema = z.object({
   decisions: z
     .array(stockAgentDecisionSchema)
-    .describe("0-3 decisions, only about what woke you and what you hold. An empty list is a normal answer: watch instead of acting early."),
+    .describe(
+      `Only about what woke you and what you hold: at most ${MAX_NEW_ENTRIES} new entries (buy, buy_option), plus one for each position in YOUR BOOK that needs a decision. An empty list is a normal answer: watch instead of acting early.`,
+    ),
   ...agentAnswerFields,
 })
 
 export type StockAgentAnswer = z.infer<typeof stockAgentAnswerSchema>
 export type StockAgentDecision = Decision
 
-/** Keeps decisions on known tickers (the first per ticker and instrument, at most three), bounded like the cycle's. */
+/**
+ * Keeps decisions on known tickers (the first per ticker and instrument), bounded like the cycle's:
+ * every decision on what is held, since the agent manages the whole book, and at most
+ * MAX_NEW_ENTRIES new entries.
+ */
 export const normalizeStockAgentDecisions = (decisions: StockAgentAnswer["decisions"], { known }: { known: (symbol: string) => boolean }): { decisions: StockAgentDecision[]; dropped: string[] } => {
   const seen = new Set<string>()
   const out: StockAgentDecision[] = []
   const dropped: string[] = []
+  let entries = 0
   for (const raw of decisions) {
     const d = normalizeDecision(raw)
     const key = `${d.symbol}:${d.action.endsWith("_option") ? (d.structure_id ?? d.option?.long_leg ?? "option") : "stock"}`
@@ -52,8 +62,11 @@ export const normalizeStockAgentDecisions = (decisions: StockAgentAnswer["decisi
       continue
     }
     seen.add(key)
+    if ((d.action === "buy" || d.action === "buy_option") && ++entries > MAX_NEW_ENTRIES) {
+      dropped.push(`${d.symbol}: more than ${MAX_NEW_ENTRIES} new entries`)
+      continue
+    }
     out.push(d)
   }
-  if (out.length > 3) dropped.push(...out.slice(3).map((d) => `${d.symbol}: more than three decisions`))
-  return { decisions: out.slice(0, 3), dropped }
+  return { decisions: out, dropped }
 }

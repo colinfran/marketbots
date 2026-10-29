@@ -26,10 +26,15 @@ export const cryptoAgentDecisionSchema = cryptoDecisionSchema.extend({
   strategy: z.enum(STRATEGY_IDS).nullable().describe("BUY only: the strategy the entry follows (discretionary when none fits). null otherwise."),
 })
 
+/** At most this many decisions about pairs not held (buys and no_trades) per answer; any held position may get one too. */
+export const MAX_NEW_PAIRS = 3
+
 export const cryptoAgentAnswerSchema = z.object({
   decisions: z
     .array(cryptoAgentDecisionSchema)
-    .describe("0-3 decisions, only about what woke you and what you hold. An empty list is a normal answer: watch instead of acting early."),
+    .describe(
+      `Only about what woke you and what you hold: at most ${MAX_NEW_PAIRS} about pairs you don't hold, plus one for each position in YOUR BOOK that needs a decision. An empty list is a normal answer: watch instead of acting early.`,
+    ),
   ...agentAnswerFields,
 })
 
@@ -38,9 +43,10 @@ export type CryptoAgentAnswer = z.infer<typeof cryptoAgentAnswerSchema>
 export type NormalizedCryptoAgentDecision = NormalizedCryptoDecision & { strategy: StrategyId | null }
 
 /**
- * Keeps decisions on known pairs (the first per pair, at most three), bounded like the cycle's. A
- * size of 1 or less is read as a fraction (the local model sometimes writes 0.5 for 50%), so it
- * isn't clamped up to the 10% floor.
+ * Keeps decisions on known pairs (the first per pair), bounded like the cycle's: every held pair's,
+ * since the agent manages the whole book, and at most MAX_NEW_PAIRS about pairs not held. A size of
+ * 1 or less is read as a fraction (the local model sometimes writes 0.5 for 50%), so it isn't
+ * clamped up to the 10% floor.
  */
 export const normalizeCryptoAgentDecisions = (
   decisions: CryptoAgentAnswer["decisions"],
@@ -49,19 +55,23 @@ export const normalizeCryptoAgentDecisions = (
   const seen = new Set<string>()
   const out: NormalizedCryptoAgentDecision[] = []
   const dropped: string[] = []
+  let fresh = 0
   for (const d of decisions) {
     const symbol = d.symbol.trim().toUpperCase()
     if (seen.has(symbol)) continue
     if (!held.has(symbol) && !universe.has(symbol)) {
-      dropped.push(`${symbol}: not in the universe or the shadow book`)
+      dropped.push(`${symbol}: not in the universe or the book`)
       continue
     }
     seen.add(symbol)
+    if (!held.has(symbol) && ++fresh > MAX_NEW_PAIRS) {
+      dropped.push(`${symbol}: more than ${MAX_NEW_PAIRS} pairs not held`)
+      continue
+    }
     const fraction = d.size_pct_of_max !== null && d.size_pct_of_max > 0 && d.size_pct_of_max <= 1
     const n = normalizeCryptoDecision(fraction ? { ...d, size_pct_of_max: d.size_pct_of_max! * 100 } : d, symbol, held.has(symbol), sourceUrls)
     if (fraction) n.notes.push(`size_pct_of_max ${d.size_pct_of_max} read as ${d.size_pct_of_max! * 100}%`)
     out.push({ ...n, strategy: n.action === "buy" ? (d.strategy ?? "discretionary") : null })
   }
-  if (out.length > 3) dropped.push(...out.slice(3).map((d) => `${d.symbol}: more than three decisions`))
-  return { decisions: out.slice(0, 3), dropped }
+  return { decisions: out, dropped }
 }

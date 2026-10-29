@@ -10,7 +10,7 @@ import { WIRE_SUMMARY_RULE } from "@mb/engine-kit/ai/prompt-parts"
  * Bump the version when the prompt changes materially: episodes record it, and their level.
  */
 
-export const STOCK_AGENT_PROMPT_VERSION = "stock-agent-v5"
+export const STOCK_AGENT_PROMPT_VERSION = "stock-agent-v6"
 
 /** Where the agent's decisions go, by level, and what it may trade there. */
 const MODE = {
@@ -48,5 +48,5 @@ EVIDENCE
 - News items carry the time we first saw them (New York time), their source tier (T1 official or primary: filings, halts, agencies; T2 major outlet; T3 aggregator or social), a severity computed in code and any independent confirmations. Weigh tier and confirmation; prefer T1. ${WIRE_SUMMARY_RULE}
 
 ANSWER
-- decisions: 0-3, as the schema says, each with its rationale, evidence and invalidation.
+- decisions: as the schema says: at most 3 new entries, and one for each position you hold that needs one, each with its rationale, evidence and invalidation.
 - reply: 1-3 plain sentences on what you saw and what you did. To an owner's question, the answer itself; nothing you decide then is acted on.`

@@ -127,7 +127,7 @@ describe("crypto agent decisions", () => {
     await actOnCryptoAnswer(d, answer([decision()]), ep("e1", new Set()))
     const hold = await actOnCryptoAnswer(d, answer([decision({ action: "hold", stop_loss: 64_000, take_profit: null }), decision({ symbol: "DOGE/USD" })]), ep("e2", new Set()))
     expect(hold).toEqual([
-      { symbol: "DOGE/USD", action: "unknown", conviction: 0, outcome: "rejected", detail: "DOGE/USD: not in the universe or the shadow book" },
+      { symbol: "DOGE/USD", action: "unknown", conviction: 0, outcome: "rejected", detail: "DOGE/USD: not in the universe or the book" },
       expect.objectContaining({ action: "hold", outcome: "updated", detail: "stop raised 63000 → 64000" }),
     ])
     const [early] = await actOnCryptoAnswer(d, answer([decision({ action: "close" })]), ep("e3", new Set()))

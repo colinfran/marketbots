@@ -391,7 +391,7 @@
           ],
           "additionalProperties": false
         },
-        "description": "0-3 decisions, only about what woke you and what you hold. An empty list is a normal answer: watch instead of acting early."
+        "description": "Only about what woke you and what you hold: at most 3 new entries (buy, buy_option), plus one for each position in YOUR BOOK that needs a decision. An empty list is a normal answer: watch instead of acting early."
       },
       "watches": {
         "type": "array",
