@@ -58,6 +58,7 @@ export const fakeHub = (quotes: Record<string, Quote | null> = { "BTC/USD": quot
   wsConnected: true,
   universe: pairs.map((p) => p.symbol),
   setUniverse: vi.fn(),
+  onBar: vi.fn(),
   health: () => ({ rest: "ok" as const, ws: "connected" as const, last_message_at: new Date(), last_error: null, status_text: "online" }),
   symbolHealth: () => [],
   heldSymbols: () => [] as string[],

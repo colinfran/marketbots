@@ -1,20 +1,29 @@
+import { checkEntry } from "@mb/agent/envelope"
 import type { Wake } from "@mb/agent/queue"
 import { BOOK_SUBJECT, MARKET_SUBJECT, type Observation } from "@mb/core/agent"
-import { formatTime } from "@mb/stock-core/time"
+import { errorMessage } from "@mb/engine-kit/log"
+import { formatTime, marketDay } from "@mb/stock-core/time"
 import { upcomingMacro } from "@mb/wire/calendar"
-import { bookText, sessionWindow, sidePrices, type StockAgentDeps } from "./book"
+import { bookText, sessionWindow, shadowRiskState, sidePrices, type StockAgentDeps } from "./book"
+import { StockScreen } from "./screen"
 
 /**
- * What wakes the stock agent besides news (docs/plans/LOCAL-AI.md §8.1, §8.7), checked by code:
+ * What wakes the stock agent besides news (docs/plans/LOCAL-AI.md §8.1, §8.7), checked by code as
+ * the data arrives:
  *
  *   session      premarket (P2: plan, watches and notes only), the open after its buffer (P2), the
  *                closing window while the book holds anything (P1), after the close (P3: review)
- *   every 5 s    in session: the shadow book's stops and targets against the bid; a fill is a P2
- *   every 15 s   in session: marks, and a held stock moving `schedule.trigger_move_pct` since your
- *                last review (down: P0, up: P2), again at every further step
+ *   bar close    each closed minute of the price board (the scan universe and what the engine
+ *                tracks) goes through the setup screen (./screen); while buys are allowed and the
+ *                envelope would take one, the minute's best setups on stocks not in the book wake
+ *                the agent together, as one P1
+ *   every 5 s    in session: the shadow book's stops and targets against the bid (a fill is a P2),
+ *                and a held stock moving `schedule.trigger_move_pct` since your last review (down:
+ *                P0, up: P2), again at every further step
+ *   every 15 s   in session: marks
  *   bell - 3 min intraday positions are closed by code (the overnight rule), as the cycles do
  *   each minute  a scheduled release 15 minutes out is a P2 about the market
- *   sweep        in session, a P2 review every `agent.sweep_minutes`
+ *   quiet time   in session, a P2 review once nothing has woken the agent for `agent.sweep_minutes`
  *
  * News comes from the wire policy's observe hook (engine.ts), around the clock: outside the session
  * the agent can only set watches and notes.
@@ -25,16 +34,39 @@ const MARK_MS = 15_000
 const CALENDAR_LEAD_MS = 15 * 60_000
 const OVERNIGHT_MINUTES = 3
 const MIN = 60_000
+/** The most setups one wake-up lists. */
+const MAX_SETUPS = 5
 
 export class StockObserver {
-  private last = { exits: 0, mark: 0, calendar: 0, sweep: 0 }
+  private last = { exits: 0, mark: 0, calendar: 0, sweep: Date.now() }
   private readonly done = new Set<string>()
   private readonly moves = new Map<string, string>()
+  private readonly screen = new StockScreen()
 
   constructor(
     private readonly d: StockAgentDeps,
     private readonly observe: (o: Observation) => void,
+    /** When the agent's last episode finished (0: none yet), for the quiet-time review. */
+    private readonly lastEpisodeAt: () => number = () => 0,
   ) {}
+
+  /** One closed minute of the price board: the screen sees every bar; its setups wake the agent only while a buy could happen. */
+  async onBars(bars: readonly { symbol: string; t: number; close: number; volume: number }[], now = new Date()) {
+    const s = this.d.session()
+    const setups = this.screen.onBars(bars, { open: s?.is_trading_day ? (s.open ?? null) : null, day: marketDay(now), minPrice: this.d.ctx.settings.current.risk.min_price })
+    if (!setups.length || !sessionWindow(this.d, now).entries) return
+    const { history, open } = await shadowRiskState(this.d, now)
+    if (!checkEntry("", history, this.d.ctx.settings.current.agent.envelope, now.getTime()).approved) return
+    const held = new Set(open.map((p) => p.symbol))
+    for (const x of setups.filter((x) => !held.has(x.symbol)).slice(0, MAX_SETUPS)) {
+      this.observe({ id: `setup:${x.symbol}:${x.kind}:${x.t}`, subject: MARKET_SUBJECT, kind: "setup", priority: 1, salience: x.score, summary: x.summary, refs: { symbol: x.symbol }, at: now })
+    }
+  }
+
+  /** onBars for the engine's callback: never throws. */
+  bars(bars: readonly { symbol: string; t: number; close: number; volume: number }[]) {
+    void this.onBars(bars).catch((e) => this.d.ctx.log.warn("agent setups failed", { error: errorMessage(e) }))
+  }
 
   /** Each key once: a session phase per day, a release, the overnight rule per day. */
   private once(key: string) {
@@ -52,21 +84,31 @@ export class StockObserver {
     if (window.open && t - this.last.exits >= EXITS_MS) {
       this.last.exits = t
       await this.exits(now)
+      await this.priceMoves(now)
     }
     if (window.open && t - this.last.mark >= MARK_MS) {
       this.last.mark = t
       await this.d.shadow.mark(this.d.price)
-      await this.priceMoves(now)
     }
     if (window.open && s?.close && s.close.getTime() - t <= OVERNIGHT_MINUTES * MIN && this.once(`overnight:${s.day}`)) await this.overnight()
     if (t - this.last.calendar >= MIN) {
       this.last.calendar = t
       this.calendarEvents(now)
     }
-    if (window.entries && t - this.last.sweep >= this.d.ctx.settings.current.agent.sweep_minutes * MIN) {
-      // The first sweep comes a full interval after the open's own wake-up.
-      if (this.last.sweep) this.observe({ id: `sweep:${t}`, subject: MARKET_SUBJECT, kind: "sweep", priority: 2, salience: 30, summary: "Periodic review: your book, the market, and anything nothing else woke you for.", refs: {}, at: now })
+    // The open's own wake-up counts: the first review comes a full quiet spell after it.
+    const quietSince = Math.max(this.last.sweep, this.lastEpisodeAt())
+    if (window.entries && t - quietSince >= this.d.ctx.settings.current.agent.sweep_minutes * MIN) {
       this.last.sweep = t
+      this.observe({
+        id: `sweep:${t}`,
+        subject: MARKET_SUBJECT,
+        kind: "sweep",
+        priority: 2,
+        salience: 30,
+        summary: `Quiet-time review: nothing has woken you for ${Math.round((t - quietSince) / MIN)} min. Check your book, the market, and anything nothing else woke you for.`,
+        refs: {},
+        at: now,
+      })
     }
   }
 
@@ -161,10 +203,12 @@ export const stockBrief = async (d: StockAgentDeps, wake: Wake) => {
     return p === null ? `${s} n/a` : `${s} ${p}${live?.change_pct !== null && live?.change_pct !== undefined ? ` (${live.change_pct >= 0 ? "+" : ""}${live.change_pct}%)` : ""}`
   })
   const sections = [await bookText(d), `MARKET\n- ${benchmarks.join(", ")}`]
-  const p = sidePrices(d, wake.subject)
-  if (p) {
-    const live = d.ctx.prices.get(wake.subject)
-    sections.push(`SUBJECT ${wake.subject}\n- ${p.last}${live?.bid && live.ask ? ` (bid ${live.bid}, ask ${live.ask})` : ""}${live?.change_pct !== null && live?.change_pct !== undefined ? `, ${live.change_pct >= 0 ? "+" : ""}${live.change_pct}% today` : ""}; technicals and news: use the tools`)
+  // The stock that woke the agent, or each stock of a market-wide wake-up's setups.
+  for (const symbol of new Set([wake.subject, ...wake.observations.map((o) => o.refs.symbol).filter((s): s is string => !!s)])) {
+    const p = sidePrices(d, symbol)
+    if (!p) continue
+    const live = d.ctx.prices.get(symbol)
+    sections.push(`SUBJECT ${symbol}\n- ${p.last}${live?.bid && live.ask ? ` (bid ${live.bid}, ask ${live.ask})` : ""}${live?.change_pct !== null && live?.change_pct !== undefined ? `, ${live.change_pct >= 0 ? "+" : ""}${live.change_pct}% today` : ""}; technicals and news: use the tools`)
   }
   return { text: sections.join("\n\n"), urls: [] }
 }

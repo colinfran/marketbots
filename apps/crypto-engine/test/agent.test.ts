@@ -29,7 +29,7 @@ const setup = async (settings: Settings = DEFAULT_SETTINGS, quotes = { "BTC/USD"
     state: { state: { status: "running", kill_switch: { engaged: false } } } as unknown as EngineStateStore,
     hub,
     // No candles: features fall back, as they do before Kraken answers.
-    candles: { get: async () => Promise.reject(new Error("no candles in this test")) } as unknown as CandleCache,
+    candles: { get: async () => Promise.reject(new Error("no candles in this test")), expire: vi.fn() } as unknown as CandleCache,
     ledger: {} as never,
     executor: {} as never,
     ai: {} as AiRunner,
@@ -147,6 +147,43 @@ describe("crypto agent observations and tools", () => {
     await observer.tick(new Date())
     expect(seen.find((o) => o.kind === "fill")).toMatchObject({ subject: "BTC/USD", priority: 2, summary: expect.stringContaining("hit its stop") })
     expect(await d.shadow.open()).toEqual([])
+  })
+
+  it("screens once a new minute's bars have arrived, and fetches an interval's candles afresh just after it closes", async () => {
+    const { d, ctx } = await setup()
+    const market = new CryptoMarketView(d)
+    const refresh = vi.spyOn(market, "refresh")
+    const observer = new CryptoObserver(d, market, () => undefined)
+    // 12:00:30 UTC: the 1 h and 4 h candles closed half a minute ago, the daily one 12 hours ago.
+    const t0 = Date.parse("2026-10-29T12:00:30Z")
+    const at = (s: number) => new Date(t0 + s * 1_000)
+    await observer.tick(at(0))
+    expect(refresh).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(ctx.candles.expire).mock.calls.map(([i]) => i)).toEqual([60, 240])
+    await observer.tick(at(1))
+    observer.onBar({ t: Date.parse("2026-10-29T12:00:00Z") }, t0 + 1_000)
+    await observer.tick(at(2))
+    expect(refresh).toHaveBeenCalledTimes(1)
+    await observer.tick(at(5))
+    expect(refresh).toHaveBeenCalledTimes(2)
+    // The same minute's other bars don't screen again.
+    observer.onBar({ t: Date.parse("2026-10-29T12:00:00Z") }, t0 + 6_000)
+    await observer.tick(at(10))
+    expect(refresh).toHaveBeenCalledTimes(2)
+  })
+
+  it("reviews the book and the market only after a quiet spell", async () => {
+    const { d } = await setup()
+    const seen: Observation[] = []
+    let lastEpisode = 0
+    const observer = new CryptoObserver(d, new CryptoMarketView(d), (o) => seen.push(o), () => lastEpisode)
+    const later = Date.now() + DEFAULT_SETTINGS.agent.sweep_minutes * 60_000 + 1_000
+    lastEpisode = later - 10 * 60_000
+    await observer.tick(new Date(later))
+    expect(seen.filter((o) => o.kind === "sweep")).toEqual([])
+    lastEpisode = 0
+    await observer.tick(new Date(later + 1_000))
+    expect(seen.find((o) => o.kind === "sweep")).toMatchObject({ subject: "MARKET", priority: 2, summary: expect.stringContaining("Quiet-time review: nothing has woken you for") })
   })
 
   it("briefs each pair of a market-wide wake-up's setups", async () => {

@@ -332,6 +332,11 @@ export class Engine {
     }
   }
 
+  /** One closed minute of the price board (the scan universe and what we track): the agent's setup screen. */
+  onBoardBars(bars: readonly { symbol: string; t: number; close: number; volume: number }[]) {
+    this.agent.onBars(bars)
+  }
+
   onTradeUpdate(update: TradeUpdate) {
     void handleTradeUpdate(this.ctx, update)
       .then(({ filled }) => {

@@ -83,7 +83,8 @@ export const createCryptoAgent = ({
     archive: history,
     signal: ctx.signal,
   })
-  observer = new CryptoObserver(deps, market, (o) => agent.observe(o))
+  observer = new CryptoObserver(deps, market, (o) => agent.observe(o), () => agent.lastEpisodeAt?.getTime() ?? 0)
+  ctx.hub.onBar((bar) => observer?.onBar(bar))
   const held = async () => new Set((await deps.shadow.open()).map((p) => p.symbol))
   return {
     agent,

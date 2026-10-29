@@ -106,6 +106,22 @@ describe("stock agent", () => {
     expect(await bookText(d)).toContain("- Market: outside the regular session. New buys: blocked")
   })
 
+  it("wakes for a minute's setups while buys are allowed, leaving out stocks it holds", async () => {
+    const { d, known } = await setup()
+    await actOnStockAnswer(d, answer([decision()]), { id: "e1" }, known)
+    const seen: Observation[] = []
+    const observer = new StockObserver(d, (o) => seen.push(o))
+    const minute = (m: number, close: number, volume: number) => ["AAPL", "NVDA"].map((symbol) => ({ symbol, t: afterOpen(m).getTime(), close, volume }))
+    for (let m = 0; m < 15; m++) await observer.onBars(minute(m, m % 2 ? 101 : 100, 1_000), now)
+    await observer.onBars(minute(15, 101.5, 3_000), now)
+    expect(seen).toEqual([expect.objectContaining({ subject: "MARKET", kind: "setup", priority: 1, refs: { symbol: "NVDA" }, summary: expect.stringMatching(/^NVDA opening-range breakout/) })])
+    // Outside the session the screen keeps count, but nothing wakes the agent.
+    current = null
+    const quiet = new StockObserver(d, (o) => seen.push(o))
+    for (let m = 0; m < 16; m++) await quiet.onBars(minute(m, m === 15 ? 101.5 : m % 2 ? 101 : 100, m === 15 ? 3_000 : 1_000), now)
+    expect(seen).toHaveLength(1)
+  })
+
   it("answers technicals from Alpaca's bars and quotes from live prices", async () => {
     const { d } = await setup()
     const tools = stockAgentTools(d)

@@ -1,4 +1,5 @@
 import { llamaChat } from "@mb/agent/client"
+import { checkEntry } from "@mb/agent/envelope"
 import { newsObservations } from "@mb/agent/observations"
 import { Agent, type AgentBot } from "@mb/agent/runtime"
 import type { AiCallLog } from "@mb/engine-kit/ai/call-log"
@@ -10,7 +11,7 @@ import type { Candidate } from "@mb/wire/trigger"
 import type { EngineContext } from "../bot/context"
 import type { Session } from "../bot/session"
 import { actOnStockAnswer } from "./act"
-import { createShadowBook, type StockAgentDeps } from "./book"
+import { createShadowBook, sessionWindow, shadowRiskState, type StockAgentDeps } from "./book"
 import { stockBrief, StockObserver } from "./observe"
 import { STOCK_AGENT_PROMPT_VERSION, stockAgentSystemPrompt } from "./prompts"
 import { stockAgentTools } from "./tools"
@@ -29,6 +30,8 @@ export type StockAgent = {
   agent: Agent<StockAgentAnswer>
   deps: StockAgentDeps
   onCandidate: (item: WireItemDoc, c: Candidate) => void
+  /** One closed minute of the price board's bars, for the setup screen. */
+  onBars: (bars: readonly { symbol: string; t: number; close: number; volume: number }[]) => void
 }
 
 const MAX_PRICE_AGE_MS = 5 * 60_000
@@ -62,6 +65,15 @@ export const createStockAgent = ({
     known,
     act: (answer, episode) => actOnStockAnswer(deps, answer, episode, known),
     tick: (now) => observer!.tick(now),
+    // Setups are only entry ideas: not worth an episode while a buy can't happen.
+    skip: async (wake) => {
+      if (!wake.observations.every((o) => o.kind === "setup")) return null
+      const window = sessionWindow(deps)
+      if (!window.entries) return `no buys now: ${window.reason}`
+      const { history } = await shadowRiskState(deps)
+      const e = checkEntry("", history, ctx.settings.current.agent.envelope, Date.now())
+      return e.approved ? null : `the envelope refuses entries: ${e.reason}`
+    },
     shadow: async () => {
       const account = await deps.shadow.account(price)
       return { account, dayPnlPct: account.day_start_equity_usd > 0 ? (account.equity_usd / account.day_start_equity_usd - 1) * 100 : 0 }
@@ -85,10 +97,13 @@ export const createStockAgent = ({
     archive: history,
     signal: ctx.signal,
   })
-  observer = new StockObserver(deps, (o) => agent.observe(o))
+  observer = new StockObserver(deps, (o) => agent.observe(o), () => agent.lastEpisodeAt?.getTime() ?? 0)
   return {
     agent,
     deps,
+    onBars: (bars) => {
+      if (agent.on) observer?.bars(bars)
+    },
     onCandidate: (item, c) => {
       if (!agent.on) return
       void deps.shadow.open().then((open) => {

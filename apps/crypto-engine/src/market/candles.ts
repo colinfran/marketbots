@@ -48,6 +48,11 @@ export class CandleCache {
     return load
   }
 
+  /** Makes every cached candle of `interval` stale, so the next read fetches the one that just closed (stale candles still serve if the fetch fails). */
+  expire(interval: OhlcInterval) {
+    for (const [key, hit] of this.cache) if (key.endsWith(`|${interval}`)) hit.at = 0
+  }
+
   /** Age of the newest closed candle, for data-freshness checks. */
   lastCandleAt(symbol: string, interval: OhlcInterval): number | null {
     return this.cache.get(`${symbol}|${interval}`)?.candles.at(-1)?.t ?? null

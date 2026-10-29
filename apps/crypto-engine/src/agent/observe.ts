@@ -12,21 +12,31 @@ import { screenCrypto } from "../strategies/registry"
 import { bookText, mid, type CryptoAgentDeps } from "./book"
 
 /**
- * What wakes the crypto agent besides news (docs/plans/LOCAL-AI.md §8.1), checked by code:
+ * What wakes the crypto agent besides news (docs/plans/LOCAL-AI.md §8.1), checked by code as the
+ * data arrives:
  *
- *   every 3 s    the shadow book's stops and targets against the live bid; a fill is a P2
- *   every 15 s   marks, and a held pair moving `schedule.trigger_move_atr` 1 h ATRs since your last
- *                review (down: P0, up: P2), again at every further ATR
- *   every 10 min features, the regime and the screens: a viable setup on a pair not in the book is
- *                a P1, asked about again only once it can have changed (2 h; daily trend 24 h),
- *                and not at all while the envelope refuses entries
+ *   every 3 s    the shadow book's stops and targets against the live bid (a fill is a P2), and a
+ *                held pair moving `schedule.trigger_move_atr` 1 h ATRs since your last review
+ *                (down: P0, up: P2), again at every further ATR
+ *   bar close    once a minute's bars arrive from Kraken: features, the regime and the screens on
+ *                the live quotes, with an interval's candles fetched afresh just after it closes
+ *                (1 h, 4 h, daily). The best viable setups on pairs not in the book wake the agent
+ *                together, as one P1; a setup is asked about again only once it can have changed
+ *                (2 h; daily trend 24 h), and none comes while the envelope refuses entries. While
+ *                no bars arrive (the feed is down), the screens still run every 10 minutes.
  *   each minute  a scheduled release 15 minutes out is a P2 about the market
- *   sweep        a P2 review of the book and the market every `agent.sweep_minutes`
+ *   quiet time   a P2 review of the book and the market once nothing has woken the agent for
+ *                `agent.sweep_minutes`
  *
  * News comes from the wire policy's observe hook (engine.ts).
  */
 
-const SCREEN_MS = 10 * 60_000
+const FALLBACK_SCREEN_MS = 10 * 60_000
+/** A minute's bars arrive over a few seconds: the screens wait this long after the first. */
+const BAR_SETTLE_MS = 3_000
+/** An interval's candles are fetched afresh for this long after it closes: Kraken can take a moment to close one. */
+const CLOSE_REFRESH_MS = 2 * 60_000
+const INTERVALS = [60, 240, 1440] as const
 const MARK_MS = 15_000
 const EXITS_MS = 3_000
 const CALENDAR_LEAD_MS = 15 * 60_000
@@ -52,6 +62,8 @@ export class CryptoMarketView {
 
 export class CryptoObserver {
   private last = { screen: 0, mark: 0, exits: 0, sweep: Date.now(), calendar: 0 }
+  /** The newest closed minute the hub has sent a bar for, when it first came, and the minute last screened. */
+  private bars = { minute: 0, seenAt: 0, screened: 0 }
   private readonly setups = new Map<string, number>()
   private readonly calendar = new Set<string>()
   private readonly moves = new Map<string, string>()
@@ -60,21 +72,32 @@ export class CryptoObserver {
     private readonly d: CryptoAgentDeps,
     private readonly market: CryptoMarketView,
     private readonly observe: (o: Observation) => void,
+    /** When the agent's last episode finished (0: none yet), for the quiet-time review. */
+    private readonly lastEpisodeAt: () => number = () => 0,
   ) {}
+
+  /** A closed 1-minute bar of any universe pair (the hub's feed). */
+  onBar(bar: { t: number }, at = Date.now()) {
+    if (bar.t <= this.bars.minute) return
+    this.bars.minute = bar.t
+    this.bars.seenAt = at
+  }
 
   async tick(now: Date) {
     const t = now.getTime()
     if (t - this.last.exits >= EXITS_MS) {
       this.last.exits = t
       await this.exits(now)
+      await this.priceMoves(now)
     }
     if (t - this.last.mark >= MARK_MS) {
       this.last.mark = t
       await this.d.shadow.mark(mid(this.d.ctx))
-      await this.priceMoves(now)
     }
-    if (t - this.last.screen >= SCREEN_MS) {
+    const barClosed = this.bars.minute > this.bars.screened && t - this.bars.seenAt >= BAR_SETTLE_MS
+    if (barClosed || t - this.last.screen >= FALLBACK_SCREEN_MS) {
       this.last.screen = t
+      this.bars.screened = this.bars.minute
       await this.screens(now).catch((e) => this.d.ctx.log.warn("agent screens failed", { error: errorMessage(e) }))
     }
     if (t - this.last.calendar >= 60_000) {
@@ -82,9 +105,19 @@ export class CryptoObserver {
       this.calendarEvents(now)
     }
     const sweepMs = this.d.ctx.settings.current.agent.sweep_minutes * 60_000
-    if (t - this.last.sweep >= sweepMs) {
+    const quietSince = Math.max(this.last.sweep, this.lastEpisodeAt())
+    if (t - quietSince >= sweepMs) {
       this.last.sweep = t
-      this.observe({ id: `sweep:${t}`, subject: MARKET_SUBJECT, kind: "sweep", priority: 2, salience: 30, summary: "Periodic review: your book, the market, and anything nothing else woke you for.", refs: {}, at: now })
+      this.observe({
+        id: `sweep:${t}`,
+        subject: MARKET_SUBJECT,
+        kind: "sweep",
+        priority: 2,
+        salience: 30,
+        summary: `Quiet-time review: nothing has woken you for ${Math.round((t - quietSince) / 60_000)} min. Check your book, the market, and anything nothing else woke you for.`,
+        refs: {},
+        at: now,
+      })
     }
   }
 
@@ -141,6 +174,10 @@ export class CryptoObserver {
    * and picks, instead of being asked about each on its own. None while the envelope refuses entries.
    */
   private async screens(now: Date) {
+    for (const interval of INTERVALS) {
+      const ms = interval * 60_000
+      if (now.getTime() - Math.floor(now.getTime() / ms) * ms < CLOSE_REFRESH_MS) this.d.ctx.candles.expire(interval)
+    }
     await this.market.refresh()
     const s = this.d.ctx.settings.current
     if (!this.market.regime) return
@@ -182,7 +219,7 @@ export class CryptoObserver {
 
 /** The bot's part of the brief: the book and its limits, the market, the subject. */
 export const cryptoBrief = async (d: CryptoAgentDeps, market: CryptoMarketView, wake: Wake) => {
-  if (Date.now() - market.at > SCREEN_MS) await market.refresh().catch(() => undefined)
+  if (Date.now() - market.at > FALLBACK_SCREEN_MS) await market.refresh().catch(() => undefined)
   const r = market.regime
   const universe = d.ctx.hub.universe.map((s) => {
     const q = d.ctx.hub.quote(s)

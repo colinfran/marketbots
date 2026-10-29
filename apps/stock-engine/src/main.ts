@@ -85,7 +85,10 @@ void bootstrap({
       log,
       finnhubKey: env.FINNHUB_API_KEY ?? undefined,
       sessionOpen: () => engine?.marketOpen() ?? false,
-      onBars: (t, bars) => marketSignals.onBars(t, bars),
+      onBars: (t, bars) => {
+        marketSignals.onBars(t, bars)
+        engine?.onBoardBars(bars)
+      },
       onTracked: (symbols) => {
         marketSignals.setTracked(symbols)
         historySymbols = new Set(["SPY", ...symbols])

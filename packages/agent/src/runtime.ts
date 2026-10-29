@@ -111,7 +111,7 @@ export class Agent<A extends AgentAnswerBase> {
   private ticking = false
   private blockedReason: string | null = null
   private lastError: string | null = null
-  private lastEpisodeAt: Date | null = null
+  private lastFinishedAt: Date | null = null
   private today = { day: "", episodes: 0, envelopeBlocks: 0, breakers: new Set<string>() }
   private shadowCache: { at: number; value: { account: ShadowAccount; dayPnlPct: number } | null } = { at: 0, value: null }
   private readonly breakers: Pick<BreakerHistory, "episodes" | "entries" | "speeds"> = { episodes: [], entries: [], speeds: [] }
@@ -139,6 +139,11 @@ export class Agent<A extends AgentAnswerBase> {
     if (this.timer) clearInterval(this.timer)
     this.timer = null
     this.running?.abort.abort()
+  }
+
+  /** When the last episode finished (null since the engine started): the bots' quiet-time review waits on it. */
+  get lastEpisodeAt(): Date | null {
+    return this.lastFinishedAt
   }
 
   /** The episode now running, if any (tests and shutdown wait for it). */
@@ -175,7 +180,7 @@ export class Agent<A extends AgentAnswerBase> {
       episode: r ? { id: r.id, subject: r.subject, priority: r.priority, started_at: r.started_at, step: r.step } : null,
       queue: this.queue.pending().slice(0, 10),
       episodes_today: this.today.episodes,
-      last_episode_at: this.lastEpisodeAt,
+      last_episode_at: this.lastFinishedAt,
       last_error: this.lastError,
       watches: this.watches.length,
       tokens_per_s: this.breakers.speeds.at(-1) ?? null,
@@ -421,7 +426,7 @@ export class Agent<A extends AgentAnswerBase> {
     doc.finished_at = finished
     doc.duration_ms = finished.getTime() - doc.started_at.getTime()
     doc.expires_at = episodeExpiry(doc)
-    this.lastEpisodeAt = finished
+    this.lastFinishedAt = finished
     this.lastError = doc.status === "failed" || doc.status === "invalid" ? doc.error : this.lastError
     this.today.episodes += 1
     const write = async () => {
