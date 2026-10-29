@@ -523,7 +523,7 @@ docker start stockmarketbot-engine
 
 For crypto: `docker compose stop crypto-engine`, then `docker start cryptomarketbot-engine`.
 
-- Both use the same database and the same wallet volume, so nothing needs copying back.
+- Both use the same wallet volume. They no longer use the same database: the old containers still point at the old Atlas clusters, which stopped at the database move (below). Don't roll back to them since then.
 - `docker start` brings the old container back with its original image and settings. The old engines were created without `SCRAPER_URL`, so they don't need the removed old scrapers.
 - Use `docker start`, not `docker compose up` in the old folder: that would rebuild and recreate the old container from the old repo.
 - Dashboards roll back with Vercel's instant rollback.
@@ -537,6 +537,18 @@ docker image rm stockmarketbot-engine:latest stockmarketbot-scraper:latest crypt
 ```
 
 **Never** remove `cryptomarketbot_kraken-paper`: it is still the live wallet.
+
+### The database move (2026-10-28)
+
+Until 2026-10-28 each bot had its own Atlas cluster: `cryptomarketbot` on the `cryptomarketbot` cluster, `stockmarketbot_v2` on the `stockmarketbot` cluster. Both moved to the one `marketbots` cluster, as databases `cryptomarketbot` and `stockmarketbot` (the stock one dropped its `_v2`).
+
+- Per bot, with the engine stopped: `mongodump | mongorestore` (`mongo:8.0` image, `--nsFrom`/`--nsTo` for the rename), then a check that every collection's count, indexes and documents match. Only then did `.env.<bot>` switch, and the engine was recreated on the same image.
+- The crypto engine must never boot against an empty or partial `cryptomarketbot`: a missing `accounts` document means fresh books, and the wallet is reset to match (§6).
+- Each `.env.<bot>` keeps the old `MONGODB_URI` / `MONGODB_DB_NAME` as comments until the cleanup.
+
+**Rollback** (only soon after the move: anything written since is only on the new cluster, and crypto's old books would no longer match the wallet): put the commented lines back in `.env.<bot>`, `docker compose up -d --no-deps --force-recreate <bot>-engine`, and set the Vercel project's `MONGODB_URI` / `MONGODB_DB_NAME` back.
+
+**Cleanup after 14 days** (with owner approval, from 2026-11-11): delete the commented lines from both env files, and delete the two old clusters in Atlas.
 
 ---
 
