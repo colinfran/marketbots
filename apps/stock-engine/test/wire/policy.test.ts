@@ -1,18 +1,10 @@
 import { silentLogger } from "@mb/engine-kit/log"
-import { settle, useFakeClock } from "@mb/engine-kit/testing/timers"
 import { DEFAULT_SETTINGS, type Settings } from "@mb/stock-core/settings"
 import type { EventFocus, WireItemDoc } from "@mb/stock-core/wire"
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import type { AiRunner, ResearchResult } from "@mb/engine-kit/ai/runner"
-import type { EngineContext } from "../../src/bot/context"
-import { researchPlan, runCycle } from "../../src/bot/cycle"
-import type { EventBus } from "../../src/bus/event-bus"
-import { assembleDossier } from "../../src/wire/dossier"
-import { CORE_REVIEW_RULE, stockRules, WirePolicy, withCoreBook } from "../../src/wire/policy"
-import { fakeBroker, type FakeBroker } from "../helpers/broker"
-import { makeBus, makeCtx } from "../helpers/ctx"
+import { describe, expect, it, vi } from "vitest"
+import { stockRules, WirePolicy } from "../../src/wire/policy"
+import { makeBus } from "../helpers/ctx"
 import { useTestDb } from "../helpers/db"
-import { afterOpen, DAY, decision, report, session } from "../helpers/factories"
 
 const db = useTestDb()
 const NOW = new Date("2026-10-27T15:00:00Z")
@@ -46,7 +38,7 @@ const item = (overrides: Partial<WireItemDoc> = {}): WireItemDoc => {
   }
 }
 
-const setup = async ({ held = ["NVDA"], open = true, settings = DEFAULT_SETTINGS, core = new Set<string>(), observe }: { held?: string[]; open?: boolean; settings?: Settings; core?: Set<string>; observe?: (item: unknown, c: { rule: string }) => void } = {}) => {
+const setup = async ({ held = ["NVDA"], open = true, settings = DEFAULT_SETTINGS, observe }: { held?: string[]; open?: boolean; settings?: Settings; observe?: (item: unknown, c: { rule: string }) => void } = {}) => {
   const bus = await makeBus(db.col)
   const request = vi.fn<(f: EventFocus) => "fired" | "queued">(() => "fired")
   const alert = vi.fn(async () => undefined)
@@ -56,7 +48,7 @@ const setup = async ({ held = ["NVDA"], open = true, settings = DEFAULT_SETTINGS
     bus,
     log: silentLogger,
     settings: () => settings,
-    rules: withCoreBook(stockRules, () => core),
+    rules: stockRules,
     engine: () => ({ running: true, killSwitch: false }),
     session: () => ({ open, reason: open ? "regular session" : "outside the regular session" }),
     held: () => held,
@@ -133,7 +125,7 @@ describe("stock policy", () => {
     expect(a.request).toHaveBeenCalledWith(expect.objectContaining({ symbol: null, rule: "odds_swing", action: "market_review" }))
     a.request.mockClear()
     for (const context of [
-      // An insider cluster is an idea for the next cycle, even when loud and positive.
+      // An insider cluster is context, even when loud and positive.
       item({ source: "insiders", tier: 2, kind: "filing", category: "insider_buy", symbols: ["AAPL"], polarity: 1, severity: 80, meta: { insider: true, cluster: true } }),
       // A congressional trade is weeks old when it is disclosed: a purchase of a stock we could buy, a sale of one we hold.
       item({ source: "congress:house", tier: 3, kind: "filing", category: "general", symbols: ["AAPL"], polarity: 1, severity: 80, meta: { congress: true, transaction: "purchase" } }),
@@ -164,100 +156,5 @@ describe("stock policy", () => {
     await policy.onItem({ item: item({ category: "bankruptcy", severity: 95, polarity: -1 }), backfill: false, confirmation: false })
     expect(emergency).toHaveBeenCalledWith("NVDA", expect.anything())
     await bus.stop()
-  })
-})
-
-describe("core book holdings", () => {
-  const core = new Set(["NVDA"])
-
-  it("ask for a single-holding core review on bad news at evaluate severity, never an event cycle or the emergency exit", async () => {
-    const exit = { ...DEFAULT_SETTINGS, wire: { ...DEFAULT_SETTINGS.wire, emergency_action: "exit" as const } }
-    const { policy, request, emergency, bus } = await setup({ held: ["NVDA", "AMD"], core, settings: exit })
-    await policy.onItem({ item: item({ symbols: ["NVDA", "AMD"], category: "bankruptcy", severity: 95, polarity: -1 }), backfill: false, confirmation: false })
-    expect(request.mock.calls.map(([f]) => [f.symbol, f.rule, f.action])).toEqual([
-      ["AMD", "held_negative", "review"],
-      ["NVDA", CORE_REVIEW_RULE, "review"],
-    ])
-    // The trading holding still gets the owner's emergency exit; the core one doesn't.
-    expect(emergency).toHaveBeenCalledOnce()
-    expect(emergency).toHaveBeenCalledWith("AMD", expect.anything())
-    await bus.stop()
-  })
-
-  it("leave lesser news, price shocks and resumed halts to the weekly review, but still alert on a halt", async () => {
-    const { policy, request, alert, bus } = await setup({ core })
-    await policy.onItem({ item: item({ category: "offering", severity: 65, polarity: -1 }), backfill: false, confirmation: false }) // review severity, under evaluate (70)
-    await policy.onItem({ item: item({ kind: "anomaly", category: "price_shock", severity: 75, polarity: -1, meta: { anomaly: "price" } }), backfill: false, confirmation: false })
-    await policy.onItem({ item: item({ category: "halt", kind: "venue", severity: 75, polarity: 0, meta: { resumes_at: "10:15:00" } }), backfill: false, confirmation: false })
-    expect(request).not.toHaveBeenCalled()
-    await policy.onItem({ item: item({ category: "halt", kind: "venue", severity: 75, polarity: -1, meta: { resumes_at: null } }), backfill: false, confirmation: false })
-    expect(alert).toHaveBeenCalledOnce()
-    expect((await triggers()).map((t) => [t.rule, t.action])).toEqual([["halt", "alert_only"]])
-    await bus.stop()
-  })
-})
-
-describe("stock research modes", () => {
-  const ctxFor = (wire: Partial<Settings["wire"]>) => ({ settings: { current: { ...DEFAULT_SETTINGS, wire: { ...DEFAULT_SETTINGS.wire, ...wire } }, version: 1 } }) as unknown as Pick<EngineContext, "settings">
-  const empty = assembleDossier([], { symbols: ["NVDA"], since: NOW, now: NOW, price: () => null, timeLabel: () => "", reviewThreshold: 55 })
-  it("is full without a healthy wire, and follows the mode otherwise", () => {
-    expect(researchPlan(ctxFor({}), { isEvent: false, wireHealthy: false, dossier: empty }).kind).toBe("full")
-    expect(researchPlan(ctxFor({}), { isEvent: false, wireHealthy: true, dossier: null }).kind).toBe("full")
-    expect(researchPlan(ctxFor({ research_mode: "gap_fill" }), { isEvent: false, wireHealthy: true, dossier: empty }).kind).toBe("gap")
-    expect(researchPlan(ctxFor({ event_research: "none" }), { isEvent: true, wireHealthy: true, dossier: empty }).kind).toBe("none")
-    expect(researchPlan(ctxFor({}), { isEvent: true, wireHealthy: true, dossier: empty }).kind).toBe("gap")
-  })
-
-  it("auto runs the gap-fill for a gap on any subject or the market, and skips Grok otherwise (no X-freshness rule)", () => {
-    const moved = item({ symbols: ["NVDA"], kind: "anomaly", category: "price_shock", polarity: 1, url: null, meta: { anomaly: "price" } })
-    const rumor = item({ symbols: [], source: "rss:blog", tier: 3, kind: "news", url: "https://blog.test/a" })
-    const o = { symbols: ["NVDA", "ACME"], since: new Date(NOW.getTime() - 3_600_000), now: NOW, price: () => null, timeLabel: () => "", reviewThreshold: 55 }
-    const auto = ctxFor({ research_mode: "auto" })
-    expect(researchPlan(auto, { isEvent: false, wireHealthy: true, dossier: assembleDossier([moved], o) })).toEqual({ kind: "gap", reason: "1 unexplained moves, 0 unconfirmed items" })
-    expect(researchPlan(auto, { isEvent: false, wireHealthy: true, dossier: assembleDossier([rumor], o) })).toEqual({ kind: "gap", reason: "0 unexplained moves, 1 unconfirmed items" })
-    expect(researchPlan(auto, { isEvent: false, wireHealthy: true, dossier: empty })).toEqual({ kind: "none", reason: "no unexplained moves or unconfirmed items in our feeds" })
-  })
-
-  it("always gives the one-time seed the full research", () => {
-    expect(researchPlan(ctxFor({}), { isEvent: false, isSeed: true, wireHealthy: true, dossier: empty })).toEqual({ kind: "full", reason: "one-time seed" })
-    expect(researchPlan(ctxFor({ research_mode: "gap_fill" }), { isEvent: false, isSeed: true, wireHealthy: true, dossier: empty }).kind).toBe("full")
-  })
-})
-
-describe("stock event cycle", () => {
-  let broker: FakeBroker
-  let ctx: EngineContext
-  let bus: EventBus
-
-  beforeEach(async () => {
-    useFakeClock(afterOpen(30))
-    broker = fakeBroker()
-    broker.calendar = [{ date: DAY, open: "09:30", close: "16:00" }]
-    for (const [s, p] of Object.entries({ SPY: 580, QQQ: 500, AAPL: 100 })) broker.setPrice(s, p)
-    ;({ ctx, bus } = await makeCtx(db.col, broker))
-  })
-  afterEach(async () => {
-    vi.useRealTimers()
-    await bus.stop()
-  })
-
-  it("focuses on the event symbol with gap-fill research and records the trigger on the decision", async () => {
-    const research = vi.fn(async (opts: Parameters<AiRunner["research"]>[0]): Promise<ResearchResult> => ({ memo: "## X sentiment\nUpbeat.", sources: [], queries: [], model: opts.model, x_search: true, duration_ms: 1, usage: { input: 1, output: 1, total: 2 }, cost_usd: 0.02, error: null }))
-    const structured = vi.fn(async (opts: Parameters<AiRunner["structured"]>[0]) => ({
-      output: report({ decisions: [decision({ symbol: "AAPL", allocation_pct: 10, conviction: 8, stop_loss: 97, take_profit: 106 })] }),
-      attempts: 1,
-      repaired: false,
-      model: opts.model,
-      cost_usd: 0.02,
-      usage: { input: 1, output: 1, total: 2 },
-    }))
-    ctx.ai = { available: true, research, structured } as unknown as AiRunner
-    const focus: EventFocus = { symbol: "AAPL", rule: "entry_event", action: "evaluate", severity: 76, polarity: 1, item_ids: ["item-1"], trigger_id: "trig-1", headline: "AAPL wins a big contract" }
-    const r = await settle(runCycle(ctx, { phase: "intraday", session: session(), trigger: "event: entry event AAPL", kind: "event", events: [focus] }))
-    expect(r.status).toBe("succeeded")
-    expect(research.mock.calls[0][0]).toMatchObject({ prompt: expect.stringContaining("THIS CYCLE WAS STARTED BY AN EVENT"), timeoutMs: 45_000 })
-    expect(structured.mock.calls[0][0]).toMatchObject({ prompt: expect.stringContaining("# EVENT (why this cycle started)"), timeoutMs: 90_000 })
-    expect(await db.col.decisions.findOne({ symbol: "AAPL" })).toMatchObject({ trigger_kind: "event", wire_item_ids: ["item-1"], status: "executed" })
-    expect(await db.col.cycles.findOne({ _id: r.cycleId })).toMatchObject({ kind: "event", wire_trigger_id: "trig-1", research_plan: { kind: "gap", reason: "event check (x_verify)" } })
   })
 })

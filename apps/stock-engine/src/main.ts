@@ -1,12 +1,8 @@
 import { AiCallLog } from "@mb/engine-kit/ai/call-log"
-import { AiRunner } from "@mb/engine-kit/ai/runner"
 import { startModelFeed } from "@mb/engine-kit/ai/feed"
 import { bootstrap } from "@mb/engine-kit/bootstrap"
 import { newsMovesJob } from "@mb/history/moves"
 import { HistoryStore } from "@mb/history/store"
-import { mongoSearchMeter } from "@mb/engine-kit/state/search-usage"
-import { httpClient } from "@mb/engine-kit/util/http"
-import { localResearcher } from "@mb/wire/research/local"
 import { CORE_INDEX_ETFS } from "@mb/stock-core/settings"
 import { marketDay } from "@mb/stock-core/time"
 import { stockBackfillJobs } from "./history/backfill"
@@ -33,8 +29,9 @@ import { Wire } from "./wire/wire"
 /**
  * Engine entry point: the shared boot order and graceful shutdown (@mb/engine-kit/bootstrap) with
  * stock's own wiring. After the stream server is up: Alpaca (REST, trade updates, market data),
- * the news engine's price layers, AI, the news engine and the history store (with its backfills).
- * The price layers start right before the engine and stop right after it has shut down.
+ * the news engine's price layers, the live model feed, the news engine and the history store
+ * (with its backfills). The price layers start right before the engine and stop right after it
+ * has shut down.
  */
 
 void bootstrap({
@@ -99,26 +96,6 @@ void bootstrap({
     // The live model feed: every model call streams its text to the dashboards (owner-only unless agent.public_thinking).
     const feed = startModelFeed({ bus, stream, llmUrl: env.LLM_URL, visibility: () => (settings.current.agent.public_thinking ? "public" : "owner") })
     const models = feed.models
-    const ai = new AiRunner(calls, log.child({ component: "ai" }), {
-      localUrl: env.LLM_URL,
-      // Research for local/… models: our search service and scraper, read by the local model.
-      localResearch: localResearcher({
-        request: httpClient(env.SEC_USER_AGENT ?? DEFAULT_USER_AGENT).requestText,
-        env: {
-          LLM_URL: env.LLM_URL,
-          SEARCH_URL: env.SEARCH_URL,
-          SCRAPER_URL: env.SCRAPER_URL,
-          TAVILY_API_KEY: env.TAVILY_API_KEY,
-          EXA_API_KEY: env.EXA_API_KEY,
-          BRIGHTDATA_API_KEY: env.BRIGHTDATA_API_KEY,
-          BRIGHTDATA_ZONE: env.BRIGHTDATA_ZONE,
-        },
-        client: "stock",
-        log: log.child({ component: "research" }),
-        meter: mongoSearchMeter(db.col.searchUsage),
-        models,
-      }),
-    })
 
     const wire = new Wire({
       col: db.col,
@@ -141,7 +118,7 @@ void bootstrap({
       history.addJob(newsMovesJob("SPY"))
       history.start()
     }
-    engine = new Engine({ env, log, db, bus, settings, state, alpaca, prices, tradeStream, marketStream, ai, calls, alerts, stream, wire, coverage, history, models })
+    engine = new Engine({ env, log, db, bus, settings, state, alpaca, prices, tradeStream, marketStream, calls, alerts, stream, wire, coverage, history, models })
     return {
       engine,
       start: () => coverage.start(),

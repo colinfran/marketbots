@@ -9,7 +9,7 @@ import type { EventBus } from "../../src/bus/event-bus"
 import { fakeBroker, type FakeBroker } from "../helpers/broker"
 import { makeCtx, type SentAlert } from "../helpers/ctx"
 import { useTestDb } from "../helpers/db"
-import { afterOpen, alpacaOrder, beforeClose, CLOSE, closedSession, cycleDoc, dailyStats as statsDoc, fill, planDoc, session } from "../helpers/factories"
+import { afterOpen, alpacaOrder, beforeClose, CLOSE, closedSession, fill, planDoc, session } from "../helpers/factories"
 
 const NOW = afterOpen(90) // 11:00 ET
 const testDb = useTestDb()
@@ -35,8 +35,7 @@ afterEach(async () => {
 const ensureProtection = () => protect(ctx)
 const enforceOvernightRules = () => overnight(ctx)
 const recordDailyStats = (day?: string) => dailyStats(ctx, day)
-const closeCycleDone = async () => (await testDb.col.cycles.countDocuments({ phase: "close", status: "succeeded" })) > 0
-const maintain = (s: Session, now: Date) => upkeep(ctx, s, { now, closeCycleDone })
+const maintain = (s: Session, now: Date) => upkeep(ctx, s, { now })
 const db = async () => testDb.col
 const plan = async (symbol: string) => (await db()).plans.findOne({ _id: symbol })
 const addPlan = async (symbol: string, overrides: Parameters<typeof planDoc>[1] = {}) => (await db()).plans.insertOne(planDoc(symbol, overrides))
@@ -110,28 +109,11 @@ describe("ensureProtection", () => {
     expect(broker.submitted[0].qty).toBe("7")
   })
 
-  it("gives a core holding a plain GTC stop at its plan's level, with no target", async () => {
+  it("protects a former core holding like any other position: OCO exits at its plan's levels", async () => {
     broker.setPosition("NVDA", 5, 200)
-    await addPlan("NVDA", { book: "core", stop_loss: 170, take_profit: null, horizon: "multi_day", decision_id: "dec-core" })
-    expect(await ensureProtection()).toEqual(["protected NVDA (core): stop 170"])
-    expect(broker.submitted).toEqual([{ symbol: "NVDA", qty: "5", side: "sell", type: "stop", stop_price: "170.00", time_in_force: "gtc", client_order_id: expect.stringMatching(/^smb-core-stop-/) }])
-    expect(await plan("NVDA")).toMatchObject({ book: "core", stop_loss: 170, take_profit: null })
-  })
-
-  it("gives a core holding without a stop the initial core stop (wider than any trading stop)", async () => {
-    broker.setPosition("NVDA", 5, 200, { avg: 190 })
-    await addPlan("NVDA", { book: "core", stop_loss: null, take_profit: null })
-    expect(await ensureProtection()).toEqual(["protected NVDA (core): stop 161.5"]) // 190 × 0.85
-    expect(await plan("NVDA")).toMatchObject({ stop_loss: 161.5 })
-  })
-
-  it("sells a core holding already through its stop", async () => {
-    broker.setPosition("NVDA", 5, 165)
-    await addPlan("NVDA", { book: "core", stop_loss: 170, take_profit: null })
-    const notes = await settle(ensureProtection())
-    expect(notes).toEqual(["flattened NVDA (core: price 165 reached its 170 stop with no stop order)"])
-    expect(broker.holdings.has("NVDA")).toBe(false)
-    expect(alerts).toContainEqual(expect.objectContaining({ level: "warning", title: "NVDA sold: its core stop was hit while unprotected", path: "/core" }))
+    await addPlan("NVDA", { book: "core", stop_loss: 190, take_profit: null, horizon: "multi_day" })
+    expect(await ensureProtection()).toEqual(["protected NVDA: stop 190, target 220"])
+    expect(broker.submitted).toEqual([expect.objectContaining({ symbol: "NVDA", qty: "5", order_class: "oco", take_profit: { limit_price: "220.00" }, stop_loss: { stop_price: "190.00" } })])
   })
 
   it("reports and alerts when protection fails", async () => {
@@ -199,14 +181,14 @@ describe("enforceOvernightRules", () => {
     expect([...broker.holdings.keys()]).toEqual(["WIN", "FLAT"])
   })
 
-  it("leaves core holdings out of the overnight rules while the core book is on", async () => {
+  it("counts a former core holding toward the cap like any other position", async () => {
     ctx.settings.current.core.enabled = true
     broker.setPosition("SPY", 12, 500) // 6,000: over the cap on its own
     await addPlan("SPY", { book: "core", horizon: "multi_day" })
     broker.setPosition("SWING", 20, 100)
     await addPlan("SWING", { horizon: "multi_day" })
-    expect(await settle(enforceOvernightRules())).toEqual([])
-    expect([...broker.holdings.keys()]).toEqual(["SPY", "SWING"])
+    expect(await settle(enforceOvernightRules())).toEqual(["flattened SPY (over the 50% overnight cap)"])
+    expect([...broker.holdings.keys()]).toEqual(["SWING"])
   })
 
   it("sells intraday positions first and counts only what's left toward the cap", async () => {
@@ -264,7 +246,7 @@ describe("maintain", () => {
     ])
   })
 
-  it("liquidates only the trading book when the core book is on: core holdings keep their stops", async () => {
+  it("liquidates a former core holding too, even if the core book's setting is still on", async () => {
     ctx.settings.current.core.enabled = true
     broker.setPosition("AAPL", 10, 100)
     broker.setPosition("SPY", 4, 500)
@@ -274,10 +256,9 @@ describe("maintain", () => {
     broker.addOrder(alpacaOrder({ symbol: "SPY", side: "sell", type: "stop", qty: "4", stop_price: "425", status: "new" }))
 
     const notes = await settle(maintain(session(), NOW))
-    expect([...broker.holdings.keys()]).toEqual(["SPY"])
-    expect(notes).toEqual(["DAILY LOSS LIMIT: day P&L -4.76% breached -4%; liquidated the trading book; the core book (SPY) keeps its stops", "flattened AAPL (daily loss limit)"])
-    expect(alerts).toContainEqual(expect.objectContaining({ title: "Daily loss limit: liquidated the trading book", fields: expect.objectContaining({ Positions: 1 }) }))
-    expect(broker.openOrders("SPY")).toHaveLength(1)
+    expect(broker.holdings.size).toBe(0)
+    expect(notes).toEqual(["DAILY LOSS LIMIT: day P&L -4.76% breached -4%; liquidated everything", "flattened AAPL (daily loss limit)", "flattened SPY (daily loss limit)"])
+    expect(alerts).toContainEqual(expect.objectContaining({ title: "Daily loss limit: liquidated all positions", fields: expect.objectContaining({ Positions: 2 }) }))
   })
 
   it("doesn't liquidate when there's nothing to sell", async () => {
@@ -299,7 +280,7 @@ describe("maintain", () => {
     expect(await maintain(session(), NOW)).toEqual(["protected AAPL: stop 98, target 104"])
   })
 
-  it("sells intraday positions in the last 7 minutes if the closing cycle never ran", async () => {
+  it("sells intraday positions in the last 7 minutes: the overnight rules end the day", async () => {
     const now = beforeClose(6)
     vi.setSystemTime(now)
     broker.setPosition("AAPL", 10, 100)
@@ -311,36 +292,10 @@ describe("maintain", () => {
     const notes = await settle(maintain(session(), now))
     expect(notes).toEqual(["flattened AAPL"])
     expect(broker.holdings.has("AAPL")).toBe(false)
-    expect(alerts).toContainEqual({
-      level: "warning",
-      title: "Closing cycle didn't run: sold intraday positions as a fallback",
-      message: "flattened AAPL",
-      path: "/journal/2026-10-26",
-    })
-  })
-
-  it("while the timed cycles are stopped, always applies the overnight rules in the last minutes, as the day's end rather than a fallback", async () => {
-    const now = beforeClose(6)
-    vi.setSystemTime(now)
-    broker.setPosition("AAPL", 10, 100)
-    await addPlan("AAPL", { horizon: "intraday" })
-    const notes = await settle(upkeep(ctx, session(), { now, closeCycleDone: async () => false, cyclesStopped: true }))
-    expect(notes).toEqual(["flattened AAPL"])
     expect(alerts).toContainEqual({ level: "info", title: "Overnight rules: sold the day's intraday positions", message: "flattened AAPL", path: "/journal/2026-10-26" })
   })
 
-  it("leaves positions alone when the closing cycle succeeded", async () => {
-    const now = beforeClose(6)
-    vi.setSystemTime(now)
-    await (await db()).cycles.insertOne(cycleDoc({ phase: "close", status: "succeeded" }))
-    broker.setPosition("AAPL", 10, 100)
-    addExits("AAPL", 10)
-    await addPlan("AAPL", { horizon: "intraday" })
-    expect(await settle(maintain(session(), now))).toEqual([])
-    expect(broker.holdings.has("AAPL")).toBe(true)
-  })
-
-  it("doesn't fall back before the last 7 minutes, or alert when there's nothing to sell", async () => {
+  it("doesn't apply them before the last 7 minutes, or alert when there's nothing to sell", async () => {
     broker.setPosition("AAPL", 10, 100)
     addExits("AAPL", 10)
     await addPlan("AAPL", { horizon: "intraday" })
@@ -402,28 +357,6 @@ describe("recordDailyStats", () => {
       updated_at: NOW,
     })
     expect(events.find((e) => e.type === "daily.stats")).toMatchObject({ data: { day: "2026-10-26", pnl: 100, pnl_pct: 1, spy_pct: null } })
-  })
-
-  it("splits the day between the core book and the trading book once the core book holds something", async () => {
-    const bar = (t: string, c: number) => ({ t, o: c, h: c, l: c, c, v: 1, vw: c, n: 1 })
-    broker.lastEquity = 10_000
-    // Core: SPY held from yesterday's 500 to 510 (+40), and one DIA share trimmed at 405 against yesterday's 400 (+5).
-    broker.setPosition("SPY", 4, 510, { avg: 480, lastday: 500 })
-    await addPlan("SPY", { book: "core" })
-    broker.snapshots.set("DIA", { dailyBar: bar("2026-10-26T04:00:00Z", 406), prevDailyBar: bar("2026-10-23T04:00:00Z", 400) })
-    await (await db()).orders.insertMany([
-      fill("DIA", "buy", 5, 390, "2026-10-23T14:00:00Z", { client_order_id: "smb-buy-1" }),
-      fill("DIA", "sell", 1, 405, "2026-10-26T15:00:00Z", { client_order_id: "smb-core-sell-1" }),
-      fill("AAPL", "buy", 10, 100, "2026-10-26T15:30:00Z", { client_order_id: "smb-buy-2" }),
-      fill("AAPL", "sell", 10, 103, "2026-10-26T16:00:00Z", { client_order_id: "smb-sell-2" }),
-    ])
-    await (await db()).dailyStats.insertOne(statsDoc("2026-10-23", { books: { core: { value: 2_000, pnl: 0, pnl_pct: 0, realized: 0, holdings: 1 }, trading: { pnl: 0, realized: 0 } } }))
-    broker.cash = 8_000 // equity 8,000 + 2,040 = 10,040: +40 on the day
-    await recordDailyStats("2026-10-26")
-    expect((await (await db()).dailyStats.findOne({ _id: "2026-10-26" }))!.books).toEqual({
-      core: { value: 2_040, pnl: 45, pnl_pct: 2.25, realized: 15, holdings: 1 },
-      trading: { pnl: -5, realized: 30 },
-    })
   })
 
   it("records SPY's move that day as the benchmark", async () => {

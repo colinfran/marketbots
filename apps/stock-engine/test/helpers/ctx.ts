@@ -1,11 +1,8 @@
-import { AiCallLog } from "@mb/engine-kit/ai/call-log"
-import { AiRunner } from "@mb/engine-kit/ai/runner"
 import { silentLogger } from "@mb/engine-kit/log"
 import { makeTestBus } from "@mb/engine-kit/testing/bus"
 import type { EngineStateDoc } from "@mb/stock-core/db"
 import { EPHEMERAL_EVENTS, type EngineEvent, type EventDataMap } from "@mb/stock-core/events"
 import { DEFAULT_SETTINGS, type Settings, type SettingsPatch, mergeSettings } from "@mb/stock-core/settings"
-import { marketDay } from "@mb/stock-core/time"
 import type { EngineContext } from "../../src/bot/context"
 import type { EventBus } from "../../src/bus/event-bus"
 import type { Collections } from "../../src/db/mongo"
@@ -39,7 +36,6 @@ export const makeCtx = async (col: Collections, broker: FakeBroker, patch: Setti
     alpaca: broker.client,
     settings,
     state,
-    ai: new AiRunner(new AiCallLog(col, marketDay), silentLogger),
     alerts: {
       send: async (level, title, message, opts) => {
         alerts.push({ level, title, message, path: opts?.path, ...(opts?.fields ? { fields: opts.fields } : {}) })

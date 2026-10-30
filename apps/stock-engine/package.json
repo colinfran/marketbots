@@ -5,7 +5,6 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch --env-file-if-exists=../../.env.stock --env-file-if-exists=../../.env.stock.local src/main.ts",
-    "eval": "tsx --env-file-if-exists=../../.env.stock --env-file-if-exists=../../.env.stock.local src/eval/cli.ts",
     "start": "node --enable-source-maps dist/main.js",
     "build": "node build.mjs",
     "test": "vitest run",

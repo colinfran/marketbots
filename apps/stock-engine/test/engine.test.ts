@@ -1,13 +1,13 @@
 import { AiCallLog } from "@mb/engine-kit/ai/call-log"
-import { AiRunner } from "@mb/engine-kit/ai/runner"
 import { silentLogger } from "@mb/engine-kit/log"
 import type { Wire } from "../src/wire/wire"
 import { randomUUID } from "node:crypto"
 import type { Command } from "@mb/stock-core/commands"
 import type { CommandDoc, StreamHealth } from "@mb/stock-core/db"
 import type { EngineEvent } from "@mb/stock-core/events"
+import { DEFAULT_SETTINGS } from "@mb/stock-core/settings"
 import { marketDay } from "@mb/stock-core/time"
-import { afterEach, beforeEach, describe, expect, it } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { Alerts } from "../src/alerts"
 import type { MarketStream } from "../src/alpaca/market-stream"
 import type { TradeStream } from "../src/alpaca/trade-stream"
@@ -21,7 +21,6 @@ import type { StreamServer } from "../src/stream/server"
 import { fakeBroker, type FakeBroker } from "./helpers/broker"
 import { makeBus } from "./helpers/ctx"
 import { useTestDb } from "./helpers/db"
-import { cycleDoc } from "./helpers/factories"
 
 const db = useTestDb()
 let broker: FakeBroker
@@ -57,7 +56,6 @@ beforeEach(async () => {
   events = []
   symbols = []
   bus.subscribe((e) => events.push(e))
-  await db.col.cycles.insertOne(cycleDoc({ _id: "interrupted", status: "running" }))
   const env = loadEnv({ MONGODB_URI: "mongodb://test", ALPACA_API_KEY: "k", ALPACA_SECRET_KEY: "s", STREAM_TOKEN_SECRET: "x".repeat(40), ENGINE_INSTANCE: "test" })
   const settings = await loadSettings(db.col, env, silentLogger)
   const state = await EngineStateStore.load(db.col)
@@ -73,7 +71,6 @@ beforeEach(async () => {
     prices: new LivePrices(bus),
     tradeStream: { start: () => undefined, stop: () => undefined, health: health() } as unknown as TradeStream,
     marketStream: { start: () => undefined, stop: () => undefined, setSymbols: (s: string[]) => symbols.push(s), health: health(), symbols: [] } as unknown as MarketStream,
-    ai: new AiRunner(calls, silentLogger),
     calls,
     alerts: new Alerts(db.col, bus, silentLogger, null, null),
     stream: { clientCount: 0 } as unknown as StreamServer,
@@ -103,9 +100,9 @@ describe("Engine", () => {
     const status = (await db.col.engineStatus.findOne({ _id: "engine" }))!
     expect(status).toMatchObject({ status: "running", instance: "test", kill_switch: false, broker: { trade_stream: { state: "connected" } }, ai: { enabled: false } })
     expect(engine.ready).toBe(true)
-    expect(await db.col.cycles.findOne({ _id: "interrupted" })).toMatchObject({ status: "timed_out", error: "the engine restarted during this cycle" })
     expect(await db.col.cache.findOne({ _id: "alpaca:account" })).not.toBeNull()
-    expect(symbols[0]).toEqual(["AAPL", "SPY", "QQQ"])
+    // What it holds, then the index ETFs, then the rest of the watchlist: the benchmarks.
+    expect(symbols[0]).toEqual(["AAPL", ...DEFAULT_SETTINGS.universe.benchmarks])
     expect(events.map((e) => e.type)).toEqual(expect.arrayContaining(["engine.started", "engine.status", "alert"]))
   })
 
@@ -120,33 +117,25 @@ describe("Engine", () => {
     expect(await db.col.audit.countDocuments({ action: "settings.update" })).toBe(1)
   })
 
-  it("sends bad news about a core holding to a single-holding core review, and other news to the agent", async () => {
-    await command({ type: "pause", reason: "test" })
-    const focus = { symbol: "SPY", rule: "core_negative", action: "review" as const, severity: 80, polarity: -1 as const, item_ids: ["i1"], trigger_id: "t1", headline: "S&P futures limit down" }
-    expect(engine.requestEventCycle(focus)).toBe("queued")
-    expect(engine.requestEventCycle({ ...focus, symbol: "AAPL", rule: "held_negative", trigger_id: "t2" })).toBe("agent")
-    const internals = engine as unknown as { coreQueue: { keys(): string[] } }
-    expect(internals.coreQueue.keys()).toEqual(["SPY"])
+  it("watches what it holds, the agent's watches and the benchmarks; the agent's watches are the news engine's focus", async () => {
+    vi.spyOn(engine.agent.agent, "watchedSymbols").mockReturnValue(["NVDA"])
+    const benchmarks = DEFAULT_SETTINGS.universe.benchmarks
+    expect(engine.wireSymbols()).toEqual({ universe: [...benchmarks, "AAPL", "NVDA"], held: ["AAPL"], focus: ["NVDA"] })
+    const internals = engine as unknown as { streamSymbols: () => string[] }
+    expect(internals.streamSymbols()).toEqual(["AAPL", "SPY", "QQQ", "NVDA", ...benchmarks.filter((s) => s !== "SPY" && s !== "QQQ")])
   })
 
-  it("runs the core review on request only when it can", async () => {
-    expect(await command({ type: "core.review" })).toMatchObject({ status: "failed", error: "the core book is off: turn it on in Admin → Settings → Core book, or run a dry run" })
-    await command({ type: "settings.update", patch: { core: { enabled: true } }, expected_version: 1 })
-    expect(await command({ type: "core.review" })).toMatchObject({ status: "failed", error: "a core review trades, so it runs only while the market is open (a dry run works any time)" })
-    // A dry run works with the market closed, but still needs the AI.
-    expect(await command({ type: "core.review", dry_run: true })).toMatchObject({ status: "failed", error: "AI is disabled (LLM_URL not set)" })
+  it("refuses core reviews: the core book is gone", async () => {
+    expect(await command({ type: "core.review" })).toMatchObject({ status: "failed", error: "the core book is gone: the agent decides" })
+    expect(await command({ type: "core.review", dry_run: true })).toMatchObject({ status: "failed", error: "the core book is gone: the agent decides" })
     expect(await db.col.coreReviews.countDocuments()).toBe(0)
   })
 
-  it("runs no timed cycles: news triggers and Wake the agent go to the agent, core reviews still go to the core book", async () => {
-    const focus = { symbol: "AAPL", rule: "held_negative", action: "review" as const, severity: 70, polarity: -1 as const, item_ids: ["i1"], trigger_id: "t1", headline: "AAPL sued" }
-    expect(engine.requestEventCycle(focus)).toBe("agent")
-    expect(engine.requestEventCycle({ ...focus, symbol: "SPY", rule: "core_negative", trigger_id: "t2" })).toMatch(/^(fired|queued)$/)
-    const internals = engine as unknown as { schedule: () => Promise<void>; plan: { reason: string } }
-    await internals.schedule()
-    expect(internals.plan.reason).toBe("The agent decides: no timed cycles.")
-    expect(await db.col.cycles.countDocuments({ _id: { $ne: "interrupted" }, kind: { $ne: "core" } })).toBe(0)
+  it("runs no timed cycles: Wake the agent goes to the agent", async () => {
+    await until(async () => (await db.col.engineStatus.findOne({ _id: "engine" })) !== null)
+    expect(await db.col.engineStatus.findOne({ _id: "engine" })).toMatchObject({ current_phase: null, schedule: { phase: null, reason: "The agent decides: no timed cycles." }, last_cycle: null })
     expect(await command({ type: "cycle.run_now", phase: "postmarket" })).toMatchObject({ status: "failed", error: "the agent needs the model server (LLM_URL)" })
+    expect(await db.col.cycles.countDocuments()).toBe(0)
   })
 
   it("turns an earlier breaker's drop to shadow into a pause on entries, which the owner lifts", async () => {

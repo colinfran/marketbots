@@ -11,7 +11,6 @@ import { marketDay } from "@mb/stock-core/time"
 import type { Alpaca } from "../alpaca/client"
 import { snapshotPrice } from "../market/indicators"
 import type { TradingContext } from "./context"
-import { coreHeld, tradingExposure } from "./books"
 import { executeOptionDecision, type OptionOutcome } from "./options"
 import { clientId, saveOrders, waitForFill } from "./orders"
 import { computeRiskState, type RiskState } from "./risk"
@@ -211,7 +210,7 @@ export type ExecuteInput = {
   entriesBlocked: () => string | null
   /** The kind of cycle, recorded on every decision. */
   triggerKind?: CycleKind
-  /** Event cycles: wire item ids per symbol ("*" = market-wide), recorded on the decisions. */
+  /** The wire items behind the decisions, per symbol ("*" = all of them), recorded on the decisions. */
   wireItemIds?: Record<string, string[]>
   /** Record a default hold for every held stock the decisions leave out (a cycle reviews them all; an agent episode only what woke it). Default true. */
   holdUnmentioned?: boolean
@@ -233,18 +232,15 @@ export const executeDecisions = async (
   if (phase !== "intraday" && phase !== "close") return summary
 
   // Refresh broker state: the model may have spent a couple of minutes thinking.
-  const [account, allPositions, clock, tradesToday, planDocs, optionDocs] = await Promise.all([
+  const [account, allPositions, clock, tradesToday, planDocs] = await Promise.all([
     alpaca.getAccount(),
     alpaca.getPositions(),
     alpaca.getClock(),
     col.decisions.countDocuments({ trading_day: day, status: "executed", action: { $in: ["buy", "sell", "buy_option", "close_option"] } }),
     col.plans.find().toArray(),
-    col.optionPositions.find({ status: { $in: ["opening", "open", "closing"] } }, { projection: { mark: 1, qty: 1, cost_usd: 1 } }).toArray(),
   ])
-  // While the core book is on, its holdings are the weekly review's: the trading book never trades them.
-  const core = coreHeld(planDocs, settings)
-  const positions = allPositions.filter((p) => (p.asset_class ?? "us_equity") === "us_equity" && !core.has(p.symbol))
-  const risk = computeRiskState(account, positions.length, tradesToday, settings, { tradingExposure: tradingExposure(positions, optionDocs) })
+  const positions = allPositions.filter((p) => (p.asset_class ?? "us_equity") === "us_equity")
+  const risk = computeRiskState(account, positions.length, tradesToday, settings)
   const held = new Map<string, AlpacaPosition>(positions.map((p) => [p.symbol, p]))
   const plans = new Map(planDocs.map((p) => [p._id, p]))
   const stockSymbols = report.decisions.filter((d) => !isOptionAction(d.action)).map((d) => d.symbol)
@@ -302,10 +298,7 @@ export const executeDecisions = async (
     )
     let outcome: Outcome
     try {
-      if (instrument === "stock" && core.has(d.symbol)) {
-        const detail = `${d.symbol} is a core book holding: the weekly core review manages it`
-        outcome = reject(detail, [{ name: "core book", ok: false, detail }])
-      } else if (!clock.is_open && d.action !== "hold" && d.action !== "hold_option") outcome = { status: "noop", reason: "market closed; not executed" }
+      if (!clock.is_open && d.action !== "hold" && d.action !== "hold_option") outcome = { status: "noop", reason: "market closed; not executed" }
       else if (instrument === "option") {
         const result: OptionOutcome = await executeOptionDecision(ctx, {
           decision: d,

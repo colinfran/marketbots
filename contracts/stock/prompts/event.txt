@@ -1,4 +1,0 @@
-<untrusted source="wire-event">
-- rule held_review | NVDA | severity 72: NVDA 8-K: 7.01 Regulation FD Disclosure (updated data-center outlook)
-- rule market_review | market-wide | severity 55: Waller: further rate cuts appropriate if inflation keeps easing
-</untrusted>

@@ -80,7 +80,7 @@ export class PriceCoverage {
     this.finnhub.stop()
   }
 
-  /** What the engine holds and watches (every few minutes, and when an event cycle starts). */
+  /** What the engine holds and watches (every few minutes). */
   setSymbols(symbols: CoverageSymbols) {
     this.symbols = symbols
     this.recompute()

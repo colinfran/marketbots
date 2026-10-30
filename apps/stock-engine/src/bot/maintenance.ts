@@ -1,10 +1,6 @@
 import type { AlpacaPosition } from "@mb/stock-core/alpaca"
-import { bookOf, type DailyStatsDoc, type PositionPlanDoc } from "@mb/stock-core/db"
 import { marketDay, minutesBetween } from "@mb/stock-core/time"
 import { errorMessage } from "@mb/engine-kit/log"
-import { placeCoreStop } from "../core-book/execute"
-import { initialCoreStop } from "../core-book/rules"
-import { coreHeld } from "./books"
 import type { TradingContext } from "./context"
 import { cancelSymbolOrders, heldExitBounds, placeExitOrders, resolveExits } from "./execute"
 import { liquidateOptions, reconcileOptions } from "./options"
@@ -17,7 +13,7 @@ import { isSessionOpen, type Session } from "./session"
  * - sync orders from Alpaca (records stop/target fills the trade stream may have missed)
  * - the daily loss limit: liquidate everything if the day's loss breaches flatten_loss_pct
  * - make sure every stock position has protective exit orders
- * - overnight rules as a fallback if the closing cycle never ran
+ * - overnight rules in the last minutes of the session
  * - compare the options books with the broker
  * - housekeeping (plans for closed positions)
  */
@@ -31,9 +27,7 @@ const flatten = async (ctx: TradingContext, positions: AlpacaPosition[], why = "
   for (const { symbol, qty } of positions) {
     try {
       await cancelSymbolOrders(ctx.alpaca, symbol)
-      // A core holding's sale stays the core book's (per-book P&L reads the client order id).
-      const core = bookOf(await ctx.col.plans.findOne({ _id: symbol }, { projection: { book: 1 } })) === "core"
-      const order = await ctx.alpaca.submitOrder({ symbol, qty, side: "sell", type: "market", time_in_force: "day", client_order_id: clientId(core ? "core-flat" : "flat") })
+      const order = await ctx.alpaca.submitOrder({ symbol, qty, side: "sell", type: "market", time_in_force: "day", client_order_id: clientId("flat") })
       ctx.bus.emit(
         "order.submitted",
         { order_id: order.id, symbol, side: "sell", type: "market", qty: Number(qty), limit_price: null, purpose: why ? `liquidation${why}` : "liquidation", asset_class: "us_equity" },
@@ -49,9 +43,8 @@ const flatten = async (ctx: TradingContext, positions: AlpacaPosition[], why = "
   return notes
 }
 
-/** Sells every stock position (cancelling its exits first); `except` (core holdings) keep theirs. */
-export const flattenStocks = async (ctx: TradingContext, why = "", except: ReadonlySet<string> = new Set()) =>
-  flatten(ctx, (await ctx.alpaca.getPositions()).filter((p) => isStock(p) && p.side === "long" && !except.has(p.symbol)), why)
+/** Sells every stock position (cancelling its exits first). */
+export const flattenStocks = async (ctx: TradingContext, why = "") => flatten(ctx, (await ctx.alpaca.getPositions()).filter((p) => isStock(p) && p.side === "long"), why)
 
 /**
  * Places OCO exits on any whole-share stock position that has no open sell orders, at its plan's
@@ -72,10 +65,6 @@ export const ensureProtection = async (ctx: TradingContext): Promise<string[]> =
     if (qty < 1) continue
     const price = Number(position.current_price)
     const plan = planBySymbol.get(position.symbol)
-    if (plan && bookOf(plan) === "core") {
-      notes.push(...(await protectCore(ctx, position, qty, plan)))
-      continue
-    }
     const exits = resolveExits(price, plan?.stop_loss ?? null, plan?.take_profit ?? null, r, heldExitBounds(r))
     if (plan?.stop_loss != null && exits.stop < plan.stop_loss - 0.005) {
       bus.emit("protection.triggered", { symbol: position.symbol, kind: "unprotected_stop", price, structure_id: null }, { summary: `${position.symbol} is through its ${plan.stop_loss} stop with no exit orders; selling`, level: "warn", instrument: position.symbol })
@@ -116,35 +105,9 @@ export const ensureProtection = async (ctx: TradingContext): Promise<string[]> =
 }
 
 /**
- * A core holding with no resting sell order gets its plain GTC stop back, at its plan's level (or
- * the initial core stop when it has none): no take-profit, and no trading-stop bounds. At or
- * through its stop, it's sold instead, like a trading position.
- */
-const protectCore = async (ctx: TradingContext, position: AlpacaPosition, qty: number, plan: PositionPlanDoc): Promise<string[]> => {
-  const { symbol } = position
-  const price = Number(position.current_price)
-  const stop = plan.stop_loss ?? initialCoreStop(Number(position.avg_entry_price), price, ctx.settings.current.core.stop_pct)
-  if (price <= stop) {
-    ctx.bus.emit("protection.triggered", { symbol, kind: "unprotected_stop", price, structure_id: null }, { summary: `${symbol} (core) is through its ${stop} stop with no stop order; selling`, level: "warn", instrument: symbol })
-    const sold = await flatten(ctx, [position], ` (core: price ${price} reached its ${stop} stop with no stop order)`)
-    if (sold[0].startsWith("flattened")) await ctx.alerts.send("warning", `${symbol} sold: its core stop was hit while unprotected`, sold[0], { path: "/core" })
-    return sold
-  }
-  try {
-    await placeCoreStop(ctx, symbol, qty, stop, plan.decision_id)
-    if (plan.stop_loss === null) await ctx.col.plans.updateOne({ _id: symbol }, { $set: { stop_loss: stop, updated_at: new Date() } })
-    return [`protected ${symbol} (core): stop ${stop}`]
-  } catch (error) {
-    await ctx.alerts.send("error", `${symbol} (core) has no stop`, `Placing its stop failed: ${errorMessage(error)}`, { fields: { Shares: qty, Stop: stop }, path: "/core" })
-    return [`could not protect ${symbol} (core): ${errorMessage(error)}`]
-  }
-}
-
-/**
- * The overnight rules for stocks, enforced in code after the closing cycle (and when it fails or
- * never runs):
- * - sell every position whose plan still says "intraday" (the closing cycle keeps one only by
- *   switching it to an overnight horizon with adjust_exits)
+ * The overnight rules for stocks, enforced in code in the last minutes of the session:
+ * - sell every position whose plan still says "intraday" (the agent keeps one only by switching it
+ *   to an overnight horizon with adjust_exits)
  * - then, if what's left is over max_overnight_pct of equity, sell the weakest positions until it fits
  * Options positions are multi-day by design and are governed by their own limits.
  */
@@ -152,9 +115,7 @@ export const enforceOvernightRules = async (ctx: TradingContext): Promise<string
   const { alpaca, col, settings } = ctx
   const [account, positions, plans] = await Promise.all([alpaca.getAccount(), alpaca.getPositions(), col.plans.find().toArray()])
   const intraday = new Set(plans.filter((p) => p.horizon === "intraday").map((p) => p._id))
-  // Core holdings are long-term by design and don't count toward the trading book's overnight cap.
-  const core = coreHeld(plans, settings.current)
-  const longs = positions.filter((p) => isStock(p) && p.side === "long" && !core.has(p.symbol))
+  const longs = positions.filter((p) => isStock(p) && p.side === "long")
   const kept = longs.filter((p) => !intraday.has(p.symbol))
 
   const maxPct = settings.current.risk.max_overnight_pct
@@ -169,17 +130,8 @@ export const enforceOvernightRules = async (ctx: TradingContext): Promise<string
   return [...(await flatten(ctx, longs.filter((p) => intraday.has(p.symbol)))), ...(await flatten(ctx, overCap, ` (over the ${maxPct}% overnight cap)`))]
 }
 
-/**
- * The regular upkeep. `closeCycleDone` tells it whether today's closing cycle succeeded, so the
- * overnight fallback only runs when it didn't. While the timed cycles are stopped (`cyclesStopped`:
- * level auto, or after a breaker's demotion) there is no closing cycle: the overnight rules are
- * simply how the day ends, not a fallback.
- */
-export const maintain = async (
-  ctx: TradingContext,
-  session: Session,
-  { now = new Date(), closeCycleDone, cyclesStopped = false }: { now?: Date; closeCycleDone: () => Promise<boolean>; cyclesStopped?: boolean },
-): Promise<string[]> => {
+/** The regular upkeep. In the last minutes of the session the overnight rules are how the day ends. */
+export const maintain = async (ctx: TradingContext, session: Session, { now = new Date() }: { now?: Date } = {}): Promise<string[]> => {
   const { alpaca, col, settings, alerts } = ctx
   const notes: string[] = []
 
@@ -190,32 +142,23 @@ export const maintain = async (
   const stocks = positions.filter(isStock)
   const risk = computeRiskState(account, stocks.length, 0, settings.current)
 
-  // While the core book is on, the daily loss limit liquidates the trading book only: selling
-  // long-term holdings on a crash day would lock in the loss. Core holdings keep their own stops.
-  const core = coreHeld(await col.plans.find({}, { projection: { book: 1 } }).toArray(), settings.current)
-  const trading = positions.filter((p) => !core.has(p.symbol))
-  if (risk.kill_switch && trading.length > 0) {
+  if (risk.kill_switch && positions.length > 0) {
     const optionNotes = await liquidateOptions(ctx, "kill_switch")
-    const stockNotes = await flattenStocks(ctx, " (daily loss limit)", core)
-    const kept = core.size ? `; the core book (${[...core].join(", ")}) keeps its stops` : ""
-    notes.push(`DAILY LOSS LIMIT: day P&L ${risk.day_pnl_pct}% breached -${settings.current.risk.flatten_loss_pct}%; liquidated ${core.size ? "the trading book" : "everything"}${kept}`, ...optionNotes, ...stockNotes)
+    const stockNotes = await flattenStocks(ctx, " (daily loss limit)")
+    notes.push(`DAILY LOSS LIMIT: day P&L ${risk.day_pnl_pct}% breached -${settings.current.risk.flatten_loss_pct}%; liquidated everything`, ...optionNotes, ...stockNotes)
     await alerts.send(
       "critical",
-      core.size ? "Daily loss limit: liquidated the trading book" : "Daily loss limit: liquidated all positions",
-      `Day P&L hit ${risk.day_pnl_pct}% (limit -${settings.current.risk.flatten_loss_pct}%). ${core.size ? `Every trading position was sold; the core book's holdings keep their stops` : "Every position was sold"} and buying is blocked for the rest of the day.`,
-      { fields: { Equity: money(risk.equity), "Day P&L": money(risk.day_pnl), Positions: trading.length }, path: `/journal/${session.day}` },
+      "Daily loss limit: liquidated all positions",
+      `Day P&L hit ${risk.day_pnl_pct}% (limit -${settings.current.risk.flatten_loss_pct}%). Every position was sold and buying is blocked for the rest of the day.`,
+      { fields: { Equity: money(risk.equity), "Day P&L": money(risk.day_pnl), Positions: positions.length }, path: `/journal/${session.day}` },
     )
     return notes
   }
 
-  const minutesToClose = minutesBetween(now, session.close!)
-  if (minutesToClose <= 7 && !(await closeCycleDone())) {
+  if (minutesBetween(now, session.close!) <= 7) {
     const flattened = await enforceOvernightRules(ctx)
     notes.push(...flattened)
-    if (flattened.length) {
-      if (cyclesStopped) await alerts.send("info", "Overnight rules: sold the day's intraday positions", flattened.join("\n"), { path: `/journal/${session.day}` })
-      else await alerts.send("warning", "Closing cycle didn't run: sold intraday positions as a fallback", flattened.join("\n"), { path: `/journal/${session.day}` })
-    }
+    if (flattened.length) await alerts.send("info", "Overnight rules: sold the day's intraday positions", flattened.join("\n"), { path: `/journal/${session.day}` })
   }
 
   notes.push(...(await ensureProtection(ctx)))
@@ -237,49 +180,10 @@ const spyChangePct = async (ctx: TradingContext, day: string): Promise<number | 
   return Math.round(((bar.c - prev) / prev) * 10_000) / 100
 }
 
-/** A symbol's previous close, as of `day` (its daily bar is today's). null without one. */
-const prevCloses = async (ctx: TradingContext, symbols: string[], day: string): Promise<Map<string, number>> => {
-  if (!symbols.length) return new Map()
-  const snaps = await ctx.alpaca.getSnapshots(symbols)
-  return new Map(
-    Object.entries(snaps).flatMap(([symbol, snap]) => {
-      const barIsToday = snap.dailyBar ? marketDay(new Date(snap.dailyBar.t)) === day : false
-      const prev = barIsToday ? snap.prevDailyBar?.c : snap.dailyBar?.c
-      return prev ? [[symbol, prev] as [string, number]] : []
-    }),
-  )
-}
-
 /**
- * The day per book (DailyStatsDoc.books), once the core book holds or trades something: the core
- * book's value at the close and its day's P&L (Alpaca's intraday P&L on the holdings, plus shares
- * sold today from yesterday's close to the sale); the trading book has the rest of the day's P&L.
+ * Writes the day's performance record (the journal's day). Options P&L counts like any other fill.
+ * The postmarket cycle called it; with the timed cycles gone, nothing does yet.
  */
-const bookStats = async (ctx: TradingContext, day: string, pnl: number, today: Awaited<ReturnType<typeof loadRealizedFills>>): Promise<DailyStatsDoc["books"]> => {
-  const [positions, plans, previous] = await Promise.all([
-    ctx.alpaca.getPositions(),
-    ctx.col.plans.find({ book: "core" }, { projection: { _id: 1 } }).toArray(),
-    ctx.col.dailyStats.findOne({ trading_day: { $lt: day } }, { sort: { trading_day: -1 } }),
-  ])
-  const core = new Set(plans.map((p) => p._id))
-  const holdings = positions.filter((p) => isStock(p) && p.side === "long" && core.has(p.symbol))
-  const coreFills = today.filter((f) => f.book === "core")
-  if (!holdings.length && !coreFills.length) return undefined
-  const sold = coreFills.filter((f) => f.side === "sell")
-  const prev = await prevCloses(ctx, [...new Set(sold.map((f) => f.symbol))], day).catch(() => new Map<string, number>())
-  const round2 = (n: number) => Math.round(n * 100) / 100
-  const value = holdings.reduce((s, p) => s + Number(p.market_value), 0)
-  const corePnl = holdings.reduce((s, p) => s + Number(p.unrealized_intraday_pl), 0) + sold.reduce((s, f) => s + f.qty * (f.price - (prev.get(f.symbol) ?? f.cost_basis ?? f.price)), 0)
-  // The day's base: yesterday's core value, else (the book's first day) what it was worth this morning.
-  const base = previous?.books?.core.value || value - corePnl
-  const realized = (book: "core" | "trading") => round2(today.filter((f) => f.book === book).reduce((s, f) => s + (f.realized_pnl ?? 0), 0))
-  return {
-    core: { value: round2(value), pnl: round2(corePnl), pnl_pct: base > 0 ? round2((corePnl / base) * 100) : null, realized: realized("core"), holdings: holdings.length },
-    trading: { pnl: round2(pnl - corePnl), realized: realized("trading") },
-  }
-}
-
-/** Writes the day's performance record (called by the postmarket cycle). Options P&L counts like any other fill. */
 export const recordDailyStats = async (ctx: TradingContext, day: string = marketDay()) => {
   const { alpaca, col, settings, log, bus } = ctx
   const [account, fills, spyPct] = await Promise.all([
@@ -301,10 +205,6 @@ export const recordDailyStats = async (ctx: TradingContext, day: string = market
   const round2 = (n: number) => Math.round(n * 100) / 100
   const pnl = round2(equity - start)
   const pnlPct = start ? round2(((equity - start) / start) * 100) : 0
-  const books = await bookStats(ctx, day, pnl, today).catch((error) => {
-    log.warn("per-book stats unavailable", { error: errorMessage(error) })
-    return undefined
-  })
 
   await col.dailyStats.updateOne(
     { _id: day },
@@ -325,7 +225,6 @@ export const recordDailyStats = async (ctx: TradingContext, day: string = market
         losses: closed.filter((f) => (f.realized_pnl ?? 0) < 0).length,
         best: sorted.length ? { symbol: label(sorted[sorted.length - 1]), pnl: sorted[sorted.length - 1].realized_pnl! } : null,
         worst: sorted.length ? { symbol: label(sorted[0]), pnl: sorted[0].realized_pnl! } : null,
-        ...(books ? { books } : {}),
         updated_at: new Date(),
       },
     },

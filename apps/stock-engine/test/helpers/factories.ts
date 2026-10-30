@@ -1,6 +1,5 @@
 import type { AlpacaAccount, AlpacaOrder, AlpacaPosition, Bar } from "@mb/stock-core/alpaca"
-import type { MarketContext, OptionsContext } from "@mb/stock-core/context"
-import type { CycleDoc, DailyStatsDoc, DecisionDoc, OptionPositionDoc, OrderDoc, PositionPlanDoc, ReportDoc, ResearchResult } from "@mb/stock-core/db"
+import type { DecisionDoc, OptionPositionDoc, OrderDoc, PositionPlanDoc } from "@mb/stock-core/db"
 import type { BotReport, Decision } from "@mb/stock-core/report"
 import { marketTime } from "@mb/stock-core/time"
 import type { Session } from "../../src/bot/session"
@@ -81,18 +80,6 @@ export const watchItem = (symbol: string, overrides: Partial<BotReport["watchlis
   stop_loss: 98,
   take_profit: 105,
   conviction: 7,
-  ...overrides,
-})
-
-export const research = (overrides: Partial<ResearchResult> = {}): ResearchResult => ({
-  memo: "## 1. Tape & macro\n- Futures flat (8:10 ET, https://reuters.com)",
-  sources: [{ title: "Reuters", url: "https://reuters.com" }],
-  queries: ["futures today"],
-  model: "spacexai/grok-4.5",
-  x_search: true,
-  duration_ms: 12_000,
-  error: null,
-  usage: { input: 1000, output: 500, total: 1500 },
   ...overrides,
 })
 
@@ -205,23 +192,6 @@ export const fill = (symbol: string, side: "buy" | "sell", qty: number, price: n
     ...overrides,
   })
 
-export const cycleDoc = (overrides: Partial<CycleDoc> = {}): CycleDoc => ({
-  _id: `cycle-${++orderSeq}`,
-  phase: "intraday",
-  trading_day: DAY,
-  trigger: "schedule",
-  status: "succeeded",
-  started_at: afterOpen(15),
-  finished_at: afterOpen(17),
-  duration_ms: 120_000,
-  error: null,
-  report_id: null,
-  steps: [],
-  ai_cost_usd: 0,
-  settings_version: 1,
-  ...overrides,
-})
-
 export const planDoc = (symbol: string, overrides: Partial<PositionPlanDoc> = {}): PositionPlanDoc => ({
   _id: symbol,
   decision_id: "dec-1",
@@ -263,89 +233,6 @@ export const decisionDoc = (overrides: Partial<DecisionDoc> = {}): DecisionDoc =
   }
 }
 
-export const dailyStats = (day: string, overrides: Partial<DailyStatsDoc> = {}): DailyStatsDoc => ({
-  _id: day,
-  trading_day: day,
-  start_equity: 10_000,
-  end_equity: 10_050,
-  pnl: 50,
-  pnl_pct: 0.5,
-  total_return_pct: 0.5,
-  orders_filled: 4,
-  buys: 2,
-  sells: 2,
-  realized_pnl: 50,
-  wins: 1,
-  losses: 1,
-  best: { symbol: "NVDA", pnl: 80 },
-  worst: { symbol: "TSLA", pnl: -30 },
-  updated_at: new Date(`${day}T20:10:00.000Z`),
-  ...overrides,
-})
-
-export const marketContext = (overrides: Partial<MarketContext> = {}): MarketContext => ({
-  generated_at: "2026-10-26T15:00:00.000Z",
-  now_et: "11:00",
-  trading_day: DAY,
-  phase: "intraday",
-  session: { open_et: "09:30", close_et: "16:00", is_open: true, early_close: false, minutes_to_open: -90, minutes_to_close: 300 },
-  risk: {
-    equity: 10_000,
-    cash: 10_000,
-    start_of_day_equity: 10_000,
-    day_pnl: 0,
-    day_pnl_pct: 0,
-    total_return_pct: 0,
-    deployable_cash: 9_500,
-    max_position_pct: 20,
-    max_position_usd: 2_000,
-    open_positions: 0,
-    max_open_positions: 6,
-    trades_today: 0,
-    trades_remaining: 30,
-    circuit_breaker: false,
-    profit_lock: false,
-    kill_switch: false,
-    new_buys_allowed: true,
-    notes: [],
-    min_conviction: 6,
-    max_new_buys_this_cycle: 3,
-    rebuy_cooldown_minutes: 30,
-  },
-  positions: [],
-  open_orders: [],
-  benchmarks: [],
-  instruments: [],
-  movers: { gainers: [], losers: [], most_active: [] },
-  news: [],
-  options: optionsContext(),
-  briefing: null,
-  previous_cycle: null,
-  requested: [],
-  today: { decisions: [], fills: [], realized_pnl: 0 },
-  memory: { recent_days: [], profitable_days: 0, total_days: 0 },
-  ...overrides,
-})
-
-export const reportDoc = (overrides: Partial<ReportDoc> = {}): ReportDoc => ({
-  _id: `rep-${++orderSeq}`,
-  cycle_id: "cycle-1",
-  phase: "intraday",
-  trading_day: DAY,
-  created_at: afterOpen(15),
-  model: "spacexai/grok-4.7",
-  attempts: 1,
-  repaired: false,
-  research: research(),
-  report: report(),
-  context: marketContext(),
-  execution: { executed: 0, rejected: 0, failed: 0, noop: 0, notes: [] },
-  usage: { input: 2000, output: 800, total: 2800 },
-  cost_usd: 0.3,
-  settings_version: 1,
-  ...overrides,
-})
-
 /** A price bar. `t` may be an ISO string or a NY wall-clock "HH:MM" on DAY. */
 export const bar = (t: string, c: number, overrides: Partial<Bar> = {}): Bar => ({
   t: /^\d\d:\d\d$/.test(t) ? marketTime(DAY, t).toISOString() : t,
@@ -356,28 +243,6 @@ export const bar = (t: string, c: number, overrides: Partial<Bar> = {}): Bar => 
   v: 1_000,
   vw: c,
   n: 10,
-  ...overrides,
-})
-
-export const optionsContext = (overrides: Partial<OptionsContext> = {}): OptionsContext => ({
-  enabled: true,
-  new_positions_allowed: true,
-  premium_open_usd: 0,
-  premium_open_pct: 0,
-  max_total_premium_pct: 15,
-  max_premium_per_trade_pct: 2,
-  max_premium_per_trade_usd: 200,
-  open_positions: 0,
-  max_open_positions: 4,
-  min_conviction: 7,
-  allow_spreads: true,
-  dte_range: [14, 45],
-  delta_range: [0.3, 0.7],
-  default_stop_loss_pct: 50,
-  default_take_profit_pct: 100,
-  positions: [],
-  chains: [],
-  notes: [],
   ...overrides,
 })
 

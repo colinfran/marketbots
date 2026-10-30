@@ -9,7 +9,6 @@ import type { DecisionDoc, OptionPositionDoc, PositionPlanDoc } from "@mb/stock-
 import { roundTo } from "@mb/stock-core/math"
 import { daysToExpiry, describeContract, OPTION_MULTIPLIER, STRATEGY_LABEL } from "@mb/stock-core/options"
 import { formatTime, marketDay } from "@mb/stock-core/time"
-import { coreHeld, tradingExposure } from "../bot/books"
 import { executeDecisions } from "../bot/execute"
 import { computeRiskState } from "../bot/risk"
 import { limitsText, sessionWindow, type StockAgentDeps } from "./book"
@@ -23,7 +22,7 @@ import { limitsText, sessionWindow, type StockAgentDeps } from "./book"
  * in the regular session after the opening buffer; sales, exits and holds are never rate-limited.
  *
  * The account comes from the engine's latest snapshot (every 15 s), so reading it costs no broker
- * call; executing refreshes what it needs. The core book's holdings stay the weekly review's.
+ * call; executing refreshes what it needs.
  */
 
 const HOUR = 3_600_000
@@ -37,13 +36,12 @@ const action = (d: StockAgentDecision, outcome: AgentAction["outcome"], detail: 
 
 const isStock = (p: AlpacaPosition) => (p.asset_class ?? "us_equity") === "us_equity"
 
-/** The trading book (the core book's holdings left out): its long stock positions with their plans, and its open options positions. */
+/** The book: its long stock positions with their plans, and its open options positions. */
 export const liveBook = async (d: Pick<StockAgentDeps, "ctx" | "snapshot">) => {
   const snap = d.snapshot()
   const [plans, options] = await Promise.all([d.ctx.col.plans.find().toArray(), d.ctx.col.optionPositions.find({ status: { $in: [...OPEN_OPTIONS] } }).toArray()])
-  const core = coreHeld(plans, d.ctx.settings.current)
-  const stocks = (snap?.positions ?? []).filter((p) => isStock(p) && p.side === "long" && !core.has(p.symbol))
-  return { snap, plans: new Map<string, PositionPlanDoc>(plans.map((p) => [p._id, p])), core, stocks, options }
+  const stocks = (snap?.positions ?? []).filter((p) => isStock(p) && p.side === "long")
+  return { snap, plans: new Map<string, PositionPlanDoc>(plans.map((p) => [p._id, p])), stocks, options }
 }
 
 /** What the envelope needs from the paper account: the agent's own entries and actions (its decisions), every stock sale and every stop-out. */
@@ -74,12 +72,12 @@ export const liveEnvelopeHistory = async (d: Pick<StockAgentDeps, "ctx">, equity
   return { equityUsd, openPositions, entries, lastAction, lastExit, lastStopOut }
 }
 
-/** The paper account as the cycle's rules see it (the trading book), with the envelope's history; null before the engine's first snapshot. */
+/** The paper account as the risk rules see it, with the envelope's history; null before the engine's first snapshot. */
 export const liveRiskState = async (d: Pick<StockAgentDeps, "ctx" | "snapshot">, now = new Date()): Promise<{ risk: RiskState; history: EnvelopeHistory; book: Awaited<ReturnType<typeof liveBook>> } | null> => {
   const book = await liveBook(d)
   if (!book.snap) return null
   const tradesToday = await d.ctx.col.decisions.countDocuments({ trading_day: marketDay(now), status: "executed", action: { $in: [...TRADES] } })
-  const risk = computeRiskState(book.snap.account, book.stocks.length, tradesToday, d.ctx.settings.current, { tradingExposure: tradingExposure(book.stocks, book.options) })
+  const risk = computeRiskState(book.snap.account, book.stocks.length, tradesToday, d.ctx.settings.current)
   return { risk, history: await liveEnvelopeHistory(d, risk.equity, now.getTime()), book }
 }
 
@@ -142,7 +140,6 @@ export const liveBookText = async (d: Pick<StockAgentDeps, "ctx" | "snapshot" | 
     `cash $${Number(book.snap!.account.cash).toFixed(2)} · equity $${equity.toFixed(2)} (${starting > 0 ? `${equity >= starting ? "+" : ""}${roundTo((equity / starting - 1) * 100, 2)}%` : "n/a"}) · today ${lastEquity > 0 ? `${equity >= lastEquity ? "+" : ""}${roundTo((equity / lastEquity - 1) * 100, 2)}%` : "n/a"} · ${book.stocks.length} stocks, ${book.options.length} options positions`,
     ...(stocks.length ? stocks : ["- no stock positions"]),
     ...options,
-    ...(book.core.size ? [`- the core book holds ${[...book.core].join(", ")}: the weekly core review's, not yours (never trade or buy them; options on them are fine)`] : []),
     "",
     ...limitsText(d, { risk, history, blocked }, now),
     `- Options: ${o.enabled ? `open premium $${premium.toFixed(0)} of the ${o.max_total_premium_pct}% of equity cap ($${((equity * o.max_total_premium_pct) / 100).toFixed(0)}); at most ${perTrade}% of equity per position; ${book.options.length}/${o.max_open_positions} positions; conviction ≥ ${o.min_conviction}; long calls and puts${o.allow_spreads ? ", call and put debit spreads" : ""}; buy |delta| ${o.min_delta}-${o.max_delta}, ${o.min_dte}-${o.max_dte} days to expiration; contracts only from an option_menu result in this episode; exits default to -${o.default_stop_loss_pct}% / +${o.default_take_profit_pct}% of the position's value, and code closes positions before expiration` : "disabled"}.`,

@@ -50,7 +50,6 @@ export const createStockAgent = ({
   session,
   layerPrice,
   snapshot,
-  busy,
   pause,
   promotion,
 }: {
@@ -65,8 +64,6 @@ export const createStockAgent = ({
   layerPrice: (symbol: string, maxAgeMs: number) => number | null
   /** The broker's account and positions as the engine last read them. */
   snapshot: StockAgentDeps["snapshot"]
-  /** Why the engine wants no episode to act now (its cycle slot is running a seed or a core review), or null. */
-  busy?: () => string | null
   /** A breaker's pause on new entries, kept in the engine's state. */
   pause?: { get: () => Pause | null; set: (p: Pause | null, by: string) => Promise<void> }
   /** When the agent was last turned on or its entries resumed, kept in the engine's state. */
@@ -107,7 +104,7 @@ export const createStockAgent = ({
     alert: (title, message, key) => ctx.alerts.send("warning", title, message, { key, path: "/agent" }),
     blocked: () => {
       const st = ctx.state.state
-      return st.kill_switch.engaged ? "the kill switch is engaged" : st.status !== "running" ? `trading is ${st.status}` : (busy?.() ?? null)
+      return st.kill_switch.engaged ? "the kill switch is engaged" : st.status !== "running" ? `trading is ${st.status}` : null
     },
     price,
     bot,
