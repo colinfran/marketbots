@@ -102,8 +102,8 @@ describe("Engine", () => {
     expect(status).toMatchObject({ status: "running", instance: "test", kill_switch: false, broker: { trade_stream: { state: "connected" } }, ai: { enabled: false } })
     expect(engine.ready).toBe(true)
     expect(await db.col.cache.findOne({ _id: "alpaca:account" })).not.toBeNull()
-    // What it holds, then the index ETFs, then the rest of the watchlist: the benchmarks.
-    expect(symbols[0]).toEqual(["AAPL", ...DEFAULT_SETTINGS.universe.benchmarks])
+    // What it holds, then the index ETFs (the other benchmarks stay off the stream, so the all-symbol bars fit).
+    expect(symbols[0]).toEqual(["AAPL", "SPY", "QQQ"])
     expect(events.map((e) => e.type)).toEqual(expect.arrayContaining(["engine.started", "engine.status", "alert"]))
   })
 
@@ -118,12 +118,12 @@ describe("Engine", () => {
     expect(await db.col.audit.countDocuments({ action: "settings.update" })).toBe(1)
   })
 
-  it("watches what it holds, the agent's watches and the benchmarks; the agent's watches are the news engine's focus", async () => {
+  it("streams what it holds, SPY, QQQ and the agent's watches; the agent's watches are the news engine's focus", async () => {
     vi.spyOn(engine.agent.agent, "watchedSymbols").mockReturnValue(["NVDA"])
     const benchmarks = DEFAULT_SETTINGS.universe.benchmarks
     expect(engine.wireSymbols()).toEqual({ universe: [...benchmarks, "AAPL", "NVDA"], held: ["AAPL"], focus: ["NVDA"] })
     const internals = engine as unknown as { streamSymbols: () => string[] }
-    expect(internals.streamSymbols()).toEqual(["AAPL", "SPY", "QQQ", "NVDA", ...benchmarks.filter((s) => s !== "SPY" && s !== "QQQ")])
+    expect(internals.streamSymbols()).toEqual(["AAPL", "SPY", "QQQ", "NVDA"])
   })
 
   it("refuses core reviews: the core book is gone", async () => {

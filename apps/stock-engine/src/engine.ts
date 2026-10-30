@@ -375,8 +375,13 @@ export class Engine {
    * Live prices for what matters most: held stocks, option underlyings, the index ETFs, the agent's
    * watches, then the rest of the watchlist (dropped first when the stream is full).
    */
+  /**
+   * The live stream's symbols: what it holds, SPY and QQQ, and what the agent watches. The rest of the
+   * benchmarks stay with the price layers: a full stream leaves no room for the all-symbol minute
+   * bars (the setup screen), which Alpaca then refuses.
+   */
   private streamSymbols() {
-    return [...new Set([...this.heldSymbols, ...this.underlyings, "SPY", "QQQ", ...this.watchedSymbols(), ...this.watchlist()])].slice(0, this.d.settings.current.universe.stream_max_symbols)
+    return [...new Set([...this.heldSymbols, ...this.underlyings, "SPY", "QQQ", ...this.watchedSymbols()])].slice(0, this.d.settings.current.universe.stream_max_symbols)
   }
 
   /** What the news engine's price layers track on top of the scan universe. */
