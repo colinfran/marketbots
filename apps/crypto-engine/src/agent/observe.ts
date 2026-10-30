@@ -10,7 +10,7 @@ import { classifyRegime, featuresForPrompt, type Features } from "../market/feat
 import { loadFeatures, viableSetup } from "../orchestrator/decide"
 import { roundTripCostBps } from "../risk/sizing"
 import { screenCrypto } from "../strategies/registry"
-import { isLive, mid, type CryptoAgentDeps } from "./book"
+import { mid, type CryptoAgentDeps } from "./book"
 import { cryptoWireDeps } from "./tools"
 import { bookText, envelopeHistory, heldPositions } from "./view"
 
@@ -18,10 +18,9 @@ import { bookText, envelopeHistory, heldPositions } from "./view"
  * What wakes the crypto agent besides news (docs/plans/LOCAL-AI.md §8.1), checked by code as the
  * data arrives:
  *
- *   every 3 s    the shadow book's stops and targets against the live bid (a fill is a P2; at level
- *                auto the engine's protection loop runs the paper account's, and a stop or target
- *                it hits is the P2), and a held pair moving `schedule.trigger_move_atr` 1 h ATRs
- *                since your last review (down: P0, up: P2), again at every further ATR
+ *   every 3 s    a held pair moving `schedule.trigger_move_atr` 1 h ATRs since your last review
+ *                (down: P0, up: P2), again at every further ATR; a stop or target the engine's
+ *                protection loop hits is a P2 (onPositionClosed)
  *   bar close    once a minute's bars arrive from Kraken: features, the regime and the screens on
  *                the live quotes, with an interval's candles fetched afresh just after it closes
  *                (1 h, 4 h, daily). The best viable setups on pairs not in the book wake the agent
@@ -41,7 +40,6 @@ const BAR_SETTLE_MS = 3_000
 /** An interval's candles are fetched afresh for this long after it closes: Kraken can take a moment to close one. */
 const CLOSE_REFRESH_MS = 2 * 60_000
 const INTERVALS = [60, 240, 1440] as const
-const MARK_MS = 15_000
 const EXITS_MS = 3_000
 const CALENDAR_LEAD_MS = 15 * 60_000
 const REASK_MS = { daily_trend: 24 * 3_600_000, other: 2 * 3_600_000 }
@@ -65,7 +63,7 @@ export class CryptoMarketView {
 }
 
 export class CryptoObserver {
-  private last = { screen: 0, mark: 0, exits: 0, sweep: Date.now(), calendar: 0 }
+  private last = { screen: 0, exits: 0, sweep: Date.now(), calendar: 0 }
   /** The newest closed minute the hub has sent a bar for, when it first came, and the minute last screened. */
   private bars = { minute: 0, seenAt: 0, screened: 0 }
   private readonly setups = new Map<string, number>()
@@ -89,16 +87,10 @@ export class CryptoObserver {
 
   async tick(now: Date) {
     const t = now.getTime()
-    // The shadow book's stops, targets and marks are the agent's to run; the paper account's are the engine's (protection, marks).
-    const live = isLive(this.d)
+    // Stops, targets and marks are the engine's (protection, marks); the agent watches the moves.
     if (t - this.last.exits >= EXITS_MS) {
       this.last.exits = t
-      if (!live) await this.exits(now)
       await this.priceMoves(now)
-    }
-    if (!live && t - this.last.mark >= MARK_MS) {
-      this.last.mark = t
-      await this.d.shadow.mark(mid(this.d.ctx))
     }
     const barClosed = this.bars.minute > this.bars.screened && t - this.bars.seenAt >= BAR_SETTLE_MS
     if (barClosed || t - this.last.screen >= FALLBACK_SCREEN_MS) {
@@ -122,27 +114,6 @@ export class CryptoObserver {
         salience: 30,
         summary: `Quiet-time review: nothing has woken you for ${Math.round((t - quietSince) / 60_000)} min. Check your book, the market, and anything nothing else woke you for.`,
         refs: {},
-        at: now,
-      })
-    }
-  }
-
-  /** Stops and targets at the price a sale would get: the bid, while the quote is fresh. */
-  private async exits(now: Date) {
-    const maxAge = this.d.ctx.settings.current.kraken.max_quote_age_seconds
-    const fills = await this.d.shadow.checkExits((s) => {
-      const q = this.d.ctx.hub.quote(s)
-      return q && q.ageS <= maxAge ? q.bid : null
-    })
-    for (const f of fills) {
-      this.observe({
-        id: `fill:${f._id}`,
-        subject: f.symbol,
-        kind: "fill",
-        priority: 2,
-        salience: 60,
-        summary: `Your shadow ${f.symbol} position hit its ${f.reason === "stop_loss" ? "stop" : "target"}: sold ${f.qty} at ${roundTo(f.price, 6)}, ${f.realized_pnl_usd! >= 0 ? "+" : "-"}$${Math.abs(f.realized_pnl_usd ?? 0).toFixed(2)}.`,
-        refs: { position_id: f.position_id },
         at: now,
       })
     }

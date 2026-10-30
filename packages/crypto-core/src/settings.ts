@@ -268,7 +268,7 @@ export const DEFAULT_SETTINGS: Settings = {
     },
   },
   agent: {
-    level: "shadow",
+    level: "on",
     model: "local/qwen3.6-35b-a3b-q2",
     limits: {
       p0: { steps: 4, seconds: 60, thinking_tokens: 0 },
@@ -288,7 +288,6 @@ export const DEFAULT_SETTINGS: Settings = {
       reentry_after_stop_hours: 24,
       flip_hours: 6,
     },
-    shadow_starting_usd: 10_000,
     public_thinking: false,
   },
 }

@@ -51,8 +51,8 @@ export type ControlPlaneDeps<S extends string, Item extends { title: string; sev
   /** Closes every position for a liquidating kill switch; returns what it did, one note per position. */
   liquidate: () => Promise<string[]>
   wording: ControlWording
-  /** The agent, for `agent.ask` (absent where there is none). */
-  agent?: { ask(question: string, by: string): string } | null
+  /** The agent, for `agent.ask` and `agent.resume_entries` (absent where there is none). */
+  agent?: { ask(question: string, by: string): string; resumeEntries(by: string): Promise<string> } | null
 }
 
 export class ControlPlane<S extends string, Item extends { title: string; severity: number }> {
@@ -124,6 +124,9 @@ export class ControlPlane<S extends string, Item extends { title: string; severi
       case "agent.ask":
         if (!this.d.agent) throw new Error("this engine has no agent")
         return this.d.agent.ask(command.question, by)
+      case "agent.resume_entries":
+        if (!this.d.agent) throw new Error("this engine has no agent")
+        return this.d.agent.resumeEntries(by)
     }
   }
 

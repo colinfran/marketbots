@@ -11,7 +11,7 @@
     },
     {
       "name": "option_menu",
-      "description": "the liquid option contracts you may buy on a stock: calls and puts in the allowed expirations, with bid, ask, delta, IV and open interest. A buy_option must copy its contracts from this list. Level auto only. Args: {symbol}.",
+      "description": "the liquid option contracts you may buy on a stock: calls and puts in the allowed expirations, with bid, ask, delta, IV and open interest. A buy_option must copy its contracts from this list. Args: {symbol}.",
       "args": {
         "type": "object",
         "properties": {
@@ -129,7 +129,7 @@
     },
     {
       "name": "past_decisions",
-      "description": "the bot's last decisions on a stock and its options (yours on the paper account, the timed cycles' before you, and yours in the shadow book), with what came of them. Args: {symbol}.",
+      "description": "the bot's last decisions on a stock and its options (yours, and the bot's earlier ones before you took over), with what came of them. Args: {symbol}.",
       "args": {
         "type": "object",
         "properties": {

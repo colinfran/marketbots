@@ -19,9 +19,7 @@ import { checkNoOrphans, matchContract, matchJson } from "./snapshot"
 const TOOLS = cryptoAgentTools({} as CryptoAgentDeps)
 
 describe("contracts: the agent", () => {
-  it("system message", () => matchContract("agent/system.txt", `${cryptoAgentSystemPrompt("shadow")}\n\n${toolProtocol(TOOLS, DEFAULT_SETTINGS.agent.limits.p1.steps)}\n`))
-
-  it("system message at level auto", () => matchContract("agent/system-auto.txt", `${cryptoAgentSystemPrompt("auto")}\n\n${toolProtocol(TOOLS, DEFAULT_SETTINGS.agent.limits.p1.steps)}\n`))
+  it("system message", () => matchContract("agent/system.txt", `${cryptoAgentSystemPrompt()}\n\n${toolProtocol(TOOLS, DEFAULT_SETTINGS.agent.limits.p1.steps)}\n`))
 
   it("tool and answer schemas", () =>
     matchJson("agent/schemas.json", {

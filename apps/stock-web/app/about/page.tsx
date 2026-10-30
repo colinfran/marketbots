@@ -60,10 +60,9 @@ export default async function AboutPage() {
   return (
     <div className="space-y-8">
       <PageHeader title="How it works" description="An experiment in whether an AI agent running on our own hardware, woken by the news and the market as they move, can finish every trading day green." />
-      {a.level !== "auto" && (
+      {a.level !== "on" && (
         <p className="text-muted-foreground rounded-lg border px-4 py-3 text-sm leading-relaxed">
-          Right now the agent isn&apos;t trading: {a.level === "shadow" ? "its decisions fill only a simulated book" : "it's switched off"} until the owner puts it back
-          in charge.
+          Right now the agent isn&apos;t trading: it&apos;s switched off until the owner turns it back on.
         </p>
       )}
       <section className="grid gap-3 sm:grid-cols-2">

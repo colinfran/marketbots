@@ -1,5 +1,6 @@
 import {
   agentAskCommand,
+  agentResumeEntriesCommand,
   BASE_COMMAND_LABEL,
   killSwitchEngageCommand,
   killSwitchReleaseCommand,
@@ -64,6 +65,7 @@ export const commandSchema = z.discriminatedUnion("type", [
   seedCancelCommand,
   wireReplayCommand,
   agentAskCommand,
+  agentResumeEntriesCommand,
 ])
 
 export type Command = z.infer<typeof commandSchema>
@@ -86,4 +88,5 @@ export const COMMAND_LABEL: Record<CommandType, string> = {
   "seed.cancel": base["seed.cancel"],
   "wire.replay": base["wire.replay"],
   "agent.ask": base["agent.ask"],
+  "agent.resume_entries": base["agent.resume_entries"],
 }

@@ -19,9 +19,7 @@ import { checkNoOrphans, matchContract, matchJson } from "./snapshot"
 const TOOLS = stockAgentTools({} as StockAgentDeps)
 
 describe("contracts: the agent", () => {
-  it("system message", () => matchContract("agent/system.txt", `${stockAgentSystemPrompt("shadow")}\n\n${toolProtocol(TOOLS, DEFAULT_SETTINGS.agent.limits.p1.steps)}\n`))
-
-  it("system message at level auto", () => matchContract("agent/system-auto.txt", `${stockAgentSystemPrompt("auto")}\n\n${toolProtocol(TOOLS, DEFAULT_SETTINGS.agent.limits.p1.steps)}\n`))
+  it("system message", () => matchContract("agent/system.txt", `${stockAgentSystemPrompt()}\n\n${toolProtocol(TOOLS, DEFAULT_SETTINGS.agent.limits.p1.steps)}\n`))
 
   it("tool and answer schemas", () =>
     matchJson("agent/schemas.json", {

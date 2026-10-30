@@ -1,27 +1,23 @@
-import type { AgentEpisodeDoc, AgentNoteDoc, AgentWatchDoc, Observation, ShadowFillDoc, ShadowPositionDoc } from "@mb/core/agent"
+import type { AgentEpisodeDoc, AgentNoteDoc, AgentWatchDoc, Observation } from "@mb/core/agent"
 import type { AgentSettings } from "@mb/core/settings"
 import { useMongoTestDb } from "@mb/engine-kit/testing/db"
 import type { Db } from "mongodb"
 import type { ChatFn, ChatRequest, ChatResult } from "../src/client"
 
-/** The agent's collections on a fresh test database, with the shadow book's one-open-position index. */
+/** The agent's collections on a fresh test database. */
 export const useAgentDb = () =>
   useMongoTestDb({
     prefix: "agent_test",
-    indexes: {
-      shadow_positions: [{ key: { symbol: 1 }, name: "one_open_shadow_position_per_symbol", unique: true, partialFilterExpression: { status: "open" } }],
-    },
+    indexes: {},
     collections: (db: Db) => ({
       agentEpisodes: db.collection<AgentEpisodeDoc>("agent_episodes"),
       agentWatches: db.collection<AgentWatchDoc>("agent_watches"),
       agentNotes: db.collection<AgentNoteDoc>("agent_notes"),
-      shadowPositions: db.collection<ShadowPositionDoc>("shadow_positions"),
-      shadowFills: db.collection<ShadowFillDoc>("shadow_fills"),
     }),
   })
 
 export const SETTINGS: AgentSettings = {
-  level: "shadow",
+  level: "on",
   model: "local/test-model",
   limits: {
     p0: { steps: 4, seconds: 60, thinking_tokens: 0 },
@@ -41,7 +37,6 @@ export const SETTINGS: AgentSettings = {
     reentry_after_stop_hours: 24,
     flip_hours: 6,
   },
-  shadow_starting_usd: 10_000,
   public_thinking: false,
 }
 

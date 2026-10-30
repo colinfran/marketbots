@@ -5,19 +5,18 @@ import type { TokenUsage } from "./db"
  * The agent (docs/plans/LOCAL-AI.md §8): what both bots mean the same thing by. Code turns what it
  * sees into observations; the attention queue turns observations into wake-ups; each wake-up is an
  * episode, in which the local model looks things up with read-only tools and answers with the
- * bot's decisions, watches and notes. At level "shadow" the decisions go into the shadow book (a
- * simulated account), never to the broker; at level "auto" they trade the paper account.
+ * bot's decisions, watches and notes, and its decisions trade the paper account through the bot's
+ * own risk checks and execution.
  *
  * The runtime is @mb/agent; each engine's src/agent/ holds the bot's tools, brief and prompts.
  */
 
 /**
- * off = nothing (the timed cycles trade); shadow = wakes, decides and records into the shadow book
- * (the timed cycles trade); auto = the agent trades the paper account through the bot's own risk
- * checks and execution, inside its envelope, and the timed cycles stop. A tripped breaker drops
- * auto back to shadow.
+ * on = the agent trades the paper account through the bot's own risk checks and execution, inside
+ * its envelope; off = nothing decides (stops, targets and the risk halts still protect positions).
+ * A tripped breaker pauses its new entries until the owner resumes them; it never turns it off.
  */
-export const AGENT_LEVELS = ["off", "shadow", "auto"] as const
+export const AGENT_LEVELS = ["off", "on"] as const
 export type AgentLevel = (typeof AGENT_LEVELS)[number]
 
 /** 0 = risk to a holding, 1 = an opportunity, 2 = a review, 3 = background. Lower runs first. */
@@ -79,7 +78,7 @@ export type AgentStepDoc = {
 
 export type EpisodeStatus = "running" | "answered" | "no_answer" | "invalid" | "aborted" | "failed"
 
-/** What became of one decision in the answer: the shadow book's fill, or why not. */
+/** What became of one decision in the answer: its fill, or why not. */
 export type AgentActionOutcome = "filled" | "updated" | "held" | "rejected" | "blocked" | "not_applicable" | "read_only"
 
 export type AgentAction = { symbol: string; action: string; conviction: number; outcome: AgentActionOutcome; detail: string | null }
@@ -115,7 +114,7 @@ export type AgentEpisodeDoc = {
   prompt_version: string
   settings_version: number
   usage: TokenUsage
-  /** TTL: episodes that changed the shadow book are kept (null), the rest expire. */
+  /** TTL: episodes that traded are kept (null), the rest expire. */
   expires_at: Date | null
 }
 
@@ -219,56 +218,8 @@ export const agentAnswerFields = {
 /** The fields the runtime reads from every bot's answer. */
 export type AgentAnswerBase = { watches: WatchRequest[]; cancel_watches: string[]; notes: NoteRequest[]; reply: string }
 
-/** A position in the shadow book: what the agent would hold. Long only, like the bots. */
-export type ShadowPositionDoc = {
-  _id: string
-  symbol: string
-  status: "open" | "closed"
-  qty: number
-  entry_price: number
-  /** What was paid, fees included, for the quantity still held. */
-  cost_usd: number
-  fees_usd: number
-  opened_at: Date
-  stop_price: number | null
-  take_profit_price: number | null
-  /** The bot's own horizon: hours (crypto) or intraday / overnight / multi_day (stock). */
-  horizon: string | null
-  strategy: string | null
-  thesis: string
-  invalidation: string
-  conviction: number
-  episode_id: string
-  last_reviewed_at: Date | null
-  last_review_price: number | null
-  mark_price: number | null
-  marked_at: Date | null
-  realized_pnl_usd: number
-  closed_at: Date | null
-  exit_price: number | null
-  exit_reason: string | null
-}
-
-export type ShadowFillDoc = {
-  _id: string
-  position_id: string
-  symbol: string
-  side: "buy" | "sell"
-  qty: number
-  price: number
-  /** The bid, ask or last price the fill was simulated from. */
-  reference_price: number
-  fee_usd: number
-  at: Date
-  /** entry, reduce, exit, stop_loss, take_profit, overnight… */
-  reason: string
-  episode_id: string | null
-  /** Sells: net of the fees of both legs. */
-  realized_pnl_usd: number | null
-}
-
-/** The shadow book's account, derived from its positions. */
-export type ShadowAccount = {
+/** The paper account the agent trades, summarized for the heartbeat, the breakers and the dashboard. */
+export type BookAccount = {
   starting_usd: number
   cash_usd: number
   equity_usd: number
@@ -283,8 +234,6 @@ export type ShadowAccount = {
 /** The heartbeat's agent block (EngineStatusBase.agent). */
 export type AgentStatus = {
   level: AgentLevel
-  /** Which book the agent decides into: its shadow book, or (level auto) the paper account. */
-  book: "shadow" | "live"
   /** off: level off or no model; idle; queued: waiting (the reason is in `blocked`); running. */
   state: "off" | "idle" | "queued" | "running"
   blocked: string | null
@@ -297,10 +246,12 @@ export type AgentStatus = {
   watches: number
   /** The latest step's generation speed, tokens/s. */
   tokens_per_s: number | null
-  /** The account the agent decides into (`book`): the shadow book's, or at level auto the paper account's. */
-  shadow: ShadowAccount | null
-  /** Circuit breakers tripped today: at level shadow recorded only; at level auto each drops the agent to shadow, except a slow model, which pauses its entries. */
+  /** The paper account it trades. */
+  account: BookAccount | null
+  /** Circuit breakers tripped today: each pauses its new entries until the owner resumes them, except a slow model, which pauses them until it is fast again. */
   breakers: string[]
-  /** Why the agent's entries are paused (a slow model), or null. */
+  /** Why the agent's new entries are paused (a breaker, a slow model), or null. Its exits carry on. */
   entries_paused: string | null
+  /** A breaker's pause on new entries, which only the owner lifts (Admin → Resume entries), or null. */
+  pause: { at: Date; reason: string } | null
 }

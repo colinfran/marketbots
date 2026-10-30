@@ -65,19 +65,17 @@ export const AGENT_SETTINGS_SECTIONS: SettingsSection[] = [
     fields: [
       {
         path: "agent.level",
-        label: "Level (off; shadow: decides into its shadow book; auto: trades the paper account, and the timed cycles stop)",
+        label: "Agent (on: it trades the paper account; off: nothing decides, and stops and targets still protect positions)",
         kind: "select",
-        options: ["off", "shadow", "auto"],
+        options: ["on", "off"],
         confirm: {
-          value: "auto",
-          message:
-            "At level auto the agent trades the paper account on its own, inside its envelope and the bot's risk checks, and the timed cycles stop. A tripped breaker drops it back to shadow; the kill switch and Agent off still work. Switch to auto?",
+          value: "off",
+          message: "With the agent off nothing decides for the bot: no entries, no exits beyond the stops and targets already in place. Turn it off?",
         },
       },
       { path: "agent.model", label: "Model", kind: "select", options: AI_MODELS },
       { path: "agent.wake_cooldown_minutes", label: "Wake cooldown per subject (min)", kind: "number" },
       { path: "agent.sweep_minutes", label: "Quiet-time review after (min with no wake-up)", kind: "number" },
-      { path: "agent.shadow_starting_usd", label: "Shadow book starting cash ($)", kind: "number" },
       { path: "agent.public_thinking", label: "Show its thinking to logged-out viewers", kind: "boolean" },
     ],
   },

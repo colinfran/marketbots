@@ -1,13 +1,12 @@
 import type { AgentActionOutcome, EpisodeStatus } from "@mb/core/agent"
 
 /**
- * Circuit breakers (docs/plans/LOCAL-AI.md §9, ring 4): signs the agent is misbehaving. At level
- * auto a trip drops it back to shadow, except a slow model, which only pauses its entries until
- * the model is fast again (`slowModel`); at level shadow there is nothing lower to go to, so a trip
- * is recorded, streamed and alerted, and nothing is enforced.
+ * Circuit breakers (docs/plans/LOCAL-AI.md §9, ring 4): signs the agent is misbehaving. A trip
+ * pauses its new entries until the owner resumes them, except a slow model, which pauses them only
+ * until the model is fast again (`slowModel`). Its exits carry on either way.
  *
- * Pure: the runtime keeps the recent history (since the engine started, or the agent's promotion
- * to auto) and asks after every episode which breakers are tripped.
+ * Pure: the runtime keeps the recent history (since the engine started, the agent was turned on or
+ * its entries resumed) and asks after every episode which breakers are tripped.
  */
 
 export type BreakerHistory = {
@@ -17,7 +16,7 @@ export type BreakerHistory = {
   entries: { at: number; outcome: AgentActionOutcome }[]
   /** Entries the envelope refused today. */
   envelopeBlocksToday: number
-  /** The shadow book's day and total return, %. */
+  /** The paper account's return today and since the agent was turned on or resumed, %. */
   dayPnlPct: number
   totalPnlPct: number
   /** Generation speed of the latest steps, tokens/s, oldest first. */
@@ -44,8 +43,8 @@ export const trippedBreakers = (h: BreakerHistory, now: number): Breaker[] => {
   const invalid = episodes.filter((e) => e.status === "invalid").length
   if (episodes.length >= 5 && invalid / episodes.length > 0.1) out.push({ name: "invalid_answers", detail: `${invalid} of ${episodes.length} answers invalid in the last hour` })
   if (h.envelopeBlocksToday >= 3) out.push({ name: "envelope_blocks", detail: `the envelope refused ${h.envelopeBlocksToday} entries today` })
-  if (h.dayPnlPct <= -3) out.push({ name: "daily_loss", detail: `the shadow book is down ${h.dayPnlPct.toFixed(2)}% today` })
-  if (h.totalPnlPct <= -6) out.push({ name: "total_loss", detail: `the shadow book is down ${h.totalPnlPct.toFixed(2)}% in all` })
+  if (h.dayPnlPct <= -3) out.push({ name: "daily_loss", detail: `the paper account is down ${h.dayPnlPct.toFixed(2)}% today` })
+  if (h.totalPnlPct <= -6) out.push({ name: "total_loss", detail: `the paper account is down ${h.totalPnlPct.toFixed(2)}% since the agent took over` })
   const slow = slowModel(h.speeds)
   if (slow) out.push(slow)
   return out

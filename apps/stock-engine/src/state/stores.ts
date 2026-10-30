@@ -1,3 +1,4 @@
+import { upgradeStoredSettings } from "@mb/core/settings"
 import type { Logger } from "@mb/engine-kit/log"
 import { SettingsStore as SettingsStoreOf, type SettingsView as SettingsViewOf } from "@mb/engine-kit/state/stores"
 import { applySettingsPatch, DEFAULT_SETTINGS, settingsSchema, type Settings, type SettingsPatch } from "@mb/stock-core/settings"
@@ -31,6 +32,7 @@ export const loadSettings = (
         ...defaults,
         account: { starting_capital: env.STARTING_CAPITAL ?? defaults.account.starting_capital },
       }),
+      upgrade: upgradeStoredSettings,
     },
     log,
   )

@@ -1,22 +1,22 @@
 import type { Metadata } from "next"
-import { AgentLive, AgentMemory, AgentStatusCard, AskAgentForm, EpisodeTable, ShadowBook } from "@mb/ui/agent"
+import { AgentLive, AgentMemory, AgentStatusCard, AskAgentForm, EpisodeTable } from "@mb/ui/agent"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@mb/ui/components/card"
 import { StreamBadge } from "@mb/ui/live"
 import { PageHeader, SectionTitle } from "@/components/bits"
-import { agentStatusView, getAgentMemory, getEpisode, getEpisodes, getShadowBook } from "@/lib/agent"
+import { agentStatusView, getAgentMemory, getEpisode, getEpisodes } from "@/lib/agent"
 import { getViewer } from "@/lib/auth"
 import { getEngine, getSettings } from "@/lib/queries"
 import { pageMetadata } from "@/lib/site"
 
 export const metadata: Metadata = pageMetadata({
   title: "The agent",
-  description: "The local AI agent that wakes on news, the session and moves, looks things up step by step, and decides into its own shadow book: every episode, watch and simulated trade.",
+  description: "The local AI agent that wakes on news, the session and moves, looks things up step by step, and trades the paper account: every episode, watch and trade.",
   path: "/agent",
 })
 
-/** The agent (docs/plans/LOCAL-AI.md §11): what it is doing now, its shadow book, its memory, its episodes. */
+/** The agent (docs/plans/LOCAL-AI.md §11): what it is doing now, its memory, its episodes. */
 export default async function AgentPage() {
-  const [viewer, engine, settings, episodes, book, memory] = await Promise.all([getViewer(), getEngine(), getSettings(), getEpisodes(50), getShadowBook(), getAgentMemory()])
+  const [viewer, engine, settings, episodes, memory] = await Promise.all([getViewer(), getEngine(), getSettings(), getEpisodes(50), getAgentMemory()])
   const thinking = viewer.owner || !!settings.agent?.public_thinking
   const latest = episodes[0] ? await getEpisode(episodes[0].id, { thinking }) : null
   const status = agentStatusView(engine.status)
@@ -24,10 +24,10 @@ export default async function AgentPage() {
     <div className="space-y-8">
       <PageHeader
         title="The agent"
-        description="A local AI model that decides for the bot. Code watches prices, news, the setup screen, the session and its own watches all the time and wakes it when something matters; it looks things up one step at a time and decides. At level auto it trades stocks and options in the paper account through the bot's risk checks, and the timed cycles are off; in shadow, its decisions fill in a simulated book at live prices and slippage, never at the broker."
+        description="A local AI model that decides for the bot. Code watches prices, news, the setup screen, the session and its own watches all the time and wakes it when something matters; it looks things up one step at a time and decides. It trades stocks and options in the paper account through the bot's risk checks."
         action={<StreamBadge />}
       />
-      <AgentStatusCard status={status} online={engine.online} />
+      <AgentStatusCard status={status} online={engine.online} owner={viewer.owner} />
       <div className="grid gap-4 lg:grid-cols-5">
         <Card className="lg:col-span-3">
           <CardHeader>
@@ -50,10 +50,6 @@ export default async function AgentPage() {
           )}
         </Card>
       </div>
-      <section>
-        <SectionTitle>Shadow book</SectionTitle>
-        <ShadowBook account={status?.book === "live" ? null : (status?.shadow ?? null)} {...book} />
-      </section>
       <section>
         <SectionTitle>Watches and notes</SectionTitle>
         <AgentMemory {...memory} />

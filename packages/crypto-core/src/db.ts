@@ -19,7 +19,7 @@ import type { DossierRow } from "./wire"
 import type { AccountId, Mode, Venue } from "./venues"
 
 export { utcDay } from "@mb/core/db"
-export type { AgentEpisodeDoc, AgentNoteDoc, AgentWatchDoc, ShadowFillDoc, ShadowPositionDoc } from "@mb/core/agent"
+export type { AgentEpisodeDoc, AgentNoteDoc, AgentWatchDoc } from "@mb/core/agent"
 export type {
   AiCallDoc,
   AiTask,
@@ -74,12 +74,10 @@ export const COLLECTIONS = {
   wireItems: "wire_items",
   wireTriggers: "wire_triggers",
   loginAttempts: "login_attempts",
-  // The agent (docs/plans/LOCAL-AI.md §8): its episodes, watches and notes, and the shadow book.
+  // The agent (docs/plans/LOCAL-AI.md §8): its episodes, watches and notes.
   agentEpisodes: "agent_episodes",
   agentWatches: "agent_watches",
   agentNotes: "agent_notes",
-  shadowPositions: "shadow_positions",
-  shadowFills: "shadow_fills",
   // Owner sign-in (Better Auth magic links), written only by the dashboard.
   authUsers: "auth_users",
   authSessions: "auth_sessions",
@@ -528,8 +526,6 @@ export const INDEXES: Partial<Record<(typeof COLLECTIONS)[keyof typeof COLLECTIO
   agent_episodes: BASE_INDEXES.agent_episodes,
   agent_watches: BASE_INDEXES.agent_watches,
   agent_notes: BASE_INDEXES.agent_notes,
-  shadow_positions: BASE_INDEXES.shadow_positions,
-  shadow_fills: BASE_INDEXES.shadow_fills,
   auth_sessions: BASE_INDEXES.auth_sessions,
   auth_verifications: BASE_INDEXES.auth_verifications,
 }

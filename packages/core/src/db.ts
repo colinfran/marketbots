@@ -26,12 +26,10 @@ export const BASE_COLLECTIONS = {
   wireItems: "wire_items",
   wireTriggers: "wire_triggers",
   loginAttempts: "login_attempts",
-  // The agent (docs/plans/LOCAL-AI.md §8): its episodes, watches and notes, and the shadow book.
+  // The agent (docs/plans/LOCAL-AI.md §8): its episodes, watches and notes.
   agentEpisodes: "agent_episodes",
   agentWatches: "agent_watches",
   agentNotes: "agent_notes",
-  shadowPositions: "shadow_positions",
-  shadowFills: "shadow_fills",
   // Owner sign-in (Better Auth magic links), written only by the dashboard.
   authUsers: "auth_users",
   authSessions: "auth_sessions",
@@ -79,12 +77,6 @@ export const BASE_INDEXES = indexes({
   agent_episodes: [{ key: { started_at: -1 } }, { key: { subject: 1, started_at: -1 } }, { key: { expires_at: 1 }, expireAfterSeconds: 0 }],
   agent_watches: [{ key: { status: 1 } }, { key: { purge_at: 1 }, expireAfterSeconds: 0 }],
   agent_notes: [{ key: { subject: 1, created_at: -1 } }, { key: { expires_at: 1 }, expireAfterSeconds: 0 }],
-  shadow_positions: [
-    { key: { status: 1 } },
-    { key: { symbol: 1 }, name: "one_open_shadow_position_per_symbol", unique: true, partialFilterExpression: { status: "open" } },
-    { key: { closed_at: -1 } },
-  ],
-  shadow_fills: [{ key: { at: -1 } }, { key: { position_id: 1 } }],
   // Better Auth's own field names (camelCase).
   auth_sessions: [{ key: { token: 1 } }, { key: { expiresAt: 1 }, expireAfterSeconds: 0 }],
   auth_verifications: [{ key: { identifier: 1 } }, { key: { expiresAt: 1 }, expireAfterSeconds: 0 }],
@@ -107,12 +99,11 @@ export type EngineStateDoc = {
   status: "running" | "paused" | "halted"
   pause_reason: string | null
   kill_switch: { engaged: boolean; reason: string | null; at: Date | null; by: string | null; liquidate: boolean }
-  /** When the agent was last promoted to level auto, and the account's equity then (absent until the first promotion). */
+  /** When the agent was last turned on or its entries resumed, and the account's equity then: the total-loss breaker counts from it. */
   agent_promotion?: { at: Date; equity_usd: number } | null
-  /**
-   * When a circuit breaker last dropped the agent from auto to shadow, and why; the next promotion
-   * clears it. While it is set the timed cycles stay stopped, as at auto.
-   */
+  /** A circuit breaker's pause on the agent's new entries, until the owner resumes them (Admin). */
+  agent_pause?: { at: Date; reason: string } | null
+  /** Legacy: a breaker's drop to the old shadow level. Read once at startup and turned into `agent_pause`. */
   agent_demotion?: { at: Date; reason: string } | null
   updated_at: Date
 }

@@ -21,7 +21,7 @@ import type {
   ReportDoc,
   SettingsDoc,
 } from "@mb/stock-core/db"
-import type { AgentEpisodeDoc, AgentNoteDoc, AgentWatchDoc, ShadowFillDoc, ShadowPositionDoc } from "@mb/stock-core/db"
+import type { AgentEpisodeDoc, AgentNoteDoc, AgentWatchDoc } from "@mb/stock-core/db"
 import type { WireItemDoc, WireTriggerDoc } from "@mb/stock-core/wire"
 import { createDb } from "@mb/web-kit/db"
 import { env } from "./env"
@@ -60,7 +60,5 @@ export const { mongoClient, db, collections } = createDb({
     agentEpisodes: d.collection<AgentEpisodeDoc>(COLLECTIONS.agentEpisodes),
     agentWatches: d.collection<AgentWatchDoc>(COLLECTIONS.agentWatches),
     agentNotes: d.collection<AgentNoteDoc>(COLLECTIONS.agentNotes),
-    shadowPositions: d.collection<ShadowPositionDoc>(COLLECTIONS.shadowPositions),
-    shadowFills: d.collection<ShadowFillDoc>(COLLECTIONS.shadowFills),
   }),
 })

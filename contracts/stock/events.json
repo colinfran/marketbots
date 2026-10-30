@@ -551,18 +551,6 @@
       ]
     },
     {
-      "type": "agent.shadow",
-      "data_keys": [
-        "position_id",
-        "symbol",
-        "side",
-        "qty",
-        "price",
-        "reason",
-        "realized_pnl_usd"
-      ]
-    },
-    {
       "type": "agent.breaker",
       "data_keys": [
         "name",

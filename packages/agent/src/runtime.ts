@@ -12,9 +12,9 @@ import {
   type AgentNoteDoc,
   type AgentStatus,
   type AgentWatchDoc,
+  type BookAccount,
   type Observation,
   type Priority,
-  type ShadowAccount,
 } from "@mb/core/agent"
 import type { AiCallDoc } from "@mb/core/db"
 import type { AgentEventDataMap, AgentEventType } from "@mb/core/events"
@@ -40,13 +40,14 @@ import { describeWatch, newsWatchFires, normalizeNote, normalizeWatch, watchFire
  * episode runs at a time per bot; a P0 aborts a running P1–P3 episode (recorded as aborted).
  *
  * After an answer, the runtime stores its watches and notes and hands its decisions to the bot,
- * which normalizes them and applies the envelope and the bot's risk checks, then fills them in the
- * shadow book or, at level auto, sends them through the bot's own execution to the paper account.
- * An owner's question is read-only: its decisions are recorded, never acted on.
+ * which normalizes them and applies the envelope and the bot's risk checks, then sends them through
+ * the bot's own execution to the paper account. An owner's question is read-only: its decisions are
+ * recorded, never acted on.
  *
- * At level auto the breakers are enforced: a trip drops the agent to shadow (`demote`, an audited
- * settings change), and a slow model pauses its entries. They count from the agent's promotion,
- * whose time and equity outlive a restart (`promotion`).
+ * The breakers are enforced: a trip pauses the agent's new entries until the owner resumes them
+ * (`pause`, kept in the engine's state), and a slow model pauses them until it is fast again. Exits
+ * carry on either way. The loss breakers count from when the agent was turned on or its entries
+ * last resumed, whose time and equity outlive a restart (`promotion`).
  *
  * Nothing here can stop trading: every failure is logged and the next tick carries on.
  */
@@ -59,19 +60,22 @@ export type AgentCollections = {
   agentNotes: Collection<AgentNoteDoc>
 }
 
-/** `entriesPaused`: why the agent may not open positions in this episode (a slow model at level auto), or null. */
+/** `entriesPaused`: why the agent may not open positions in this episode (a breaker's pause, a slow model), or null. */
 export type EpisodeInfo = { id: string; wake: Wake; readOnly: boolean; urls: ReadonlySet<string>; entriesPaused: string | null }
 
 /** The account the agent decides into, as the heartbeat and the breakers read it. */
-export type AgentAccount = { account: ShadowAccount; dayPnlPct: number }
+export type AgentAccount = { account: BookAccount; dayPnlPct: number }
 
-/** When the agent was last promoted to level auto, and the account's equity then: the total-loss breaker counts from it. */
+/** When the agent was last turned on or its entries resumed, and the account's equity then: the total-loss breaker counts from it. */
 export type Promotion = { at: Date; equity_usd: number }
+
+/** A breaker's pause on the agent's new entries: when and why. */
+export type Pause = { at: Date; reason: string }
 
 /** What a bot gives the runtime. */
 export type AgentBot<A extends AgentAnswerBase> = {
   promptVersion: string
-  /** The system prompt; it may follow the level (shadow or auto). */
+  /** The system prompt. */
   system: () => string
   /** The bot's part of the brief (the book, the subject, the market); its URLs count as seen. */
   brief: (wake: Wake) => Promise<{ text: string; urls: string[] }>
@@ -79,13 +83,13 @@ export type AgentBot<A extends AgentAnswerBase> = {
   answer: z.ZodType<A>
   /** Symbols the agent may name in decisions, watches and notes. */
   known: (symbol: string) => boolean
-  /** Normalizes the answer's decisions and acts on them: the shadow book, or at level auto the paper account. */
+  /** Normalizes the answer's decisions and acts on them in the paper account. */
   act: (answer: A, episode: EpisodeInfo) => Promise<AgentAction[]>
   /** Each second: the bot's own observations (screens, price moves, sessions, the calendar, the quiet-time review). */
   tick?: (now: Date) => Promise<void>
   /** Why a wake-up isn't worth an episode now (an entry idea while entries are refused), or null to run it. */
   skip?: (wake: Wake) => Promise<string | null>
-  /** The account the agent decides into (the shadow book, or at level auto the paper account) and today's P&L %. */
+  /** The paper account and today's P&L %. */
   account: () => Promise<AgentAccount | null>
 }
 
@@ -105,9 +109,9 @@ export type AgentDeps<A extends AgentAnswerBase> = {
   price: (symbol: string) => number | null
   bot: AgentBot<A>
   archive?: EpisodeArchive | null
-  /** Level auto: drops the agent to shadow after a breaker trips (an audited settings change by the engine). */
-  demote?: (reason: string) => Promise<void>
-  /** Level auto: the agent's last promotion, kept across restarts (the engine's state). */
+  /** A breaker's pause on new entries, kept in the engine's state (audited); null lifts it. */
+  pause?: { get: () => Pause | null; set: (p: Pause | null, by: string) => Promise<void> }
+  /** When the agent was last turned on or its entries resumed, kept across restarts (the engine's state). */
   promotion?: { get: () => Promotion | null; set: (p: Promotion) => Promise<void> }
   /** The engine's shutdown signal. */
   signal: AbortSignal
@@ -130,7 +134,7 @@ export class Agent<A extends AgentAnswerBase> {
   private blockedReason: string | null = null
   private lastError: string | null = null
   private lastFinishedAt: Date | null = null
-  /** The level the last tick saw (null before the first): a change to auto is a promotion. */
+  /** The level the last tick saw (null before the first): turning on is a promotion. */
   private levelSeen: AgentLevel | null = null
   private today = { day: "", episodes: 0, envelopeBlocks: 0, breakers: new Set<string>() }
   private accountCache: { at: number; value: AgentAccount | null } = { at: 0, value: null }
@@ -176,14 +180,14 @@ export class Agent<A extends AgentAnswerBase> {
 
   /** The owner's question (Admin → Ask the agent): a read-only P2 episode. */
   ask(question: string, by: string): string {
-    if (!this.on) throw new Error(this.d.chat ? "the agent is off: set Admin → Settings → Agent → level to shadow or auto" : "the agent needs the model server (LLM_URL)")
+    if (!this.on) throw new Error(this.d.chat ? "the agent is off: turn it on in Admin → Settings → Agent" : "the agent needs the model server (LLM_URL)")
     const text = cleanLine(question, 500)
     this.queue.add({ id: `owner:${randomUUID()}`, subject: OWNER_SUBJECT, kind: "owner", priority: 2, salience: 70, summary: text, urgent: true, refs: {}, at: this.now() })
     this.d.log.info("owner asked the agent", { by, chars: text.length })
     return "question queued: the answer appears on the Agent page"
   }
 
-  /** The owner's Run now while the agent trades (level auto): a P1 review of the named symbols, or of the book and the market, that it may act on. */
+  /** The owner's Wake the agent: a P1 review of the named symbols, or of the book and the market, that it may act on. */
   review(symbols: string[], by: string): string {
     if (!this.on) throw new Error(this.d.chat ? "the agent is off" : "the agent needs the model server (LLM_URL)")
     const subjects = symbols.length ? symbols : [MARKET_SUBJECT]
@@ -195,11 +199,26 @@ export class Agent<A extends AgentAnswerBase> {
     return `the agent will review ${subjects.join(", ")} now: see the Agent page`
   }
 
-  /** Why the agent may not open positions now: a slow model at level auto (its exits carry on). */
+  /** Why the agent may not open positions now: a breaker's pause, or a slow model (its exits carry on). */
   entriesPaused(): string | null {
-    if (this.d.settings().level !== "auto") return null
+    const pause = this.d.pause?.get()
+    if (pause) return `entries paused by a breaker until the owner resumes them: ${pause.reason}`
     const slow = slowModel(this.breakers.speeds)
     return slow ? `entries paused: ${slow.detail}` : null
+  }
+
+  /** The owner lifts a breaker's pause (Admin): the breakers count afresh, the loss breakers from the account's equity now. */
+  async resumeEntries(by: string): Promise<string> {
+    if (!this.d.pause?.get()) throw new Error("the agent's entries aren't paused")
+    await this.d.pause.set(null, by)
+    this.breakers = { episodes: [], entries: [], speeds: [] }
+    this.today.breakers.clear()
+    this.today.envelopeBlocks = 0
+    const account = await this.d.bot.account().catch(() => null)
+    this.accountCache = { at: this.now().getTime(), value: account }
+    if (account) await this.d.promotion?.set({ at: this.now(), equity_usd: account.account.equity_usd })
+    this.d.log.info("agent entries resumed", { by, equity: account?.account.equity_usd })
+    return "the agent's entries resumed; its loss breakers count from the account's equity now"
   }
 
   /** Every stored wire item: news watches. */
@@ -213,7 +232,6 @@ export class Agent<A extends AgentAnswerBase> {
     const r = this.running
     return {
       level: s.level,
-      book: s.level === "auto" ? "live" : "shadow",
       state: !this.on ? "off" : r ? "running" : this.queue.size ? "queued" : "idle",
       blocked: !this.d.chat ? "no model server (LLM_URL not set)" : this.blockedReason,
       model: s.model,
@@ -224,16 +242,17 @@ export class Agent<A extends AgentAnswerBase> {
       last_error: this.lastError,
       watches: this.watches.length,
       tokens_per_s: this.breakers.speeds.at(-1) ?? null,
-      shadow: this.accountCache.value?.account ?? null,
+      account: this.accountCache.value?.account ?? null,
       breakers: [...this.today.breakers],
       entries_paused: this.entriesPaused(),
+      pause: this.d.pause?.get() ?? null,
     }
   }
 
   /**
-   * A change of level. To auto (or a start at auto) is a promotion: the breakers count afresh, and
-   * the account's equity is recorded for the total-loss breaker, unless a restart finds the
-   * promotion already recorded. Any change refreshes the account, since the book changed.
+   * A change of level. Turning on (or a start while on) is a promotion: the breakers count afresh,
+   * and the account's equity is recorded for the total-loss breaker, unless a restart finds the
+   * promotion already recorded.
    */
   private async watchLevel(now: Date) {
     const level = this.d.settings().level
@@ -241,14 +260,14 @@ export class Agent<A extends AgentAnswerBase> {
     const started = this.levelSeen === null
     this.levelSeen = level
     this.accountCache = { at: now.getTime(), value: await this.d.bot.account().catch(() => null) }
-    if (level !== "auto") return
+    if (level !== "on") return
     this.breakers = { episodes: [], entries: [], speeds: [] }
     this.today.breakers.clear()
     this.today.envelopeBlocks = 0
     if (started && this.d.promotion?.get()) return
     const equity = this.accountCache.value?.account.equity_usd
     if (equity) await this.d.promotion?.set({ at: now, equity_usd: equity })
-    this.d.log.info("agent promoted to auto", { equity })
+    this.d.log.info("agent turned on", { equity })
   }
 
   private rollDay() {
@@ -534,20 +553,21 @@ export class Agent<A extends AgentAnswerBase> {
     for (const a of doc.actions.filter((x) => x.action === "buy" && (x.outcome !== "blocked" || envelopeBlock(x)))) b.entries = [...b.entries, { at: t, outcome: a.outcome }].slice(-50)
     this.today.envelopeBlocks += doc.actions.filter((a) => a.action === "buy" && envelopeBlock(a)).length
     const account = this.accountCache.value ?? (await this.d.bot.account().catch(() => null))
-    const level = this.d.settings().level
-    // At level auto the total loss counts from the promotion; in the shadow book, from its start.
-    const promotion = level === "auto" ? this.d.promotion?.get() : null
+    // The total loss counts from when the agent was turned on or last resumed; before any, from the account's start.
+    const promotion = this.d.promotion?.get()
     const totalPnlPct = promotion && account ? (account.account.equity_usd / promotion.equity_usd - 1) * 100 : (account?.account.return_pct ?? 0)
     const tripped = trippedBreakers({ ...b, envelopeBlocksToday: this.today.envelopeBlocks, dayPnlPct: account?.dayPnlPct ?? 0, totalPnlPct }, t)
     for (const br of tripped) {
       if (this.today.breakers.has(br.name)) continue
       this.today.breakers.add(br.name)
-      const demotes = level === "auto" && br.name !== "slow_model"
-      const effect = level !== "auto" ? `recorded only at level ${level}` : demotes ? "the agent drops to shadow" : "the agent's entries pause until the model is fast again"
+      const pauses = br.name !== "slow_model"
+      const effect = pauses ? "the agent's new entries pause until you resume them; its exits carry on" : "the agent's entries pause until the model is fast again"
       const name = br.name.replace(/_/g, " ")
       this.d.bus.emit("agent.breaker", br, { summary: `Agent breaker tripped: ${name} (${br.detail}); ${effect}`, level: "warn" })
-      await this.d.alert(`Agent breaker: ${name}`, `${br.detail}. ${effect[0].toUpperCase()}${effect.slice(1)}.${demotes ? " Promote it again from Admin → Settings → Agent once you've looked." : ""}`, `agent-breaker|${br.name}|${this.today.day}`)
-      if (demotes) await this.d.demote?.(`${name}: ${br.detail}`).catch((e) => this.d.log.error("demoting the agent failed", { error: errorMessage(e) }))
+      await this.d.alert(`Agent breaker: ${name}`, `${br.detail}. ${effect[0].toUpperCase()}${effect.slice(1)}.${pauses ? " Resume them from Admin once you've looked." : ""}`, `agent-breaker|${br.name}|${this.today.day}`)
+      if (pauses && !this.d.pause?.get()) {
+        await this.d.pause?.set({ at: this.now(), reason: `${name}: ${br.detail}` }, "engine:agent-breaker").catch((e) => this.d.log.error("pausing the agent's entries failed", { error: errorMessage(e) }))
+      }
     }
   }
 

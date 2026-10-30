@@ -153,7 +153,7 @@
     "themes": []
   },
   "agent": {
-    "level": "shadow",
+    "level": "on",
     "model": "local/qwen3.6-35b-a3b-q2",
     "limits": {
       "p0": {
@@ -189,7 +189,6 @@
       "reentry_after_stop_hours": 24,
       "flip_hours": 6
     },
-    "shadow_starting_usd": 10000,
     "public_thinking": false
   }
 }

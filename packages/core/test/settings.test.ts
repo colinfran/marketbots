@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { z } from "zod"
-import { aiSettingsBase, applySettingsPatch, int, mergeSettings, refineWireThresholds, wireSettingsBase, wireSummariesSettings } from "../src/settings"
+import { aiSettingsBase, applySettingsPatch, int, mergeSettings, refineWireThresholds, upgradeStoredSettings, wireSettingsBase, wireSummariesSettings } from "../src/settings"
 
 /** A small bot built the way the real ones are: base fields in the bot's own order, refined last. */
 const wire = wireSettingsBase.shape
@@ -73,5 +73,17 @@ describe("article summaries settings", () => {
 
   it("drop the Ollama-era model tag from stored settings (the model server picks the model)", () => {
     expect(wireSummariesSettings.parse({ ...summaries, model: "llama3.2:3b" })).toEqual(summaries)
+  })
+})
+
+describe("stored settings from before the agent-only bots", () => {
+  it("turns the agent's old levels into on and off, and leaves everything else alone", () => {
+    const stored = { risk: { max: 5 }, agent: { level: "auto", model: "local/m" } }
+    expect(upgradeStoredSettings(stored)).toEqual({ risk: { max: 5 }, agent: { level: "on", model: "local/m" } })
+    expect(upgradeStoredSettings({ agent: { level: "shadow" } })).toEqual({ agent: { level: "off" } })
+    const current = { agent: { level: "on" } }
+    expect(upgradeStoredSettings(current)).toBe(current)
+    expect(upgradeStoredSettings(null)).toBeNull()
+    expect(upgradeStoredSettings({ wire: {} })).toEqual({ wire: {} })
   })
 })

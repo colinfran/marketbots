@@ -22,7 +22,7 @@ import type {
   ReportDoc,
   SettingsDoc,
 } from "@mb/stock-core/db"
-import type { AgentEpisodeDoc, AgentNoteDoc, AgentWatchDoc, ShadowFillDoc, ShadowPositionDoc } from "@mb/core/agent"
+import type { AgentEpisodeDoc, AgentNoteDoc, AgentWatchDoc } from "@mb/core/agent"
 import type { SearchUsageDoc } from "@mb/core/db"
 import type { WireItemDoc, WireTriggerDoc } from "@mb/stock-core/wire"
 import type { Collection, Db } from "mongodb"
@@ -48,8 +48,6 @@ export type Collections = {
   agentEpisodes: Collection<AgentEpisodeDoc>
   agentWatches: Collection<AgentWatchDoc>
   agentNotes: Collection<AgentNoteDoc>
-  shadowPositions: Collection<ShadowPositionDoc>
-  shadowFills: Collection<ShadowFillDoc>
   aiCalls: Collection<AiCallDoc>
   searchUsage: Collection<SearchUsageDoc>
   cycles: Collection<CycleDoc>
@@ -80,8 +78,6 @@ export const collectionsFor = (db: Db): Collections => ({
   agentEpisodes: db.collection<AgentEpisodeDoc>(COLLECTIONS.agentEpisodes),
   agentWatches: db.collection<AgentWatchDoc>(COLLECTIONS.agentWatches),
   agentNotes: db.collection<AgentNoteDoc>(COLLECTIONS.agentNotes),
-  shadowPositions: db.collection<ShadowPositionDoc>(COLLECTIONS.shadowPositions),
-  shadowFills: db.collection<ShadowFillDoc>(COLLECTIONS.shadowFills),
   aiCalls: db.collection<AiCallDoc>(COLLECTIONS.aiCalls),
   searchUsage: db.collection<SearchUsageDoc>(COLLECTIONS.searchUsage),
   cycles: db.collection<CycleDoc>(COLLECTIONS.cycles),

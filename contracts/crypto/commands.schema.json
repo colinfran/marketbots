@@ -336,6 +336,18 @@
           "type",
           "question"
         ]
+      },
+      {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "agent.resume_entries"
+          }
+        },
+        "required": [
+          "type"
+        ]
       }
     ]
   },
@@ -425,7 +437,8 @@
     "seed.schedule": "Schedule seed buy",
     "seed.cancel": "Cancel seed buy",
     "wire.replay": "Replay news item",
-    "agent.ask": "Ask the agent"
+    "agent.ask": "Ask the agent",
+    "agent.resume_entries": "Resume the agent's entries"
   },
   "backtest_intervals": [
     60,

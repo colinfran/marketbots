@@ -1,6 +1,6 @@
 import { checkEntry, entryRoomUsd, type EnvelopeHistory } from "@mb/agent/envelope"
 import type { EpisodeInfo } from "@mb/agent/runtime"
-import type { AgentAction, ShadowAccount } from "@mb/core/agent"
+import type { AgentAction, BookAccount } from "@mb/core/agent"
 import { normalizeCryptoAgentDecisions, type CryptoAgentAnswer, type NormalizedCryptoAgentDecision } from "@mb/crypto-core/agent"
 import type { DecisionDoc, PositionDoc } from "@mb/crypto-core/db"
 import { roundTo } from "@mb/crypto-core/math"
@@ -13,14 +13,14 @@ import { agentStop, limitsText, mid, price, type CryptoAgentDeps } from "./book"
 import { CRYPTO_AGENT_PROMPT_VERSION } from "./prompts"
 
 /**
- * The crypto agent at level auto (docs/plans/LOCAL-AI.md §10): it decides into the paper account,
- * through the timed cycles' own path (`processDecision`: the risk engine, the executor, the
- * ledger, a `decisions` record scored like any other). Before that, the envelope: an entry must pass
+ * The crypto agent's decisions into the paper account (docs/plans/LOCAL-AI.md §8.4, §9), through the
+ * bot's execution path (`processDecision`: the risk engine, the executor, the ledger, a
+ * `decisions` record scored like any other). Before that, the envelope: an entry must pass
  * its rate limits, is sized at its share of what the risk checks allow and capped by the hour's
  * commitment budget. Exits, reductions and stops obey only the risk engine's minimum hold.
  *
- * The positions it inherits (the cycles', the seed's) are its to manage; the envelope's open-position
- * limit counts only the ones it opened.
+ * The positions it inherited from the bot's earlier designs are its to manage; the envelope's
+ * open-position limit counts only the ones it opened.
  */
 
 const HOUR = 3_600_000
@@ -66,8 +66,8 @@ export const liveRiskState = async (d: Pick<CryptoAgentDeps, "ctx">, now = Date.
   return { state, history: await liveEnvelopeHistory(d, state?.equityUsd ?? 0, now), open }
 }
 
-/** The paper account in the shadow book's terms, for the heartbeat and the breakers. */
-export const liveAccount = async (d: Pick<CryptoAgentDeps, "ctx">): Promise<{ account: ShadowAccount; dayPnlPct: number } | null> => {
+/** The paper account, summarized for the heartbeat and the breakers. */
+export const liveAccount = async (d: Pick<CryptoAgentDeps, "ctx">): Promise<{ account: BookAccount; dayPnlPct: number } | null> => {
   const [a, open, closed] = await Promise.all([d.ctx.ledger.account(), d.ctx.ledger.openPositions(), d.ctx.col.positions.countDocuments({ status: "closed" })])
   if (!a) return null
   const unrealized = open.reduce((s, p) => s + p.qty * (mid(d.ctx)(p.symbol) ?? p.mark_price ?? p.avg_price) - p.cost_basis_usd, 0)
@@ -128,7 +128,7 @@ const outcomeOf = (dec: NormalizedCryptoAgentDecision, doc: DecisionDoc): AgentA
 }
 
 /** The agent's decisions into the paper account: exits first, holds, then entries by conviction. */
-export const actLive = async (d: Pick<CryptoAgentDeps, "ctx">, answer: CryptoAgentAnswer, episode: Pick<EpisodeInfo, "id" | "urls" | "wake" | "entriesPaused">): Promise<AgentAction[]> => {
+export const actOnCryptoAnswer = async (d: Pick<CryptoAgentDeps, "ctx">, answer: CryptoAgentAnswer, episode: Pick<EpisodeInfo, "id" | "urls" | "wake" | "entriesPaused">): Promise<AgentAction[]> => {
   const { ctx } = d
   const settings = ctx.settings.current
   const held = new Map((await ctx.ledger.openPositions()).map((p) => [p.symbol, p]))

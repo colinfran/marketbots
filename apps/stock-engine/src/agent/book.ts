@@ -1,54 +1,31 @@
 import { checkEntry, entryRoomUsd, type EnvelopeHistory } from "@mb/agent/envelope"
-import { ShadowBook } from "@mb/agent/shadow"
-import type { ShadowPositionDoc } from "@mb/core/agent"
 import type { HistoryStore } from "@mb/history/store"
 import type { AlpacaAccount, AlpacaPosition } from "@mb/stock-core/alpaca"
 import type { ChainContract, RiskState } from "@mb/stock-core/context"
-import { roundTo } from "@mb/stock-core/math"
 import { formatTime, marketDay, marketTime, minutesBetween } from "@mb/stock-core/time"
 import type { WireCategory } from "@mb/stock-core/wire"
 import type { EngineContext } from "../bot/context"
-import { computeRiskState } from "../bot/risk"
 import { isSessionOpen, type Session } from "../bot/session"
 
 /**
  * What the stock agent works with: the engine's context, the session, live prices (the broker's
- * stream, else the news engine's price layers), its shadow book and the history store. At level
- * auto it decides into the paper account instead (./live), read from the engine's latest account
- * snapshot.
- *
- * The shadow book fills at the quote's ask or bid (the last price where there is no quote) plus
- * SHADOW_SLIPPAGE_BPS, commission-free like Alpaca. Whole shares only.
+ * stream, else the news engine's price layers) and the history store. It trades the paper account
+ * (./live), read from the engine's latest account snapshot.
  */
-
-export const SHADOW_SLIPPAGE_BPS = 5
 
 export type StockAgentDeps = {
   ctx: EngineContext
-  shadow: ShadowBook
   history: HistoryStore<WireCategory> | null
   session: () => Session | null
   /** The latest price no older than five minutes: the broker's stream, else the price layers. */
   price: (symbol: string) => number | null
   /** The broker's account and positions as the engine last read them (every 15 s); null before the first read. */
   snapshot: () => { account: AlpacaAccount; positions: AlpacaPosition[] } | null
-  /** Level auto: the option contracts each episode's option_menu calls offered (an entry must use them), by episode id. */
+  /** The option contracts each episode's option_menu calls offered (an entry must use them), by episode id. */
   offered: Map<string, Map<string, ChainContract>>
-  /** Level auto: the price at the agent's last decision on a held stock, for the price-move wake-ups. */
+  /** The price at the agent's last decision on a held stock, for the price-move wake-ups. */
   reviews: Map<string, { price: number; at: Date }>
 }
-
-export const createShadowBook = (ctx: EngineContext) =>
-  new ShadowBook(ctx.col, {
-    startingUsd: () => ctx.settings.current.agent.shadow_starting_usd,
-    costs: () => ({ feeBps: 0, slippageBps: SHADOW_SLIPPAGE_BPS }),
-    bus: ctx.bus,
-    day: (d) => marketDay(d),
-    roundPrice: (_s, p) => roundTo(p, 2),
-  })
-
-/** Level auto: the agent trades the paper account. */
-export const isLive = (d: Pick<StockAgentDeps, "ctx">) => d.ctx.settings.current.agent.level === "auto"
 
 /** The price a buy would pay (the ask) and a sale would get (the bid), falling back to the last price. */
 export const sidePrices = (d: Pick<StockAgentDeps, "ctx" | "price">, symbol: string) => {
@@ -70,24 +47,10 @@ export const sessionWindow = (d: Pick<StockAgentDeps, "ctx" | "session">, now = 
   return { open: true, entries: true, closing, reason: closing ? "the closing window" : "the regular session" }
 }
 
-/** The shadow book as the cycle's risk rules see an account (computeRiskState, from the book's own equity and cash). */
-export const shadowRiskState = async (d: StockAgentDeps, now = new Date()): Promise<{ risk: RiskState; history: EnvelopeHistory; open: ShadowPositionDoc[] }> => {
-  const account = await d.shadow.account(d.price)
-  const [open, history, tradesToday] = await Promise.all([
-    d.shadow.open(),
-    d.shadow.envelopeHistory(account.equity_usd),
-    d.ctx.col.shadowFills.countDocuments({ at: { $gte: dayStart(now) }, $or: [{ side: "buy" }, { episode_id: { $ne: null } }] }),
-  ])
-  // computeRiskState reads only these three fields of the broker's account.
-  const pseudo = { equity: String(account.equity_usd), cash: String(account.cash_usd), last_equity: String(account.day_start_equity_usd) } as AlpacaAccount
-  const settings = { ...d.ctx.settings.current, account: { starting_capital: account.starting_usd } }
-  return { risk: computeRiskState(pseudo, open.length, tradesToday, settings), history, open }
-}
-
 /** Midnight in New York on the trading day a moment falls in. */
 export const dayStart = (now: Date) => marketTime(marketDay(now), "00:00")
 
-/** The market's state and the limits code enforces, the same for both books. `blocked` lists why buys can't happen at all. */
+/** The market's state and the limits code enforces. `blocked` lists why buys can't happen at all. */
 export const limitsText = (d: Pick<StockAgentDeps, "ctx" | "session">, { risk, history, blocked }: { risk: RiskState; history: EnvelopeHistory; blocked: string[] }, now = new Date()) => {
   const r = d.ctx.settings.current.risk
   const window = sessionWindow(d, now)
@@ -102,26 +65,3 @@ export const limitsText = (d: Pick<StockAgentDeps, "ctx" | "session">, { risk, h
   ]
 }
 
-/** YOUR BOOK and LIMITS for the shadow book: the brief's account part, also the `book` tool's answer. */
-export const shadowBookText = async (d: StockAgentDeps, now = new Date()) => {
-  const { risk, history, open } = await shadowRiskState(d, now)
-  const account = await d.shadow.account(d.price)
-  const window = sessionWindow(d, now)
-  const lines = open.map((p) => {
-    const m = d.price(p.symbol)
-    const pnl = m ? ((m / p.entry_price - 1) * 100).toFixed(2) : "n/a"
-    return `- ${p.symbol}: ${p.qty} shares at ${p.entry_price.toFixed(2)}, now ${m ?? "n/a"} (${pnl}%), stop ${p.stop_price ?? "none"}, target ${p.take_profit_price ?? "none"}, ${p.horizon ?? "?"} horizon, opened ${formatTime(p.opened_at)}, conviction ${p.conviction}/10. Thesis: ${p.thesis} Invalidation: ${p.invalidation}`
-  })
-  const st = d.ctx.state.state
-  const blocked = [st.kill_switch.engaged ? "the kill switch is engaged" : null, st.status !== "running" ? `trading is ${st.status}` : null, window.entries ? null : window.reason, risk.new_buys_allowed ? null : risk.notes.join(" ")].filter(
-    (x): x is string => !!x,
-  )
-  return [
-    `YOUR BOOK (shadow; started with $${account.starting_usd.toLocaleString("en-US")})`,
-    `cash $${account.cash_usd.toFixed(2)} · equity $${account.equity_usd.toFixed(2)} (${account.return_pct >= 0 ? "+" : ""}${account.return_pct}%) · today ${risk.day_pnl_pct >= 0 ? "+" : ""}${risk.day_pnl_pct}% · realized $${account.realized_pnl_usd.toFixed(2)} · ${account.open_positions} open, ${account.closed_positions} closed`,
-    ...(lines.length ? lines : ["- no open positions"]),
-    "",
-    ...limitsText(d, { risk, history, blocked }, now),
-    "- Intraday positions are closed by code in the last minutes of the session. Trades fill at the ask or bid plus 5 bps, commission-free. Options are traded only at level auto.",
-  ].join("\n")
-}

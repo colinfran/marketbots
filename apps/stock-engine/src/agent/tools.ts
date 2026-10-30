@@ -8,7 +8,7 @@ import type { WireCategory } from "@mb/stock-core/wire"
 import { z } from "zod"
 import { dailyTechnicals, intradayTechnicals, snapshotPrice } from "../market/indicators"
 import { loadChain } from "../market/options-chain"
-import { isLive, sidePrices, type StockAgentDeps } from "./book"
+import { sidePrices, type StockAgentDeps } from "./book"
 import { bookText } from "./view"
 
 /**
@@ -62,10 +62,9 @@ export const stockAgentTools = (d: StockAgentDeps): AgentTool[] => {
     }),
     defineTool({
       name: "option_menu",
-      description: "the liquid option contracts you may buy on a stock: calls and puts in the allowed expirations, with bid, ask, delta, IV and open interest. A buy_option must copy its contracts from this list. Level auto only. Args: {symbol}.",
+      description: "the liquid option contracts you may buy on a stock: calls and puts in the allowed expirations, with bid, ask, delta, IV and open interest. A buy_option must copy its contracts from this list. Args: {symbol}.",
       args: z.object({ symbol: symbolArg }),
       run: async ({ symbol }, t) => {
-        if (!isLive(d)) return "options are traded only at level auto: the shadow book has none"
         const o = ctx.settings.current.options
         if (!o.enabled) return "options trading is disabled"
         if (!valid(symbol)) return `${symbol} is not a ticker`
@@ -134,23 +133,19 @@ export const stockAgentTools = (d: StockAgentDeps): AgentTool[] => {
     ...wireTools(wire),
     defineTool({
       name: "past_decisions",
-      description: "the bot's last decisions on a stock and its options (yours on the paper account, the timed cycles' before you, and yours in the shadow book), with what came of them. Args: {symbol}.",
+      description: "the bot's last decisions on a stock and its options (yours, and the bot's earlier ones before you took over), with what came of them. Args: {symbol}.",
       args: z.object({ symbol: symbolArg }),
       run: async ({ symbol }) => {
-        const [cycles, shadow] = await Promise.all([
-          ctx.col.decisions
-            .find({ symbol }, { projection: { created_at: 1, action: 1, status: 1, reason: 1, price: 1, agent_episode_id: 1, "request.conviction": 1, "request.rationale": 1 } })
-            .sort({ created_at: -1 })
-            .limit(6)
-            .toArray(),
-          ctx.col.shadowPositions.find({ symbol }).sort({ opened_at: -1 }).limit(5).toArray(),
-        ])
-        const a = cycles.map(
+        const decisions = await ctx.col.decisions
+          .find({ symbol }, { projection: { created_at: 1, action: 1, status: 1, reason: 1, price: 1, agent_episode_id: 1, "request.conviction": 1, "request.rationale": 1 } })
+          .sort({ created_at: -1 })
+          .limit(8)
+          .toArray()
+        const a = decisions.map(
           (x) =>
-            `- ${formatDateTime(x.created_at)} ${x.agent_episode_id ? "you" : "cycle"}: ${x.action.replace(/_/g, " ")} at ${x.price ?? "?"} (conviction ${x.request.conviction}/10, ${x.status}${x.reason ? `: ${cleanLine(x.reason, 100)}` : ""}): ${cleanLine(x.request.rationale, 160)}`,
+            `- ${formatDateTime(x.created_at)} ${x.agent_episode_id ? "you" : "before you"}: ${x.action.replace(/_/g, " ")} at ${x.price ?? "?"} (conviction ${x.request.conviction}/10, ${x.status}${x.reason ? `: ${cleanLine(x.reason, 100)}` : ""}): ${cleanLine(x.request.rationale, 160)}`,
         )
-        const b = shadow.map((p) => `- ${formatDateTime(p.opened_at)} you (shadow): bought ${p.qty || ""} at ${p.entry_price.toFixed(2)}${p.status === "closed" ? `, sold at ${p.exit_price?.toFixed(2)} (${p.exit_reason}) for ${p.realized_pnl_usd >= 0 ? "+" : ""}$${p.realized_pnl_usd.toFixed(2)}` : ", still open"}: ${cleanLine(p.thesis, 160)}`)
-        return [...a, ...b].join("\n") || `no decisions on ${symbol} yet`
+        return a.join("\n") || `no decisions on ${symbol} yet`
       },
     }),
     calendarTool((t) => formatDateTime(t)),

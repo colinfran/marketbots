@@ -192,7 +192,7 @@ export const kit: BotKit<EngineEvent> = {
       "daily.stats",
       "market.session",
       "agent.answered",
-      "agent.shadow",
+      "agent.breaker",
     ]),
     // Thinking-trail events that are worth showing even though they're logged at debug level.
     feedDebug: new Set(["research.query", "research.source", "research.progress", "ai.reasoning", "ai.decision.progress"]),

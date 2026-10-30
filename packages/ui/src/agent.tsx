@@ -1,17 +1,16 @@
 "use client"
 
-import type { ShadowAccount } from "@mb/core/agent"
-import type { AgentStatusView, EpisodeRowView, EpisodeView, NoteView, ShadowFillView, ShadowPositionView, StepView, WatchView } from "@mb/core/agent-views"
+import type { AgentStatusView, EpisodeRowView, EpisodeView, NoteView, StepView, WatchView } from "@mb/core/agent-views"
 import { cn } from "cn"
 import { BrainIcon, LoaderIcon, MessageCircleQuestionIcon } from "lucide-react"
 import Link from "next/link"
 import { useMemo, useState } from "react"
-import { Delta, Empty, Stat, SymbolLink } from "./bits"
+import { Empty, SymbolLink } from "./bits"
 import { Badge } from "./components/badge"
 import { Button } from "./components/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./components/table"
-import { CommandResult, useCommand } from "./command"
+import { CommandButton, CommandResult, useCommand } from "./command"
 import { Excerpt, Step, type StepStatus } from "./cycle-trail"
 import { useKit } from "./kit"
 import { ago, num, usd } from "./lib/format"
@@ -20,8 +19,8 @@ import { useStream } from "./stream"
 
 /**
  * The agent's page (docs/plans/LOCAL-AI.md §11), the same in both dashboards: what it is doing
- * now (live, from the stream), its state, its shadow book, its watches and notes, its episodes and
- * one episode in full. Each app's /agent pages read the data (@mb/web-kit/agent) and lay these out.
+ * now (live, from the stream), its state, its watches and notes, its episodes and one episode in
+ * full. Each app's /agent pages read the data (@mb/web-kit/agent) and lay these out.
  */
 
 const PRIORITY = ["risk", "opportunity", "review", "background"] as const
@@ -66,8 +65,8 @@ function Outcome({ action, outcome, symbol }: { action: string; outcome: string;
   )
 }
 
-/** The agent's state from the heartbeat: level, what it is doing, its queue, its speed, its breakers. */
-export function AgentStatusCard({ status, online }: { status: AgentStatusView | null; online: boolean }) {
+/** The agent's state from the heartbeat: on or off, what it is doing, its queue, its speed, its breakers; the owner can resume paused entries. */
+export function AgentStatusCard({ status, online, owner = false }: { status: AgentStatusView | null; online: boolean; owner?: boolean }) {
   const now = useNow()
   if (!status) return <Empty>The engine hasn&apos;t reported the agent yet: it starts with the engine.</Empty>
   const state = !online ? "engine offline" : status.state === "running" && status.episode ? `working on ${SPECIAL[status.episode.subject] ?? status.episode.subject}, step ${status.episode.step}` : status.state
@@ -76,16 +75,14 @@ export function AgentStatusCard({ status, online }: { status: AgentStatusView | 
       <CardHeader>
         <CardTitle className="flex flex-wrap items-center gap-2 text-base">
           The agent
-          <Badge variant="outline" className={cn("font-mono uppercase", status.level === "auto" ? OUTCOME_STYLE.filled : status.level === "shadow" ? OUTCOME_STYLE.updated : "text-muted-foreground")}>
+          <Badge variant="outline" className={cn("font-mono uppercase", status.level === "on" ? OUTCOME_STYLE.filled : "text-muted-foreground")}>
             {status.level}
           </Badge>
         </CardTitle>
         <CardDescription>
-          {status.level === "auto"
-            ? "Trades the paper account: wakes when something matters, looks things up, and decides. Its orders go through the bot's risk checks and its envelope; the timed cycles are off."
-            : status.level === "shadow"
-              ? "Wakes when something matters, looks things up, and decides into its shadow book. Nothing it decides reaches the broker."
-              : "Off: it makes no decisions."}
+          {status.level === "on"
+            ? "Trades the paper account: wakes when something matters, looks things up, and decides. Its orders go through the bot's risk checks and its envelope."
+            : "Off: nothing decides for the bot. Stops and targets still protect what it holds."}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
@@ -126,18 +123,23 @@ export function AgentStatusCard({ status, online }: { status: AgentStatusView | 
             </ul>
           </div>
         )}
-        {status.level === "auto" && status.shadow && (
+        {status.account && (
           <p className="text-muted-foreground text-xs">
-            Paper account: equity {usd(status.shadow.equity_usd)} ({status.shadow.return_pct >= 0 ? "+" : ""}
-            {num(status.shadow.return_pct, 2)}% since it started), {status.shadow.open_positions} open positions.
+            Paper account: equity {usd(status.account.equity_usd)} ({status.account.return_pct >= 0 ? "+" : ""}
+            {num(status.account.return_pct, 2)}% since it started), {status.account.open_positions} open positions.
           </p>
         )}
-        {status.entries_paused && <p className="text-amber-700 dark:text-amber-300">New entries paused: {status.entries_paused.replace(/^entries paused: /, "")}. Exits carry on.</p>}
-        {status.breakers.length > 0 && (
-          <p className="text-amber-700 dark:text-amber-300">
-            Breakers tripped today{status.level === "auto" ? "" : " (recorded, not enforced in shadow)"}: {status.breakers.join(", ").replace(/_/g, " ")}.
-          </p>
+        {status.pause ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2">
+            <p className="text-amber-800 dark:text-amber-300">
+              A breaker paused its new entries {ago(status.pause.at, now)}: {status.pause.reason}. Exits carry on.
+            </p>
+            {owner && <CommandButton command={{ type: "agent.resume_entries" }} label="Resume entries" confirm={{ title: "Resume the agent's entries?", description: "It may open positions again. Its loss breakers count afresh from the account's equity now." }} />}
+          </div>
+        ) : (
+          status.entries_paused && <p className="text-amber-700 dark:text-amber-300">New entries paused: {status.entries_paused.replace(/^entries paused: /, "")}. Exits carry on.</p>
         )}
+        {status.breakers.length > 0 && <p className="text-amber-700 dark:text-amber-300">Breakers tripped today: {status.breakers.join(", ").replace(/_/g, " ")}.</p>}
       </CardContent>
     </Card>
   )
@@ -230,103 +232,6 @@ export function AgentLive({ initial }: { initial: EpisodeView | null }) {
         )}
       </Step>
     </ol>
-  )
-}
-
-/** The shadow book: what the agent would hold, at what it would have paid. */
-export function ShadowBook({ account, open, closed, fills }: { account: ShadowAccount | null; open: ShadowPositionView[]; closed: ShadowPositionView[]; fills: ShadowFillView[] }) {
-  const kit = useKit()
-  return (
-    <div className="space-y-4">
-      {account && (
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <Stat label="Shadow equity" value={usd(account.equity_usd)} sub={<Delta value={account.equity_usd - account.starting_usd} percent={account.return_pct} />} />
-          <Stat label="Cash" value={usd(account.cash_usd)} sub={<span className="text-muted-foreground">started with {usd(account.starting_usd, { whole: true })}</span>} />
-          <Stat label="Realized" value={<Delta value={account.realized_pnl_usd} className="text-2xl" />} sub={<span className="text-muted-foreground">{account.closed_positions} closed</span>} />
-          <Stat label="Open" value={usd(account.exposure_usd)} sub={<Delta value={account.unrealized_pnl_usd} />} />
-        </div>
-      )}
-      {open.length === 0 ? (
-        <Empty>The shadow book holds nothing right now.</Empty>
-      ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Symbol</TableHead>
-              <TableHead className="text-right">Qty</TableHead>
-              <TableHead className="text-right">Entry</TableHead>
-              <TableHead className="text-right">Now</TableHead>
-              <TableHead className="text-right">Stop / target</TableHead>
-              <TableHead>Thesis</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {open.map((p) => (
-              <TableRow key={p.id}>
-                <TableCell>
-                  <SymbolLink symbol={p.symbol} href={kit.symbolHref(p.symbol)} />
-                </TableCell>
-                <TableCell className="text-right tabular-nums">{num(p.qty, 8)}</TableCell>
-                <TableCell className="text-right tabular-nums">{kit.format.price(p.entry_price)}</TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {kit.format.price(p.mark_price)} {p.mark_price !== null && <Delta percent={(p.mark_price / p.entry_price - 1) * 100} className="text-xs" />}
-                </TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {kit.format.price(p.stop_price)} / {kit.format.price(p.take_profit_price)}
-                </TableCell>
-                <TableCell className="max-w-md text-xs">
-                  <Link href={`/agent/${p.episode_id}`} className="hover:underline">
-                    {p.thesis}
-                  </Link>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      )}
-      {closed.length > 0 && (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Closed</TableHead>
-              <TableHead>Symbol</TableHead>
-              <TableHead className="text-right">Entry → exit</TableHead>
-              <TableHead>Why</TableHead>
-              <TableHead className="text-right">P&amp;L</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {closed.map((p) => (
-              <TableRow key={p.id}>
-                <TableCell className="text-muted-foreground text-xs whitespace-nowrap">{kit.format.dateTime(p.closed_at ?? p.opened_at)}</TableCell>
-                <TableCell>
-                  <SymbolLink symbol={p.symbol} href={kit.symbolHref(p.symbol)} />
-                </TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {kit.format.price(p.entry_price)} → {kit.format.price(p.exit_price)}
-                </TableCell>
-                <TableCell className="text-xs">{(p.exit_reason ?? "").replace(/_/g, " ")}</TableCell>
-                <TableCell className="text-right">
-                  <Delta value={p.realized_pnl_usd} />
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      )}
-      {fills.length > 0 && (
-        <details className="text-sm">
-          <summary className="text-muted-foreground cursor-pointer text-xs">The last {fills.length} shadow fills</summary>
-          <ul className="mt-2 space-y-1 font-mono text-xs">
-            {fills.map((f) => (
-              <li key={f.id}>
-                {kit.format.dateTime(f.at)} {f.side} {num(f.qty, 8)} {f.symbol} at {kit.format.price(f.price)} ({f.reason.replace(/_/g, " ")}){f.realized_pnl_usd !== null && <> · {usd(f.realized_pnl_usd, { sign: true })}</>}
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
-    </div>
   )
 }
 

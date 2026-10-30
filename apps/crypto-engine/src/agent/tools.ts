@@ -90,19 +90,22 @@ export const cryptoAgentTools = (d: CryptoAgentDeps): AgentTool[] => {
     ...wireTools(wire),
     defineTool({
       name: "past_decisions",
-      description: "the bot's last decisions on a pair (yours on the paper account, the timed cycles' before you, and yours in the shadow book), with how they turned out. Args: {symbol}.",
+      description: "the bot's last decisions on a pair (yours, and the bot's earlier ones before you took over), with how they turned out. Args: {symbol}.",
       args: z.object({ symbol: symbolArg }),
       run: async ({ symbol }) => {
-        const [cycles, shadow] = await Promise.all([
-          ctx.col.decisions.find({ symbol }, { projection: { created_at: 1, action: 1, agent_episode_id: 1, "ai.conviction": 1, "ai.thesis": 1, "execution.status": 1, outcome: 1 } }).sort({ created_at: -1 }).limit(6).toArray(),
-          ctx.col.shadowPositions.find({ symbol }).sort({ opened_at: -1 }).limit(5).toArray(),
-        ])
-        const a = cycles.map(
+        const decisions = await ctx.col.decisions
+          .find({ symbol }, { projection: { created_at: 1, action: 1, agent_episode_id: 1, "ai.conviction": 1, "ai.thesis": 1, "execution.status": 1, outcome: 1 } })
+          .sort({ created_at: -1 })
+          .limit(8)
+          .toArray()
+        return (
+          decisions
+            .map(
           (x) =>
-            `- ${utcTime(x.created_at)} ${x.agent_episode_id ? "you" : "cycle"}: ${x.action} (conviction ${x.ai.conviction}, ${x.execution.status})${x.outcome ? `; after ${x.outcome.horizon_hours} h ${x.outcome.forward_return_pct ?? "?"}%, ${x.outcome.hit ?? "?"} hit, ${x.outcome.correct === null ? "unscored" : x.outcome.correct ? "right" : "wrong"}` : ""}: ${cleanLine(x.ai.thesis, 160)}`,
+              `- ${utcTime(x.created_at)} ${x.agent_episode_id ? "you" : "before you"}: ${x.action} (conviction ${x.ai.conviction}, ${x.execution.status})${x.outcome ? `; after ${x.outcome.horizon_hours} h ${x.outcome.forward_return_pct ?? "?"}%, ${x.outcome.hit ?? "?"} hit, ${x.outcome.correct === null ? "unscored" : x.outcome.correct ? "right" : "wrong"}` : ""}: ${cleanLine(x.ai.thesis, 160)}`,
+            )
+            .join("\n") || `no decisions on ${symbol} yet`
         )
-        const b = shadow.map((p) => `- ${utcTime(p.opened_at)} you (shadow): bought at ${p.entry_price}${p.status === "closed" ? `, sold at ${p.exit_price} (${p.exit_reason}) for ${p.realized_pnl_usd >= 0 ? "+" : ""}$${p.realized_pnl_usd.toFixed(2)}` : ", still open"}: ${cleanLine(p.thesis, 160)}`)
-        return [...a, ...b].join("\n") || `no decisions on ${symbol} yet`
       },
     }),
     calendarTool(utcTime),

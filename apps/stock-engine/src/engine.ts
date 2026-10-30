@@ -200,8 +200,11 @@ export class Engine {
       layerPrice: (s, ms) => d.coverage.price(s, ms),
       snapshot: () => this.snapshot,
       // At level auto the cycle slot runs only the one-time seed and the core book's reviews: the agent waits for them, so they never spend the same cash.
-      busy: () => (this.agentTrades && this.cycle ? "a core review or the one-time seed is running" : null),
-      demote: (reason) => this.demoteAgent(reason),
+      busy: () => (this.cycle ? "a core review or the one-time seed is running" : null),
+      pause: {
+        get: () => d.state.state.agent_pause ?? null,
+        set: (p, by) => d.state.update({ agent_pause: p }, by, p ? "agent.entries_paused" : "agent.entries_resumed", {}),
+      },
       promotion: {
         get: () => d.state.state.agent_promotion ?? null,
         set: (p) => this.promoteAgent(p),
@@ -386,6 +389,7 @@ export class Engine {
     const staleReviews = await db.col.coreReviews.updateMany({ status: "running" }, { $set: { status: "failed", finished_at: new Date(), error: "the engine restarted during this review" } })
     if (staleReviews.modifiedCount) await alerts.send("error", "Core review interrupted", "The engine restarted during a core review. Check the core holdings and their stops in Alpaca; the weekly slot tries again the next trading day.", { path: "/core" })
     await this.control.failInterruptedSeed()
+    await this.upgradeDemotion().catch((e) => this.d.log.error("upgrading the agent's demotion failed", { error: errorMessage(e) }))
 
     await this.refreshSession().catch((e) => log.warn("market calendar unavailable", { error: errorMessage(e) }))
     await syncOrders(db.col, this.d.alpaca).catch((e) => log.warn("initial order sync failed", { error: errorMessage(e) }))
@@ -511,11 +515,8 @@ export class Engine {
     const now = new Date()
     const session = await this.refreshSession(now)
     const settings = this.d.settings.current
-    // At level auto (and after a breaker's demotion) the agent decides on its own events: no session
-    // phases, intraday, price-move or event cycles.
-    this.plan = this.cyclesStopped
-      ? { phase: null, reason: this.agentTrades ? "The agent trades (level auto): no timed cycles." : "A circuit breaker dropped the agent to shadow: no timed cycles until the owner promotes it again." }
-      : await planPhase(this.d.db.col, settings, session, now)
+    // The agent decides on its own events: no session phases, intraday, price-move or event cycles.
+    this.plan = { phase: null, reason: "The agent decides: no timed cycles." }
     // In the background: a few REST calls once a day, never blocking a cycle.
     void this.coreRanking.refresh(session, now)
     if (this.cycle) return
@@ -534,24 +535,7 @@ export class Engine {
       if (core.due) return this.startCoreReview(session, "schedule", { dryRun: false })
     }
     // News events go before scheduled intraday cycles (the planner's other phases still come first).
-    if ((!this.plan.phase || this.plan.phase === "intraday") && (this.coreQueue.drain() || (!this.cyclesStopped && this.eventQueue.drain()))) return
-    if (this.plan.phase) return this.startCycle(this.plan.phase, session, "schedule", { kind: "scheduled" })
-    if (this.cyclesStopped) return
-
-    // Between scheduled intraday cycles, a held stock or option underlying moving sharply triggers an early one.
-    const s = settings.schedule
-    if (!isSessionOpen(session, now) || -minutesBetween(now, session.open!) < s.open_buffer_minutes || minutesBetween(now, session.close!) <= s.close_window_minutes) return
-    if (Date.now() - this.lastCycleAt < s.min_cycle_gap_minutes * MIN) return
-    const moved: string[] = []
-    for (const [symbol, ref] of this.reference) {
-      const price = this.d.prices.fresh(symbol, MIN)
-      if (price === null || !ref) continue
-      const cooled = Date.now() - (this.triggerCooldown.get(symbol) ?? 0) >= s.trigger_cooldown_minutes * MIN
-      if (cooled && Math.abs(price / ref - 1) * 100 >= s.trigger_move_pct) moved.push(`${symbol} ${price >= ref ? "+" : ""}${((price / ref - 1) * 100).toFixed(1)}%`)
-    }
-    if (!moved.length) return
-    for (const m of moved) this.triggerCooldown.set(m.split(" ")[0], Date.now())
-    this.startCycle("intraday", session, `price move: ${moved.join(", ")}`, { kind: "price_move" })
+    this.coreQueue.drain()
   }
 
   private async rememberReferencePrices() {
@@ -674,39 +658,30 @@ export class Engine {
   requestEventCycle(focus: EventFocus): "fired" | "queued" | "agent" {
     // Bad news about a core holding goes to the core book's single-holding review, not an event cycle.
     if (focus.rule === CORE_REVIEW_RULE) return this.coreQueue.request(focus)
-    // While the timed cycles are stopped the trigger is the agent's: it has already seen its candidate.
-    if (this.cyclesStopped) return "agent"
-    return this.eventQueue.request(focus)
+    // Anything else is the agent's: it has already seen the trigger's candidate.
+    return "agent"
   }
 
-  /** Level auto: the agent decides and the timed cycles stop (the core book's reviews carry on). */
-  private get agentTrades() {
-    return this.d.settings.current.agent.level === "auto"
-  }
-
-  /**
-   * The timed cycles stop at level auto, and stay stopped after a circuit breaker drops the agent
-   * to shadow, until the owner promotes it again.
-   */
-  private get cyclesStopped() {
-    return this.agentTrades || !!this.d.state.state.agent_demotion
-  }
-
-  /**
-   * A circuit breaker drops the agent to shadow (an audited settings change). The demotion is kept
-   * first, so no scheduler tick sees shadow without it and starts a timed cycle.
-   */
-  private async demoteAgent(reason: string) {
-    const { settings, state, log } = this.d
-    await state.update({ agent_demotion: { at: new Date(), reason } }, "engine:agent-breaker", "agent.demoted", {})
-    const r = await settings.apply({ agent: { level: "shadow" } } as SettingsPatch, "engine:agent-breaker", null)
-    if (!r.ok) throw new Error(r.error)
-    log.warn("agent dropped to shadow", { reason })
-  }
-
-  /** A promotion to auto: its time and equity, for the total-loss breaker. It ends any demotion. */
+  /** When the agent was turned on or its entries resumed: its time and equity, for the total-loss breaker. */
   private async promoteAgent(p: { at: Date; equity_usd: number }) {
-    await this.d.state.update({ agent_promotion: p, agent_demotion: null }, "engine", "agent.promoted", {})
+    await this.d.state.update({ agent_promotion: p }, "engine", "agent.promoted", {})
+  }
+
+  /**
+   * Before the agent-only bots a breaker dropped the agent to a "shadow" level (and stopped the
+   * timed cycles). Such a drop becomes what a breaker does now: the agent on, its new entries paused
+   * until the owner resumes them.
+   */
+  private async upgradeDemotion() {
+    const { state, settings, log } = this.d
+    const demotion = state.state.agent_demotion
+    if (!demotion) return
+    if (settings.current.agent.level === "off") {
+      const r = await settings.apply({ agent: { level: "on" } } as SettingsPatch, "engine:migration", null)
+      if (!r.ok) throw new Error(r.error)
+    }
+    await state.update({ agent_pause: demotion, agent_demotion: null }, "engine:migration", "agent.entries_paused", {})
+    log.warn("the agent's earlier drop to shadow is now a pause on its entries", { reason: demotion.reason })
   }
 
   /** Drops triggers that waited too long (the queue does this on every drain; tests call it with a later clock). */
@@ -762,15 +737,15 @@ export class Engine {
     // While a cycle or an agent episode is trading, only sync: re-protecting a stock it is selling
     // would fight it for the shares. The cycle checks protection itself before it finishes; the
     // next pass does it after an episode.
-    if (this.cycle || (this.agentTrades && this.agent.agent.current)) {
+    if (this.cycle || this.agent.agent.current) {
       await syncOrders(this.d.db.col, this.d.alpaca)
       return
     }
     const notes = await maintain(this.ctx, session, {
       now,
-      // While the timed cycles are stopped there is no closing cycle: the overnight rules always run in the last minutes.
-      closeCycleDone: async () => !this.cyclesStopped && (await this.d.db.col.cycles.countDocuments({ trading_day: session.day, phase: "close", status: { $in: ["succeeded", "running"] } })) > 0,
-      cyclesStopped: this.cyclesStopped,
+      // There is no closing cycle: the overnight rules always run in the last minutes.
+      closeCycleDone: async () => false,
+      cyclesStopped: true,
     })
     if (notes.length) this.d.log.info("maintenance", { notes })
   }
@@ -817,16 +792,9 @@ export class Engine {
     const by = doc.created_by
     switch (command.type) {
       case "cycle.run_now": {
-        // While the timed cycles are stopped the agent reviews what was asked, and at level auto may act on it.
-        if (this.cyclesStopped) return this.agent.agent.review(command.symbols ?? [], by)
-        if (this.cycle) throw new Error("a cycle is already running")
+        // The agent reviews what was asked, and may act on it.
         if (state.state.status !== "running" || state.state.kill_switch.engaged) throw new Error(`engine is ${this.status}`)
-        const session = await this.refreshSession()
-        const phase = command.phase ?? (this.plan.phase && this.plan.phase !== "intraday" ? this.plan.phase : isSessionOpen(session) ? "intraday" : null)
-        if (!phase) throw new Error("the market is closed: pick a phase (premarket or postmarket) or wait for the open")
-        const symbols = command.symbols ?? []
-        this.startCycle(phase, session, symbols.length ? `manual: evaluate ${symbols.join(", ")}` : "manual", { kind: "manual", requested: symbols })
-        return symbols.length ? `${phase} cycle started; the AI will evaluate ${symbols.join(", ")}` : `${phase} cycle started`
+        return this.agent.agent.review(command.symbols ?? [], by)
       }
       case "position.close": {
         const position = (await alpaca.getPositions()).find((p) => p.symbol === command.symbol && (p.asset_class ?? "us_equity") === "us_equity")

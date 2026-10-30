@@ -158,7 +158,6 @@ export type EventDataMap = {
   "agent.thinking": Shared["agent.thinking"]
   "agent.answered": Shared["agent.answered"]
   "agent.watch": Shared["agent.watch"]
-  "agent.shadow": Shared["agent.shadow"]
   "agent.breaker": Shared["agent.breaker"]
   error: Shared["error"]
   alert: Shared["alert"]

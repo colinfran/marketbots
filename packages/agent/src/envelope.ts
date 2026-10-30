@@ -14,7 +14,7 @@ export type Envelope = AgentSettings["envelope"]
 
 export type EnvelopeCheck = { name: string; ok: boolean; detail: string }
 
-/** What the envelope needs to know about the agent's recent activity (the shadow book's fills). */
+/** What the envelope needs to know about the agent's recent activity (its fills in the paper account). */
 export type EnvelopeHistory = {
   equityUsd: number
   openPositions: number

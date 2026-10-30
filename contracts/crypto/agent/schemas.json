@@ -129,7 +129,7 @@
     },
     {
       "name": "past_decisions",
-      "description": "the bot's last decisions on a pair (yours on the paper account, the timed cycles' before you, and yours in the shadow book), with how they turned out. Args: {symbol}.",
+      "description": "the bot's last decisions on a pair (yours, and the bot's earlier ones before you took over), with how they turned out. Args: {symbol}.",
       "args": {
         "type": "object",
         "properties": {

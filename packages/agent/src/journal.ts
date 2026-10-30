@@ -6,7 +6,7 @@ import { cap } from "./tools"
  *
  * - in MongoDB (`agent_episodes`) for the dashboard, with its long text capped (the brief, each
  *   step's thinking and tool result) and a 14-day TTL, because the Atlas tier may be the free one.
- *   An episode that changed the shadow book is kept for good, so the dashboard can always show why;
+ *   An episode that traded is kept for good, so the dashboard can always show why;
  * - in the history store (`EpisodeArchive`), uncapped, for replays and debugging.
  */
 
@@ -29,6 +29,6 @@ export const compactEpisode = (doc: AgentEpisodeDoc): AgentEpisodeDoc => ({
   })),
 })
 
-/** When an episode's dashboard copy expires: never once it changed the shadow book. */
+/** When an episode's dashboard copy expires: never once it traded. */
 export const episodeExpiry = (doc: Pick<AgentEpisodeDoc, "started_at" | "actions">): Date | null =>
   doc.actions.some((a) => a.outcome === "filled" || a.outcome === "updated") ? null : new Date(doc.started_at.getTime() + EPISODE_TTL_DAYS * 86_400_000)

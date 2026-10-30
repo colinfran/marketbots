@@ -5,7 +5,7 @@ import { BOOK_SUBJECT, MARKET_SUBJECT, type Observation } from "@mb/core/agent"
 import { errorMessage } from "@mb/engine-kit/log"
 import { formatTime, marketDay } from "@mb/stock-core/time"
 import { upcomingMacro } from "@mb/wire/calendar"
-import { isLive, sessionWindow, sidePrices, type StockAgentDeps } from "./book"
+import { sessionWindow, sidePrices, type StockAgentDeps } from "./book"
 import { StockScreen } from "./screen"
 import { stockWireDeps } from "./tools"
 import { bookText, envelopeHistory, heldPositions, heldSymbols } from "./view"
@@ -20,13 +20,9 @@ import { bookText, envelopeHistory, heldPositions, heldSymbols } from "./view"
  *                tracks) goes through the setup screen (./screen); while buys are allowed and the
  *                envelope would take one, the minute's best setups on stocks not in the book wake
  *                the agent together, as one P1
- *   every 5 s    in session: the shadow book's stops and targets against the bid (a fill is a P2; at
- *                level auto they rest at the broker, and a stop or target it fills is the P2), and a
- *                held stock moving `schedule.trigger_move_pct` since your last review (down: P0,
- *                up: P2), again at every further step
- *   every 15 s   in session: the shadow book's marks
- *   bell - 3 min the shadow book's intraday positions are closed by code (the overnight rule); at
- *                level auto the engine's maintenance does it for the paper account
+ *   every 5 s    in session: a held stock moving `schedule.trigger_move_pct` since your last review
+ *                (down: P0, up: P2), again at every further step; stops and targets rest at the
+ *                broker, and a stop or target it fills is a P2 (onPositionClosed)
  *   each minute  a scheduled release 15 minutes out is a P2 about the market
  *   quiet time   in session, a P2 review once nothing has woken the agent for `agent.sweep_minutes`
  *
@@ -85,19 +81,11 @@ export class StockObserver {
     const s = this.d.session()
     const window = sessionWindow(this.d, now)
     await this.phases(now)
-    // The shadow book's stops, targets, marks and overnight rule are the agent's to run; the paper
-    // account's rest at the broker and in the engine's maintenance.
-    const live = isLive(this.d)
+    // Stops and targets rest at the broker, and the overnight rule is the engine's maintenance; the agent watches the moves.
     if (window.open && t - this.last.exits >= EXITS_MS) {
       this.last.exits = t
-      if (!live) await this.exits(now)
       await this.priceMoves(now)
     }
-    if (!live && window.open && t - this.last.mark >= MARK_MS) {
-      this.last.mark = t
-      await this.d.shadow.mark(this.d.price)
-    }
-    if (!live && window.open && s?.close && s.close.getTime() - t <= OVERNIGHT_MINUTES * MIN && this.once(`overnight:${s.day}`)) await this.overnight()
     if (t - this.last.calendar >= MIN) {
       this.last.calendar = t
       this.calendarEvents(now)
@@ -143,22 +131,6 @@ export class StockObserver {
     }
   }
 
-  private async exits(now: Date) {
-    const fills = await this.d.shadow.checkExits((s) => sidePrices(this.d, s)?.bid ?? null)
-    for (const f of fills) {
-      this.observe({
-        id: `fill:${f._id}`,
-        subject: f.symbol,
-        kind: "fill",
-        priority: 2,
-        salience: 60,
-        summary: `Your shadow ${f.symbol} position hit its ${f.reason === "stop_loss" ? "stop" : "target"}: sold ${f.qty} at ${f.price.toFixed(2)}, ${(f.realized_pnl_usd ?? 0) >= 0 ? "+" : "-"}$${Math.abs(f.realized_pnl_usd ?? 0).toFixed(2)}.`,
-        refs: { position_id: f.position_id },
-        at: now,
-      })
-    }
-  }
-
   private async priceMoves(now: Date) {
     const step = this.d.ctx.settings.current.schedule.trigger_move_pct
     for (const p of await heldPositions(this.d)) {
@@ -197,15 +169,6 @@ export class StockObserver {
       refs: {},
       at: now,
     })
-  }
-
-  /** Never leave an intraday position open overnight (the cycles' overnight rule). */
-  private async overnight() {
-    for (const p of await this.d.shadow.open()) {
-      if (p.horizon !== "intraday") continue
-      const bid = sidePrices(this.d, p.symbol)?.bid
-      if (bid) await this.d.shadow.sell(p, { reference: bid, reason: "overnight", episodeId: null })
-    }
   }
 
   private calendarEvents(now: Date) {

@@ -120,29 +120,13 @@ describe("Engine", () => {
     expect(await db.col.audit.countDocuments({ action: "settings.update" })).toBe(1)
   })
 
-  it("holds news triggers while it can't run them, merged by symbol, and drops them once stale", async () => {
-    await command({ type: "pause", reason: "test" })
-    await db.col.wireTriggers.insertOne({ _id: "t1", at: new Date(), rule: "held_negative", action: "review", status: "queued", reason: "queued", item_ids: ["i1"], symbols: ["AAPL"], severity: 70, cycle_id: null, queue_wait_ms: null, expires_at: new Date(Date.now() + 86_400_000) })
-    const focus = { symbol: "AAPL", rule: "held_negative", action: "review" as const, severity: 70, polarity: -1 as const, item_ids: ["i1"], trigger_id: "t1", headline: "AAPL sued" }
-    expect(engine.requestEventCycle(focus)).toBe("queued")
-    expect(engine.requestEventCycle({ ...focus, severity: 60, item_ids: ["i2"], trigger_id: "t2" })).toBe("queued")
-    const internals = engine as unknown as { eventQueue: Map<string, { severity: number; item_ids: string[]; trigger_id: string }>; expireEvents: (now: number) => void }
-    expect(internals.eventQueue.get("AAPL")).toMatchObject({ severity: 70, item_ids: ["i1", "i2"], trigger_id: "t1" })
-    internals.expireEvents(Date.now() + 31 * 60_000)
-    expect(internals.eventQueue.size).toBe(0)
-    await until(async () => (await db.col.wireTriggers.findOne({ _id: "t1" }))?.status === "suppressed")
-    expect((await db.col.wireTriggers.findOne({ _id: "t1" }))!.reason).toMatch(/^expired: waited 3\d min in the queue$/)
-    expect(await db.col.cycles.countDocuments({ kind: "event" })).toBe(0)
-  })
-
-  it("sends bad news about a core holding to a single-holding core review, not an event cycle", async () => {
+  it("sends bad news about a core holding to a single-holding core review, and other news to the agent", async () => {
     await command({ type: "pause", reason: "test" })
     const focus = { symbol: "SPY", rule: "core_negative", action: "review" as const, severity: 80, polarity: -1 as const, item_ids: ["i1"], trigger_id: "t1", headline: "S&P futures limit down" }
     expect(engine.requestEventCycle(focus)).toBe("queued")
-    expect(engine.requestEventCycle({ ...focus, symbol: "AAPL", rule: "held_negative", trigger_id: "t2" })).toBe("queued")
-    const internals = engine as unknown as { eventQueue: { keys(): string[] }; coreQueue: { keys(): string[] } }
+    expect(engine.requestEventCycle({ ...focus, symbol: "AAPL", rule: "held_negative", trigger_id: "t2" })).toBe("agent")
+    const internals = engine as unknown as { coreQueue: { keys(): string[] } }
     expect(internals.coreQueue.keys()).toEqual(["SPY"])
-    expect(internals.eventQueue.keys()).toEqual(["AAPL"])
   })
 
   it("runs the core review on request only when it can", async () => {
@@ -154,49 +138,30 @@ describe("Engine", () => {
     expect(await db.col.coreReviews.countDocuments()).toBe(0)
   })
 
-  it("at level auto runs no timed cycles: news triggers and Run now go to the agent, core reviews still go to the core book", async () => {
-    expect(await command({ type: "settings.update", patch: { agent: { level: "auto" } }, expected_version: 1 })).toMatchObject({ status: "done" })
+  it("runs no timed cycles: news triggers and Wake the agent go to the agent, core reviews still go to the core book", async () => {
     const focus = { symbol: "AAPL", rule: "held_negative", action: "review" as const, severity: 70, polarity: -1 as const, item_ids: ["i1"], trigger_id: "t1", headline: "AAPL sued" }
     expect(engine.requestEventCycle(focus)).toBe("agent")
     expect(engine.requestEventCycle({ ...focus, symbol: "SPY", rule: "core_negative", trigger_id: "t2" })).toMatch(/^(fired|queued)$/)
-    const internals = engine as unknown as { eventQueue: { keys(): string[] }; schedule: () => Promise<void> }
-    expect(internals.eventQueue.keys()).toEqual([])
+    const internals = engine as unknown as { schedule: () => Promise<void>; plan: { reason: string } }
     await internals.schedule()
+    expect(internals.plan.reason).toBe("The agent decides: no timed cycles.")
     expect(await db.col.cycles.countDocuments({ _id: { $ne: "interrupted" }, kind: { $ne: "core" } })).toBe(0)
     expect(await command({ type: "cycle.run_now", phase: "postmarket" })).toMatchObject({ status: "failed", error: "the agent needs the model server (LLM_URL)" })
   })
 
-  it("keeps the timed cycles stopped after a breaker drops the agent to shadow, until the next promotion", async () => {
-    const internals = engine as unknown as {
-      schedule: () => Promise<void>
-      plan: { reason: string }
-      cyclesStopped: boolean
-      demoteAgent: (reason: string) => Promise<void>
-      promoteAgent: (p: { at: Date; equity_usd: number }) => Promise<void>
-    }
-    expect(await command({ type: "settings.update", patch: { agent: { level: "auto" } }, expected_version: 1 })).toMatchObject({ status: "done" })
-    await internals.demoteAgent("daily_loss: the account is down 3.10% today")
-    expect((await db.col.settings.findOne({ _id: "current" }))!.settings.agent.level).toBe("shadow")
-    expect(await db.col.engineState.findOne({ _id: "engine" })).toMatchObject({ agent_demotion: { reason: "daily_loss: the account is down 3.10% today" } })
-    const focus = { symbol: "AAPL", rule: "held_negative", action: "review" as const, severity: 70, polarity: -1 as const, item_ids: ["i1"], trigger_id: "t1", headline: "AAPL sued" }
-    expect(engine.requestEventCycle(focus)).toBe("agent")
-    await internals.schedule()
-    expect(internals.plan.reason).toBe("A circuit breaker dropped the agent to shadow: no timed cycles until the owner promotes it again.")
-    expect(await db.col.cycles.countDocuments({ _id: { $ne: "interrupted" }, kind: { $ne: "core" } })).toBe(0)
-    expect(await command({ type: "cycle.run_now", phase: "postmarket" })).toMatchObject({ status: "failed", error: "the agent needs the model server (LLM_URL)" })
-
-    // The owner promotes it again: the demotion ends, and a later shadow is the owner's own, with the cycles back.
-    expect(await command({ type: "settings.update", patch: { agent: { level: "auto" } }, expected_version: 3 })).toMatchObject({ status: "done" })
-    await internals.promoteAgent({ at: new Date(), equity_usd: 10_000 })
-    expect((await db.col.engineState.findOne({ _id: "engine" }))!.agent_demotion).toBeNull()
-    expect(await command({ type: "settings.update", patch: { agent: { level: "shadow" } }, expected_version: 4 })).toMatchObject({ status: "done" })
-    expect(internals.cyclesStopped).toBe(false)
-  })
-
-  it("runs a cycle on request (skipped without an AI key) and refuses a second one", async () => {
-    expect(await command({ type: "cycle.run_now", phase: "postmarket" })).toMatchObject({ status: "done", result: "postmarket cycle started" })
-    await until(async () => (await db.col.cycles.countDocuments({ phase: "postmarket", status: "skipped" })) === 1)
-    expect(await db.col.cycles.findOne({ phase: "postmarket" })).toMatchObject({ trigger: "manual", error: "AI is disabled (LLM_URL not set)" })
+  it("turns an earlier breaker's drop to shadow into a pause on entries, which the owner lifts", async () => {
+    const internals = engine as unknown as { upgradeDemotion: () => Promise<void>; d: { state: EngineStateStore } }
+    const reason = "daily loss: the shadow book is down -3.10% today"
+    expect(await command({ type: "settings.update", patch: { agent: { level: "off" } }, expected_version: 1 })).toMatchObject({ status: "done" })
+    await internals.d.state.update({ agent_demotion: { at: new Date(), reason } }, "test", "test")
+    await internals.upgradeDemotion()
+    expect((await db.col.settings.findOne({ _id: "current" }))!.settings.agent.level).toBe("on")
+    expect(await db.col.engineState.findOne({ _id: "engine" })).toMatchObject({ agent_pause: { reason }, agent_demotion: null })
+    expect(await db.col.audit.findOne({ action: "agent.entries_paused" })).toMatchObject({ actor: "engine:migration" })
+    expect(engine.agent.agent.entriesPaused()).toBe(`entries paused by a breaker until the owner resumes them: ${reason}`)
+    expect(await command({ type: "agent.resume_entries" })).toMatchObject({ status: "done", result: expect.stringMatching(/^the agent's entries resumed/) })
+    expect(await db.col.engineState.findOne({ _id: "engine" })).toMatchObject({ agent_pause: null })
+    expect(engine.agent.agent.entriesPaused()).toBeNull()
   })
 
   it("halts with the kill switch, liquidating when asked, and stays paused after release", async () => {
@@ -249,9 +214,9 @@ describe("Engine", () => {
     ])
   })
 
-  it("runs the agent in shadow by default, and says why it can't answer without the model server", async () => {
-    expect((await db.col.settings.findOne({ _id: "current" }))!.settings.agent.level).toBe("shadow")
-    expect(engine.agent.agent.status()).toMatchObject({ level: "shadow", state: "off", blocked: "no model server (LLM_URL not set)" })
+  it("runs the agent by default, and says why it can't answer without the model server", async () => {
+    expect((await db.col.settings.findOne({ _id: "current" }))!.settings.agent.level).toBe("on")
+    expect(engine.agent.agent.status()).toMatchObject({ level: "on", state: "off", blocked: "no model server (LLM_URL not set)", pause: null })
     expect(await command({ type: "agent.ask", question: "What do you hold?" })).toMatchObject({ status: "failed", error: "the agent needs the model server (LLM_URL)" })
   })
 

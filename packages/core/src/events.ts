@@ -96,16 +96,14 @@ export type BaseEventDataMap<Category extends string, RunStatus extends string, 
     duration_ms: number
   }
   "agent.watch": { watch_id: string; status: "set" | "fired" | "expired" | "canceled"; kind: WatchKind; symbol: string | null; note: string }
-  /** A fill in the shadow book: what the agent would have traded. */
-  "agent.shadow": { position_id: string; symbol: string; side: "buy" | "sell"; qty: number; price: number; reason: string; realized_pnl_usd: number | null }
-  /** A circuit breaker tripped (recorded; at level shadow nothing is enforced). */
+  /** A circuit breaker tripped: the agent's new entries pause (until the owner resumes them, or for a slow model until it is fast again). */
   "agent.breaker": { name: string; detail: string }
   error: { scope: string; message: string }
   alert: { level: "info" | "warning" | "error" | "critical"; title: string; message: string }
 }
 
 /** The agent's events: the same in both bots. */
-export const AGENT_EVENT_TYPES = ["agent.woke", "agent.step", "agent.thinking", "agent.answered", "agent.watch", "agent.shadow", "agent.breaker"] as const
+export const AGENT_EVENT_TYPES = ["agent.woke", "agent.step", "agent.thinking", "agent.answered", "agent.watch", "agent.breaker"] as const
 export type AgentEventType = (typeof AGENT_EVENT_TYPES)[number]
 export type AgentEventDataMap = Pick<BaseEventDataMap<string, string, string>, AgentEventType>
 

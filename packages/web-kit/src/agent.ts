@@ -1,8 +1,8 @@
 import "server-only"
-import { describeWatch, type AgentEpisodeDoc, type AgentNoteDoc, type AgentStatus, type AgentWatchDoc, type ShadowFillDoc, type ShadowPositionDoc } from "@mb/core/agent"
-import { toAgentStatusView, type AgentStatusView, type EpisodeRowView, type EpisodeView, type NoteView, type ShadowFillView, type ShadowPositionView, type WatchView } from "@mb/core/agent-views"
+import { describeWatch, type AgentEpisodeDoc, type AgentNoteDoc, type AgentStatus, type AgentWatchDoc } from "@mb/core/agent"
+import { toAgentStatusView, type AgentStatusView, type EpisodeRowView, type EpisodeView, type NoteView, type WatchView } from "@mb/core/agent-views"
 
-export type { AgentStatusView, EpisodeRowView, EpisodeView, NoteView, ShadowFillView, ShadowPositionView, StepView, WatchView } from "@mb/core/agent-views"
+export type { AgentStatusView, EpisodeRowView, EpisodeView, NoteView, StepView, WatchView } from "@mb/core/agent-views"
 
 /** The heartbeat's agent block as the page shows it, or null before the engine reported one. */
 export const agentStatusView = (status: { agent?: AgentStatus } | null): AgentStatusView | null => (status?.agent ? toAgentStatusView(status.agent) : null)
@@ -11,7 +11,7 @@ import { connection } from "next/server"
 
 /**
  * The agent's pages (docs/plans/LOCAL-AI.md §11), the same in both dashboards: its episodes, its
- * watches and notes, and the shadow book. Only plain, serializable values leave this module (dates
+ * watches and notes. Only plain, serializable values leave this module (dates
  * as ISO strings). The model's thinking is owner-only unless the bot's `agent.public_thinking` is
  * on: the caller says whether to include it.
  */
@@ -20,8 +20,6 @@ export type AgentCollections = {
   agentEpisodes: Collection<AgentEpisodeDoc>
   agentWatches: Collection<AgentWatchDoc>
   agentNotes: Collection<AgentNoteDoc>
-  shadowPositions: Collection<ShadowPositionDoc>
-  shadowFills: Collection<ShadowFillDoc>
 }
 
 const iso = (d: Date | null | undefined) => (d ? d.toISOString() : null)
@@ -38,28 +36,6 @@ const toRow = (e: AgentEpisodeDoc): EpisodeRowView => ({
   duration_ms: e.duration_ms,
   tools: e.steps.filter((s) => s.kind === "tool" && s.tool).map((s) => s.tool!),
   actions: e.actions.map((a) => ({ symbol: a.symbol, action: a.action, outcome: a.outcome })),
-})
-
-const toPosition = (p: ShadowPositionDoc): ShadowPositionView => ({
-  id: p._id,
-  symbol: p.symbol,
-  status: p.status,
-  qty: p.qty,
-  entry_price: p.entry_price,
-  mark_price: p.mark_price,
-  stop_price: p.stop_price,
-  take_profit_price: p.take_profit_price,
-  cost_usd: p.cost_usd,
-  realized_pnl_usd: p.realized_pnl_usd,
-  opened_at: p.opened_at.toISOString(),
-  closed_at: iso(p.closed_at),
-  exit_price: p.exit_price,
-  exit_reason: p.exit_reason,
-  horizon: p.horizon,
-  strategy: p.strategy,
-  thesis: p.thesis,
-  conviction: p.conviction,
-  episode_id: p.episode_id,
 })
 
 export const createAgentQueries = <Cols extends AgentCollections>({ collections }: { collections: () => Promise<Cols> }) => {
@@ -92,22 +68,6 @@ export const createAgentQueries = <Cols extends AgentCollections>({ collections 
     }
   }
 
-  /** The shadow book's open positions, its last closed ones and its last fills. */
-  const getShadowBook = async () => {
-    await connection()
-    const { shadowPositions, shadowFills } = await collections()
-    const [open, closed, fills] = await Promise.all([
-      shadowPositions.find({ status: "open" }).sort({ opened_at: -1 }).toArray(),
-      shadowPositions.find({ status: "closed" }).sort({ closed_at: -1 }).limit(20).toArray(),
-      shadowFills.find({}).sort({ at: -1 }).limit(30).toArray(),
-    ])
-    return {
-      open: open.map(toPosition),
-      closed: closed.map(toPosition),
-      fills: fills.map((f): ShadowFillView => ({ id: f._id, symbol: f.symbol, side: f.side, qty: f.qty, price: f.price, at: f.at.toISOString(), reason: f.reason, realized_pnl_usd: f.realized_pnl_usd, episode_id: f.episode_id })),
-    }
-  }
-
   /** The agent's active watches and its notes. */
   const getAgentMemory = async () => {
     await connection()
@@ -119,5 +79,5 @@ export const createAgentQueries = <Cols extends AgentCollections>({ collections 
     }
   }
 
-  return { getEpisodes, getEpisode, getShadowBook, getAgentMemory }
+  return { getEpisodes, getEpisode, getAgentMemory }
 }

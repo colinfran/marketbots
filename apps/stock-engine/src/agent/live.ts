@@ -15,8 +15,8 @@ import { computeRiskState } from "../bot/risk"
 import { limitsText, sessionWindow, type StockAgentDeps } from "./book"
 
 /**
- * The stock agent at level auto (docs/plans/LOCAL-AI.md §10): it decides into the paper account,
- * stocks and options, through the timed cycles' own path (`executeDecisions`: the buy rules, the
+ * The stock agent's decisions into the paper account (docs/plans/LOCAL-AI.md §8.4, §9), stocks and
+ * options, through the bot's execution path (`executeDecisions`: the buy rules, the
  * options rules, bracket and OCO orders at the broker, a `decisions` record per decision). Before
  * that, the envelope: an entry must pass its rate limits, and its size (a buy's allocation, an
  * option's premium) is cut to the envelope's share and the hour's commitment budget. Buys happen only
@@ -83,7 +83,7 @@ export const liveRiskState = async (d: Pick<StockAgentDeps, "ctx" | "snapshot">,
   return { risk, history: await liveEnvelopeHistory(d, risk.equity, now.getTime()), book }
 }
 
-/** The paper account in the shadow book's terms, for the heartbeat and the breakers. */
+/** The paper account, summarized for the heartbeat and the breakers. */
 export const liveAccount = (d: Pick<StockAgentDeps, "ctx" | "snapshot">): AgentAccount | null => {
   const snap = d.snapshot()
   if (!snap) return null
@@ -160,7 +160,7 @@ const outcomeOf = (dec: StockAgentDecision, doc: DecisionDoc | null): AgentActio
 }
 
 /** The agent's decisions into the paper account, one at a time (the envelope sees each entry before the next): sales first, exits, holds, then buys by conviction. */
-export const actLive = async (
+export const actOnStockAnswer = async (
   d: StockAgentDeps,
   answer: StockAgentAnswer,
   episode: Pick<EpisodeInfo, "id" | "wake" | "entriesPaused">,

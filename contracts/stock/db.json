@@ -26,8 +26,6 @@
     "agentEpisodes": "agent_episodes",
     "agentWatches": "agent_watches",
     "agentNotes": "agent_notes",
-    "shadowPositions": "shadow_positions",
-    "shadowFills": "shadow_fills",
     "authUsers": "auth_users",
     "authSessions": "auth_sessions",
     "authAccounts": "auth_accounts",
@@ -357,40 +355,6 @@
           "expires_at": 1
         },
         "expireAfterSeconds": 0
-      }
-    ],
-    "shadow_positions": [
-      {
-        "key": {
-          "status": 1
-        }
-      },
-      {
-        "key": {
-          "symbol": 1
-        },
-        "name": "one_open_shadow_position_per_symbol",
-        "unique": true,
-        "partialFilterExpression": {
-          "status": "open"
-        }
-      },
-      {
-        "key": {
-          "closed_at": -1
-        }
-      }
-    ],
-    "shadow_fills": [
-      {
-        "key": {
-          "at": -1
-        }
-      },
-      {
-        "key": {
-          "position_id": 1
-        }
       }
     ],
     "auth_sessions": [

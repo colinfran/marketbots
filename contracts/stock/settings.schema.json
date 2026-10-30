@@ -713,8 +713,7 @@
             "type": "string",
             "enum": [
               "off",
-              "shadow",
-              "auto"
+              "on"
             ]
           },
           "model": {
@@ -897,11 +896,6 @@
               "flip_hours"
             ]
           },
-          "shadow_starting_usd": {
-            "type": "number",
-            "minimum": 100,
-            "maximum": 10000000
-          },
           "public_thinking": {
             "type": "boolean"
           }
@@ -913,7 +907,6 @@
           "wake_cooldown_minutes",
           "sweep_minutes",
           "envelope",
-          "shadow_starting_usd",
           "public_thinking"
         ]
       }
@@ -1656,8 +1649,7 @@
             "type": "string",
             "enum": [
               "off",
-              "shadow",
-              "auto"
+              "on"
             ]
           },
           "model": {
@@ -1846,11 +1838,6 @@
             ],
             "additionalProperties": false
           },
-          "shadow_starting_usd": {
-            "type": "number",
-            "minimum": 100,
-            "maximum": 10000000
-          },
           "public_thinking": {
             "type": "boolean"
           }
@@ -1862,7 +1849,6 @@
           "wake_cooldown_minutes",
           "sweep_minutes",
           "envelope",
-          "shadow_starting_usd",
           "public_thinking"
         ],
         "additionalProperties": false

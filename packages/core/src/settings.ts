@@ -116,10 +116,10 @@ export const agentPriorityLimits = z.object({
 })
 
 /**
- * The agent (docs/plans/LOCAL-AI.md §8–§10), the same in both bots. At `level` shadow it wakes on
- * what code observes, looks things up, and puts its decisions into the shadow book; nothing reaches
- * the broker. The envelope limits what the agent does, tighter than the bot's own risk caps;
- * risk-reducing actions are never rate-limited.
+ * The agent (docs/plans/LOCAL-AI.md §8–§10), the same in both bots. At `level` on it wakes on what
+ * code observes, looks things up, and trades the paper account through the bot's own risk checks;
+ * it is the only thing that decides. The envelope limits what the agent does, tighter than the
+ * bot's own risk caps; risk-reducing actions are never rate-limited.
  */
 export const agentSettingsBase = z.object({
   level: z.enum(AGENT_LEVELS),
@@ -144,12 +144,22 @@ export const agentSettingsBase = z.object({
     /** Re-entering a symbol this soon after exiting it is refused. */
     flip_hours: z.number().min(0).max(72),
   }),
-  /** The shadow book's starting cash. */
-  shadow_starting_usd: z.number().min(100).max(10_000_000),
   /** Stream the model's thinking to logged-out viewers too (it quotes untrusted news text). */
   public_thinking: z.boolean(),
 })
 export type AgentSettings = z.infer<typeof agentSettingsBase>
+
+/**
+ * Stored settings from before the agent-only bots: the agent's levels were off, shadow and auto.
+ * auto is on; shadow becomes off, so the agent never turns itself on (a breaker's drop to shadow is
+ * the engine's to turn into a pause on entries, from its state). Anything else passes unchanged.
+ */
+export const upgradeStoredSettings = (stored: unknown): unknown => {
+  if (!isPlainObject(stored) || !isPlainObject(stored.agent)) return stored
+  const level = stored.agent.level
+  if (level !== "auto" && level !== "shadow") return stored
+  return { ...stored, agent: { ...stored.agent, level: level === "auto" ? "on" : "off" } }
+}
 
 /** The first refinement of every bot's settings: the wire thresholds must ascend. */
 export const refineWireThresholds = (settings: { wire: Pick<WireSettingsBase, "thresholds"> }, ctx: z.RefinementCtx) => {

@@ -153,7 +153,6 @@ export type EventDataMap = {
   "agent.thinking": Shared["agent.thinking"]
   "agent.answered": Shared["agent.answered"]
   "agent.watch": Shared["agent.watch"]
-  "agent.shadow": Shared["agent.shadow"]
   "agent.breaker": Shared["agent.breaker"]
   "core.review.started": { review_id: string; cycle_id: string; kind: "weekly" | "holding"; trigger: string; symbol: string | null; dry_run: boolean }
   "core.review.completed": {

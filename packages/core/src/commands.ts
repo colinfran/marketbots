@@ -50,6 +50,9 @@ export const wireReplayCommand = z.object({ type: z.literal("wire.replay"), item
 /** A question for the agent (docs/plans/LOCAL-AI.md §11): a read-only episode whose reply shows on the Agent page. Nothing it decides is acted on. */
 export const agentAskCommand = z.object({ type: z.literal("agent.ask"), question: z.string().trim().min(3).max(500) })
 
+/** Lifts a circuit breaker's pause on the agent's new entries. Its total-loss breaker counts afresh from now. */
+export const agentResumeEntriesCommand = z.object({ type: z.literal("agent.resume_entries") })
+
 export type BaseCommand = z.infer<
   | typeof pauseCommand
   | typeof resumeCommand
@@ -60,6 +63,7 @@ export type BaseCommand = z.infer<
   | typeof seedCancelCommand
   | typeof wireReplayCommand
   | typeof agentAskCommand
+  | typeof agentResumeEntriesCommand
 >
 export type BaseCommandType = BaseCommand["type"]
 
@@ -73,4 +77,5 @@ export const BASE_COMMAND_LABEL: Record<BaseCommandType, string> = {
   "seed.cancel": "Cancel seed buy",
   "wire.replay": "Replay news item",
   "agent.ask": "Ask the agent",
+  "agent.resume_entries": "Resume the agent's entries",
 }

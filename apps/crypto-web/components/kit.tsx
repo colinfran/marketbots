@@ -150,7 +150,7 @@ export const kit: BotKit<EngineEvent> = {
       trades: (e) => /^(order|position|protection|risk)\./.test(e.type),
       system: (e) => /^(engine|venue|market|budget|command|alert|error|summary)/.test(e.type),
     },
-    refreshOn: new Set(["order.filled", "position.opened", "position.closed", "position.updated", "cycle.completed", "cycle.skipped", "engine.status", "command.completed", "command.failed", "backtest.completed", "summary.periodic", "engine.reconciled", "agent.answered", "agent.shadow"]),
+    refreshOn: new Set(["order.filled", "position.opened", "position.closed", "position.updated", "cycle.completed", "cycle.skipped", "engine.status", "command.completed", "command.failed", "backtest.completed", "summary.periodic", "engine.reconciled", "agent.answered", "agent.breaker"]),
     // Thinking-trail events that are worth showing even though they're logged at debug level.
     feedDebug: new Set(["research.query", "research.source", "research.progress", "ai.reasoning", "ai.decision.progress"]),
     // Decision progress shows in the current work and the live trail, not as feed lines.

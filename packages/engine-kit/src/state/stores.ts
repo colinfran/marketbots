@@ -21,6 +21,8 @@ export type SettingsBinding<S, P> = {
   applyPatch: (base: S, patch: P) => SettingsValidation<S>
   /** The settings written on first boot, from the defaults and the env's seed values (models, starting capital…). */
   seed: (defaults: S) => S
+  /** Rewrites stored settings from an older schema whose values changed meaning (renamed enum values), before they are read. */
+  upgrade?: (stored: unknown) => unknown
 }
 
 type SettingsCol<S> = { settings: Collection<SettingsDoc<S>>; audit: Collection<AuditDoc> }
@@ -38,10 +40,19 @@ export class SettingsStore<S, P> implements SettingsView<S> {
   static async load<S, P>(col: SettingsCol<S>, bot: SettingsBinding<S, P>, log: Logger): Promise<SettingsStore<S, P>> {
     const doc = await col.settings.findOne({ _id: "current" })
     if (doc) {
-      const parsed = bot.schema.safeParse(doc.settings)
+      const stored = bot.upgrade ? bot.upgrade(doc.settings) : doc.settings
+      const parsed = bot.schema.safeParse(stored)
+      if (parsed.success && stored !== doc.settings) {
+        // An upgraded value is written back once, and audited like any settings change.
+        const changes = diffSettings(doc.settings, stored)
+        log.warn("stored settings upgraded", { changes })
+        await col.settings.updateOne({ _id: "current" }, { $set: { settings: parsed.data, version: doc.version + 1, updated_at: new Date(), updated_by: "engine:migration" } })
+        await col.audit.insertOne({ _id: randomUUID(), at: new Date(), actor: "engine:migration", action: "settings.update", target: "settings", details: { version: doc.version + 1, changes } })
+        return new SettingsStore(col, bot.applyPatch, parsed.data, doc.version + 1)
+      }
       if (parsed.success) return new SettingsStore(col, bot.applyPatch, parsed.data, doc.version)
       // Stored settings from an older schema: fill in new fields from defaults, keep the rest.
-      const migrated = bot.applyPatch(bot.defaults, doc.settings as unknown as P)
+      const migrated = bot.applyPatch(bot.defaults, stored as P)
       if (migrated.ok) {
         log.warn("stored settings migrated to the current schema")
         await col.settings.updateOne({ _id: "current" }, { $set: { settings: migrated.settings, version: doc.version + 1, updated_at: new Date(), updated_by: "engine:migration" } })
