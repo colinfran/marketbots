@@ -24,7 +24,7 @@ import type { EventBus } from "./bus/event-bus"
 import { CommandProcessor } from "./commands/processor"
 import type { EngineContext } from "./bot/context"
 import { cancelSymbolOrders } from "./bot/execute"
-import { flattenStocks, maintain } from "./bot/maintenance"
+import { flattenStocks, maintain, recordDailyStats } from "./bot/maintenance"
 import { closeOptionPosition, liquidateOptions, monitorOptions, reconcileOptions } from "./bot/options"
 import { clientId, syncOrders } from "./bot/orders"
 import { getSession, isSessionOpen, type Session } from "./bot/session"
@@ -129,6 +129,8 @@ export class Engine {
   private nextOpen: Date | null = null
   private lastOptionsCheck = 0
   private lastMaintenance = 0
+  /** The trading day whose record (the journal's day) this process last saw written. */
+  private statsDay: string | null = null
   private lastHistory: Record<"intraday" | "long", number> = { intraday: 0, long: 0 }
   private lastCharts = 0
   private lastSummaryAt = 0
@@ -508,6 +510,16 @@ export class Engine {
     }
     const notes = await maintain(this.ctx, session, { now })
     if (notes.length) this.d.log.info("maintenance", { notes })
+    await this.recordDay(session, now)
+  }
+
+  /** The day's record (the journal's day, with SPY's), once its session has closed: written once a day, after the postmarket delay. */
+  private async recordDay(session: Session, now: Date) {
+    if (!session.close || session.day === this.statsDay) return
+    if (now.getTime() < session.close.getTime() + this.d.settings.current.schedule.postmarket_delay_minutes * MIN) return
+    const written = await this.d.db.col.dailyStats.findOne({ _id: session.day, updated_at: { $gte: session.close } }, { projection: { _id: 1 } })
+    if (!written) await recordDailyStats(this.ctx, session.day)
+    this.statsDay = session.day
   }
 
   private async watchOptions() {

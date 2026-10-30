@@ -182,7 +182,7 @@ const spyChangePct = async (ctx: TradingContext, day: string): Promise<number | 
 
 /**
  * Writes the day's performance record (the journal's day). Options P&L counts like any other fill.
- * The postmarket cycle called it; with the timed cycles gone, nothing does yet.
+ * The engine writes it once a day, after the close (Engine.recordDay).
  */
 export const recordDailyStats = async (ctx: TradingContext, day: string = marketDay()) => {
   const { alpaca, col, settings, log, bus } = ctx

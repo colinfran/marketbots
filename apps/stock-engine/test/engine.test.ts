@@ -13,6 +13,7 @@ import type { MarketStream } from "../src/alpaca/market-stream"
 import type { TradeStream } from "../src/alpaca/trade-stream"
 import type { EventBus } from "../src/bus/event-bus"
 import type { Database } from "../src/db/mongo"
+import type { Session } from "../src/bot/session"
 import { Engine } from "../src/engine"
 import { loadEnv } from "../src/env"
 import { LivePrices } from "../src/market/prices"
@@ -207,6 +208,19 @@ describe("Engine", () => {
     expect((await db.col.settings.findOne({ _id: "current" }))!.settings.agent.level).toBe("on")
     expect(engine.agent.agent.status()).toMatchObject({ level: "on", state: "off", blocked: "no model server (LLM_URL not set)", pause: null })
     expect(await command({ type: "agent.ask", question: "What do you hold?" })).toMatchObject({ status: "failed", error: "the agent needs the model server (LLM_URL)" })
+  })
+
+  it("writes the day's record once, after the close", async () => {
+    const internals = engine as unknown as { recordDay: (s: Session, now: Date) => Promise<void> }
+    const close = new Date("2026-10-26T20:00:00Z")
+    const session: Session = { day: "2026-10-26", is_trading_day: true, open: new Date("2026-10-26T13:30:00Z"), close, open_et: "09:30", close_et: "16:00", early_close: false }
+    await internals.recordDay(session, new Date(close.getTime() - 60_000))
+    expect(await db.col.dailyStats.countDocuments({ _id: "2026-10-26" })).toBe(0)
+    await internals.recordDay(session, new Date(close.getTime() + 2 * 3_600_000))
+    expect(await db.col.dailyStats.findOne({ _id: "2026-10-26" })).toMatchObject({ trading_day: "2026-10-26" })
+    expect(events.filter((e) => e.type === "daily.stats")).toHaveLength(1)
+    await internals.recordDay(session, new Date(close.getTime() + 3 * 3_600_000))
+    expect(events.filter((e) => e.type === "daily.stats")).toHaveLength(1)
   })
 
   it("words its control results for stocks and options", async () => {
