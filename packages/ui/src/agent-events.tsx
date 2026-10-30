@@ -1,7 +1,7 @@
 "use client"
 
 import { AGENT_EVENT_TYPES } from "@mb/core/events"
-import { BellIcon, BotIcon, EyeIcon, ShieldAlertIcon, type LucideIcon } from "lucide-react"
+import { BellIcon, BotIcon, EyeIcon, SearchIcon, ShieldAlertIcon, type LucideIcon } from "lucide-react"
 import Link from "next/link"
 import type { AnyEvent } from "./stream"
 
@@ -12,6 +12,7 @@ import type { AnyEvent } from "./stream"
 
 export const AGENT_ICONS: Partial<Record<string, LucideIcon>> = {
   "agent.woke": BellIcon,
+  "agent.step": SearchIcon,
   "agent.answered": BotIcon,
   "agent.watch": EyeIcon,
   "agent.breaker": ShieldAlertIcon,

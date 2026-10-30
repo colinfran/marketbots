@@ -1,5 +1,7 @@
 import type { TokenUsage } from "@mb/core/db"
+import { NO_MODEL_CALLS, type ModelCalls } from "@mb/engine-kit/ai/monitor"
 import type { LocalResearch, ResearchSource } from "@mb/engine-kit/ai/runner"
+import { streamChat } from "@mb/engine-kit/ai/stream-chat"
 import { errorMessage, type Logger } from "@mb/engine-kit/log"
 import type { SearchMeter } from "@mb/engine-kit/state/search-usage"
 import { cleanLine, cleanText, domainOf, fenceUntrusted } from "@mb/engine-kit/util/text"
@@ -121,6 +123,8 @@ export type LocalResearchDeps = {
   meter?: SearchMeter
   /** Default PAID_SEARCHES_PER_DAY. */
   paidSearchesPerDay?: number
+  /** The live model feed: each step's call streams there. */
+  models?: ModelCalls
 }
 
 type Json = Record<string, unknown>
@@ -151,36 +155,36 @@ const pool = async <T, R>(items: T[], limit: number, work: (item: T) => Promise<
 const resultLine = (r: SearchResult, i: number) => `[${i}] ${r.title || "(no title)"} | ${domainOf(r.url)} | ${r.published?.slice(0, 16) ?? "date unknown"}\n${r.url}\n${r.snippet}`
 
 export const localResearcher = (d: LocalResearchDeps): LocalResearch => {
-  /** One chat completion on the model server; JSON when a schema is given. */
-  const ask = async (job: { model: string; system: string; user: string; schema?: object; think: number; maxTokens: number; timeoutMs: number }, usage: TokenUsage) => {
-    const res = await d.request(`${d.env.LLM_URL!.replace(/\/+$/, "")}/v1/chat/completions`, {
-      method: "POST",
-      headers: { "content-type": "application/json", accept: "application/json" },
-      body: JSON.stringify({
-        model: job.model,
-        messages: [
-          { role: "system", content: job.system },
-          { role: "user", content: job.user },
-        ],
-        ...(job.schema ? { response_format: { type: "json_schema", json_schema: { name: "answer", schema: job.schema, strict: true } } } : {}),
-        temperature: 0.2,
-        max_tokens: job.maxTokens,
-        chat_template_kwargs: { enable_thinking: job.think > 0 },
-        ...(job.think > 0 ? { thinking_budget_tokens: job.think } : { reasoning_effort: "none" }),
-        stream: false,
-      }),
-      timeoutMs: job.timeoutMs,
-      attempts: 1,
-    })
-    const body = JSON.parse(res.text) as Json
-    const choice = Array.isArray(body.choices) ? body.choices.find(isObject) : undefined
-    const content = choice && isObject(choice.message) && typeof choice.message.content === "string" ? choice.message.content : null
-    if (content === null) throw new Error("the local model answered in an unexpected shape")
-    const u = isObject(body.usage) ? body.usage : {}
-    usage.input += num(u.prompt_tokens)
-    usage.output += num(u.completion_tokens)
-    usage.total += num(u.prompt_tokens) + num(u.completion_tokens)
-    return content
+  const models = d.models ?? NO_MODEL_CALLS
+  /** One chat completion on the model server, streamed to the live model feed as `label`; JSON when a schema is given. */
+  const ask = async (job: { model: string; label: string; system: string; user: string; schema?: object; think: number; maxTokens: number; timeoutMs: number }, usage: TokenUsage) => {
+    const call = models.start({ kind: "research", label: job.label, model: job.model })
+    try {
+      const res = await streamChat(
+        d.env.LLM_URL!,
+        {
+          model: job.model,
+          messages: [
+            { role: "system", content: job.system },
+            { role: "user", content: job.user },
+          ],
+          ...(job.schema ? { response_format: { type: "json_schema", json_schema: { name: "answer", schema: job.schema, strict: true } } } : {}),
+          temperature: 0.2,
+          max_tokens: job.maxTokens,
+          chat_template_kwargs: { enable_thinking: job.think > 0 },
+          ...(job.think > 0 ? { thinking_budget_tokens: job.think } : { reasoning_effort: "none" }),
+        },
+        { timeoutMs: job.timeoutMs, onReasoning: (delta) => call.thinking(delta), onContent: (delta) => call.output(delta) },
+      )
+      usage.input += res.prompt_tokens
+      usage.output += res.completion_tokens
+      usage.total += res.prompt_tokens + res.completion_tokens
+      call.end({ ok: true, prompt_tokens: res.prompt_tokens, completion_tokens: res.completion_tokens, tokens_per_s: res.per_second })
+      return res.content
+    } catch (error) {
+      call.end({ ok: false, error: errorMessage(error) })
+      throw error
+    }
   }
 
   const paidPerDay = d.paidSearchesPerDay ?? PAID_SEARCHES_PER_DAY
@@ -202,7 +206,8 @@ export const localResearcher = (d: LocalResearchDeps): LocalResearch => {
   if (d.env.EXA_API_KEY) metered.push(exaProvider(d.request, d.env.EXA_API_KEY, ledger))
   if (d.env.BRIGHTDATA_API_KEY) metered.push(brightDataProvider(d.request, d.env.BRIGHTDATA_API_KEY, d.env.BRIGHTDATA_ZONE || BRIGHT_DATA_ZONE, ledger))
 
-  return async ({ model, prompt, fromDate, timeoutMs, progress }) => {
+  return async ({ model, prompt, fromDate, timeoutMs, progress, label, freeOnly = false }) => {
+    const about = label ? `Research on ${label}` : "Research"
     const started = Date.now()
     const left = () => timeoutMs - (Date.now() - started)
     /** A step's timeout: `part` of the time left, at most `cap`, at least a second, in whole milliseconds. */
@@ -216,7 +221,7 @@ export const localResearcher = (d: LocalResearchDeps): LocalResearch => {
 
     try {
       // 1. The searches.
-      const planned = JSON.parse(await ask({ model: alias, system: PLAN_SYSTEM, user: `RESEARCH REQUEST\n${prompt}\n\nWrite the searches.`, schema: QUERIES_SCHEMA, think: 0, maxTokens: 400, timeoutMs: slice(1 / 4, 45_000) }, usage)) as { queries?: unknown }
+      const planned = JSON.parse(await ask({ model: alias, label: `${about}: planning the searches`, system: PLAN_SYSTEM, user: `RESEARCH REQUEST\n${prompt}\n\nWrite the searches.`, schema: QUERIES_SCHEMA, think: 0, maxTokens: 400, timeoutMs: slice(1 / 4, 45_000) }, usage)) as { queries?: unknown }
       for (const q of Array.isArray(planned.queries) ? planned.queries : []) {
         const query = cleanLine(q, 120)
         if (query && !queries.includes(query) && queries.length < MAX_QUERIES) {
@@ -240,7 +245,7 @@ export const localResearcher = (d: LocalResearchDeps): LocalResearch => {
           d.log.warn("local research: a search failed", { query: q, error: errorMessage(error) })
           return []
         }
-        for (const provider of metered) {
+        for (const provider of freeOnly ? [] : metered) {
           if (results.length >= ENOUGH_FREE_RESULTS) break
           try {
             const more = await provider.search(q, { range, since: fromDate, maxResults: RESULTS_PER_QUERY, timeoutMs: slice(1 / 4, 20_000) })
@@ -251,7 +256,7 @@ export const localResearcher = (d: LocalResearchDeps): LocalResearch => {
             d.log.warn("local research: a metered search failed", { provider: provider.name, query: q, error: errorMessage(error) })
           }
         }
-        if (results.length < ENOUGH_FREE_RESULTS && takePaidSearch()) {
+        if (!freeOnly && results.length < ENOUGH_FREE_RESULTS && takePaidSearch()) {
           try {
             const paid = (await search(PAID_ENGINES)).results
             d.log.info("local research: a paid search", { query: q, found: results.length, paid: paid.length, today: paidToday })
@@ -275,7 +280,7 @@ export const localResearcher = (d: LocalResearchDeps): LocalResearch => {
       const listing = results.map(resultLine).join("\n\n")
       const picked = JSON.parse(
         await ask(
-          { model: alias, system: PICK_SYSTEM, user: `RESEARCH REQUEST\n${prompt}\n\nSEARCH RESULTS\n${fenceUntrusted("search results", listing)}\n\nWhich should the desk read in full?`, schema: PICK_SCHEMA, think: 0, maxTokens: 200, timeoutMs: slice(1 / 4, 45_000) },
+          { model: alias, label: `${about}: picking what to read`, system: PICK_SYSTEM, user: `RESEARCH REQUEST\n${prompt}\n\nSEARCH RESULTS\n${fenceUntrusted("search results", listing)}\n\nWhich should the desk read in full?`, schema: PICK_SCHEMA, think: 0, maxTokens: 200, timeoutMs: slice(1 / 4, 45_000) },
           usage,
         ),
       ) as { read?: unknown }
@@ -303,6 +308,7 @@ export const localResearcher = (d: LocalResearchDeps): LocalResearch => {
         await ask(
           {
             model: alias,
+            label: `${about}: writing the memo`,
             system: MEMO_SYSTEM,
             user: `RESEARCH REQUEST\n${prompt}\n\nSEARCHES RUN\n${queries.map((q) => `- ${q}`).join("\n")}\n\nSEARCH RESULTS\n${fenceUntrusted("search results", listing)}\n\nARTICLES READ IN FULL\n${read || "(none could be read)"}\n\nWrite the research memo.`,
             ...memoBudget(memoTimeoutMs),

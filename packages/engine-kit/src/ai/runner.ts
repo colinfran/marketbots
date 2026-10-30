@@ -97,6 +97,10 @@ export type LocalResearch = (job: {
   timeoutMs: number
   signal?: AbortSignal
   progress?: ResearchProgress
+  /** What the live model feed calls this research (its subject). */
+  label?: string
+  /** Only the search service's free engines: no metered providers, no paid searches. */
+  freeOnly?: boolean
 }) => Promise<{ memo: string; sources: ResearchSource[]; queries: string[]; usage: TokenUsage; error: string | null }>
 
 /** Throttled reasoning reporter: the last ~240 characters, at most every PROGRESS_MS. */

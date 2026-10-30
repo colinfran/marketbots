@@ -121,18 +121,20 @@ describe("episode loop", () => {
     expect(r.status).toBe("aborted")
   })
 
-  it("turns thinking on with the priority's budget and streams it", async () => {
+  it("turns thinking on with the priority's budget and streams each step's thinking and JSON to its model call", async () => {
     const seen: string[] = []
     const { chat, requests } = scriptedChat([
       (req) => {
         req.onReasoning?.("Hmm, ")
         req.onReasoning?.("hold.")
+        req.onContent?.("{\"kind\":")
         return reply({ kind: "answer", answer: { decision: "hold", reply: "Hold." } }, { reasoning: "Hmm, hold." })
       },
     ])
-    const r = await runEpisode(input(chat, { limits: { steps: 4, seconds: 60, thinking_tokens: 1_024 }, onThinking: (_n, text) => seen.push(text) }))
+    const call = (n: number) => ({ id: `c${n}`, thinking: (d: string) => seen.push(`think ${n}: ${d}`), output: (d: string) => seen.push(`out ${n}: ${d}`), end: (e: { ok: boolean }) => seen.push(`end ${n}: ${e.ok}`) })
+    const r = await runEpisode(input(chat, { limits: { steps: 4, seconds: 60, thinking_tokens: 1_024 }, call }))
     expect(requests[0].thinkingTokens).toBe(1_024)
-    expect(seen).toEqual(["Hmm, ", "Hmm, hold."])
+    expect(seen).toEqual(["think 1: Hmm, ", "think 1: hold.", "out 1: {\"kind\":", "end 1: true"])
     expect(r.steps[0].thinking).toBe("Hmm, hold.")
   })
 })

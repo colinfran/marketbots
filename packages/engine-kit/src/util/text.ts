@@ -7,6 +7,9 @@
 // or reorder text, plus the private-use "tag" block sometimes used to smuggle invisible instructions.
 const INVISIBLE = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F​-‏‪-‮⁠-⁤⁦-⁩﻿]|[\u{E0000}-\u{E007F}]/gu
 
+/** Streamed model text: invisible characters out, line breaks normalized, spacing kept (a piece of a stream must not be trimmed). */
+export const stripInvisible = (value: string) => value.replace(INVISIBLE, "").replace(/\r\n?/g, "\n")
+
 export const cleanText = (value: unknown, maxLength = 2_000): string => {
   if (typeof value !== "string") return ""
   const cleaned = value.replace(INVISIBLE, "").replace(/\r\n?/g, "\n").replace(/[ \t]+/g, " ").trim()

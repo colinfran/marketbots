@@ -1,3 +1,5 @@
+import type { ModelCall } from "@mb/engine-kit/ai/monitor"
+import { streamChat } from "@mb/engine-kit/ai/stream-chat"
 import { cleanLine, fenceUntrusted } from "@mb/engine-kit/util/text"
 import type { RequestText } from "../fetch"
 import { unmatchedNumbers } from "./numbers"
@@ -104,14 +106,11 @@ export const servedModel = async (request: RequestText, base: string, timeoutMs:
 /** The JSON text the model wrote, and how fast it wrote it (the server's own timing; null if it sent none). */
 export type Reply = { content: string; tokens: number; perSecond: number | null }
 
-const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null)
-
-/** Asks the model, without thinking. Throws when the server can't be reached or answers with an error. */
-export const chat = async (request: RequestText, base: string, job: { model: string; context: string; timeoutMs: number }): Promise<Reply> => {
-  const res = await request(`${base.replace(/\/+$/, "")}/v1/chat/completions`, {
-    method: "POST",
-    headers: { "content-type": "application/json", accept: "application/json" },
-    body: JSON.stringify({
+/** Asks the model, without thinking, streaming its reply to the live model feed (`call`). Throws when the server can't be reached or answers with an error. */
+export const chat = async (base: string, job: { model: string; context: string; timeoutMs: number; call?: ModelCall }): Promise<Reply> => {
+  const res = await streamChat(
+    base,
+    {
       model: job.model,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
@@ -123,17 +122,11 @@ export const chat = async (request: RequestText, base: string, job: { model: str
       // No thinking: Qwen's template switch, and llama.cpp's own.
       chat_template_kwargs: { enable_thinking: false },
       reasoning_effort: "none",
-      stream: false,
-    }),
-    timeoutMs: job.timeoutMs,
-    attempts: 1,
-  })
-  const body = parseJson(res.text, "the local model")
-  const choice = Array.isArray(body.choices) ? body.choices.find(isObject) : undefined
-  const content = choice && isObject(choice.message) ? str(choice.message.content) : null
-  if (content === null) throw new Error("the local model answered in an unexpected shape")
-  const timings = isObject(body.timings) ? body.timings : {}
-  return { content, tokens: num(timings.predicted_n) ?? 0, perSecond: num(timings.predicted_per_second) }
+    },
+    { timeoutMs: job.timeoutMs, onContent: (delta) => job.call?.output(delta) },
+  )
+  if (!res.content) throw new Error("the local model answered in an unexpected shape")
+  return { content: res.content, tokens: res.completion_tokens, perSecond: res.per_second }
 }
 
 const wordCount = (s: string) => (s.match(/\S+/g) ?? []).length

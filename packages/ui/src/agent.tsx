@@ -2,7 +2,7 @@
 
 import type { AgentStatusView, EpisodeRowView, EpisodeView, NoteView, StepView, WatchView } from "@mb/core/agent-views"
 import { cn } from "cn"
-import { BrainIcon, LoaderIcon, MessageCircleQuestionIcon } from "lucide-react"
+import { LoaderIcon, MessageCircleQuestionIcon } from "lucide-react"
 import Link from "next/link"
 import { useMemo, useState } from "react"
 import { Empty, SymbolLink } from "./bits"
@@ -11,10 +11,11 @@ import { Button } from "./components/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./components/table"
 import { CommandButton, CommandResult, useCommand } from "./command"
-import { Excerpt, Step, type StepStatus } from "./cycle-trail"
+import { Step, type StepStatus } from "./cycle-trail"
 import { useKit } from "./kit"
 import { ago, num, usd } from "./lib/format"
 import { useNow } from "./live"
+import { ModelCallCard } from "./model-feed"
 import { useStream } from "./stream"
 
 /**
@@ -152,7 +153,6 @@ type LiveEpisode = {
   priority: number
   reasons: string[]
   steps: LiveStep[]
-  thinking: string | null
   answered: { status: string; reply: string | null; actions: { symbol: string; action: string; outcome: string }[]; duration_ms: number } | null
 }
 
@@ -162,23 +162,22 @@ const fromStored = (e: EpisodeView): LiveEpisode => ({
   priority: e.priority,
   reasons: e.observations.slice(0, 5).map((o) => o.summary),
   steps: e.steps.map((s) => ({ ...s, tokens_per_s: s.gen_per_s || null })),
-  thinking: null,
   answered: e.status === "running" ? null : { status: e.status, reply: e.reply, actions: e.actions, duration_ms: e.duration_ms ?? 0 },
 })
 
-/** The episode running now (or the last one), step by step, as the stream reports it. */
-export function AgentLive({ initial }: { initial: EpisodeView | null }) {
-  const { events } = useStream()
+/** The episode running now (or the last one), step by step, as the stream reports it, with the step the model is writing now. */
+export function AgentLive({ initial, textShown }: { initial: EpisodeView | null; textShown: boolean }) {
+  const { events, models } = useStream()
+  const now = useNow(1_000)
   const live = useMemo(() => {
     const woke = [...events].reverse().find((e) => e.type === "agent.woke")
     if (!woke) return null
     const d = woke.data as { episode_id: string; subject: string; priority: number; reasons: string[] }
-    const ep: LiveEpisode = { id: d.episode_id, subject: d.subject, priority: d.priority, reasons: d.reasons, steps: [], thinking: null, answered: null }
+    const ep: LiveEpisode = { id: d.episode_id, subject: d.subject, priority: d.priority, reasons: d.reasons, steps: [], answered: null }
     for (const e of events) {
       const data = e.data as Record<string, unknown>
       if (data.episode_id !== ep.id) continue
       if (e.type === "agent.step") ep.steps = [...ep.steps.filter((s) => s.n !== data.step), { n: data.step as number, kind: data.kind as StepView["kind"], tool: data.tool as string | null, purpose: data.purpose as string | null, result: data.result as string | null, ms: data.ms as number, tokens_per_s: data.tokens_per_s as number | null }]
-      else if (e.type === "agent.thinking") ep.thinking = data.excerpt as string
       else if (e.type === "agent.answered") ep.answered = { status: data.status as string, reply: data.reply as string | null, actions: data.actions as NonNullable<LiveEpisode["answered"]>["actions"], duration_ms: data.duration_ms as number }
     }
     return ep
@@ -190,6 +189,7 @@ export function AgentLive({ initial }: { initial: EpisodeView | null }) {
   if (!ep) return <Empty>No episode yet. The agent wakes on news, setups, moves in what it holds, its watches, the session and a periodic review.</Empty>
   const running = !ep.answered
   const lastStep = ep.steps.at(-1)
+  const writing = running ? models.calls.find((c) => c.episode_id === ep.id && !c.done) : undefined
   return (
     <ol>
       <Step n={1} title="Woke" status="done" aside={<PriorityBadge priority={ep.priority} />}>
@@ -216,7 +216,7 @@ export function AgentLive({ initial }: { initial: EpisodeView | null }) {
         status={running ? "active" : ep.answered!.status === "answered" ? "done" : "failed"}
         aside={ep.answered ? `${Math.round(ep.answered.duration_ms / 1000)} s` : undefined}
       >
-        {running && ep.thinking && <Excerpt label="Thinking" text={ep.thinking} icon={BrainIcon} />}
+        {writing && <ModelCallCard call={writing} now={now} textShown={textShown} />}
         {ep.answered?.reply && <p>{ep.answered.reply}</p>}
         {ep.answered && ep.answered.actions.length > 0 && (
           <div className="flex flex-wrap gap-1.5">

@@ -1,5 +1,6 @@
 import type { WireSettingsBase } from "@mb/core/settings"
 import type { NotableReason, WireItemDoc, WireSourceHealth, WireSourceState, WireStatus } from "@mb/core/wire"
+import type { ModelCalls } from "@mb/engine-kit/ai/monitor"
 import { errorMessage, type Logger } from "@mb/engine-kit/log"
 import type { Collection, UpdateFilter } from "mongodb"
 import { ClusterIndex } from "./cluster"
@@ -56,6 +57,8 @@ export type WireDeps<C extends string, W extends WireSettingsBase> = {
    * engine by (`X-Client`), for its share of the render queue. Without it nothing is summarized.
    */
   enrich?: { client: string; timeouts?: Partial<EnricherTimeouts> }
+  /** The live model feed (article summaries stream there). */
+  models?: ModelCalls
 }
 
 const DAY_MS = 86_400_000
@@ -103,6 +106,7 @@ export class Wire<C extends string, W extends WireSettingsBase> {
           now: this.now,
           onState: (state, error) => this.onSourceState(ENRICH_SOURCE_ID, state, error),
           timeouts: d.enrich.timeouts,
+          models: d.models,
         })
       : null
   }

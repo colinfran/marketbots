@@ -3,6 +3,7 @@ import { checkEntry } from "@mb/agent/envelope"
 import { newsObservations } from "@mb/agent/observations"
 import { Agent, type AgentBot, type Pause, type Promotion } from "@mb/agent/runtime"
 import type { AiCallLog } from "@mb/engine-kit/ai/call-log"
+import type { ModelCalls } from "@mb/engine-kit/ai/monitor"
 import type { HistoryStore } from "@mb/history/store"
 import { stockAgentAnswerSchema, type StockAgentAnswer } from "@mb/stock-core/agent"
 import type { EventDataMap } from "@mb/stock-core/events"
@@ -44,6 +45,7 @@ export const createStockAgent = ({
   ctx,
   history,
   calls,
+  models,
   llmUrl,
   session,
   layerPrice,
@@ -55,6 +57,8 @@ export const createStockAgent = ({
   ctx: EngineContext
   history: HistoryStore<WireCategory> | null
   calls: Pick<AiCallLog, "record">
+  /** The live model feed: each step streams there. */
+  models?: ModelCalls
   llmUrl: string | null
   session: () => Session | null
   /** The news engine's price layers (a price no older than `maxAgeMs`, or null). */
@@ -98,6 +102,7 @@ export const createStockAgent = ({
     settings: () => ctx.settings.current.agent,
     settingsVersion: () => ctx.settings.version,
     chat: llmUrl ? llamaChat(llmUrl) : null,
+    models,
     calls,
     alert: (title, message, key) => ctx.alerts.send("warning", title, message, { key, path: "/agent" }),
     blocked: () => {

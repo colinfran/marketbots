@@ -1,5 +1,6 @@
 import { utcDay } from "@mb/crypto-core/db"
 import { AiCallLog } from "@mb/engine-kit/ai/call-log"
+import { startModelFeed } from "@mb/engine-kit/ai/feed"
 import { bootstrap } from "@mb/engine-kit/bootstrap"
 import { newsMovesJob } from "@mb/history/moves"
 import { HistoryStore } from "@mb/history/store"
@@ -57,6 +58,9 @@ void bootstrap({
     const ledger = new Ledger(db.col, bus)
     const executor = new Executor(db.col, ledger, new PaperWalletExecution(cli, hub), bus, log.child({ component: "executor" }))
     const calls = new AiCallLog(db.col, utcDay)
+    // The live model feed: every model call streams its text to the dashboards (owner-only unless agent.public_thinking).
+    const feed = startModelFeed({ bus, stream, llmUrl: env.LLM_URL, visibility: () => (settings.current.agent.public_thinking ? "public" : "owner") })
+    const models = feed.models
     const ai = new AiRunner(calls, log.child({ component: "ai" }), {
       localUrl: env.LLM_URL,
       // Research for local/… models: our search service and scraper, read by the local model.
@@ -74,6 +78,7 @@ void bootstrap({
         client: "crypto",
         log: log.child({ component: "research" }),
         meter: mongoSearchMeter(db.col.searchUsage),
+        models,
       }),
     })
 
@@ -99,6 +104,7 @@ void bootstrap({
       symbols: () => engine?.wireSymbols() ?? { universe: hub.universe, held: [], focus: [] },
       price: (symbol) => hub.quote(symbol)?.mid ?? null,
       userAgent: env.SEC_USER_AGENT ?? DEFAULT_USER_AGENT,
+      models,
     })
 
     // The history store (docs/plans/LOCAL-AI.md §6): every closed 1-minute bar, and the news archive.
@@ -113,10 +119,11 @@ void bootstrap({
       history.start()
     }
 
-    engine = new Engine({ env, log, db, bus, settings, state, hub, rest, candles, cli, ledger, executor, ai, calls, alerts, stream, wire, history })
+    engine = new Engine({ env, log, db, bus, settings, state, hub, rest, candles, cli, ledger, executor, ai, calls, alerts, stream, wire, history, models })
     return {
       engine,
       stop: () => {
+        feed.stop()
         hub.stop()
         void history?.stop()
       },

@@ -1,5 +1,6 @@
 import { AiCallLog } from "@mb/engine-kit/ai/call-log"
 import { AiRunner } from "@mb/engine-kit/ai/runner"
+import { startModelFeed } from "@mb/engine-kit/ai/feed"
 import { bootstrap } from "@mb/engine-kit/bootstrap"
 import { newsMovesJob } from "@mb/history/moves"
 import { HistoryStore } from "@mb/history/store"
@@ -95,6 +96,9 @@ void bootstrap({
       },
     })
     const calls = new AiCallLog(db.col, marketDay)
+    // The live model feed: every model call streams its text to the dashboards (owner-only unless agent.public_thinking).
+    const feed = startModelFeed({ bus, stream, llmUrl: env.LLM_URL, visibility: () => (settings.current.agent.public_thinking ? "public" : "owner") })
+    const models = feed.models
     const ai = new AiRunner(calls, log.child({ component: "ai" }), {
       localUrl: env.LLM_URL,
       // Research for local/… models: our search service and scraper, read by the local model.
@@ -112,6 +116,7 @@ void bootstrap({
         client: "stock",
         log: log.child({ component: "research" }),
         meter: mongoSearchMeter(db.col.searchUsage),
+        models,
       }),
     })
 
@@ -127,6 +132,7 @@ void bootstrap({
       // Broker prices first; the other layers fill in for symbols outside the 30-symbol stream.
       price: (symbol) => prices.fresh(symbol, 5 * 60_000) ?? coverage.price(symbol, 5 * 60_000),
       userAgent: env.SEC_USER_AGENT ?? DEFAULT_USER_AGENT,
+      models,
     })
 
     if (history) {
@@ -135,11 +141,12 @@ void bootstrap({
       history.addJob(newsMovesJob("SPY"))
       history.start()
     }
-    engine = new Engine({ env, log, db, bus, settings, state, alpaca, prices, tradeStream, marketStream, ai, calls, alerts, stream, wire, coverage, history })
+    engine = new Engine({ env, log, db, bus, settings, state, alpaca, prices, tradeStream, marketStream, ai, calls, alerts, stream, wire, coverage, history, models })
     return {
       engine,
       start: () => coverage.start(),
       stop: () => {
+        feed.stop()
         coverage.stop()
         void history?.stop()
       },

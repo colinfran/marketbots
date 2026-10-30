@@ -1,4 +1,5 @@
 import type { AiCallLog } from "@mb/engine-kit/ai/call-log"
+import type { ModelCalls } from "@mb/engine-kit/ai/monitor"
 import type { AiRunner } from "@mb/engine-kit/ai/runner"
 import { EventCycleQueue, type QueuedEvent } from "@mb/engine-kit/control/event-queue"
 import { ControlPlane, type ControlWording } from "@mb/engine-kit/control/plane"
@@ -89,6 +90,8 @@ export type EngineDeps = {
   marketStream: MarketStream
   ai: AiRunner
   calls: AiCallLog
+  /** The live model feed. */
+  models?: ModelCalls
   alerts: Alerts
   stream: StreamServer
   wire: Wire
@@ -195,6 +198,7 @@ export class Engine {
       ctx: this.ctx,
       history: d.history ?? null,
       calls: d.calls,
+      models: d.models,
       llmUrl: d.env.LLM_URL ?? null,
       session: () => this.session,
       layerPrice: (s, ms) => d.coverage.price(s, ms),

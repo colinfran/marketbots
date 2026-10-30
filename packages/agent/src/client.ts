@@ -26,6 +26,8 @@ export type ChatRequest = {
   signal?: AbortSignal
   /** Each piece of thinking as it streams. */
   onReasoning?: (delta: string) => void
+  /** Each piece of the answer (the step's JSON) as it streams. */
+  onContent?: (delta: string) => void
 }
 
 export type ChatResult = {
@@ -122,7 +124,11 @@ export const llamaChat =
           if (!data || data === "[DONE]") continue
           const chunk = parse(data) as Chunk | undefined
           const choice = chunk?.choices?.[0]
-          content += choice?.delta?.content ?? ""
+          const piece = choice?.delta?.content ?? ""
+          if (piece) {
+            content += piece
+            r.onContent?.(piece)
+          }
           const delta = choice?.delta?.reasoning_content ?? ""
           if (delta) {
             reasoning += delta

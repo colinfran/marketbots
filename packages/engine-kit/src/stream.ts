@@ -52,6 +52,7 @@ export class StreamServer<M> {
   private readonly clients = new Set<Client<M>>()
   private pingTimer: NodeJS.Timeout | null = null
   private unsubscribe: (() => void) | null = null
+  private snapshot: (() => EngineEvent<M>[]) | null = null
 
   constructor(
     private readonly bus: Pick<EventBus<M>, "subscribe" | "replay" | "lastSeq">,
@@ -62,6 +63,11 @@ export class StreamServer<M> {
 
   get clientCount() {
     return this.clients.size
+  }
+
+  /** Live state no replay holds (the model calls running now and their text so far), sent to each viewer after its replay. */
+  setSnapshot(fn: () => EngineEvent<M>[]) {
+    this.snapshot = fn
   }
 
   get address() {
@@ -170,6 +176,7 @@ export class StreamServer<M> {
         // Events that arrived during the replay, in order, without duplicates.
         const lastReplayed = events.at(-1)?.seq ?? frame.since ?? 0
         for (const e of client.queue) if (e.seq === 0 || e.seq > lastReplayed) this.deliver(client, e)
+        for (const e of this.snapshot?.() ?? []) this.deliver(client, e)
         this.send(client, { type: "replay_done", last_seq: this.bus.lastSeq, truncated })
       } catch (error) {
         this.log.warn("stream replay failed", { error: errorMessage(error) })

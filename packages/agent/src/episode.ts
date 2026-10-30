@@ -1,6 +1,7 @@
 import type { AgentStepDoc, EpisodeStatus } from "@mb/core/agent"
 import type { TokenUsage } from "@mb/core/db"
 import type { AgentSettings } from "@mb/core/settings"
+import type { ModelCall } from "@mb/engine-kit/ai/monitor"
 import type { z } from "zod"
 import type { ChatFn, ChatMessage, ChatResult } from "./client"
 import { callTool, cap, jsonSchemaOf, TOOL_RESULT_CHARS, type AgentTool, type ToolContext } from "./tools"
@@ -31,8 +32,8 @@ export type EpisodeInput<A> = {
   /** A step begins (its number). */
   onStepStart?: (n: number) => void
   onStep?: (step: AgentStepDoc) => void
-  /** The step's thinking so far, as it streams. */
-  onThinking?: (n: number, text: string) => void
+  /** Each step's model call, for the live model feed: its thinking and its JSON as they stream, then its end. */
+  call?: (n: number) => ModelCall
   now?: () => number
 }
 
@@ -106,7 +107,7 @@ export const runEpisode = async <A>(input: EpisodeInput<A>): Promise<EpisodeResu
     if (n > limits.steps && !retried) break
     const mustAnswer = retried || n >= limits.steps || now() >= toolStop || tools.length === 0
     input.onStepStart?.(n)
-    let thinking = ""
+    const call = input.call?.(n)
     const res: ChatResult = await input.chat({
       model: input.model,
       messages,
@@ -116,11 +117,10 @@ export const runEpisode = async <A>(input: EpisodeInput<A>): Promise<EpisodeResu
       maxTokens: limits.thinking_tokens + ANSWER_TOKENS,
       timeoutMs: remaining,
       signal: ctx.signal,
-      onReasoning: (delta) => {
-        thinking += delta
-        input.onThinking?.(n, thinking)
-      },
+      onReasoning: (delta) => call?.thinking(delta),
+      onContent: (delta) => call?.output(delta),
     })
+    call?.end({ ok: res.ok, error: res.error, prompt_tokens: res.prompt_tokens, completion_tokens: res.completion_tokens, tokens_per_s: res.gen_per_s || null })
     usage.input += res.prompt_tokens
     usage.output += res.completion_tokens
     usage.total += res.prompt_tokens + res.completion_tokens

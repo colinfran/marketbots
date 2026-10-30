@@ -32,10 +32,10 @@ export default async function AgentPage() {
         <Card className="lg:col-span-3">
           <CardHeader>
             <CardTitle className="text-base">Now</CardTitle>
-            <CardDescription>The episode running now, or the last one: why it woke, each lookup, and what it decided.{thinking ? " Its thinking streams while it runs." : ""}</CardDescription>
+            <CardDescription>The episode running now, or the last one: why it woke, each lookup, and what it decided.{thinking ? " The step it is writing streams as it writes it." : ""}</CardDescription>
           </CardHeader>
           <CardContent>
-            <AgentLive initial={latest} />
+            <AgentLive initial={latest} textShown={thinking} />
           </CardContent>
         </Card>
         <Card className="lg:col-span-2">

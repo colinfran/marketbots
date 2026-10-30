@@ -20,6 +20,7 @@ import type { AiCallDoc } from "@mb/core/db"
 import type { AgentEventDataMap, AgentEventType } from "@mb/core/events"
 import type { AgentSettings } from "@mb/core/settings"
 import type { WireItemDoc } from "@mb/core/wire"
+import { NO_MODEL_CALLS, type ModelCalls } from "@mb/engine-kit/ai/monitor"
 import type { EmitMeta } from "@mb/engine-kit/bus"
 import { errorMessage, type Logger } from "@mb/engine-kit/log"
 import { cleanLine, fenceUntrusted } from "@mb/engine-kit/util/text"
@@ -101,6 +102,8 @@ export type AgentDeps<A extends AgentAnswerBase> = {
   settingsVersion: () => number
   /** The model server; null while LLM_URL is unset (the agent stays off). */
   chat: ChatFn | null
+  /** The live model feed: each step's call, its thinking and its JSON as they stream. */
+  models?: ModelCalls
   calls: { record(call: Omit<AiCallDoc, "_id" | "day" | "at">): Promise<void> }
   alert: (title: string, message: string, key: string) => Promise<void>
   /** Why no episode may start now (paused, halted, kill switch), or null. */
@@ -119,9 +122,11 @@ export type AgentDeps<A extends AgentAnswerBase> = {
 }
 
 const TICK_MS = 1_000
-const THINKING_EVENT_MS = 1_500
 const ACCOUNT_REFRESH_MS = 15_000
 const HOUR = 3_600_000
+
+/** How the feed names a subject that isn't a symbol. */
+const SPECIAL_SUBJECT: Record<string, string> = { [OWNER_SUBJECT]: "the owner's question", [MARKET_SUBJECT]: "the market", [BOOK_SUBJECT]: "its book" }
 
 type Running = { id: string; subject: string; priority: Priority; started_at: Date; step: number; abort: AbortController; preempted: boolean }
 
@@ -408,7 +413,8 @@ export class Agent<A extends AgentAnswerBase> {
       for (const u of own.urls) urls.add(u)
       doc.brief = await this.compose(wake, own.text)
       await this.d.col.agentEpisodes.insertOne(compactEpisode(doc))
-      let lastThinking = 0
+      const models = this.d.models ?? NO_MODEL_CALLS
+      const about = SPECIAL_SUBJECT[wake.subject] ?? wake.subject
       const result = await runEpisode({
         chat: this.d.chat!,
         model: s.model,
@@ -419,11 +425,7 @@ export class Agent<A extends AgentAnswerBase> {
         limits,
         ctx: { episodeId: id, urls, signal },
         onStepStart: (n) => (run.step = n),
-        onThinking: (n, text) => {
-          if (Date.now() - lastThinking < THINKING_EVENT_MS) return
-          lastThinking = Date.now()
-          this.d.bus.emit("agent.thinking", { episode_id: id, step: n, chars: text.length, excerpt: cleanLine(text.slice(-240), 240) }, { summary: `Agent thinking (step ${n})`, level: "debug", visibility: s.public_thinking ? "public" : "owner" })
-        },
+        call: (n) => models.start({ kind: "agent", label: `Agent on ${about}, step ${n}`, model: s.model, subject: wake.subject, episode_id: id, step: n }),
         onStep: (step) => {
           if (step.gen_per_s > 0) this.breakers.speeds = [...this.breakers.speeds, step.gen_per_s].slice(-20)
           this.d.bus.emit(

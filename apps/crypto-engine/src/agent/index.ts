@@ -7,6 +7,7 @@ import { cryptoAgentAnswerSchema, type CryptoAgentAnswer } from "@mb/crypto-core
 import type { EventDataMap } from "@mb/crypto-core/events"
 import type { WireCategory, WireItemDoc } from "@mb/crypto-core/wire"
 import type { AiCallLog } from "@mb/engine-kit/ai/call-log"
+import type { ModelCalls } from "@mb/engine-kit/ai/monitor"
 import type { HistoryStore } from "@mb/history/store"
 import type { Candidate } from "@mb/wire/trigger"
 import type { EngineContext } from "../orchestrator/context"
@@ -35,6 +36,7 @@ export const createCryptoAgent = ({
   ctx,
   history,
   calls,
+  models,
   llmUrl,
   busy,
   pause,
@@ -43,6 +45,8 @@ export const createCryptoAgent = ({
   ctx: EngineContext
   history: HistoryStore<WireCategory> | null
   calls: Pick<AiCallLog, "record">
+  /** The live model feed: each step streams there. */
+  models?: ModelCalls
   llmUrl: string | null
   /** Why the engine wants no episode to act now (its one-time seed is running), or null. */
   busy?: () => string | null
@@ -83,6 +87,7 @@ export const createCryptoAgent = ({
     settings: () => ctx.settings.current.agent,
     settingsVersion: () => ctx.settings.version,
     chat: llmUrl ? llamaChat(llmUrl) : null,
+    models,
     calls,
     alert: (title, message, key) => ctx.alerts.send("warning", title, message, { key, path: "/agent" }),
     blocked: () => {

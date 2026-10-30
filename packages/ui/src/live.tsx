@@ -72,18 +72,32 @@ export function StatusPill({ initial }: { initial: { online: boolean; status: st
   )
 }
 
-/** Refreshes server-rendered data when the engine reports something that changes it. */
+/** Server data is refreshed this soon after a change, and at most this often. */
+const REFRESH_MS = 2_000
+/** The least wait after an event, so the engine's writes behind it have landed. */
+const SETTLE_MS = 500
+
+/**
+ * Refreshes server-rendered data when the engine reports something that changes it: within two
+ * seconds of the change, at most once every two seconds. (The model's own text doesn't wait for
+ * this: the live model feed streams it.)
+ */
 export function LiveRefresh() {
   const { refreshOn } = useKit().events
   const router = useRouter()
   const { gapCount, status } = useStream()
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const last = useRef(0)
   const schedule = () => {
     if (timer.current) return
-    timer.current = setTimeout(() => {
-      timer.current = null
-      router.refresh()
-    }, 1_500)
+    timer.current = setTimeout(
+      () => {
+        timer.current = null
+        last.current = Date.now()
+        router.refresh()
+      },
+      Math.max(SETTLE_MS, last.current + REFRESH_MS - Date.now()),
+    )
   }
   useStreamEvents((e) => {
     if (refreshOn.has(e.type)) schedule()

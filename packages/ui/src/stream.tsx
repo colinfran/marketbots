@@ -1,6 +1,6 @@
 "use client"
 
-import type { EngineEvent } from "@mb/core/events"
+import type { EngineEvent, ModelCallKind, ModelEventDataMap, ModelSlot } from "@mb/core/events"
 import { eventEnvelopeSchema } from "@mb/core/events"
 import { createContext, useContext, useEffect, useRef, useState, useSyncExternalStore } from "react"
 
@@ -31,6 +31,27 @@ export type StreamConfig = { maxEvents: number; mapTicker: MapTicker }
 /** Engine run status and cycle state as the stream last reported them. */
 export type StreamEngine = { status: string; cycle_state: string | null; at: number }
 
+/** A model call as the live model feed shows it: what it is for, what it has written, how it ended. */
+export type ModelCallView = {
+  id: string
+  kind: ModelCallKind
+  label: string
+  model: string
+  subject: string | null
+  episode_id: string | null
+  step: number | null
+  started_at: number
+  thinking: string
+  output: string
+  done: (Omit<ModelEventDataMap["llm.done"], "call_id"> & { at: number }) | null
+}
+
+/** The model server's slots, as last read. */
+export type ModelServerView = { ok: boolean; error: string | null; slots: ModelSlot[]; at: number }
+
+/** The live model feed: the calls running now and the last ones that ended (newest first), and the model server. */
+export type ModelFeed = { calls: ModelCallView[]; server: ModelServerView | null }
+
 export type StreamSnapshot<E extends AnyEvent = AnyEvent> = {
   status: StreamStatus
   scope: "public" | "owner" | null
@@ -40,12 +61,57 @@ export type StreamSnapshot<E extends AnyEvent = AnyEvent> = {
   engine: StreamEngine | null
   /** Bumped when the replay couldn't cover a gap, so pages refetch server data. */
   gapCount: number
+  models: ModelFeed
 }
 
 const SILENCE_MS = 45_000
+/** Finished model calls kept for the feed, besides the running ones. */
+const KEEP_FINISHED_CALLS = 30
+/** Text kept per call (the newest). */
+const CALL_CHARS = 60_000
+
+const tail = (s: string) => (s.length > CALL_CHARS ? s.slice(s.length - CALL_CHARS) : s)
+
+/** The live model feed after one of its events (llm.*). */
+export const applyModelEvent = (feed: ModelFeed, e: { type: string; data: unknown }, now = Date.now()): ModelFeed => {
+  if (e.type === "llm.status") {
+    const d = e.data as ModelEventDataMap["llm.status"]
+    return { ...feed, server: { ...d, at: now } }
+  }
+  if (e.type === "llm.call") {
+    const d = e.data as ModelEventDataMap["llm.call"]
+    // Announced again (the snapshot after a reconnect): it is still running.
+    if (feed.calls.some((c) => c.id === d.call_id)) return { ...feed, calls: feed.calls.map((c) => (c.id === d.call_id ? { ...c, done: null } : c)) }
+    const call: ModelCallView = { id: d.call_id, kind: d.kind, label: d.label, model: d.model, subject: d.subject, episode_id: d.episode_id, step: d.step, started_at: Date.parse(d.started_at) || now, thinking: "", output: "", done: null }
+    return { ...feed, calls: trim([call, ...feed.calls]) }
+  }
+  if (e.type === "llm.delta") {
+    const d = e.data as ModelEventDataMap["llm.delta"]
+    const pieces = new Map(d.calls.map((c) => [c.call_id, c]))
+    return {
+      ...feed,
+      calls: feed.calls.map((c) => {
+        const p = pieces.get(c.id)
+        if (!p) return c
+        return d.full ? { ...c, thinking: p.thinking, output: p.output } : { ...c, thinking: tail(c.thinking + p.thinking), output: tail(c.output + p.output) }
+      }),
+    }
+  }
+  if (e.type === "llm.done") {
+    const { call_id, ...done } = e.data as ModelEventDataMap["llm.done"]
+    return { ...feed, calls: feed.calls.map((c) => (c.id === call_id ? { ...c, done: { ...done, at: now } } : c)) }
+  }
+  return feed
+}
+
+/** Every running call, and the newest finished ones. */
+const trim = (calls: ModelCallView[]) => {
+  let finished = 0
+  return calls.filter((c) => !c.done || ++finished <= KEEP_FINISHED_CALLS)
+}
 
 class StreamStore {
-  snapshot: StreamSnapshot = { status: "connecting", scope: null, lastEventAt: null, events: [], tickers: {}, engine: null, gapCount: 0 }
+  snapshot: StreamSnapshot = { status: "connecting", scope: null, lastEventAt: null, events: [], tickers: {}, engine: null, gapCount: 0, models: { calls: [], server: null } }
   private listeners = new Set<() => void>()
   private eventListeners = new Set<(e: AnyEvent) => void>()
   private ws: WebSocket | null = null
@@ -141,7 +207,10 @@ class StreamStore {
       }
       if (frame.type === "hello") {
         this.attempt = 0
-        this.set({ status: "live", scope: frame.scope as StreamSnapshot["scope"] })
+        // Calls that were running when the connection dropped: the snapshot after the replay revives the ones still running.
+        const now = Date.now()
+        const calls = this.snapshot.models.calls.map((c) => (c.done ? c : { ...c, done: { ok: false, error: "the live stream reconnected", ms: now - c.started_at, prompt_tokens: 0, completion_tokens: 0, tokens_per_s: null, at: now } }))
+        this.set({ status: "live", scope: frame.scope as StreamSnapshot["scope"], models: { ...this.snapshot.models, calls } })
       } else if (frame.type === "ping") {
         ws.send(JSON.stringify({ type: "pong", t: frame.t }))
       } else if (frame.type === "replay_done" && frame.truncated) {
@@ -164,6 +233,13 @@ class StreamStore {
       this.lastSeq = e.seq
     }
     const patch: Partial<StreamSnapshot> = { lastEventAt: Date.now() }
+    if (e.type.startsWith("llm.")) {
+      // The live model feed keeps its own state: its deltas would crowd every other event out of the list.
+      patch.models = applyModelEvent(this.snapshot.models, e)
+      this.set(patch)
+      for (const fn of this.eventListeners) fn(e)
+      return
+    }
     if (e.type === "market.ticker") {
       const { symbol, ...quote } = this.config.mapTicker(e.data)
       patch.tickers = { ...this.snapshot.tickers, [symbol]: { ...quote, at: Date.now() } }

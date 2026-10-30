@@ -6,6 +6,7 @@ import { roundTo } from "@mb/crypto-core/math"
 import type { SettingsPatch } from "@mb/crypto-core/settings"
 import type { EventFocus, WireCategory, WireItemDoc } from "@mb/crypto-core/wire"
 import type { AiCallLog } from "@mb/engine-kit/ai/call-log"
+import type { ModelCalls } from "@mb/engine-kit/ai/monitor"
 import { EventCycleQueue, type QueuedEvent } from "@mb/engine-kit/control/event-queue"
 import { ControlPlane, type ControlWording } from "@mb/engine-kit/control/plane"
 import { StatusReporter } from "@mb/engine-kit/control/status"
@@ -80,6 +81,8 @@ export type EngineDeps = {
   executor: Executor
   ai: AiRunner
   calls: AiCallLog
+  /** The live model feed. */
+  models?: ModelCalls
   alerts: Alerts
   stream: StreamServer
   wire: Wire
@@ -163,6 +166,7 @@ export class Engine {
       ctx: this.ctx,
       history: d.history ?? null,
       calls: d.calls,
+      models: d.models,
       llmUrl: d.env.LLM_URL ?? null,
       // The cycle slot runs only the owner's one-time seed: the agent waits for it.
       busy: () => (this.cycle ? "the one-time seed is running" : null),

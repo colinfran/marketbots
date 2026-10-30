@@ -59,11 +59,9 @@ export class EventBus<M> {
     return this.last
   }
 
-  emit<T extends keyof M>(type: T, data: M[T], meta: EmitMeta): EngineEvent<M, T> {
-    const ephemeral = this.ephemeral.has(type)
-    const seq = ephemeral ? 0 : Math.max(this.last + 1, this.clock() * 1000)
-    if (!ephemeral) this.last = seq
-    const event: EngineEvent<M, T> = {
+  /** An event in the bus's envelope without emitting it (seq 0 unless given): what the stream sends a viewer who just connected. */
+  envelope<T extends keyof M>(type: T, data: M[T], meta: EmitMeta, seq = 0): EngineEvent<M, T> {
+    return {
       v: EVENT_SCHEMA_VERSION,
       seq,
       ts: new Date(this.clock()).toISOString(),
@@ -75,6 +73,13 @@ export class EventBus<M> {
       ...(meta.cycle_id ? { cycle_id: meta.cycle_id } : {}),
       data,
     }
+  }
+
+  emit<T extends keyof M>(type: T, data: M[T], meta: EmitMeta): EngineEvent<M, T> {
+    const ephemeral = this.ephemeral.has(type)
+    const seq = ephemeral ? 0 : Math.max(this.last + 1, this.clock() * 1000)
+    if (!ephemeral) this.last = seq
+    const event = this.envelope(type, data, meta, seq)
     if (!ephemeral) {
       this.ring.push(event)
       if (this.ring.length > RING_SIZE) this.ring.splice(0, this.ring.length - RING_SIZE)

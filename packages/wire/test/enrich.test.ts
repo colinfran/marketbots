@@ -245,7 +245,7 @@ describe("the summary queue", () => {
       max_tokens: 1_024,
       chat_template_kwargs: { enable_thinking: false },
       reasoning_effort: "none",
-      stream: false,
+      stream: true,
     })
     const [system, user] = chat.body.messages as { role: string; content: string }[]
     expect(system.content).toMatch(/Never calculate, total, convert or estimate a new number/)
@@ -407,7 +407,7 @@ describe("the summary queue", () => {
     a.enricher.offer(item("a"))
     await a.enricher.idle()
     expect(a.stored.size).toBe(0)
-    expect(a.enricher.health()).toMatchObject({ state: "degraded", last_error: expect.stringMatching(/^local model: POST \/v1\/chat\/completions failed \(500\)/) })
+    expect(a.enricher.health()).toMatchObject({ state: "degraded", last_error: expect.stringMatching(/^local model: the local model server answered 500/) })
     // Tried once more after the backoff, then given up.
     a.clock.now = minutes(1)
     await vi.advanceTimersByTimeAsync(60_000)
@@ -433,7 +433,7 @@ describe("the summary queue", () => {
     b.enricher.offer(item("b"))
     await b.enricher.idle()
     expect(b.stored.size).toBe(0)
-    expect(b.enricher.health().last_error).toMatch(/^local model: POST \/v1\/chat\/completions outcome unknown: .*(timeout|aborted)/i)
+    expect(b.enricher.health().last_error).toMatch(/^local model: the local model timed out after/)
     b.enricher.stop()
   })
 

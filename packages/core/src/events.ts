@@ -81,8 +81,6 @@ export type BaseEventDataMap<Category extends string, RunStatus extends string, 
   "agent.woke": { episode_id: string; priority: Priority; subject: string; kinds: ObservationKind[]; observations: number; reasons: string[] }
   /** One step of an episode: a tool call (its purpose and result, capped) or the answer. */
   "agent.step": { episode_id: string; step: number; kind: AgentStepKind; tool: string | null; purpose: string | null; result: string | null; ms: number; tokens_per_s: number | null }
-  /** The latest ~240 characters of the model's thinking, at most every 1.5 s while it streams (owner-only unless agent.public_thinking). */
-  "agent.thinking": { episode_id: string; step: number; chars: number; excerpt: string }
   "agent.answered": {
     episode_id: string
     status: EpisodeStatus
@@ -98,12 +96,35 @@ export type BaseEventDataMap<Category extends string, RunStatus extends string, 
   "agent.watch": { watch_id: string; status: "set" | "fired" | "expired" | "canceled"; kind: WatchKind; symbol: string | null; note: string }
   /** A circuit breaker tripped: the agent's new entries pause (until the owner resumes them, or for a slow model until it is fast again). */
   "agent.breaker": { name: string; detail: string }
+  /** A call to the local model began: what it is for (an agent step, an article summary, research). */
+  "llm.call": { call_id: string; kind: ModelCallKind; label: string; model: string; subject: string | null; episode_id: string | null; step: number | null; started_at: string }
+  /**
+   * What the model calls running now wrote since the last one, about once a second: their thinking
+   * and their output, new text only (`full`: the text so far, for a viewer who just connected).
+   * Owner-only unless agent.public_thinking: it quotes untrusted news text.
+   */
+  "llm.delta": { full: boolean; calls: { call_id: string; thinking: string; output: string }[] }
+  /** A model call ended. */
+  "llm.done": { call_id: string; ok: boolean; error: string | null; ms: number; prompt_tokens: number; completion_tokens: number; tokens_per_s: number | null }
+  /** The model server's slots, every second: which are working, on how long a prompt, how much written so far. */
+  "llm.status": { ok: boolean; error: string | null; slots: ModelSlot[] }
   error: { scope: string; message: string }
   alert: { level: "info" | "warning" | "error" | "critical"; title: string; message: string }
 }
 
+/** What a model call is for. */
+export type ModelCallKind = "agent" | "summary" | "research"
+
+/** One slot of the model server (llama.cpp's `/slots`): busy or not, the prompt it is reading and what it has written. */
+export type ModelSlot = { id: number; busy: boolean; prompt_tokens: number; prompt_done: number; decoded: number; n_ctx: number }
+
+/** The live model feed's events: the same in both bots, all ephemeral. */
+export const MODEL_EVENT_TYPES = ["llm.call", "llm.delta", "llm.done", "llm.status"] as const
+export type ModelEventType = (typeof MODEL_EVENT_TYPES)[number]
+export type ModelEventDataMap = Pick<BaseEventDataMap<string, string, string>, ModelEventType>
+
 /** The agent's events: the same in both bots. */
-export const AGENT_EVENT_TYPES = ["agent.woke", "agent.step", "agent.thinking", "agent.answered", "agent.watch", "agent.breaker"] as const
+export const AGENT_EVENT_TYPES = ["agent.woke", "agent.step", "agent.answered", "agent.watch", "agent.breaker"] as const
 export type AgentEventType = (typeof AGENT_EVENT_TYPES)[number]
 export type AgentEventDataMap = Pick<BaseEventDataMap<string, string, string>, AgentEventType>
 

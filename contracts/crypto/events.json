@@ -475,15 +475,6 @@
       ]
     },
     {
-      "type": "agent.thinking",
-      "data_keys": [
-        "episode_id",
-        "step",
-        "chars",
-        "excerpt"
-      ]
-    },
-    {
       "type": "agent.answered",
       "data_keys": [
         "episode_id",
@@ -516,6 +507,46 @@
       ]
     },
     {
+      "type": "llm.call",
+      "data_keys": [
+        "call_id",
+        "kind",
+        "label",
+        "model",
+        "subject",
+        "episode_id",
+        "step",
+        "started_at"
+      ]
+    },
+    {
+      "type": "llm.delta",
+      "data_keys": [
+        "full",
+        "calls"
+      ]
+    },
+    {
+      "type": "llm.done",
+      "data_keys": [
+        "call_id",
+        "ok",
+        "error",
+        "ms",
+        "prompt_tokens",
+        "completion_tokens",
+        "tokens_per_s"
+      ]
+    },
+    {
+      "type": "llm.status",
+      "data_keys": [
+        "ok",
+        "error",
+        "slots"
+      ]
+    },
+    {
       "type": "error",
       "data_keys": [
         "scope",
@@ -544,7 +575,10 @@
     "research.progress",
     "ai.decision.progress",
     "ai.reasoning",
-    "agent.thinking"
+    "llm.call",
+    "llm.delta",
+    "llm.done",
+    "llm.status"
   ],
   "envelope_schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",

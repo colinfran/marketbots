@@ -1,7 +1,9 @@
 import type { WireSettingsBase, WireSummariesSettings } from "@mb/core/settings"
 import type { WireArticle, WireArticleStatus, WireItemDoc, WireSourceHealth, WireSourceState } from "@mb/core/wire"
+import { NO_MODEL_CALLS, type ModelCalls } from "@mb/engine-kit/ai/monitor"
 import { errorMessage, type Logger } from "@mb/engine-kit/log"
 import { HttpError } from "@mb/engine-kit/util/http"
+import { cleanLine } from "@mb/engine-kit/util/text"
 import type { RequestText } from "../fetch"
 import { articleContext, chat, checkSummary, extractArticle, MIN_WORDS, servedModel, type Extracted, type Reply } from "./article"
 import { isEnglish, skipReason, type SummaryCandidate } from "./select"
@@ -69,6 +71,8 @@ export type EnricherDeps = {
   /** State changes, reported like a source's (the wire emits `wire.source`). */
   onState?: (state: WireSourceState, error: string | null) => void
   timeouts?: Partial<EnricherTimeouts>
+  /** The live model feed: each summary streams there. */
+  models?: ModelCalls
 }
 
 /** What the queue keeps of an item. */
@@ -269,9 +273,12 @@ export class Enricher {
 
     const context = articleContext({ title: extracted.title ?? item.title, host: new URL(url).hostname.replace(/^www\./, ""), published: extracted.published, text: extracted.text })
     let reply: Reply
+    const call = (this.d.models ?? NO_MODEL_CALLS).start({ kind: "summary", label: `Summary: ${cleanLine(extracted.title ?? item.title, 160)}`, model })
     try {
-      reply = await chat(this.d.request, llm, { model, context, timeoutMs: this.timeouts.chatMs })
+      reply = await chat(llm, { model, context, timeoutMs: this.timeouts.chatMs, call })
+      call.end({ ok: true, completion_tokens: reply.tokens, tokens_per_s: reply.perSecond })
     } catch (error) {
+      call.end({ ok: false, error: errorMessage(error) })
       return this.failed("llm", error)
     }
     this.failures.llm = 0
