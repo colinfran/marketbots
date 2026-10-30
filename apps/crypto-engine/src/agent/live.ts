@@ -5,7 +5,7 @@ import { normalizeCryptoAgentDecisions, type CryptoAgentAnswer, type NormalizedC
 import type { DecisionDoc, PositionDoc } from "@mb/crypto-core/db"
 import { roundTo } from "@mb/crypto-core/math"
 import { cleanLine } from "@mb/engine-kit/util/text"
-import { loadFeatures, processDecision } from "../orchestrator/crypto-cycle"
+import { loadFeatures, processDecision } from "../orchestrator/decide"
 import { correlationMatrix } from "../risk/correlation"
 import type { AccountState } from "../risk/engine"
 import { boundedStop, candidateFeatures, type CryptoCandidate } from "../strategies/types"

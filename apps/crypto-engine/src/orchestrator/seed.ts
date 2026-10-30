@@ -10,7 +10,8 @@ import { classifyRegime, featuresForPrompt, type Features } from "../market/feat
 import { correlationMatrix } from "../risk/correlation"
 import { boundedStop, candidateFeatures, type CryptoCandidate } from "../strategies/types"
 import { cycleStep, finishCycle, reasoningEvent, seedProgressEvent, type EngineContext } from "./context"
-import { loadFeatures, processDecision, summarize, type CycleResult, type SeedOutcome } from "./crypto-cycle"
+import { summarize, type CycleResult, type SeedOutcome } from "./crypto-cycle"
+import { loadFeatures, processDecision } from "./decide"
 
 /**
  * The one-time seed: the owner chose to put a dollar amount into long-term core holdings at a
