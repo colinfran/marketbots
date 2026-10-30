@@ -7,8 +7,7 @@ import { LOCAL_PREFIX } from "@mb/engine-kit/ai/models"
  * (when the step allows it), and its thinking streams back separately from the answer; the server
  * caches each slot's prompt, so a step only reads what is new since the last one.
  *
- * Streamed, like the eval's `complete` (@mb/engine-kit/ai/eval): a long answer would otherwise send
- * nothing for minutes. Never throws: failures come back with `ok` false.
+ * Streamed: a long answer would otherwise send nothing for minutes. Never throws: failures come back with `ok` false.
  */
 
 export type ChatMessage = { role: "system" | "user" | "assistant"; content: string }
@@ -99,7 +98,7 @@ export const llamaChat =
           temperature: r.temperature,
           max_tokens: r.maxTokens,
           response_format: { type: "json_schema", json_schema: { name: "step", schema: r.schema, strict: true } },
-          // Qwen's thinking switch and the server's cap on it, as AiRunner sends them; "none" is
+          // Qwen's thinking switch and the server's cap on it; "none" is
           // llama.cpp's own switch for no thinking at all.
           chat_template_kwargs: { enable_thinking: thinking },
           ...(thinking ? { thinking_budget_tokens: r.thinkingTokens } : { reasoning_effort: "none" }),

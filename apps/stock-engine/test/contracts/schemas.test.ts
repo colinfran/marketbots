@@ -22,9 +22,6 @@ import { matchJson } from "./snapshot"
  * superRefine: ascending wire thresholds, stop bounds, loss limits, DTE and delta bands, premium
  * caps, unique benchmarks) have no JSON Schema form, so they are not in the schema files;
  * settings-validation.json covers them by recording which settings validate and how.
- *
- * Not covered: the lenient repair schema in src/ai/repair.ts (z.preprocess everywhere, and not
- * exported); its behavior is covered by repairReport's own tests.
  */
 
 const jsonSchema = (schema: z.ZodType, io: "input" | "output") => z.toJSONSchema(schema, { io, unrepresentable: "any", target: "draft-2020-12" })

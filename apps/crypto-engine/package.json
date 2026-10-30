@@ -18,7 +18,6 @@
     "@mb/engine-kit": "workspace:*",
     "@mb/history": "workspace:*",
     "@mb/wire": "workspace:*",
-    "ai": "^7.0.153",
     "cheerio": "1.2.0",
     "fast-xml-parser": "5.11.2",
     "mongodb": "^7.7.0",
