@@ -38,7 +38,7 @@ import { pct, usd } from "./lib/format"
  * reads in (none = UTC with the library's own labels).
  */
 
-type Theme = { text: string; muted: string; grid: string; up: string; down: string; series: string; ink: string }
+type Theme = { text: string; muted: string; grid: string; up: string; down: string; series: string; ink: string; palette: string[] }
 
 /** Chart colors from the CSS tokens (hex, so the canvas renderer can parse them). */
 const readTheme = (): Theme => {
@@ -52,6 +52,8 @@ const readTheme = (): Theme => {
     down: v("--down", "#e34948"),
     series: v("--series-1", "#2a78d6"),
     ink: v("--chart-ink", "#0b0b0b"),
+    // The categorical order (styles.css), for charts with more than one line.
+    palette: [v("--series-1", "#2a78d6"), v("--series-2", "#eb6834"), v("--series-3", "#1baf7a")],
   }
 }
 
@@ -706,5 +708,115 @@ export function CumulativePnlChart({
         (v) => usd(v, { sign: true }),
       )} ${count(points.length - 1, "closing trade")}.`}
     />
+  )
+}
+
+// ─── Lines ───────────────────────────────────────────────────────────────────
+
+/** One line: its name, its categorical slot (1–3, fixed per entity across a page), and a value per time (null: no reading). */
+export type LineSpec = { key: string; label: string; slot: 1 | 2 | 3; values: (number | null)[] }
+
+/** Tailwind classes for each slot's legend swatch. */
+const SWATCH = { 1: "bg-series-1", 2: "bg-series-2", 3: "bg-series-3" } as const
+
+/**
+ * Up to three measures in one unit over time (the CPU's and each GPU's temperature, say), a line
+ * each. A missing value, or a stretch longer than `gapMs` without points, breaks the line rather
+ * than joining across it. Each line's name is on its axis label and in the legend (above it, for
+ * two or more lines); a single line needs neither, the card names it. `range` pins the value axis
+ * (0–100 for a percentage).
+ */
+export function LinesChart({
+  times,
+  lines,
+  format,
+  dateTime,
+  empty,
+  label,
+  height = 180,
+  timeZone,
+  range,
+  gapMs,
+}: {
+  times: number[]
+  lines: LineSpec[]
+  /** Values on the axis, the tooltip and the summary. */
+  format(value: number): string
+  dateTime(ms: number): string
+  empty: string
+  label: string
+  height?: number
+  timeZone?: string
+  range?: { min: number; max: number }
+  gapMs?: number
+}) {
+  const drawn = lines.filter((l) => l.values.some((v) => v !== null))
+  if (times.length < 2 || !drawn.length) return <ChartEmpty height={height}>{empty}</ChartEmpty>
+  const key = `${times[0]}-${times.at(-1)}-${times.length}-${drawn.map((l) => `${l.key}:${l.values.at(-1)}`).join(",")}`
+  const build: Build = (chart, theme, clock) => {
+    const chartTimes = times.map(clock)
+    const all = drawn.map((line) => {
+      const series = chart.addSeries(LineSeries, {
+        color: theme.palette[line.slot - 1],
+        lineWidth: 2,
+        priceLineVisible: false,
+        lastValueVisible: true,
+        ...(drawn.length > 1 ? { title: line.label } : {}),
+        priceFormat: { type: "custom", formatter: format },
+        ...(range ? { autoscaleInfoProvider: () => ({ priceRange: { minValue: range.min, maxValue: range.max } }) } : {}),
+      })
+      const data: ({ time: UTCTimestamp; value: number } | { time: UTCTimestamp })[] = []
+      times.forEach((t, i) => {
+        // A whitespace point inside a long gap breaks the line there.
+        if (gapMs && i > 0 && t - times[i - 1] > gapMs) data.push({ time: (chartTimes[i - 1] + 1) as UTCTimestamp })
+        const v = line.values[i]
+        data.push(v === null ? { time: chartTimes[i] as UTCTimestamp } : { time: chartTimes[i] as UTCTimestamp, value: v })
+      })
+      series.setData(dedupe(data))
+      // A pinned range keeps only a sliver of margin, so 0–100% doesn't label its top 120%.
+      if (range) series.priceScale().applyOptions({ scaleMargins: { top: 0.06, bottom: 0.04 } })
+      return { line, series }
+    })
+    const byTime = new Map(chartTimes.map((time, i) => [time, i]))
+    const first = all[0]
+    return {
+      series: first.series,
+      stops: chartTimes.flatMap((time, i) => (first.line.values[i] === null ? [] : [{ time, value: first.line.values[i]! }])),
+      tip: (time) => {
+        const i = byTime.get(time)
+        if (i === undefined) return null
+        return { title: dateTime(times[i]), rows: all.map(({ line }) => [line.label, line.values[i] === null ? "—" : format(line.values[i]!)] as TooltipRow) }
+      },
+    }
+  }
+  return (
+    <div className="space-y-2">
+      {drawn.length > 1 && (
+        <ul className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 text-xs">
+          {drawn.map((l) => (
+            <li key={l.key} className="flex items-center gap-1.5">
+              <span className={`${SWATCH[l.slot]} inline-block h-0.5 w-3 rounded-full`} aria-hidden />
+              {l.label}
+            </li>
+          ))}
+        </ul>
+      )}
+      <Canvas
+        build={build}
+        deps={[key, range?.min, range?.max, gapMs]}
+        setup={{ height, timeZone, priceFormatter: format }}
+        label={label}
+        summary={drawn
+          .map(
+            (l) =>
+              `${l.label}: ${describe(
+                times.flatMap((t, i) => (l.values[i] === null ? [] : [{ t, value: l.values[i]! }])),
+                dateTime,
+                format,
+              )}`,
+          )
+          .join(" ")}
+      />
+    </div>
   )
 }

@@ -15,13 +15,14 @@ type AnyCommand = { type: string }
 /**
  * Sends an owner command and waits for the engine to process it (it polls MongoDB every
  * second, so the result usually arrives within a couple of seconds). Shows the outcome inline.
+ * `endpoint` and `runner`: another queue and who answers it (the host agent's, on Admin → Server).
  */
-export const useCommand = <C extends AnyCommand>() => {
+export const useCommand = <C extends AnyCommand>({ endpoint = "/api/commands", runner = "the engine" }: { endpoint?: string; runner?: string } = {}) => {
   const router = useRouter()
   const [state, setState] = useState<{ busy: boolean; result: string | null; error: string | null }>({ busy: false, result: null, error: null })
   const send = async (command: C): Promise<boolean> => {
     setState({ busy: true, result: null, error: null })
-    const res = await fetch("/api/commands", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(command) }).catch(() => null)
+    const res = await fetch(endpoint, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(command) }).catch(() => null)
     const body = res ? await res.json().catch(() => ({})) : {}
     if (!res?.ok) {
       setState({ busy: false, result: null, error: body.error ?? "Request failed" })
@@ -30,7 +31,7 @@ export const useCommand = <C extends AnyCommand>() => {
     // Wait for the engine (up to ~30s); if it's offline the command stays queued.
     for (let i = 0; i < 30; i++) {
       await new Promise((r) => setTimeout(r, 1_000))
-      const s = await fetch(`/api/commands/${body.id}`, { cache: "no-store" })
+      const s = await fetch(`${endpoint}/${body.id}`, { cache: "no-store" })
         .then((r) => r.json())
         .catch(() => null)
       if (s && (s.status === "done" || s.status === "failed" || s.status === "rejected")) {
@@ -40,7 +41,7 @@ export const useCommand = <C extends AnyCommand>() => {
         return ok
       }
     }
-    setState({ busy: false, result: null, error: "Queued, but the engine hasn't processed it yet (is it running?)." })
+    setState({ busy: false, result: null, error: `Queued, but ${runner} hasn't processed it yet (is it running?).` })
     return false
   }
   return { ...state, send }

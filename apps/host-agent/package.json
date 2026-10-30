@@ -1,0 +1,31 @@
+{
+  "name": "@mb/host-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx --env-file-if-exists=../../.env.host src/main.ts",
+    "start": "node --enable-source-maps --env-file-if-exists=../../.env.host dist/main.js",
+    "import-history": "node --enable-source-maps --env-file-if-exists=../../.env.host dist/import-history.js",
+    "build": "node build.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@mb/core": "workspace:*",
+    "mongodb": "^7.7.0",
+    "systeminformation": "^5.33.16",
+    "tsvesync": "^1.6.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@mb/config": "workspace:*",
+    "@types/node": "^22",
+    "esbuild": "^0.28.2",
+    "eslint": "^9",
+    "tsx": "^4.23.15",
+    "typescript": "^5",
+    "vitest": "^4.1.12"
+  }
+}

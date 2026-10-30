@@ -14,6 +14,8 @@
   --color-up: var(--up);
   --color-down: var(--down);
   --color-series-1: var(--series-1);
+  --color-series-2: var(--series-2);
+  --color-series-3: var(--series-3);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
@@ -67,7 +69,14 @@
   --loss: #dc2626;
   --up: #2a78d6;
   --down: #e34948;
+  /*
+   * Categorical series in fixed order (blue, orange, aqua), never cycled: a chart with more series
+   * folds them. Validated all-pairs in both themes (CVD ΔE 9.2 light, 9.4 dark). Light aqua is
+   * 2.8:1 on white, so charts that use it label their lines.
+   */
   --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
   /* Chart chrome in hex: the canvas chart library doesn't parse oklch(). */
   --chart-grid: #e1e0d9;
   --chart-axis: #898781;
@@ -112,6 +121,8 @@
   --up: #3987e5;
   --down: #e66767;
   --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
   --chart-grid: #2c2c2a;
   --chart-axis: #898781;
   --chart-ink: #f0efec;

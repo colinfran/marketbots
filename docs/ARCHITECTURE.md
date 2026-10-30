@@ -34,12 +34,14 @@ Browser ──https──▶ Vercel: cryptomarketbot.app, stockmarketbot.app ─
                                                                     ──▶ llm (llama.cpp, Qwen 3.6, both GPUs),
                                                                     ──▶ history (Postgres + TimescaleDB + pgvector),
                                                                         both on network `ai`: no host port, no internet
+Windows host, outside Docker: host agent (+ LibreHardwareMonitor, nvidia-smi, the VeSync outlet) ──▶ MongoDB Atlas (`serverstats`)
 External: Kraken (CLI wallet in its volume), Alpaca, ~150 news sources, and the search engines behind `search`
 ```
 
 - **Each engine owns its bot's trading state.** It is the only writer of positions, orders and fills, and a MongoDB lease in its own database guarantees one running instance per bot.
 - **The dashboards never trade.** They read MongoDB and write only commands (polled by the engine every second), audit entries and sign-in records.
 - **The engines listen only on loopback**: the read-only live stream plus `/healthz` and `/readyz`. Caddy on the host terminates TLS and forwards each `engine.<domain>` to its port. Ports, Caddy sites and domains are the same as before the merge.
+- **The host agent reads the machine itself** ([SERVER.md §11](SERVER.md#11-the-host-agent-admin--server)): a Node process on Windows, not in Docker (containers see only the Docker VM). It writes the hardware readings into its own database on the cluster, `serverstats`, which both dashboards read for Admin → Server; runs the motherboard fans; and takes the owner's fan and settings commands from `host_commands` there. Like the engines, it accepts no inbound connections.
 
 ### What the bots share at runtime
 
@@ -49,7 +51,8 @@ External: Kraken (CLI wallet in its volume), Alpaca, ~150 news sources, and the 
 | Local model | One llama.cpp server on both GPUs (`llm`, Qwen 3.6 35B-A3B at 2-bit) on the internal `ai` network, `http://llm:8080` (OpenAI-compatible), with a slot per bot and one for news. It runs every AI call of both engines: the agents' episodes, their research and the article summaries. If it is down, the engines still protect positions but make no new decisions ([SERVER.md §9](SERVER.md#9-the-local-model-server-llm)). |
 | Search service | One SearXNG container, `http://search:8080` on the compose network, that runs the web searches of the agents' research tool (`@mb/wire/research`) for both engines, on free search engines only. If it is down, research fails and the agent decides without it. |
 | History store | One Postgres container (TimescaleDB, pgvector) on the internal `ai` network, with a database and a role per bot (`crypto_history`, `stock_history`): each engine's `HISTORY_URL` holds only its own password. Each engine writes its closed 1-minute bars and archives its news there (`@mb/history`, [plans/LOCAL-AI.md §6](plans/LOCAL-AI.md#6-the-history-store-history)). If it is down, only history stops. |
-| Atlas cluster | One cluster, a separate database per bot. |
+| Atlas cluster | One cluster, a separate database per bot, and `serverstats` for the host agent. |
+| Host agent | One process on Windows ([SERVER.md §11](SERVER.md#11-the-host-agent-admin--server)) writes the machine's readings into `serverstats`, which both dashboards read, and either dashboard can send it commands. If it is down, only Admin → Server goes stale (and the BIOS runs the fans). |
 | The server's IP | Outbound rate limits (SEC, GDELT, ForexFactory…) apply to both bots together. |
 | Caddy | One host process, one site per engine. |
 
@@ -64,6 +67,7 @@ marketbots/
 │  ├─ crypto-web/      @mb/crypto-web      (was cryptomarketbot/apps/web)      → Vercel (crypto)
 │  ├─ stock-engine/    @mb/stock-engine    (was stockmarketbot/apps/engine)
 │  ├─ stock-web/       @mb/stock-web       (was stockmarketbot/apps/web)       → Vercel (stock)
+│  ├─ host-agent/      @mb/host-agent      the Windows host agent (Admin → Server, the fans); the server's own Node, not Docker
 │  └─ scraper/         @mb/scraper         one sidecar; own npm lockfile, outside the pnpm workspace
 ├─ packages/
 │  ├─ config/          @mb/config          tsconfig base, ESLint presets with the import boundaries, Vitest presets
@@ -80,7 +84,7 @@ marketbots/
 ├─ docs/               ARCHITECTURE.md (this file), CRYPTO.md, STOCK.md, SERVER.md
 ├─ compose.yml         the marketbots stack
 ├─ compose.smoke.yml   boot test of new images beside the live stack
-├─ .env.crypto.example  .env.stock.example
+├─ .env.crypto.example  .env.stock.example  .env.host.example
 ├─ AGENTS.md           conventions for changing this repo
 └─ package.json  pnpm-workspace.yaml  pnpm-lock.yaml
 ```
@@ -91,13 +95,13 @@ Both bots were moved in from their old repos unchanged and then refactored onto 
 
 | Package | Holds | Used by |
 | --- | --- | --- |
-| `@mb/core` | Pure shared schemas and helpers, no I/O: `math`, `stream-token` (prefix as a parameter), settings base pieces and helpers, the shared command schemas, the event envelope and the events both bots define identically, base collections, indexes and document types, wire types, `metrics`, `indicators`, generic `time` | every app and package |
+| `@mb/core` | Pure shared schemas and helpers, no I/O: `math`, `stream-token` (prefix as a parameter), settings base pieces and helpers, the shared command schemas, the event envelope and the events both bots define identically, base collections, indexes and document types, wire types, `metrics`, `indicators`, generic `time`, and `host`: the host agent's documents, settings, fan rules, commands and chart ranges | every app and package |
 | `@mb/engine-kit` | Engine runtime, generic over each bot's settings, events and commands: log, lease, heartbeat, bus, stream server, command processor, Mongo connect, state stores, alerts, the AI call log and prompt parts, the live model feed (`ai/monitor`: every model call's thinking and output, streamed once a second; `ai/model-server`: the server's slots), `ControlPlane`, `StatusReporter`, bootstrap, env base, test helpers | both engines |
 | `@mb/wire` | The news engine: the formerly mirrored files, shared source helpers, `sharedCatalog()`, a `makeLexicon()` skeleton, `enrich/` for article summaries, and `research/` for local research (web search, with the metered search APIs paced through the month, then the local model) | both engines |
 | `@mb/history` | The history store ([plans/LOCAL-AI.md §6](plans/LOCAL-AI.md#6-the-history-store-history)): the Postgres client (node-postgres; PGlite in tests), the migrations, the 1-minute bar writer, the news archive (wire items and triggers copied from MongoDB before their TTL), the moves after each news item, the job runner the backfills use, `HistoryStore`. `docker/initdb.sh` creates each bot's database and role | both engines |
 | `@mb/agent` | The agent runtime ([plans/LOCAL-AI.md §8](plans/LOCAL-AI.md#8-the-agent)), generic over each bot's tools, brief and answer: the attention queue, the episode loop and its llama.cpp client, the tool registry and the tools both bots share (news, the dossier, an item, the calendar, history, past news, and web research on one question for P2/P3 episodes), watches and notes, the envelope and circuit breakers (pure functions; a trip pauses the agent's new entries until the owner resumes them, and exits continue), the journal, `Agent`. The agent is the only decision-maker: each bot's `src/agent/` trades the paper account through the bot's own execution path, and there are no timed cycles. The types and settings both bots share are in `@mb/core/agent` and `@mb/core/settings` | both engines |
-| `@mb/ui` | Client-safe React: the shadcn primitives, design tokens (`styles.css`), app-shell components (including the navigation, below), the live-UI shell driven by a per-bot event catalog, shared page sections (the Agent page's included: `agent`, `agent-events`), the charts (`@mb/ui/charts`) | both dashboards |
-| `@mb/web-kit` | Server-only dashboard helpers: auth factory, database, command routes, shared queries (the agent's in `agent`), formatting, metadata, error reporting | both dashboards |
+| `@mb/ui` | Client-safe React: the shadcn primitives, design tokens (`styles.css`, with the three categorical chart colors), app-shell components (including the navigation, below), the live-UI shell driven by a per-bot event catalog, shared page sections (the Agent page's: `agent`, `agent-events`; Admin → Server's: `host`), the charts (`@mb/ui/charts`) | both dashboards |
+| `@mb/web-kit` | Server-only dashboard helpers: auth factory, database, command routes, shared queries (the agent's in `agent`; Admin → Server's queries, routes and host commands in `host`), formatting, metadata, error reporting | both dashboards |
 
 ### The dashboards' navigation
 
@@ -111,7 +115,7 @@ Both dashboards have the same pages under the same URLs, in five sections (`pack
 | Markets | Markets, News (`/news`: the news engine, its sources and triggers) |
 | Performance | Analytics, Journal |
 | About | How it works |
-| Admin | Owner only: settings (the agent's included, and on crypto the strategy toggles), system health, the audit log |
+| Admin | Owner only. `/admin`: settings (the agent's included, and on crypto the strategy toggles), system health, the audit log; `/admin/server`: the Windows machine both bots run on, its history and its fans ([SERVER.md §11](SERVER.md#11-the-host-agent-admin--server)) |
 
 The live feed and the agent's events push to the page as they happen (the feed batches a model call's text once a second); everything else refreshes every 2 seconds. The model's thinking is owner-only unless `agent.public_thinking` is on: it quotes untrusted news text.
 
@@ -131,6 +135,7 @@ Each piece of information has one page; others link to it. The equity and daily 
 | `@mb/ui`, `@mb/web-kit` | `@mb/core` |
 | `crypto-core`, `crypto-engine`, `crypto-web` | shared packages and crypto packages; never a stock package |
 | `stock-core`, `stock-engine`, `stock-web` | shared packages and stock packages; never a crypto package |
+| `host-agent` | `@mb/core` |
 
 No package or app ever imports an app. ESLint enforces this with `no-restricted-imports`, built by `boundaries(owner)` in `packages/config/eslint.mjs`; each package's `eslint.config.mjs` names its owner. How to work with it: [AGENTS.md](../AGENTS.md).
 
@@ -151,12 +156,13 @@ No package or app ever imports an app. ESLint enforces this with `no-restricted-
 | Scraper | The official Playwright image plus `playwright-core` | `docker compose up -d --build scraper` |
 | History store | The official TimescaleDB image (Postgres 17 with TimescaleDB and pgvector) pinned by digest; no build | `docker compose up -d history history-backup` |
 | Dashboards and landing page | Vercel, Root Directory `apps/<bot>-web` (landing: `apps/landing`), files outside the root included | push to `main`; Vercel skips a project when neither its app nor a workspace package it depends on changed |
+| Host agent | An esbuild bundle on the server (`apps/host-agent/build.mjs`): the agent, its fan watchdog, the one-off history import | `pnpm --filter @mb/host-agent build`, then restart its scheduled task ([SERVER.md §11.3](SERVER.md#113-deploy-restart-logs)) |
 
 Every deploy is gated by `pnpm typecheck && pnpm test && pnpm lint && pnpm build`. The contract snapshots under `contracts/<bot>/` change only with a deliberate, owner-approved behavior change ([AGENTS.md](../AGENTS.md)).
 
 ## Configuration
 
-One env file per bot at the repo root, `.env.crypto` and `.env.stock`, under the variable names the code already used. The engine container reads its file through compose, which also sets `STREAM_HOST`, `STREAM_PORT`, `SCRAPER_URL` and `LLM_URL`. Local dev reads the same file, then `.env.<bot>.local`. The file's SHARED and DASHBOARD sections are what goes into the bot's Vercel project. A third file, `.env.history`, holds only the history service's passwords; each bot's file carries its own in `HISTORY_URL`. Details: [SERVER.md §3](SERVER.md#3-the-env-files).
+One env file per bot at the repo root, `.env.crypto` and `.env.stock`, under the variable names the code already used. The engine container reads its file through compose, which also sets `STREAM_HOST`, `STREAM_PORT`, `SCRAPER_URL` and `LLM_URL`. Local dev reads the same file, then `.env.<bot>.local`. The file's SHARED and DASHBOARD sections are what goes into the bot's Vercel project. A third file, `.env.history`, holds only the history service's passwords; each bot's file carries its own in `HISTORY_URL`. Details: [SERVER.md §3](SERVER.md#3-the-env-files). The host agent reads `.env.host` ([SERVER.md §11.1](SERVER.md#111-envhost)).
 
 Live trading settings are not configuration: they live in each bot's database and change only from its dashboard's Admin page.
 

@@ -10,6 +10,7 @@ What runs where:
 | --- | --- | --- |
 | Windows server, Docker stack `marketbots` | `crypto-engine` on 127.0.0.1:8787 (with the Kraken CLI paper wallet), `stock-engine` on 127.0.0.1:8788, `scraper` (no host port), `llm` (llama.cpp with the local model on both GPUs, no host port), `search` (SearXNG for local research, no host port), `history` (Postgres with TimescaleDB and pgvector, no host port) and `history-backup` | `compose.yml`, `.env.crypto`, `.env.stock`, `.env.history`, `.env.search` (optional) at the repo root |
 | Caddy on the Windows host | `engine.cryptomarketbot.app` → 127.0.0.1:8787, `engine.stockmarketbot.app` → 127.0.0.1:8788 (WebSocket) | `C:\Caddy\Caddyfile` |
+| The Windows host, outside Docker | The host agent and its LibreHardwareMonitor (Admin → Server, the motherboard fans; §11) | `.env.host` at the repo root |
 | Vercel | two projects: `apps/crypto-web` at cryptomarketbot.app, `apps/stock-web` at stockmarketbot.app | each project's environment variables |
 | MongoDB Atlas | one cluster, databases `cryptomarketbot` and `stockmarketbot` | `MONGODB_URI` |
 | Alpaca | the stock bot's paper account | `.env.stock` (engine only) |
@@ -158,6 +159,7 @@ Set for Production and Preview, with the same values as the bot's env file. Verc
 | `USESEND_API_KEY` | DASHBOARD | the useSend key |
 | `ENGINE_STREAM_URL` | DASHBOARD | `wss://engine.cryptomarketbot.app/v1/stream` |
 | `NEXT_PUBLIC_DISPLAY_TIMEZONE` | DASHBOARD | `America/Los_Angeles` |
+| `HOST_DB_NAME` | DASHBOARD | optional: the host agent's database (default `serverstats`, §11) |
 | `SITE_URL`, `OWNER_EMAIL`, `USESEND_BASE_URL`, `USESEND_FROM_EMAIL` | DASHBOARD | optional; the defaults are in `.env.crypto.example` |
 
 **Stock** (the stockmarketbot.app project):
@@ -171,6 +173,7 @@ Set for Production and Preview, with the same values as the bot's env file. Verc
 | `USESEND_API_KEY` | DASHBOARD | the useSend key |
 | `ENGINE_STREAM_URL` | DASHBOARD | `wss://engine.stockmarketbot.app/v1/stream` |
 | `DISCORD_WEBHOOK_URL` | DASHBOARD | optional: unhandled dashboard errors go to Discord (the engine reads the same variable for its alerts) |
+| `HOST_DB_NAME` | DASHBOARD | optional: the host agent's database (default `serverstats`, §11) |
 | `SITE_URL`, `OWNER_EMAIL`, `USESEND_BASE_URL`, `USESEND_FROM_EMAIL` | DASHBOARD | optional; the defaults are in `.env.stock.example` |
 
 Nothing from the ENGINE sections goes to Vercel: the dashboards hold no broker or AI keys. Vercel sets `VERCEL_PROJECT_PRODUCTION_URL` itself (the default for `SITE_URL`); sign in on the production domain, not on preview URLs.
@@ -286,6 +289,7 @@ docker compose up -d --build                   # everything whose image or confi
 - A stop is graceful (30 s grace period): the engine releases its lease, so the new container takes over at once.
 - **History**: any time. While it's down the engines keep up to 50,000 bars each in memory and copy the news they missed when it's back; trading never waits for it.
 - **llm**: any time. Recreating it reloads the model (~1 minute), during which the summaries back off and retry; trading never waits for it.
+- **The host agent** isn't in compose: it is built and restarted on Windows (§11.3).
 - Dashboards deploy by pushing to `main` (Vercel, §8).
 
 ### 5.2 Status, logs, restart
@@ -757,3 +761,124 @@ A run takes about a minute, and costs nothing (`ai_calls`: `cost_source: "local"
 | Admin → System: *History store: unreachable*, log `history store unavailable; retrying in a minute` | `docker compose ps history`: not running, or still starting. A `password authentication failed` means the bot's `HISTORY_URL` doesn't match the role's password (§3.6). The engine keeps trading and retries every minute. |
 | *History store* shows bars *dropped* | It was down long enough for an engine's 50,000-bar buffer to fill. The backfills can fetch those minutes again. |
 | `history-backup` logs `backup of … failed (no news archive yet?)` | Normal until the engine has migrated its database; otherwise check `docker compose logs history`. |
+
+---
+
+## 11. The host agent (Admin → Server)
+
+Admin → Server, the same in both dashboards, shows the Windows machine itself: the CPU (load per thread, package temperature, clock, power), both GPUs, memory, the motherboard fans, the volumes and disk rates, the outlet's power and the electricity it measured, with 30 days of history. It also runs the motherboard fans. It replaces the Jellyfin System Monitor (`C:\JellyfinDocker\apps\SystemMonitor`), removed with Jellyfin; its history was imported (§11.6).
+
+The containers can't read any of this (they see the Docker VM), so it runs on Windows:
+
+| What | Where | Started by |
+| --- | --- | --- |
+| LibreHardwareMonitor 0.9.6 | `apps\host-agent\data\LibreHardwareMonitor`. Its sensor server listens on 127.0.0.1:8086 behind a generated password (`data\lhm.json`); firewall rule `marketbots-host-sensors-block` blocks the port from the network | `\marketbots\Host sensors` at sign-in, elevated (its PawnIO driver reads and sets the board) |
+| The host agent | `apps\host-agent\dist\main.js` on the server's own Node, with `.env.host` | `\marketbots\Host agent` at startup, no window; restarted if it exits |
+| The fan watchdog | `dist\fan-watchdog.js`, a detached process the agent starts | the agent, when `FAN_CONTROL=on` |
+
+Every reading (2 s by default) the agent reads Windows, `nvidia-smi` and LibreHardwareMonitor; the VeSync outlet once a minute. It writes into its own database on the bots' cluster, `serverstats` (`HOST_DATABASES`), which both dashboards read (`HOST_DB_NAME`): it is one machine, so one copy.
+
+- `host_status`: the latest reading. The page polls it every 2 seconds and shows a reading older than 15 seconds as offline, never as current.
+- `host_samples`: every reading, kept a little over an hour, and minute averages with the energy measured in each minute, kept 30 days (TTL). About 20 MB.
+- `host_commands`: the owner's fan setting, agent settings and outlet discovery, from either dashboard. Audited like the engines' commands (the request in the sending bot's audit log, the outcome in `serverstats.audit_log`); one not picked up within 2 minutes is rejected unapplied.
+
+Nothing in it touches the bots' databases or trading state, and the engines don't know it exists.
+
+### 11.1 `.env.host`
+
+`.env.host` at the repo root (git-ignored; template `.env.host.example`). Nothing in it goes to Vercel.
+
+| Variable | What |
+| --- | --- |
+| `MONGODB_URI` | The bots' Atlas cluster (a user with read/write on `serverstats`) |
+| `HOST_DATABASES` | Optional: its database (default `serverstats`; the dashboards' `HOST_DB_NAME` must match) |
+| `FAN_CONTROL` | `on`: the agent sets the motherboard fans. `off` (default): it only reads them (§11.4) |
+| `VESYNC_USERNAME`, `VESYNC_PASSWORD` | A VeSync account that sees the outlet: a separate one the home or outlet is shared with (accept the share in the VeSync app, signed in as it). Without them, no power or energy readings (the recorded history still shows) |
+| `VESYNC_TIMEZONE`, `VESYNC_COUNTRY_CODE`, `VESYNC_REFRESH_MS` | Optional: the account's time zone (default the server's) and country (`US`), and how often the outlet is read (60000 ms) |
+| `HOST_DATA_DIR`, `LHM_CONNECTION_FILE` | Optional: where the agent keeps its files (`apps\host-agent\data`) and LibreHardwareMonitor's login (`<data>\lhm.json`) |
+
+The agent's own settings (the reading interval, the electricity price and currency, the outlet) aren't in the file: they change in Admin → Server → Settings and are kept in `data\settings.json`. After editing `.env.host`, restart the agent (§11.3).
+
+### 11.2 First install
+
+```powershell
+Copy-Item .env.host.example .env.host
+notepad .env.host                                        # MONGODB_URI (as in .env.crypto), the VeSync login
+pnpm install
+pnpm --filter @mb/host-agent build
+.\apps\host-agent\scripts\install-sensors.ps1            # administrator PowerShell
+.\apps\host-agent\scripts\install-tasks.ps1              # administrator PowerShell, as the account that signs in
+Start-ScheduledTask -TaskPath '\marketbots\' -TaskName 'Host sensors'   # approve the PawnIO driver prompt the first time
+Start-ScheduledTask -TaskPath '\marketbots\' -TaskName 'Host agent'
+Get-Content apps\host-agent\data\logs\agent.log -Tail 20
+```
+
+The sensors run only after sign-in (LibreHardwareMonitor is a desktop app); before that the agent reports without the motherboard sensors, and the BIOS runs the fans.
+
+### 11.3 Deploy, restart, logs
+
+```powershell
+pnpm --filter @mb/host-agent build
+Stop-ScheduledTask -TaskPath '\marketbots\' -TaskName 'Host agent'     # the watchdog hands the fans to the BIOS
+Start-ScheduledTask -TaskPath '\marketbots\' -TaskName 'Host agent'    # the saved fan setting is back within seconds
+Get-Content apps\host-agent\data\logs\agent.log -Tail 50 -Wait          # JSON lines; rolls over to agent.log.1 at 10 MB
+Get-ScheduledTask -TaskPath '\marketbots\' | Get-ScheduledTaskInfo      # last run and result of both tasks
+```
+
+Any time is fine: the engines don't depend on it. The page itself deploys with the dashboards (push to `main`).
+
+### 11.4 Fans
+
+One setting for every motherboard CPU/case fan with RPM feedback (never the GPUs' own fans, never a header named like a pump):
+
+- **Automatic cooling**: follows the CPU package temperature: 30 °C → 40%, 45 → 50%, 60 → 65%, 75 → 85%, 85 → 100%, interpolated.
+- **Manual speed**: one speed, 40–100%.
+- **BIOS control**: the motherboard's own curve.
+
+In every mode but BIOS, every fan runs at 100% at 85 °C, without a CPU temperature, or when a controlled fan stops reporting RPM. Speeds go up at once and come down at most 5 points every 2 seconds. Before each write the agent tells the watchdog which headers it holds. If the agent exits or stops heartbeating for 8 seconds, the watchdog hands them back to the BIOS, retrying every second. The setting and its headers are saved in `data\fan-settings.json` and reapplied when the agent starts; with no saved setting, the BIOS keeps control.
+
+- **Never run two fan controllers.** `FAN_CONTROL=on` only when nothing else sets the fans: not the old System Monitor, not a vendor utility, not LibreHardwareMonitor's own fan controls.
+- This is best effort, not a replacement for the BIOS's thermal protection: keep a sane BIOS curve. Nothing in software helps while Windows or LibreHardwareMonitor is down.
+- A pump on a header with a generic name can't be told from a fan: don't enable fan control with one.
+
+### 11.5 Switching over from the Jellyfin System Monitor (once)
+
+Its Windows agent held fans #1, #2 and #5 at manual 100%. On 2026-10-30 its agent was stopped (its watchdog handed the fans to the BIOS) and `data\fan-settings.json` was seeded with that setting; the agent's fan control was checked on the board (taking the fans to 100%, and handing them back when killed). What is left, from an administrator PowerShell at the repo root:
+
+```powershell
+Disable-ScheduledTask -TaskName JellyfinSystemMonitor
+Disable-ScheduledTask -TaskName JellyfinSystemMonitorSensors
+Stop-ScheduledTask -TaskName JellyfinSystemMonitorSensors
+Get-Process LibreHardwareMonitor -ErrorAction SilentlyContinue | Stop-Process     # the old one; the BIOS keeps the fans
+.\apps\host-agent\scripts\install-sensors.ps1
+.\apps\host-agent\scripts\install-tasks.ps1
+Start-ScheduledTask -TaskPath '\marketbots\' -TaskName 'Host sensors'           # approve the PawnIO prompt
+Start-ScheduledTask -TaskPath '\marketbots\' -TaskName 'Host agent'             # restores manual 100% within seconds
+```
+
+Then check Admin → Server: the fans at 100% under *Motherboard fans*, and *Manual speed* under *Cooling*.
+
+### 11.6 The imported history
+
+The old monitor's data folder was copied out of its Docker volume (`jellyfin-system-monitor-data`) into `backups\jellyfin-system-monitor\` on 2026-10-30: `history.sqlite` (2-second readings from 2026-10-17) and `settings.json` (the price, currency and outlet, which became the agent's settings). It was imported as minute samples into `serverstats`:
+
+```powershell
+cd apps\host-agent
+node --env-file=..\..\.env.host dist\import-history.js ..\..\backups\jellyfin-system-monitor
+```
+
+The import matches the old monitor's own energy totals to the watt-hour. Running it again only fills minutes that are missing; `--replace` rewrites an earlier import's minutes. The imported minutes leave the charts as they turn 30 days old, by 2026-11-29; after that the backup can be deleted.
+
+### 11.7 Troubleshooting
+
+| Symptom | Likely cause / fix |
+| --- | --- |
+| *The host agent has never reported* | The `Host agent` task isn't running or can't reach Atlas: `Get-ScheduledTask -TaskPath '\marketbots\' \| Get-ScheduledTaskInfo`, then the log (§11.3). A bad `.env.host` stops it at start: the task's last result is 1. |
+| *Offline* with a time | The agent stopped or lost Atlas after that reading. The history stays. |
+| *Motherboard sensors: LibreHardwareMonitor is not responding* | The `Host sensors` task isn't running, or the PawnIO prompt wasn't approved: run `start-sensors.ps1` by hand. |
+| No CPU temperature, every fan at 100% | *Cooling protection*: LibreHardwareMonitor has no `CPU Package` temperature (sensors still loading, or the driver isn't approved). |
+| *Fan control is off on the server* | `FAN_CONTROL=off` in `.env.host` (§11.4). |
+| *The fan watchdog stopped* | Fan control is off until the agent restarts (§11.3). |
+| *VeSync login failed*, *Several outlets found* | Check the account and region in `.env.host`; pick the outlet in Settings after *Discover*. |
+| *VeSync lists no devices on this account* | The account logs in but sees no outlet: accept the home (or outlet) share in the VeSync app, signed in as that account. |
+| VeSync: `login temporary auth code expired` | Since 2026-10-26 VeSync completes logins only for its own app's ID, which the agent sends (`VESYNC_APP_ID` in `vesync.ts`); if VeSync changes it again, update it there. |

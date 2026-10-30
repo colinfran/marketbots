@@ -11,7 +11,7 @@ import tseslint from "typescript-eslint"
  *   @mb/core ← @mb/engine-kit ← @mb/wire, @mb/history; @mb/wire ← @mb/agent
  *   @mb/core ← @mb/ui, @mb/web-kit
  *   apps depend on packages; packages never import apps; crypto never imports stock, or the reverse;
- *   the landing page imports only @mb/ui and @mb/web-kit.
+ *   the landing page imports only @mb/ui and @mb/web-kit; the host agent only @mb/core.
  */
 
 /** What each shared package may import (besides itself and @mb/config). */
@@ -28,9 +28,10 @@ const SHARED = {
 /** What each app outside the two bots may import (besides itself and @mb/config). */
 const SITES = {
   landing: ["ui", "web-kit"],
+  "host-agent": ["core"],
 }
 
-const APPS = "@mb/((crypto|stock)-(engine|web)|landing)(/|$)"
+const APPS = "@mb/((crypto|stock)-(engine|web)|landing|host-agent)(/|$)"
 
 /**
  * `no-restricted-imports` for one owner: "crypto" or "stock" (a bot's apps and core package), a

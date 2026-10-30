@@ -48,10 +48,19 @@ const SECTIONS: Section[] = [
   { label: "About", pages: [{ href: "/about", label: "About" }] },
 ]
 
-const ADMIN: Section = { label: "Admin", pages: [{ href: "/admin", label: "Admin" }] }
+const ADMIN: Section = {
+  label: "Admin",
+  pages: [
+    { href: "/admin", label: "Admin" },
+    { href: "/admin/server", label: "Server" },
+  ],
+}
 
 const under = (pathname: string, href: string) => (href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`))
 const isActive = (pathname: string, page: NavPage) => [page.href, ...(page.also ?? [])].some((href) => under(pathname, href))
+
+/** The section's page for this path: the most specific match (/admin/server, not /admin). */
+const activePage = (pathname: string, pages: NavPage[]) => pages.filter((p) => isActive(pathname, p)).sort((a, b) => b.href.length - a.href.length)[0] ?? null
 
 /** `extra`: pages only this dashboard has, by section label, added at the end of that section. */
 export function SiteHeader({
@@ -137,7 +146,7 @@ export function SiteHeader({
       {current && current.pages.length > 1 && (
         <nav className="mx-auto flex w-full max-w-7xl items-center gap-0.5 overflow-x-auto px-4 pb-2" aria-label={current.label}>
           {current.pages.map((p) => {
-            const active = isActive(pathname, p)
+            const active = p === activePage(pathname, current.pages)
             return (
               <Link
                 key={p.href}

@@ -29,6 +29,9 @@ coverage/
 # local data (backtest CSVs etc.)
 /data/
 
+# the host agent's own files on the server: LibreHardwareMonitor and its login, settings, fan settings, logs
+/apps/host-agent/data/
+
 # misc
 .DS_Store
 npm-debug.log*
