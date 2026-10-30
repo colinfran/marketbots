@@ -1,24 +1,19 @@
-import { randomUUID } from "node:crypto"
 import type { Command } from "@mb/crypto-core/commands"
-import type { CommandDoc, EngineStatusDoc, PaperWalletHealth, SeedRunDoc } from "@mb/crypto-core/db"
+import type { CommandDoc, EngineStatusDoc, PaperWalletHealth } from "@mb/crypto-core/db"
 import type { CycleState, EngineRunStatus } from "@mb/crypto-core/events"
 import { roundTo } from "@mb/crypto-core/math"
 import type { SettingsPatch } from "@mb/crypto-core/settings"
-import type { EventFocus, WireCategory, WireItemDoc } from "@mb/crypto-core/wire"
+import type { WireCategory, WireItemDoc } from "@mb/crypto-core/wire"
 import type { AiCallLog } from "@mb/engine-kit/ai/call-log"
 import type { ModelCalls } from "@mb/engine-kit/ai/monitor"
-import { EventCycleQueue, type QueuedEvent } from "@mb/engine-kit/control/event-queue"
 import { ControlPlane, type ControlWording } from "@mb/engine-kit/control/plane"
 import { StatusReporter } from "@mb/engine-kit/control/status"
 import { errorMessage, type Logger } from "@mb/engine-kit/log"
-import { claimDueSeed, finishSeed } from "@mb/engine-kit/state/seed-runs"
 import { every, withTimeout } from "@mb/engine-kit/util/async"
 import type { HistoryStore } from "@mb/history/store"
 import { coverageGaps } from "@mb/wire/calendar"
 import { createCryptoAgent, type CryptoAgent } from "./agent"
-import type { AiRunner } from "./ai/runner"
 import type { Alerts } from "./alerts"
-import { runBacktest } from "./backtest/run"
 import type { EventBus } from "./bus/event-bus"
 import { CommandProcessor } from "./commands/processor"
 import type { Database } from "./db/mongo"
@@ -27,7 +22,6 @@ import type { Executor } from "./execution/executor"
 import type { CandleCache } from "./market/candles"
 import type { MarketHub } from "./market/hub"
 import type { EngineContext } from "./orchestrator/context"
-import { runCryptoCycle, type CycleRequest } from "./orchestrator/crypto-cycle"
 import { evaluateOutcomes } from "./orchestrator/outcomes"
 import { checkProtection } from "./orchestrator/protection"
 import { exitPosition, liquidateAll } from "./orchestrator/trading"
@@ -43,18 +37,6 @@ import { cryptoRules, WirePolicy } from "./wire/policy"
 import type { Wire } from "./wire/wire"
 
 export const ENGINE_VERSION = "0.1.0"
-
-/** A seed that couldn't start within this long of its time (engine down or paused) is failed, not run late. */
-const SEED_MAX_LATE_MINUTES = 120
-
-/**
- * A news trigger waits at most this long for its event cycle (as in stock). It outlasts the
- * slowest normal cycle it can queue behind (two research attempts of research_timeout_seconds
- * plus three decision attempts of decision_timeout_seconds: about 18 minutes at the defaults);
- * a longer wait means trading was paused or halted, and news that old shouldn't start a cycle.
- * Its items stay in the wire dossier that later cycles read.
- */
-const EVENT_QUEUE_MAX_MS = 30 * 60_000
 
 /** Crypto's words in the shared control results and seed alerts (@mb/engine-kit/control/plane). */
 const WORDING: ControlWording = {
@@ -79,7 +61,6 @@ export type EngineDeps = {
   cli: KrakenCli
   ledger: Ledger
   executor: Executor
-  ai: AiRunner
   calls: AiCallLog
   /** The live model feed. */
   models?: ModelCalls
@@ -95,7 +76,6 @@ export type EngineDeps = {
  *
  *   every 3s   position protection (stops / targets), regardless of pause or AI state
  *   every 15s  mark-to-market and the drawdown halt
- *   every 30s  the cycle scheduler (scheduled scans + triggered reviews)
  *   every 5s   heartbeat to MongoDB (the dashboard's Admin page)
  *   every 5m   portfolio snapshot and paper-wallet reconciliation
  *   every 30m  scoring of decisions whose horizon has passed
@@ -106,8 +86,8 @@ export type EngineDeps = {
  * wallet before allowing new entries.
  *
  * The parts both bots share come from @mb/engine-kit/control: the owner's controls and the run
- * status (`control`), the heartbeat (`reporter`) and the news engine's event-cycle queue
- * (`eventQueue`: triggers expire after 30 minutes; no gate, since crypto trades around the clock).
+ * status (`control`) and the heartbeat (`reporter`). The agent decides; the news engine's
+ * triggers reach it through the wire policy's observe hook.
  */
 export class Engine {
   cycleState: CycleState = "idle"
@@ -122,20 +102,11 @@ export class Engine {
 
   private readonly abort = new AbortController()
   private readonly protectionInFlight = new Set<string>()
-  private readonly triggerCooldown = new Map<string, number>()
   private stops: (() => void)[] = []
   private commands: CommandProcessor
   private readonly reporter: StatusReporter<EngineStatusDoc>
-  private cycle: Promise<unknown> | null = null
-  private lastCycleStartedAt = 0
-  private lastAiCycleAt = 0
-  private lastCycle: EngineStatusDoc["last_cycle"] = null
   private lastSummaryAt = 0
   private heldSymbols: string[] = []
-  /** Candidates of the latest cycle and owner-requested pairs (the news engine's "focus"). */
-  private focusSymbols: string[] = []
-  /** News-engine event cycles waiting to run, merged by symbol ("MARKET" for market-wide), highest severity kept. */
-  private readonly eventQueue: EventCycleQueue
 
   constructor(private readonly d: EngineDeps) {
     this.wallet = { ok: false, cli_version: null, workspace: d.cli.workspace, fee_bps: null, slippage_bps: null, last_error: "not initialized", last_checked_at: null }
@@ -149,7 +120,6 @@ export class Engine {
       candles: d.candles,
       ledger: d.ledger,
       executor: d.executor,
-      ai: d.ai,
       alerts: d.alerts,
       gate: () => ({
         runStatus: d.state.state.status,
@@ -168,8 +138,6 @@ export class Engine {
       calls: d.calls,
       models: d.models,
       llmUrl: d.env.LLM_URL ?? null,
-      // The cycle slot runs only the owner's one-time seed: the agent waits for it.
-      busy: () => (this.cycle ? "the one-time seed is running" : null),
       pause: {
         get: () => d.state.state.agent_pause ?? null,
         set: (p, by) => d.state.update({ agent_pause: p }, by, p ? "agent.entries_paused" : "agent.entries_resumed", {}),
@@ -181,20 +149,6 @@ export class Engine {
     })
     this.commands = new CommandProcessor(d.db.col, d.bus, d.log.child({ component: "commands" }), (c, doc) => this.handleCommand(c, doc))
     d.hub.heldSymbols = () => this.heldSymbols
-    this.eventQueue = new EventCycleQueue({
-      col: d.db.col,
-      log: d.log,
-      state: d.state,
-      settings: d.settings,
-      busy: () => !!this.cycle,
-      start: (events, trigger) => this.runCycle({ kind: "event", trigger, events: events.map(({ queued_at: _q, ...e }) => e) }, events),
-      // A trigger queued behind a cycle, the minimum gap, a pause or the kill switch is dropped
-      // unrun after 30 minutes (marked suppressed, "expired: …"), so a resume never fires stale news.
-      expireAfterMs: EVENT_QUEUE_MAX_MS,
-      // No gate: crypto trades 24/7, and the queue already waits for running, no kill switch, no
-      // cycle in progress and the minimum gap. Venue or reconciliation trouble is handled inside
-      // the cycle (entries blocked), as for scheduled scans.
-    })
     this.policy = new WirePolicy({
       col: d.db.col,
       bus: d.bus,
@@ -204,7 +158,8 @@ export class Engine {
       engine: () => ({ running: d.state.state.status === "running", killSwitch: d.state.state.kill_switch.engaged }),
       held: () => this.heldSymbols,
       universe: () => d.hub.universe,
-      request: (focus) => this.requestEventCycle(focus),
+      // The agent has already seen the trigger's candidate (observe).
+      request: () => "agent",
       markNotable: (ids, reason) => d.wire.markNotable(ids, reason),
       emergency: (symbol) => this.emergencyAction(symbol),
       alert: (title, message) => d.alerts.send("warning", title, message, { path: "/news" }),
@@ -226,7 +181,7 @@ export class Engine {
       bus: d.bus,
       calls: d.calls,
       settings: d.settings,
-      ai: d.ai,
+      ai: { available: !!d.env.LLM_URL },
       state: d.state,
       stream: d.stream,
       wire: d.wire,
@@ -234,7 +189,6 @@ export class Engine {
       instance: d.env.ENGINE_INSTANCE,
       version: ENGINE_VERSION,
       run: () => ({ status: this.status, cycle_state: this.cycleState, current_task: this.currentTask }),
-      eventQueue: () => this.eventQueue.keys(),
       doc: (p) => ({
         ...p.run,
         ...p.live,
@@ -242,7 +196,7 @@ export class Engine {
         paper_wallet: this.wallet,
         symbols: d.hub.symbolHealth(),
         ...p.usage,
-        last_cycle: this.lastCycle,
+        last_cycle: null,
         next_cycle_at: null,
         reconciliation: this.reconciliation ? { ok: this.reconciliation.ok, at: this.reconciliation.at, issues: this.reconciliation.issues.slice(0, 20) } : null,
         ...p.health,
@@ -270,11 +224,6 @@ export class Engine {
    * (highest severity kept), and runs the moment the current cycle ends, or is dropped unrun once
    * it has waited 30 minutes.
    */
-  requestEventCycle(_focus: EventFocus): "fired" | "queued" | "agent" {
-    // The agent decides: it has already seen the trigger's candidate.
-    return "agent"
-  }
-
   /** When the agent was turned on or its entries resumed: its time and equity, for the total-loss breaker. */
   private async promoteAgent(p: { at: Date; equity_usd: number }) {
     await this.d.state.update({ agent_promotion: p }, "engine", "agent.promoted", {})
@@ -319,9 +268,9 @@ export class Engine {
     return "review only"
   }
 
-  /** Symbol sets the news engine tags and ranks items against. */
+  /** Symbol sets the news engine tags and ranks items against: the agent's watches are its focus. */
   wireSymbols() {
-    return { universe: this.d.hub.universe, held: this.heldSymbols, focus: this.focusSymbols }
+    return { universe: this.d.hub.universe, held: this.heldSymbols, focus: this.agent.agent.watchedSymbols() }
   }
 
   /** The macro calendar file needs regenerating before any kind runs out of dates. */
@@ -341,18 +290,13 @@ export class Engine {
     await this.initWallet()
     this.control.status = "reconciling"
     await this.reconcile()
-    // A cycle left "running" belonged to a previous process that stopped mid-way.
-    const stale = await this.d.db.col.cycles.updateMany({ status: "running" }, { $set: { status: "failed", state: "idle", finished_at: new Date(), error: "the engine restarted during this cycle" } })
-    if (stale.modifiedCount) log.warn("marked interrupted cycles as failed", { count: stale.modifiedCount })
-    await this.control.failInterruptedSeed()
     await this.upgradeDemotion().catch((e) => log.error("upgrading the agent's demotion failed", { error: errorMessage(e) }))
     this.control.emitStatus("startup complete")
-    if (!this.d.ai.available) await this.d.alerts.send("warning", "AI disabled", "LLM_URL is not set: the engine will monitor and protect positions but make no new decisions.")
+    if (!env.LLM_URL) await this.d.alerts.send("warning", "AI disabled", "LLM_URL is not set: the engine will monitor and protect positions but make no new decisions.")
 
     const onError = (job: string) => (error: unknown) => log.warn(`${job} failed`, { error: errorMessage(error) })
     this.stops.push(every(3_000, () => checkProtection(this.ctx, this.protectionInFlight), onError("protection")))
     this.stops.push(every(15_000, () => this.markAndMonitor(), onError("mark-to-market"), { immediate: true }))
-    this.stops.push(every(30_000, () => this.schedule(), onError("scheduler")))
     this.stops.push(every(5_000, () => this.reporter.write(), onError("heartbeat"), { immediate: true }))
     this.stops.push(every(5 * 60_000, () => this.periodic(), onError("snapshot")))
     this.stops.push(every(5 * 60_000, () => this.reconcile(), onError("reconciliation")))
@@ -431,79 +375,6 @@ export class Engine {
     }
   }
 
-  /**
-   * Decides whether a cycle is due: the owner's one-time seed when its time comes, else on
-   * schedule, or triggered by a held position moving sharply.
-   */
-  private async schedule() {
-    if (this.cycle) return
-    const { settings, state, db } = this.d
-    await this.control.failMissedSeeds((r) => new Date(r.at.getTime() + SEED_MAX_LATE_MINUTES * 60_000))
-    if (state.state.status !== "running" || state.state.kill_switch.engaged) return
-    const seed = await claimDueSeed(db.col)
-    if (seed) return this.runSeed(seed)
-    // The agent decides on its own events: no timed cycles.
-  }
-
-  /** The one-time seed: a single attempt, recorded on the run whatever happens. */
-  private runSeed(run: SeedRunDoc) {
-    const { db, alerts, bus, log } = this.d
-    this.cycle = runCryptoCycle(this.ctx, { kind: "seed", trigger: "seed", seed: { id: run._id, amountUsd: run.amount_usd } })
-      .then(async (r) => {
-        this.lastCycle = { id: r.cycleId, at: new Date(), status: r.status, summary: r.summary }
-        for (const [symbol, f] of r.features) this.d.hub.features.set(symbol, f)
-        if (r.status !== "skipped") this.lastAiCycleAt = Date.now()
-        const seed = r.seed ?? { allocations: [], orders: [], notes: [], rationale: null, executed: 0 }
-        const result = { allocations: seed.allocations, orders: seed.orders, notes: seed.notes, rationale: seed.rationale }
-        if (r.status !== "completed" || seed.executed === 0) {
-          const reasons = seed.orders.map((o) => `${o.symbol}: ${o.reason ?? o.status}`)
-          return this.control.failSeed(run, r.status === "completed" ? `no buy went through (${reasons.join("; ") || "nothing allocated"})` : r.summary, r.cycleId, result)
-        }
-        await finishSeed(db.col, run._id, { status: "done", cycle_id: r.cycleId, result, error: null })
-        bus.emit(
-          "seed.completed",
-          { seed_id: run._id, cycle_id: r.cycleId, status: "done", allocations: seed.allocations.map(({ thesis: _t, ...a }) => a), executed: seed.executed, error: null },
-          { summary: `One-time seed done: ${seed.allocations.map((a) => `${a.symbol} ${a.weight_pct}%`).join(", ")}` },
-        )
-        const fields = Object.fromEntries(seed.orders.map((o) => [o.symbol, `${o.status}${o.notional_usd ? ` · $${o.notional_usd.toFixed(2)}` : ""}${o.status === "filled" || !o.reason ? "" : ` (${o.reason})`}`]))
-        await alerts.success("One-time seed done", `[paper] ${seed.rationale ?? ""}`.slice(0, 1_500), { path: `/research/${r.cycleId}`, key: `seed|${run._id}`, fields: { Amount: `$${run.amount_usd.toLocaleString("en-US")}`, ...fields } })
-      })
-      .catch(async (error) => {
-        log.error("seed cycle crashed", { error: errorMessage(error) })
-        await this.control.failSeed(run, `crashed: ${errorMessage(error)}`, null).catch(() => undefined)
-      })
-      .finally(() => {
-        this.cycle = null
-        this.setCycleState("idle")
-        this.eventQueue.drain()
-      })
-  }
-
-  private runCycle(request: CycleRequest, queued: QueuedEvent[] = []) {
-    const startedAt = Date.now()
-    // Event cycles don't move the scheduled scan's clock.
-    if (request.kind !== "event") this.lastCycleStartedAt = startedAt
-    this.cycle = runCryptoCycle(this.ctx, request)
-      .then(async (r) => {
-        this.lastCycle = { id: r.cycleId, at: new Date(), status: r.status, summary: r.summary }
-        for (const [symbol, f] of r.features) this.d.hub.features.set(symbol, f)
-        if (r.candidates) this.focusSymbols = [...new Set([...r.candidates, ...(request.requested ?? [])])]
-        // Only cycles that reached the AI count toward the minimum gap between AI cycles.
-        if (r.status !== "skipped" && !r.summary.startsWith("idle")) this.lastAiCycleAt = Date.now()
-        await this.eventQueue.served(queued, r.cycleId, startedAt)
-      })
-      .catch(async (error) => {
-        this.d.log.error("cycle crashed", { error: errorMessage(error) })
-        await this.d.alerts.send("error", "Decision cycle crashed", errorMessage(error))
-      })
-      .finally(() => {
-        this.cycle = null
-        this.setCycleState("idle")
-        // Triggers that arrived meanwhile run now.
-        this.eventQueue.drain()
-      })
-  }
-
   private async periodic() {
     await this.d.ledger.snapshot()
     if (Date.now() - this.lastSummaryAt < 3_600_000) return
@@ -523,9 +394,9 @@ export class Engine {
     )
   }
 
-  /** Crypto's own commands; the shared ones (pause, kill switch, settings, seed, replay) go to the control plane. */
+  /** Crypto's own commands; the shared ones (pause, kill switch, settings, replay, the agent's) go to the control plane. */
   private async handleCommand(command: Command, doc: CommandDoc): Promise<string> {
-    const { state, settings, ledger, cli, bus } = this.d
+    const { state, settings, ledger, cli } = this.d
     const by = doc.created_by
     switch (command.type) {
       case "strategy.set_enabled": {
@@ -545,7 +416,7 @@ export class Engine {
         return `${report.order.status}: sold ${report.order.filled_qty} ${position.symbol}`
       }
       case "paper.reset": {
-        if (this.cycle) throw new Error("a cycle is running; try again in a minute")
+        if (this.agent.agent.current) throw new Error("the agent is deciding; try again in a minute")
         const s = settings.current
         const config = { capital: s.paper.starting_usd, feeRate: s.kraken.taker_fee_bps / 10_000, slippageRate: s.kraken.paper_slippage_bps / 10_000 }
         await cli.reset(config)
@@ -554,17 +425,8 @@ export class Engine {
         await this.reconcile()
         return `paper wallet reset to $${s.paper.starting_usd.toLocaleString("en-US")} (fee ${s.kraken.taker_fee_bps} bps, slippage ${s.kraken.paper_slippage_bps} bps)`
       }
-      case "backtest.run": {
-        const id = randomUUID()
-        void runBacktest({ col: this.d.db.col, rest: this.d.rest, pairs: this.d.hub.pairs, settings: settings.current, dataDir: this.d.env.BACKTEST_DATA_DIR, params: command.params, id }).then((r) =>
-          bus.emit(
-            "backtest.completed",
-            { backtest_id: r._id, total_return_pct: r.metrics?.total_return_pct ?? null, sharpe: r.metrics?.sharpe ?? null, max_drawdown_pct: r.metrics?.max_drawdown_pct ?? null },
-            { summary: r.status === "completed" ? `Backtest done: ${r.metrics?.total_return_pct ?? "n/a"}% return` : `Backtest failed: ${r.error}` },
-          ),
-        )
-        return `backtest ${id.slice(0, 8)} started`
-      }
+      case "backtest.run":
+        throw new Error("the backtester is gone: the agent decides")
       default:
         return this.control.handle(command, by)
     }
@@ -578,12 +440,10 @@ export class Engine {
     bus.emit("engine.stopping", { reason }, { summary: `Engine stopping (${reason})`, level: "warn" })
     this.commands.shutdown()
     this.d.wire.stop()
-    this.eventQueue.stop()
     for (const stop of this.stops) stop()
     this.agent.agent.stop()
     // Abort in-flight AI calls; an order already handed to the wallet still completes.
     this.abort.abort()
-    if (this.cycle) await withTimeout(this.cycle, 20_000, "cycle shutdown").catch(() => undefined)
     if (this.agent.agent.current) await withTimeout(this.agent.agent.current, 20_000, "agent shutdown").catch(() => undefined)
     await this.reporter.write().catch(() => undefined)
   }

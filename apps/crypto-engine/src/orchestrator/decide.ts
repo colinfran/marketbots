@@ -7,7 +7,6 @@ import type { Settings } from "@mb/crypto-core/settings"
 import { ACCOUNT_ID, MODE } from "@mb/crypto-core/venues"
 import { errorMessage } from "@mb/engine-kit/log"
 import { cleanLine } from "@mb/engine-kit/util/text"
-import { CRYPTO_PROMPT_VERSION } from "../ai/prompts"
 import { computeFeatures, type Features } from "../market/features"
 import { correlatedWith, type correlationMatrix } from "../risk/correlation"
 import { evaluateCryptoEntry, evaluateExit, type RiskResult } from "../risk/engine"
@@ -73,7 +72,8 @@ export type DecisionInput = {
    * risk engine skips only its conviction, edge and reward:risk gates. Every cap still applies.
    */
   seed?: { notionalUsd: number }
-  promptVersion?: string
+  /** The agent's prompt version. */
+  promptVersion: string
   /** Event decisions: the wire items behind them. */
   wireItemIds?: string[]
   /** The agent's decisions (level auto): the episode, recorded on the decision, and the most its envelope lets a buy commit. */
@@ -143,7 +143,7 @@ export const processDecision = async (ctx: EngineContext, i: DecisionInput): Pro
     risk: null,
     execution: { status: "not_applicable", order_ids: [], filled_qty: 0, avg_price: null, notes: [] },
     model: i.decisionModel,
-    prompt_version: i.promptVersion ?? CRYPTO_PROMPT_VERSION,
+    prompt_version: i.promptVersion,
     settings_version: ctx.settings.version,
     outcome_due_at: new Date(now.getTime() + Math.min(MAX_HORIZON_HOURS, Math.max(1, d.horizon_hours)) * HOUR),
     outcome: null,

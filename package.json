@@ -13,7 +13,6 @@
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
-    "lint": "pnpm -r lint",
-    "backtest": "pnpm --filter @mb/crypto-engine backtest"
+    "lint": "pnpm -r lint"
   }
 }

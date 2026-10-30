@@ -9,7 +9,7 @@ import { build } from "esbuild"
  * dependency, needed for SCRAM auth, so it is bundled.)
  */
 await build({
-  entryPoints: ["src/main.ts", "src/backtest/cli.ts"],
+  entryPoints: ["src/main.ts"],
   outdir: "dist",
   bundle: true,
   platform: "node",
@@ -34,4 +34,4 @@ await build({
     js: "import { createRequire as __cmbCreateRequire } from 'node:module'; const require = __cmbCreateRequire(import.meta.url);",
   },
 })
-console.log("built dist/main.js and dist/backtest/cli.js")
+console.log("built dist/main.js")

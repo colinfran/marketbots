@@ -1,9 +1,7 @@
 import type { DecisionDoc, PositionDoc } from "@mb/crypto-core/db"
 import { DEFAULT_SETTINGS } from "@mb/crypto-core/settings"
 import { describe, expect, it } from "vitest"
-import { aggregate, simulate } from "../src/backtest/simulate"
 import { classifyRegime, computeFeatures } from "../src/market/features"
-import { recentlyJudged, reviewsDue } from "../src/orchestrator/crypto-cycle"
 import { viableSetup } from "../src/orchestrator/decide"
 import { firstTouch, scoreDecision } from "../src/orchestrator/outcomes"
 import { correlatedWith, correlationMatrix } from "../src/risk/correlation"
@@ -11,12 +9,33 @@ import { dailyTrendStrategy } from "../src/strategies/daily-trend"
 import { meanReversionStrategy } from "../src/strategies/mean-reversion"
 import { screenCrypto } from "../src/strategies/registry"
 import { useTestDb } from "./helpers/db"
+import type { Candle } from "../src/venues/kraken/rest"
 import { candles, quote } from "./helpers/fakes"
 
 const HOUR = 3_600_000
 
 /** A steady uptrend with small noise, then a fresh push to new highs. */
 const uptrend = (n: number, start = 100) => Array.from({ length: n }, (_, i) => start * (1 + 0.002 * i) * (1 + (i % 3 === 0 ? 0.001 : -0.0005)))
+
+/** Hourly candles grouped into longer ones (4 h, daily). */
+const aggregate = (candles: Candle[], factor: number): Candle[] => {
+  const out: Candle[] = []
+  for (let i = 0; i + factor <= candles.length; i += factor) {
+    const g = candles.slice(i, i + factor)
+    const volume = g.reduce((s, c) => s + c.volume, 0)
+    out.push({
+      t: g[0].t,
+      open: g[0].open,
+      high: Math.max(...g.map((c) => c.high)),
+      low: Math.min(...g.map((c) => c.low)),
+      close: g[g.length - 1].close,
+      vwap: volume > 0 ? g.reduce((s, c) => s + c.vwap * c.volume, 0) / volume : g[g.length - 1].close,
+      volume,
+      trades: g.reduce((s, c) => s + c.trades, 0),
+    })
+  }
+  return out
+}
 
 const featureSet = (closes1h: number[]) => {
   const h1 = candles(closes1h)
@@ -54,33 +73,6 @@ describe("correlation", () => {
     const m = correlationMatrix(new Map([["A", a], ["B", a.map((x) => x * 2)], ["C", a.map((_, i) => 100 + Math.sin(i))]]))
     expect(m.get("A")!.get("B")).toBeCloseTo(1, 5)
     expect(correlatedWith("A", ["B", "C", "Z"], m, 0.75)).toEqual(["B", "Z"])
-  })
-})
-
-describe("backtest", () => {
-  const params = { symbols: ["BTC/USD"], strategies: ["trend", "mean_reversion", "momentum"] as ("trend" | "mean_reversion" | "momentum")[], interval: 60 as const, starting_usd: 10_000, slippage_bps: 5, fee_bps: 40, in_sample_fraction: 0.7 }
-
-  it("trades and reports metrics with costs", () => {
-    const series = new Map([["BTC/USD", candles(uptrend(24 * 60))]])
-    const r = simulate(series, params, DEFAULT_SETTINGS)
-    expect(r.metrics).not.toBeNull()
-    expect(r.trades.length).toBeGreaterThan(0)
-    expect(r.equity_curve.length).toBeGreaterThan(10)
-    expect(r.benchmarks.buy_hold_btc_pct).not.toBeNull()
-  })
-
-  it("has no look-ahead: changing the future doesn't change past trades", () => {
-    const base = uptrend(24 * 60)
-    const crashed = [...base.slice(0, 24 * 50), ...base.slice(24 * 50).map((x) => x * 0.5)]
-    const a = simulate(new Map([["BTC/USD", candles(base)]]), params, DEFAULT_SETTINGS)
-    const b = simulate(new Map([["BTC/USD", candles(crashed)]]), params, DEFAULT_SETTINGS)
-    const cutoff = Date.UTC(2026, 0, 1) + 24 * 50 * HOUR
-    const before = (r: typeof a) => r.trades.filter((t) => t.exit_at.getTime() < cutoff).map((t) => [t.entry_at.getTime(), t.entry_price, t.exit_price])
-    expect(before(b)).toEqual(before(a))
-  })
-
-  it("refuses to backtest without enough history", () => {
-    expect(simulate(new Map([["BTC/USD", candles(uptrend(100))]]), params, DEFAULT_SETTINGS).notes.at(-1)).toMatch(/Not enough history/)
   })
 })
 
@@ -152,31 +144,4 @@ describe("setups the AI is asked about", () => {
     expect(viableSetup({ stop_hint: 95, target_hint: 115 }, 100, 87, k)).toBe(true) // a daily-trend 3R setup
   })
 
-  it("doesn't re-ask about a setup the AI ruled on: daily-trend for a day, the others for 2 hours", async () => {
-    const now = Date.UTC(2026, 9, 27, 12)
-    const decision = (symbol: string, strategy_id: DecisionDoc["strategy_id"], minutesAgo: number) =>
-      ({ _id: `${symbol}-${strategy_id}`, symbol, strategy_id, created_at: new Date(now - minutesAgo * 60_000) }) as unknown as DecisionDoc
-    await db.col.decisions.insertMany([
-      decision("TRX/USD", "mean_reversion", 90),
-      decision("SOL/USD", "mean_reversion", 150),
-      decision("BTC/USD", "daily_trend", 20 * 60),
-      decision("ETH/USD", "daily_trend", 25 * 60),
-      decision("XRP/USD", "discretionary", 10), // the owner's requests are always asked
-    ])
-    expect([...(await recentlyJudged(db.col, now))].sort()).toEqual(["BTC/USD daily_trend", "TRX/USD mean_reversion"])
-  })
-})
-
-describe("position reviews", () => {
-  const now = Date.now()
-  const f = { ...featureSet(uptrend(24 * 45))!, price: 101.5, atr_1h: 0.5, atr_pct_1d: 3 }
-  const position = (strategy_id: "trend" | "daily_trend", ageHours: number) =>
-    ({ symbol: "BTC/USD", strategy_id, opened_at: new Date(now - ageHours * HOUR), last_reviewed_at: null, last_review_price: null, avg_price: 100, horizon_hours: 336 }) as unknown as PositionDoc
-  const due = (p: PositionDoc) => reviewsDue([p], new Map([["BTC/USD", f]]), new Set(), 240, 1.5, now)
-
-  it("reviews long-term holds daily and on daily-ATR moves, not hourly ones", () => {
-    expect(due(position("trend", 1))).toHaveLength(1) // 1.5% ≥ 1.5 × hourly ATR
-    expect(due(position("daily_trend", 5))).toEqual([]) // same move is noise on the daily chart
-    expect(due(position("daily_trend", 25))[0].reason).toMatch(/scheduled review/)
-  })
 })

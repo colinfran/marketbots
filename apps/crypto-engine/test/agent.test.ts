@@ -9,7 +9,6 @@ import { actOnCryptoAnswer, liveEnvelopeHistory } from "../src/agent/live"
 import { cryptoBrief, CryptoMarketView, CryptoObserver } from "../src/agent/observe"
 import { cryptoAgentTools } from "../src/agent/tools"
 import { bookText } from "../src/agent/view"
-import type { AiRunner } from "../src/ai/runner"
 import type { Alerts } from "../src/alerts"
 import { Executor } from "../src/execution/executor"
 import { PaperWalletExecution } from "../src/execution/paper-wallet"
@@ -40,7 +39,6 @@ const setup = async (settings: Settings = DEFAULT_SETTINGS, quotes = { "BTC/USD"
     candles: { get: async () => Promise.reject(new Error("no candles in this test")), expire: vi.fn() } as unknown as CandleCache,
     ledger,
     executor: new Executor(db.col, ledger, new PaperWalletExecution(new FakeWallet().cli(), hub), bus, silentLogger),
-    ai: {} as AiRunner,
     alerts: { send: vi.fn(), success: vi.fn(async () => undefined) } as unknown as Alerts,
     gate: () => ({ runStatus: "running", killSwitch: false, venueOnline: true, reconciled: true }),
     feeBps: () => 40,

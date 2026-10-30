@@ -5,7 +5,6 @@ import type { EngineEvent } from "@mb/crypto-core/events"
 import { AiCallLog } from "@mb/engine-kit/ai/call-log"
 import { createLogger, silentLogger } from "@mb/engine-kit/log"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { AiRunner } from "../src/ai/runner"
 import { Alerts } from "../src/alerts"
 import type { EventBus } from "../src/bus/event-bus"
 import type { Database } from "../src/db/mongo"
@@ -48,16 +47,8 @@ const command = async (c: Command): Promise<CommandDoc> => {
   return (await db.col.commands.findOne({ _id: id }))!
 }
 
-const focus = { symbol: "BTC/USD", rule: "held_negative", action: "review" as const, severity: 70, polarity: -1 as const, item_ids: ["i1"], trigger_id: "t1", headline: "BTC exchange hack" }
-
-/** The trigger record the wire policy writes when it queues a focus. */
-const queuedTrigger = (id: string) =>
-  db.col.wireTriggers.insertOne({ _id: id, at: new Date(), rule: "held_negative", action: "review", status: "queued", reason: "queued behind a running cycle or the minimum gap", item_ids: ["i1"], symbols: ["BTC/USD"], severity: 70, cycle_id: null, queue_wait_ms: null, expires_at: new Date(Date.now() + 86_400_000) })
 
 type Internals = {
-  eventQueue: Map<string, { severity: number; item_ids: string[]; trigger_id: string }>
-  /** The 30-second scheduler tick: after a resume, the first one drains the event queue. */
-  schedule: () => Promise<void>
   /** At startup: an earlier breaker's drop to the old shadow level becomes a pause on entries. */
   upgradeDemotion: () => Promise<void>
 }
@@ -69,7 +60,6 @@ beforeEach(async () => {
   queues = []
   lines = []
   bus.subscribe((e) => events.push(e))
-  await db.col.cycles.insertOne({ _id: "interrupted", status: "running" } as never)
   const env = loadEnv({ MONGODB_URI: "mongodb://test", STREAM_TOKEN_SECRET: "x".repeat(40), ENGINE_INSTANCE: "test" })
   const settings = await loadSettings(db.col, env, silentLogger)
   const state = await EngineStateStore.load(db.col)
@@ -90,7 +80,6 @@ beforeEach(async () => {
     cli,
     ledger,
     executor: new Executor(db.col, ledger, new PaperWalletExecution(cli, hub), bus, silentLogger),
-    ai: new AiRunner(calls, silentLogger),
     calls,
     alerts: new Alerts(db.col, bus, silentLogger, null, null),
     stream: { clientCount: 0 } as unknown as StreamServer,
@@ -148,7 +137,6 @@ describe("Engine", () => {
       "agent",
     ])
     expect(engine.ready).toBe(true)
-    expect(await db.col.cycles.findOne({ _id: "interrupted" })).toMatchObject({ status: "failed", error: "the engine restarted during this cycle" })
     expect(events.map((e) => e.type)).toEqual(expect.arrayContaining(["engine.started", "engine.status", "alert"]))
   })
 
@@ -158,10 +146,7 @@ describe("Engine", () => {
     expect(await command({ type: "agent.ask", question: "What do you hold?" })).toMatchObject({ status: "failed", error: "the agent needs the model server (LLM_URL)" })
   })
 
-  it("runs no timed cycles: news triggers and Wake the agent go to the agent", async () => {
-    expect(engine.requestEventCycle(focus)).toBe("agent")
-    await internals().schedule()
-    expect(await db.col.cycles.countDocuments({ _id: { $ne: "interrupted" } })).toBe(0)
+  it("runs no timed cycles: Wake the agent goes to the agent", async () => {
     expect(await command({ type: "cycle.run_now", symbols: ["BTC/USD"] })).toMatchObject({ status: "failed", error: "the agent needs the model server (LLM_URL)" })
     await until(async () => (await db.col.engineStatus.findOne({ _id: "engine" }))?.agent?.level === "on")
     expect((await db.col.engineStatus.findOne({ _id: "engine" }))!.next_cycle_at).toBeNull()

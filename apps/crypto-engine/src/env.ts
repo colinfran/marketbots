@@ -36,8 +36,6 @@ const envSchema = z.object({
     .regex(/^[a-z0-9][a-z0-9-]{1,40}$/, "KRAKEN_WORKSPACE must be lowercase letters, digits and dashes")
     .default("cryptomarketbot"),
   KRAKEN_CLI_TIMEOUT_MS: z.coerce.number().int().min(2_000).max(120_000).default(20_000),
-  /** Optional folder of Kraken OHLCVT CSV files for longer backtests (e.g. XBTUSD_60.csv). */
-  BACKTEST_DATA_DIR: optional,
   /** Kraken's OHLCVT history, extracted per archive into subfolders (full/, 2026Q3/…), for the history backfill. */
   KRAKEN_OHLCVT_DIR: optional,
 

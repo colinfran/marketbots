@@ -50,8 +50,8 @@ export type StatusReporterDeps<D extends Base> = {
   version: string
   /** The engine's run status, cycle state and current task, read at each beat. */
   run: () => { status: D["status"]; cycle_state: D["cycle_state"]; current_task: string | null }
-  /** Triggers waiting for an event cycle. */
-  eventQueue: () => string[]
+  /** Triggers waiting for an event cycle (none where the agent takes them). */
+  eventQueue?: () => string[]
   /** The bot's document: the shared parts and its own section, in its field order. */
   doc: (parts: StatusParts<D["status"], D["cycle_state"]>) => D
 }
@@ -84,7 +84,7 @@ export class StatusReporter<D extends Base> {
         },
         system: this.sampler.sample(),
       },
-      health: { errors_last_hour: errors, wire: this.d.wire.health({ triggers_today: this.triggersToday, event_queue: this.d.eventQueue() }) },
+      health: { errors_last_hour: errors, wire: this.d.wire.health({ triggers_today: this.triggersToday, event_queue: this.d.eventQueue?.() ?? [] }) },
     }
     await col.engineStatus.replaceOne({ _id: "engine" }, this.d.doc(parts), { upsert: true })
     if (Math.floor(Date.now() / 5_000) % 3 === 0) {

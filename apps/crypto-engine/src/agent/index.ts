@@ -38,7 +38,6 @@ export const createCryptoAgent = ({
   calls,
   models,
   llmUrl,
-  busy,
   pause,
   promotion,
 }: {
@@ -48,8 +47,6 @@ export const createCryptoAgent = ({
   /** The live model feed: each step streams there. */
   models?: ModelCalls
   llmUrl: string | null
-  /** Why the engine wants no episode to act now (its one-time seed is running), or null. */
-  busy?: () => string | null
   /** A breaker's pause on new entries, kept in the engine's state. */
   pause?: { get: () => Pause | null; set: (p: Pause | null, by: string) => Promise<void> }
   /** When the agent was last turned on or its entries resumed, kept in the engine's state. */
@@ -92,7 +89,7 @@ export const createCryptoAgent = ({
     alert: (title, message, key) => ctx.alerts.send("warning", title, message, { key, path: "/agent" }),
     blocked: () => {
       const g = ctx.gate()
-      return g.killSwitch ? "the kill switch is engaged" : g.runStatus !== "running" ? `trading is ${g.runStatus}` : (busy?.() ?? null)
+      return g.killSwitch ? "the kill switch is engaged" : g.runStatus !== "running" ? `trading is ${g.runStatus}` : null
     },
     price: (symbol) => ctx.hub.quote(symbol)?.mid ?? null,
     bot,

@@ -4,11 +4,7 @@ import { startModelFeed } from "@mb/engine-kit/ai/feed"
 import { bootstrap } from "@mb/engine-kit/bootstrap"
 import { newsMovesJob } from "@mb/history/moves"
 import { HistoryStore } from "@mb/history/store"
-import { mongoSearchMeter } from "@mb/engine-kit/state/search-usage"
-import { httpClient } from "@mb/engine-kit/util/http"
-import { localResearcher } from "@mb/wire/research/local"
 import { krakenDailyJob, krakenFilesJob, krakenGapJob } from "./history/backfill"
-import { AiRunner } from "./ai/runner"
 import { Alerts } from "./alerts"
 import { EventBus } from "./bus/event-bus"
 import { connectDatabase } from "./db/mongo"
@@ -61,26 +57,6 @@ void bootstrap({
     // The live model feed: every model call streams its text to the dashboards (owner-only unless agent.public_thinking).
     const feed = startModelFeed({ bus, stream, llmUrl: env.LLM_URL, visibility: () => (settings.current.agent.public_thinking ? "public" : "owner") })
     const models = feed.models
-    const ai = new AiRunner(calls, log.child({ component: "ai" }), {
-      localUrl: env.LLM_URL,
-      // Research for local/… models: our search service and scraper, read by the local model.
-      localResearch: localResearcher({
-        request: httpClient(env.SEC_USER_AGENT ?? DEFAULT_USER_AGENT).requestText,
-        env: {
-          LLM_URL: env.LLM_URL,
-          SEARCH_URL: env.SEARCH_URL,
-          SCRAPER_URL: env.SCRAPER_URL,
-          TAVILY_API_KEY: env.TAVILY_API_KEY,
-          EXA_API_KEY: env.EXA_API_KEY,
-          BRIGHTDATA_API_KEY: env.BRIGHTDATA_API_KEY,
-          BRIGHTDATA_ZONE: env.BRIGHTDATA_ZONE,
-        },
-        client: "crypto",
-        log: log.child({ component: "research" }),
-        meter: mongoSearchMeter(db.col.searchUsage),
-        models,
-      }),
-    })
 
     // Our own market data as a news source: price/volume anomalies and stablecoin depegs.
     const marketSignals = new KrakenMarketSignals(hub, () => settings.current, log.child({ component: "anomaly" }), (symbol, kind) => wire.recordAnomaly(symbol, kind))
@@ -119,7 +95,7 @@ void bootstrap({
       history.start()
     }
 
-    engine = new Engine({ env, log, db, bus, settings, state, hub, rest, candles, cli, ledger, executor, ai, calls, alerts, stream, wire, history, models })
+    engine = new Engine({ env, log, db, bus, settings, state, hub, rest, candles, cli, ledger, executor, calls, alerts, stream, wire, history, models })
     return {
       engine,
       stop: () => {

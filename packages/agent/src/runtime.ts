@@ -170,6 +170,11 @@ export class Agent<A extends AgentAnswerBase> {
     this.running?.abort.abort()
   }
 
+  /** The symbols the agent's active watches name: the news engine's focus. */
+  watchedSymbols(): string[] {
+    return [...new Set(this.watches.filter((w) => w.status === "active" && w.symbol).map((w) => w.symbol!))]
+  }
+
   /** When the last episode finished (null since the engine started): the bots' quiet-time review waits on it. */
   get lastEpisodeAt(): Date | null {
     return this.lastFinishedAt
