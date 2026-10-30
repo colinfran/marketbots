@@ -26,7 +26,16 @@ The two engines are independent: separate images, containers, ports, env files, 
 2. *Networking*: the firewall rule `0.0.0.0 – 255.255.255.255`. Vercel connects from changing IPs (and isn't on Azure, so *Allow Azure services* doesn't cover it); the strong password is the protection. With no rule, nothing connects.
 3. *Connection strings*: copy the `mongodb+srv://…` string and put the password in.
 
-The free tier has no backups and no high availability, and pauses after 60 days without a connection (the engines are always connected). One free cluster per Azure subscription. Admin → System's *Database storage* card shows how much of the 32 GB the databases take (`DB_STORAGE_LIMIT_BYTES` in `@mb/core/db`: change it with the tier). It counts what MongoDB reports; Azure's own storage metric (portal → the cluster → *Metrics*) also counts its logs and system files.
+The free tier has no backups and no high availability, and pauses after 60 days without a connection (the engines are always connected). One free cluster per Azure subscription. Admin → System's *Database storage* card shows how full the disk is. With the four `AZURE_*` variables (below) it shows Azure Monitor's count, `StorageUsed` against the disk it fills: the databases plus their logs and system files, which on 2026-10-30 were 4.6 GB of 31.2 GB while the databases themselves were 192 MB. Without them it shows only what MongoDB reports, against `DB_STORAGE_LIMIT_BYTES` in `@mb/core/db` (32 GB).
+
+**Azure Monitor for the card** (optional): a service principal that can read the cluster's metrics and nothing else. Once, with the Azure CLI signed in as the subscription's owner (`az login`):
+
+```powershell
+$id = az resource list --resource-type Microsoft.DocumentDB/mongoClusters --query "[0].id" --output tsv
+az ad sp create-for-rbac --name marketbots-metrics --role "Monitoring Reader" --scopes $id --years 2
+```
+
+Its output has `tenant`, `appId` and `password`: they go into `AZURE_TENANT_ID`, `AZURE_CLIENT_ID` and `AZURE_CLIENT_SECRET`, and `$id` into `AZURE_DOCUMENTDB_RESOURCE_ID`, on both Vercel projects (§3.4) and in `.env.crypto` / `.env.stock` for local dev. The secret expires after 2 years: the card then shows *Azure sign-in failed (HTTP 401)*; run `az ad sp credential reset --id <appId> --years 2` and update the four places.
 
 **Alpaca (stock)**: the paper account, reset to **10,000**. Total return is measured from $10,000 and every P&L number comes from Alpaca, so the account belongs to this bot alone. A reset can issue new keys. Debit spreads need **options level 3** (Admin shows the level the engine sees). Alpaca's free market-data stream allows **one connection per account**: never run a second engine, script or notebook with these keys.
 
@@ -164,6 +173,7 @@ Set for Production and Preview, with the same values as the bot's env file. Verc
 | `NEXT_PUBLIC_DISPLAY_TIMEZONE` | DASHBOARD | `America/Los_Angeles` |
 | `HOST_DB_NAME` | DASHBOARD | optional: the host agent's database (default `serverstats`, §11) |
 | `SITE_URL` | DASHBOARD | optional: defaults to the project's production domain |
+| `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_DOCUMENTDB_RESOURCE_ID` | DASHBOARD | optional, all four or none: Azure Monitor's count of the database's storage on Admin → System (§1) |
 
 **Stock** (the stockmarketbot.app project):
 
@@ -179,6 +189,7 @@ Set for Production and Preview, with the same values as the bot's env file. Verc
 | `DISCORD_WEBHOOK_URL` | DASHBOARD | optional: unhandled dashboard errors go to Discord (the engine reads the same variable for its alerts) |
 | `HOST_DB_NAME` | DASHBOARD | optional: the host agent's database (default `serverstats`, §11) |
 | `SITE_URL` | DASHBOARD | optional: defaults to the project's production domain |
+| `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_DOCUMENTDB_RESOURCE_ID` | DASHBOARD | optional, all four or none: Azure Monitor's count of the database's storage on Admin → System (§1) |
 
 Nothing from the ENGINE sections goes to Vercel: the dashboards hold no broker or AI keys. Vercel sets `VERCEL_PROJECT_PRODUCTION_URL` itself (the default for `SITE_URL`); sign in on the production domain, not on preview URLs.
 

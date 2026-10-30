@@ -227,12 +227,15 @@ export type CycleKind = "scheduled" | "price_move" | "manual" | "event" | "seed"
 /** Rate-limit counter for the dashboard's sign-in endpoints, keyed by a hash of client IP + path. */
 export type LoginAttemptDoc = { _id: string; count: number; first_at: Date; expires_at: Date }
 
-/** The cluster's storage cap: the Azure DocumentDB free tier (docs/SERVER.md §1). MongoDB can't report it. */
+/**
+ * The cluster's storage cap: the Azure DocumentDB free tier (docs/SERVER.md §1). MongoDB can't report
+ * it; Azure Monitor can, so this is only used without the AZURE_* variables.
+ */
 export const DB_STORAGE_LIMIT_BYTES = 32 * 1024 ** 3
 
 /**
  * Admin → System's database card: what the cluster's databases take on disk, as MongoDB reports it
- * (`used_bytes` null and `error` set when it couldn't be read).
+ * (`used_bytes` null and `error` set when it couldn't be read), and the disk as Azure counts it.
  */
 export type DatabaseStorageView = {
   used_bytes: number | null
@@ -240,6 +243,12 @@ export type DatabaseStorageView = {
   /** Each database's data and indexes on disk, largest first. */
   databases: { name: string; bytes: number }[]
   error: string | null
+  /**
+   * Azure Monitor's storage metrics (StorageUsed, StoragePercent): data, indexes, logs and system
+   * files, against the disk they fill. Null without the AZURE_* variables or when they failed.
+   */
+  azure: { used_bytes: number; limit_bytes: number; percent: number; at: Date } | null
+  azure_error: string | null
 }
 
 /** UTC calendar day, e.g. "2026-10-25". */

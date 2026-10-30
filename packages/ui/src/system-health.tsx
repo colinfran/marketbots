@@ -133,31 +133,45 @@ export function HistoryHealthCard({ history }: { history: NonNullable<Status["hi
   )
 }
 
-/** The MongoDB cluster both bots share: its databases on disk against the storage cap, read when the page loads. */
+/**
+ * The MongoDB cluster both bots share, read when the page loads. With Azure Monitor configured, the
+ * headline is the disk as Azure counts it (logs and system files included) and the databases are a
+ * part of it; without, it is the databases against the free tier's cap.
+ */
 export function DatabaseStorageCard({ storage }: { storage: DatabaseStorageView }) {
-  const used = storage.used_bytes
-  const usedPct = used === null ? null : (used / storage.limit_bytes) * 100
+  const az = storage.azure
+  const used = az ? az.used_bytes : storage.used_bytes
+  const limit = az ? az.limit_bytes : storage.limit_bytes
+  const usedPct = az ? az.percent : used === null ? null : (used / limit) * 100
+  const errors = [storage.azure_error, storage.error].filter((e): e is string => !!e)
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
-          <HealthDot ok={usedPct !== null && usedPct < 80} /> Database storage
+          <HealthDot ok={usedPct !== null && usedPct < 80 && !errors.length} /> Database storage
         </CardTitle>
       </CardHeader>
       <CardContent>
         <Meter value={usedPct} className="mb-2" />
-        <KV label="Used">{used === null ? "—" : `${bytes(used)} of ${bytes(storage.limit_bytes)} (${num(usedPct, 1)}%)`}</KV>
-        <KV label="Free">{used === null ? "—" : bytes(Math.max(0, storage.limit_bytes - used))}</KV>
+        <KV label={az ? "On disk (Azure)" : "Used"}>{used === null ? "—" : `${bytes(used)} of ${bytes(limit)} (${num(usedPct, 1)}%)`}</KV>
+        <KV label="Free">{used === null ? "—" : bytes(Math.max(0, limit - used))}</KV>
+        {az && <KV label="Databases (MongoDB)">{bytes(storage.used_bytes)}</KV>}
         {storage.databases.map((d) => (
           <KV key={d.name} label={d.name}>
             {bytes(d.bytes)}
           </KV>
         ))}
-        {storage.error ? (
-          <p className="text-loss mt-2 line-clamp-3 text-xs">{storage.error}</p>
-        ) : (
-          <p className="text-muted-foreground mt-2 text-xs">The Azure DocumentDB free tier, shared by both bots. Azure&apos;s own storage metric also counts its logs and system files.</p>
-        )}
+        {az && <KV label="Azure measured">{ago(az.at)}</KV>}
+        {errors.map((e) => (
+          <p key={e} className="text-loss mt-2 line-clamp-3 text-xs">
+            {e}
+          </p>
+        ))}
+        <p className="text-muted-foreground mt-2 text-xs">
+          {az
+            ? "The Azure DocumentDB free tier, shared by both bots. Azure counts the disk: the databases plus their logs and system files."
+            : "The Azure DocumentDB free tier, shared by both bots: the databases as MongoDB reports them. Azure's own count, with logs and system files, needs the AZURE_* variables."}
+        </p>
       </CardContent>
     </Card>
   )

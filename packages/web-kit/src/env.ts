@@ -34,6 +34,11 @@ export const dashboardEnv = ({ dbName }: { dbName: string }) => ({
   siteUrl: () => read("SITE_URL") ?? (read("VERCEL_PROJECT_PRODUCTION_URL") ? `https://${read("VERCEL_PROJECT_PRODUCTION_URL")}` : null),
   /** Optional: unhandled server errors on the dashboard are posted here. */
   discordWebhookUrl: () => read("DISCORD_WEBHOOK_URL"),
+  /** Optional, all four or none: Azure Monitor's count of the database's storage (Admin → System; @mb/web-kit/azure). */
+  azureTenantId: () => read("AZURE_TENANT_ID"),
+  azureClientId: () => read("AZURE_CLIENT_ID"),
+  azureClientSecret: () => read("AZURE_CLIENT_SECRET"),
+  azureDocumentDbResourceId: () => read("AZURE_DOCUMENTDB_RESOURCE_ID"),
 })
 
 export type DashboardEnv = ReturnType<typeof dashboardEnv>
