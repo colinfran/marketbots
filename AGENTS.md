@@ -56,7 +56,7 @@ The shared packages are `packages/config`, `packages/core`, `packages/engine-kit
 4. **Consumers** add `"@mb/<name>": "workspace:*"` to their dependencies and import by subpath: `@mb/core/math` is `packages/core/src/math.ts`.
    - Packages ship TypeScript source, with no build step and no `dist/`.
    - Engines need nothing more: esbuild bundles the source, and the engine Dockerfiles copy `packages/` whole.
-   - Dashboards also list the package in `transpilePackages` in `next.config.ts`, and the package path must be in both Vercel Ignored Build Step commands ([docs/SERVER.md §8.2](docs/SERVER.md#82-ignored-build-step)).
+   - Dashboards also list the package in `transpilePackages` in `next.config.ts`. Vercel builds an app when a package in its `dependencies` changes, so the dependency entry is what matters ([docs/SERVER.md §8.2](docs/SERVER.md#82-skipping-unaffected-builds)).
    - For `@mb/ui`, each app's `globals.css` also needs an `@source` for the package: Tailwind v4 doesn't scan workspace symlinks by itself.
 5. **Update the tables** in docs/ARCHITECTURE.md.
 

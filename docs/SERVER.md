@@ -572,46 +572,55 @@ Until 2026-10-28 each bot had its own Atlas cluster: `cryptomarketbot` on the `c
 
 ## 8. Vercel
 
-Both dashboards are on Vercel, in the same two projects as before the merge, with the same domains, env vars and auth. Both build from `colinfran/marketbots`.
+Three Vercel projects build from `colinfran/marketbots`, on the Hobby plan of the `colinfran` team:
+
+| Project | Root Directory | Domain |
+|---|---|---|
+| `cryptomarketbot` | `apps/crypto-web` | cryptomarketbot.app |
+| `stockmarketbot` | `apps/stock-web` | stockmarketbot.app |
+| `marketbots` | `apps/landing` | marketbots.vercel.app |
+
+The two dashboards are the same projects as before the merge, with the same domains, env vars and auth.
 
 ### 8.1 Project settings
 
 In each project:
 
 1. *Settings → Build and Deployment*:
-   - **Root Directory**: `apps/crypto-web` (stock: `apps/stock-web`).
+   - **Root Directory**: as in the table above.
    - **Include files outside the root directory in the Build Step**: on. The apps import `packages/*`.
-   - **Node.js Version**: 22.x.
+   - **Skip deployments when there are no changes to the root directory or its dependencies**: on (§8.2).
+   - **Node.js Version**: 24.x.
    - Framework Next.js; install and build commands default (pnpm is detected from the root lockfile).
-2. *Settings → Git → Ignored Build Step*: Custom, with the bot's command from §8.2.
-3. *Settings → Git*: repo `colinfran/marketbots`, production branch `main`.
+2. *Settings → Git*: repo `colinfran/marketbots`, production branch `main`. No custom Ignored Build Step.
 
 After a deploy, check that you can sign in, the stream connects, and a *Pause* / *Resume* round trip works. The old repos no longer deploy anything and can be archived (read-only).
 
-### 8.2 Ignored Build Step
+### 8.2 Skipping unaffected builds
 
-So that a push touching only one bot doesn't rebuild the other bot's dashboard.
+So that a push touching only one bot doesn't rebuild the other bot's dashboard. Vercel reads the pnpm workspace: a project builds when a commit changes its Root Directory or a workspace package it depends on (its `package.json`, followed through the packages' own dependencies). Otherwise the commit shows *Skipped - Not affected*.
 
-Crypto:
-
-```sh
-[ -n "$VERCEL_GIT_PREVIOUS_SHA" ] && git diff --quiet "$VERCEL_GIT_PREVIOUS_SHA" HEAD -- :/apps/crypto-web :/packages/core :/packages/crypto-core :/packages/ui :/packages/web-kit :/packages/config :/pnpm-lock.yaml || exit 1
-```
-
-Stock:
-
-```sh
-[ -n "$VERCEL_GIT_PREVIOUS_SHA" ] && git diff --quiet "$VERCEL_GIT_PREVIOUS_SHA" HEAD -- :/apps/stock-web :/packages/core :/packages/stock-core :/packages/ui :/packages/web-kit :/packages/config :/pnpm-lock.yaml || exit 1
-```
-
-- Exit 0 skips the build, exit 1 builds. `git diff --quiet` exits 0 when none of the paths changed since the last deployed commit. Without a previous SHA (the first deploy), or with one git can't find, the command builds.
-- The `:/` prefix anchors each path at the repo root. Vercel runs the command from the project's Root Directory, where a plain `apps/crypto-web` would be read as `apps/crypto-web/apps/crypto-web`, match nothing, and skip every build.
-- A new shared package that a dashboard imports must be added to both commands.
-- A commit that touches only the root `package.json` or `pnpm-workspace.yaml` doesn't trigger a build; redeploy by hand if it matters.
+- A new shared package is covered once it's in the app's `dependencies`; there's no list to update.
+- Commits that touch only the engines, `docs/` or `contracts/` build nothing.
 
 ### 8.3 Bad deploys
 
-Vercel's instant rollback (*Deployments* → a previous deployment → *Instant Rollback*), as before.
+Vercel's instant rollback (*Deployments* → a previous deployment → *Instant Rollback*). Only the last few deployments are kept (§8.4); to go further back, redeploy an older commit.
+
+### 8.4 Deployment storage
+
+Every deployment Vercel keeps holds its own copy of the dashboard's server code (*Functions Storage*). The Hobby plan caps that at 10 GB for the whole team, all projects together, and going over can block deploys. With the default 30-day retention, a busy month of pushes fills it: on 2026-10-30 the team had ~400 kept deployments, ~300 of them these three projects'.
+
+- **Retention** (*Team Settings → Security & Privacy → Deployment Retention Policy*, applied to all existing projects): the shortest periods. Vercel still keeps each project's last 3 production deployments, so rollback works.
+- **Clean-up by hand**, if usage is high again: delete all but the live deployment and the two before it. Each project's *Deployments* page does it, or the CLI (`npx vercel login` first):
+
+  ```powershell
+  npx vercel list cryptomarketbot                  # newest first
+  npx vercel rm <deployment id> ... --safe --yes   # --safe skips anything on a domain
+  ```
+
+  Deleted deployments can be restored for a while from the project's *Settings → Security → Recently Deleted*.
+- Usage is counted in GB-months, so the figure on *Usage* can stay high until the billing period resets, even after a clean-up.
 
 ---
 
@@ -735,7 +744,8 @@ A run takes about a minute, and costs nothing (`ai_calls`: `cost_source: "local"
 | Stream stuck on "reconnecting" | Caddy isn't running or lacks the site, `STREAM_ALLOWED_ORIGINS` doesn't include the exact dashboard origin (handshake refused), or `STREAM_TOKEN_SECRET` differs between Vercel and the engine (connection closed with 4003). |
 | "Owner sign-in is not configured" | `BETTER_AUTH_SECRET` (32+ characters) or `MONGODB_URI` is missing on Vercel. |
 | No sign-in email arrives | `USESEND_API_KEY` is missing or wrong, or the sender domain isn't verified in useSend (Vercel function logs show the error). Only `OWNER_EMAIL` is ever emailed. |
-| Vercel skips every build | The Ignored Build Step paths aren't anchored with `:/` (§8.2). |
+| Vercel skips a build that changed a dashboard | The change was outside the app and its workspace dependencies, e.g. a package the app imports without listing it in `package.json` (§8.2). List it, or redeploy by hand. |
+| A deploy is blocked for storage, or *Functions Storage* is near 10 GB | Too many kept deployments (§8.4). |
 | Vercel build can't resolve `@mb/...` | *Include files outside the root directory* is off (§8.1). |
 | `llm` won't start: `could not select device driver "nvidia"` | Docker can't see the GPUs: update the NVIDIA driver and Docker Desktop, and check the WSL2 backend is on. |
 | `llm` exits at start with `cudaMalloc failed: out of memory` | Something else holds GPU memory (a game, a second model server, a big transcode). Free it, then `docker compose up -d llm`. |

@@ -150,7 +150,7 @@ No package or app ever imports an app. ESLint enforces this with `no-restricted-
 | Engines | A Docker image each, built from the repo root: `pnpm fetch` (lockfile only, cached), an offline install filtered to `@mb/<bot>-engine...`, the esbuild bundle. Runtime: `node:22-bookworm-slim` pinned by digest, tini, non-root, healthcheck. Crypto adds the checksummed Kraken CLI and the `/data/kraken` volume. | `docker compose up -d --build <bot>-engine` on the server |
 | Scraper | The official Playwright image plus `playwright-core` | `docker compose up -d --build scraper` |
 | History store | The official TimescaleDB image (Postgres 17 with TimescaleDB and pgvector) pinned by digest; no build | `docker compose up -d history history-backup` |
-| Dashboards | Vercel, Root Directory `apps/<bot>-web`, files outside the root included | push to `main`; an Ignored Build Step skips a dashboard none of whose paths changed |
+| Dashboards and landing page | Vercel, Root Directory `apps/<bot>-web` (landing: `apps/landing`), files outside the root included | push to `main`; Vercel skips a project when neither its app nor a workspace package it depends on changed |
 
 Every deploy is gated by `pnpm typecheck && pnpm test && pnpm lint && pnpm build`. The contract snapshots under `contracts/<bot>/` change only with a deliberate, owner-approved behavior change ([AGENTS.md](../AGENTS.md)).
 
