@@ -1,7 +1,7 @@
 #!/bin/sh
 # Starts SearXNG for the `search` service (compose.yml; docs/SERVER.md §9). It sets a random
 # secret at every start, and writes searxng.yml with the residential proxy's URL
-# (SEARCH_PROXY_URL, from .env.search) over its placeholders. Without a URL it drops those
+# (SEARCH_PROXY_URL, from .env) over its placeholders. Without a URL it drops those
 # lines, and the paid engines go direct. The copy with the URL lives only in /tmp, a tmpfs.
 set -eu
 umask 077

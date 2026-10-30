@@ -113,7 +113,7 @@ export class FanController {
   /** Applies and saves a new setting; on failure, keeps the previous one and hands the fans back to the BIOS. */
   update(input: FanSettings): Promise<HostFans> {
     return this.serial(async () => {
-      if (!this.d.control) throw new Error("Fan control is off on the server (FAN_CONTROL=off in .env.host).")
+      if (!this.d.control) throw new Error("Fan control is off on the server (FAN_CONTROL=off in .env).")
       const next = fanSettingsSchema.parse(input)
       if (next.mode !== "bios" && !this.channels.some((c) => (c.rpm ?? 0) > 0)) throw new Error("No connected motherboard fans with RPM feedback.")
       const previous = this.settings

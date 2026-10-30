@@ -1,18 +1,18 @@
 # Registers the host agent's two scheduled tasks under \marketbots\ (docs/SERVER.md section 11.3). Run from an
 # administrator PowerShell, as the account that signs in on the server, after install-sensors.ps1 and once
-# .env.host exists and the agent is built (pnpm --filter @mb/host-agent build):
+# .env exists and the agent is built (pnpm --filter @mb/host-agent build):
 #
 #   .\apps\host-agent\scripts\install-tasks.ps1
 #
 #   Host sensors  LibreHardwareMonitor, elevated, at sign-in (it is a desktop app); restarted if it exits.
-#   Host agent    node dist\main.js with .env.host, at startup, without a window (S4U); restarted if it exits.
+#   Host agent    node dist\main.js with .env, at startup, without a window (S4U); restarted if it exits.
 #                 Before sign-in it runs without the motherboard sensors, and the BIOS runs the fans.
 #
 # Re-running replaces both tasks. Neither starts here: start them with Start-ScheduledTask (section 11.3).
 $ErrorActionPreference = 'Stop'
 $AgentDir = Split-Path -Parent $PSScriptRoot
 $RepoDir = Split-Path -Parent (Split-Path -Parent $AgentDir)
-$EnvFile = Join-Path $RepoDir '.env.host'
+$EnvFile = Join-Path $RepoDir '.env'
 $Main = Join-Path $AgentDir 'dist\main.js'
 $Node = (Get-Command node.exe -ErrorAction Stop).Source
 $PowerShell = (Get-Command powershell.exe -ErrorAction Stop).Source
@@ -21,7 +21,7 @@ $UserId = "$env:USERDOMAIN\$env:USERNAME"
 if (-not (New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     throw 'Run this from an administrator PowerShell.'
 }
-if (-not (Test-Path $EnvFile)) { throw "Create $EnvFile first (from .env.host.example)." }
+if (-not (Test-Path $EnvFile)) { throw "Create $EnvFile first (from .env.example)." }
 if (-not (Test-Path $Main)) { throw 'Build the agent first: pnpm --filter @mb/host-agent build' }
 if (-not (Test-Path (Join-Path $AgentDir 'data\lhm.json'))) { throw 'Run install-sensors.ps1 first.' }
 

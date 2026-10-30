@@ -64,7 +64,7 @@ export const envFields = ({ dbName, streamPort }: { dbName: string; streamPort: 
   LLM_URL: optional,
   /** The search service (SearXNG) for local research, e.g. http://search:8080 inside docker compose. Unset: local models can't research. */
   SEARCH_URL: optional,
-  /** Research's metered search providers (in .env.search, shared by both bots). A provider whose key is unset isn't asked. */
+  /** Research's metered search providers (one key each for both bots: .env's SHARED section). A provider whose key is unset isn't asked. */
   TAVILY_API_KEY: optional,
   EXA_API_KEY: optional,
   BRIGHTDATA_API_KEY: optional,
@@ -89,10 +89,15 @@ export type BaseEnv = z.infer<z.ZodObject<ReturnType<typeof envFields>>>
 
 /**
  * Parses the environment with the bot's schema. Every value is trimmed first (.env files edited on
- * Windows often end lines with \r), and every problem is listed in one readable error.
+ * Windows often end lines with \r), an empty one counts as unset (compose passes a variable that
+ * isn't in .env as empty, so its default applies), and every problem is listed in one readable error.
  */
 export const parseEnv = <S extends z.ZodType>(schema: S, source: NodeJS.ProcessEnv = process.env): z.output<S> => {
-  const trimmed = Object.fromEntries(Object.entries(source).map(([k, v]) => [k, typeof v === "string" ? v.trim() : v]))
+  const trimmed = Object.fromEntries(
+    Object.entries(source)
+      .map(([k, v]) => [k, typeof v === "string" ? v.trim() : v] as const)
+      .filter(([, v]) => v !== ""),
+  )
   const parsed = schema.safeParse(trimmed)
   if (!parsed.success) {
     const problems = parsed.error.issues.map((i) => `  - ${i.path.join(".")}: ${i.message}`).join("\n")

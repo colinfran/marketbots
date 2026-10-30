@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx --env-file-if-exists=../../.env.host src/main.ts",
-    "start": "node --enable-source-maps --env-file-if-exists=../../.env.host dist/main.js",
-    "import-history": "node --enable-source-maps --env-file-if-exists=../../.env.host dist/import-history.js",
+    "dev": "tsx --env-file-if-exists=../../.env src/main.ts",
+    "start": "node --enable-source-maps --env-file-if-exists=../../.env dist/main.js",
+    "import-history": "node --enable-source-maps --env-file-if-exists=../../.env dist/import-history.js",
     "build": "node build.mjs",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json",

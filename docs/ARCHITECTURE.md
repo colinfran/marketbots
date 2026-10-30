@@ -11,12 +11,12 @@ The platform view of marketbots: how the two bots run side by side, what the rep
 | Dashboard | `apps/crypto-web` → Vercel, cryptomarketbot.app | `apps/stock-web` → Vercel, stockmarketbot.app |
 | Live stream | `wss://engine.cryptomarketbot.app/v1/stream` | `wss://engine.stockmarketbot.app/v1/stream` |
 | Database (Azure DocumentDB) | `cryptomarketbot` | `stockmarketbot` |
-| Config | `.env.crypto` | `.env.stock` |
+| Config | `.env`: SHARED and `CRYPTO_*` | `.env`: SHARED and `STOCK_*` |
 | Design doc | [CRYPTO.md](CRYPTO.md) | [STOCK.md](STOCK.md) |
 
 The rules behind the layout:
 
-- **Two independent engines.** Separate images, containers, processes, ports, databases, leases and env files. They share library code, compiled into each image at build time, and have no runtime link to each other. A crash, deploy or restart of one never touches the other.
+- **Two independent engines.** Separate images, containers, processes, ports, databases, leases and variables (each gets only its own from `.env`). They share library code, compiled into each image at build time, and have no runtime link to each other. A crash, deploy or restart of one never touches the other.
 - **Two dashboards with separate auth.** Each has its own auth secret, database, domain and owner check.
 - **Share code only when both bots mean the same thing by it.** If sharing would need flags that switch between two behaviors, or would bend one bot's model to fit the other's, the code stays per bot.
 - **Paper trading only.** Neither engine has a live-trading code path.
@@ -56,7 +56,7 @@ External: Kraken (CLI wallet in its volume), Alpaca, ~150 news sources, and the 
 | The server's IP | Outbound rate limits (SEC, GDELT, ForexFactory…) apply to both bots together. |
 | Caddy | One host process, one site per engine. |
 
-Not shared: databases (MongoDB and history), leases, env files, auth secrets, stream token secrets (whose HMAC context prefixes, `cmb-stream.` and `smb-stream.`, also keep tokens from crossing bots), and the Kraken wallet volume (crypto only).
+Not shared: databases (MongoDB and history), leases, the bots' own variables (`CRYPTO_*`, `STOCK_*`), auth secrets, stream token secrets (whose HMAC context prefixes, `cmb-stream.` and `smb-stream.`, also keep tokens from crossing bots), and the Kraken wallet volume (crypto only).
 
 ## Repo layout
 
@@ -70,7 +70,7 @@ marketbots/
 │  ├─ host-agent/      @mb/host-agent      the Windows host agent (Admin → Server, the fans); the server's own Node, not Docker
 │  └─ scraper/         @mb/scraper         one sidecar; own npm lockfile, outside the pnpm workspace
 ├─ packages/
-│  ├─ config/          @mb/config          tsconfig base, ESLint presets with the import boundaries, Vitest presets
+│  ├─ config/          @mb/config          tsconfig base, ESLint presets with the import boundaries, Vitest presets, mb-env
 │  ├─ core/            @mb/core            pure shared schemas and helpers
 │  ├─ engine-kit/      @mb/engine-kit      engine runtime
 │  ├─ history/         @mb/history         the history store: Postgres client, migrations, bars, news archive
@@ -84,7 +84,7 @@ marketbots/
 ├─ docs/               ARCHITECTURE.md (this file), CRYPTO.md, STOCK.md, SERVER.md
 ├─ compose.yml         the marketbots stack
 ├─ compose.smoke.yml   boot test of new images beside the live stack
-├─ .env.crypto.example  .env.stock.example  .env.host.example
+├─ .env.example       every variable of the stack, in sections (copy to .env)
 ├─ AGENTS.md           conventions for changing this repo
 └─ package.json  pnpm-workspace.yaml  pnpm-lock.yaml
 ```
@@ -145,7 +145,7 @@ No package or app ever imports an app. ESLint enforces this with `no-restricted-
   - the engines bundle packages with esbuild (`apps/*-engine/build.mjs` → `dist/main.js`);
   - the dashboards list them in `transpilePackages` (`next.config.ts`);
   - Vitest and `tsc` read the source directly.
-- `@mb/config` exports its files as they are (`"./*": "./*"`): `tsconfig.base.json`, `eslint.mjs`, `vitest.mjs`.
+- `@mb/config` exports its files as they are (`"./*": "./*"`): `tsconfig.base.json`, `eslint.mjs`, `vitest.mjs`. Its `mb-env` command (`mb-env.mjs`, `env.mjs`) runs the apps' `dev` scripts with one bot's variables from `.env` and `.env.local`.
 - **Plain pnpm workspaces**, no Turborepo. The scraper is outside the workspace, with its own npm lockfile and image.
 
 ## Builds and deploys
@@ -162,7 +162,7 @@ Every deploy is gated by `pnpm typecheck && pnpm test && pnpm lint && pnpm build
 
 ## Configuration
 
-One env file per bot at the repo root, `.env.crypto` and `.env.stock`, under the variable names the code already used. The engine container reads its file through compose, which also sets `STREAM_HOST`, `STREAM_PORT`, `SCRAPER_URL` and `LLM_URL`. Local dev reads the same file, then `.env.<bot>.local`. The file's SHARED and DASHBOARD sections are what goes into the bot's Vercel project. A third file, `.env.history`, holds only the history service's passwords; each bot's file carries its own in `HISTORY_URL`. Details: [SERVER.md §3](SERVER.md#3-the-env-files). The host agent reads `.env.host` ([SERVER.md §11.1](SERVER.md#111-envhost)).
+One env file, `.env` at the repo root, in sections: SHARED (no prefix, the same for both bots), `CRYPTO_*`, `STOCK_*`, `HISTORY_*` (the history store's passwords), SEARCH and HOST. The code reads the names it always used: `compose.yml` gives each container only its own variables, without the bot prefix (`CRYPTO_MONGODB_DB_NAME` is the crypto engine's `MONGODB_DB_NAME`), and sets `STREAM_HOST`, `STREAM_PORT`, `SCRAPER_URL`, `LLM_URL`, `SEARCH_URL` and each engine's `HISTORY_URL`, built from its bot's history password. Local dev renames the same way through `mb-env` (`@mb/config`), reading `.env`, then `.env.local`. Each Vercel project holds its dashboard's values under the unprefixed names. The host agent reads `.env` directly. Details: [SERVER.md §3](SERVER.md#3-the-env-file), [§11.1](SERVER.md#111-its-variables).
 
 Live trading settings are not configuration: they live in each bot's database and change only from its dashboard's Admin page.
 
@@ -187,6 +187,6 @@ Both were copied unchanged from the old repos' `docs/ARCHITECTURE.md`, so their 
 | `packages/core`, `@cmb/core`, `@smb/core` | `packages/crypto-core` / `packages/stock-core`, `@mb/crypto-core` / `@mb/stock-core` |
 | `apps/scraper`, one per bot | `apps/scraper`, one for both |
 | "Mirrored in cryptomarketbot and stockmarketbot" | `packages/wire` (`@mb/wire`), once for both |
-| `docker-compose.yml`, `.env` | `compose.yml`, `.env.crypto` / `.env.stock` |
+| `docker-compose.yml`, `.env` | `compose.yml`, `.env` (in sections, the bot's variables prefixed) |
 
 When a change adds or changes a shared package, update the tables in this file; per-bot behavior goes in CRYPTO.md or STOCK.md.

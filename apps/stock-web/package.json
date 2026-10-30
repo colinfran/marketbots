@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "node --env-file-if-exists=../../.env.stock --env-file-if-exists=../../.env.stock.local ./node_modules/next/dist/bin/next dev",
+    "dev": "mb-env stock next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",

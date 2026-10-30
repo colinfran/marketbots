@@ -6,8 +6,14 @@
 #   docker compose logs -f crypto-engine                 follow one engine's structured logs
 #   docker compose up -d llm                             (re)start the local model server
 #
-# The two engines share nothing at runtime: separate images, containers, ports, env files,
+# The two engines share nothing at runtime: separate images, containers, ports, variables,
 # databases (one history database each, too) and leases. See docs/SERVER.md.
+#
+# Every secret and setting is in .env at the repo root (template .env.example; docs/SERVER.md §3),
+# which compose reads by itself. Each service below takes only its own variables, under the names its
+# code reads: crypto-engine's MONGODB_DB_NAME is .env's CRYPTO_MONGODB_DB_NAME. A variable that isn't
+# in .env arrives empty, which the engines read as unset. A new variable goes into .env.example and
+# into the environment of each service that reads it.
 
 name: marketbots
 
@@ -27,6 +33,23 @@ x-logging: &logging
     max-size: "10m"
     max-file: "5"
 
+# What both engines read: .env's SHARED section, and the addresses of the stack's own services.
+x-engine-env: &engine-env
+  MONGODB_URI: ${MONGODB_URI:-}
+  SEC_USER_AGENT: ${SEC_USER_AGENT:-}
+  FINNHUB_API_KEY: ${FINNHUB_API_KEY:-}
+  FRED_API_KEY: ${FRED_API_KEY:-}
+  BLS_API_KEY: ${BLS_API_KEY:-}
+  TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+  EXA_API_KEY: ${EXA_API_KEY:-}
+  BRIGHTDATA_API_KEY: ${BRIGHTDATA_API_KEY:-}
+  BRIGHTDATA_ZONE: ${BRIGHTDATA_ZONE:-}
+  STREAM_HOST: 0.0.0.0
+  SCRAPER_URL: http://scraper:8790
+  LLM_URL: http://llm:8080
+  SEARCH_URL: http://search:8080
+  LOG_DIR: /logs
+
 services:
   crypto-engine:
     <<: *hardened
@@ -35,19 +58,27 @@ services:
       dockerfile: apps/crypto-engine/Dockerfile
     image: marketbots-crypto-engine:latest
     container_name: marketbots-crypto-engine
-    env_file:
-      - path: .env.crypto
-      # TAVILY_API_KEY for research (docs/SERVER.md §3.7); optional.
-      - path: .env.search
-        required: false
     environment:
-      STREAM_HOST: 0.0.0.0
+      <<: *engine-env
       STREAM_PORT: 8787
-      SCRAPER_URL: http://scraper:8790
-      LLM_URL: http://llm:8080
-      SEARCH_URL: http://search:8080
-      LOG_DIR: /logs
       KRAKEN_OHLCVT_DIR: /data/ohlcvt
+      # Its own history database, with the password the history service created its role with.
+      HISTORY_URL: postgres://crypto_history:${HISTORY_CRYPTO_PASSWORD:-}@history:5432/crypto_history
+      MONGODB_DB_NAME: ${CRYPTO_MONGODB_DB_NAME:-}
+      STREAM_TOKEN_SECRET: ${CRYPTO_STREAM_TOKEN_SECRET:-}
+      STREAM_ALLOWED_ORIGINS: ${CRYPTO_STREAM_ALLOWED_ORIGINS:-}
+      STREAM_TRUST_PROXY: ${CRYPTO_STREAM_TRUST_PROXY:-}
+      STREAM_MAX_CLIENTS: ${CRYPTO_STREAM_MAX_CLIENTS:-}
+      LOG_LEVEL: ${CRYPTO_LOG_LEVEL:-}
+      ENGINE_INSTANCE: ${CRYPTO_ENGINE_INSTANCE:-}
+      DISCORD_WEBHOOK_URL: ${CRYPTO_DISCORD_WEBHOOK_URL:-}
+      DASHBOARD_URL: ${CRYPTO_DASHBOARD_URL:-}
+      EVENT_RETENTION_DAYS: ${CRYPTO_EVENT_RETENTION_DAYS:-}
+      KRAKEN_WORKSPACE: ${CRYPTO_KRAKEN_WORKSPACE:-}
+      KRAKEN_CLI_TIMEOUT_MS: ${CRYPTO_KRAKEN_CLI_TIMEOUT_MS:-}
+      COINGECKO_API_KEY: ${CRYPTO_COINGECKO_API_KEY:-}
+      ETHERSCAN_API_KEY: ${CRYPTO_ETHERSCAN_API_KEY:-}
+      COINALYZE_API_KEY: ${CRYPTO_COINALYZE_API_KEY:-}
     ports:
       # Loopback only: Caddy on the host forwards wss://engine.cryptomarketbot.app here.
       - "127.0.0.1:8787:8787"
@@ -72,18 +103,27 @@ services:
       dockerfile: apps/stock-engine/Dockerfile
     image: marketbots-stock-engine:latest
     container_name: marketbots-stock-engine
-    env_file:
-      - path: .env.stock
-      # TAVILY_API_KEY for research (docs/SERVER.md §3.7); optional.
-      - path: .env.search
-        required: false
     environment:
-      STREAM_HOST: 0.0.0.0
+      <<: *engine-env
       STREAM_PORT: 8788
-      SCRAPER_URL: http://scraper:8790
-      LLM_URL: http://llm:8080
-      SEARCH_URL: http://search:8080
-      LOG_DIR: /logs
+      HISTORY_URL: postgres://stock_history:${HISTORY_STOCK_PASSWORD:-}@history:5432/stock_history
+      MONGODB_DB_NAME: ${STOCK_MONGODB_DB_NAME:-}
+      STREAM_TOKEN_SECRET: ${STOCK_STREAM_TOKEN_SECRET:-}
+      STREAM_ALLOWED_ORIGINS: ${STOCK_STREAM_ALLOWED_ORIGINS:-}
+      STREAM_TRUST_PROXY: ${STOCK_STREAM_TRUST_PROXY:-}
+      STREAM_MAX_CLIENTS: ${STOCK_STREAM_MAX_CLIENTS:-}
+      LOG_LEVEL: ${STOCK_LOG_LEVEL:-}
+      ENGINE_INSTANCE: ${STOCK_ENGINE_INSTANCE:-}
+      DISCORD_WEBHOOK_URL: ${STOCK_DISCORD_WEBHOOK_URL:-}
+      DASHBOARD_URL: ${STOCK_DASHBOARD_URL:-}
+      EVENT_RETENTION_DAYS: ${STOCK_EVENT_RETENTION_DAYS:-}
+      ALPACA_API_KEY: ${STOCK_ALPACA_API_KEY:-}
+      ALPACA_SECRET_KEY: ${STOCK_ALPACA_SECRET_KEY:-}
+      ALPACA_DATA_FEED: ${STOCK_ALPACA_DATA_FEED:-}
+      STARTING_CAPITAL: ${STOCK_STARTING_CAPITAL:-}
+      OPENFDA_API_KEY: ${STOCK_OPENFDA_API_KEY:-}
+      MASSIVE_API_KEY: ${STOCK_MASSIVE_API_KEY:-}
+      EIA_API_KEY: ${STOCK_EIA_API_KEY:-}
     ports:
       # Loopback only: Caddy on the host forwards wss://engine.stockmarketbot.app here.
       - "127.0.0.1:8788:8788"
@@ -150,8 +190,11 @@ services:
     image: timescale/timescaledb:2.31.0-pg17@sha256:b56a3f51991df1f79d0c1a0841cad5c5fa8058fdd6a3ee6886394a6d4c174538
     container_name: marketbots-history
     restart: unless-stopped
-    env_file: .env.history
     environment:
+      # The passwords take effect only when the history-data volume is created (docs/SERVER.md §3.6).
+      POSTGRES_PASSWORD: ${HISTORY_POSTGRES_PASSWORD:-}
+      CRYPTO_HISTORY_PASSWORD: ${HISTORY_CRYPTO_PASSWORD:-}
+      STOCK_HISTORY_PASSWORD: ${HISTORY_STOCK_PASSWORD:-}
       HISTORY_DATABASES: crypto_history stock_history
       # timescaledb-tune sizes shared_buffers and workers for this, not for the whole VM.
       TS_TUNE_MEMORY: 2GB
@@ -187,7 +230,8 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
-    env_file: .env.history
+    environment:
+      POSTGRES_PASSWORD: ${HISTORY_POSTGRES_PASSWORD:-}
     entrypoint: ["sh", "-c"]
     command:
       - |
@@ -215,8 +259,8 @@ services:
 
   # The search service for local research (docs/SERVER.md §9): SearXNG asks the news engines
   # that answer from our IP and, only when research names them, the paid ones through the
-  # residential proxy (SEARCH_PROXY_URL in .env.search). It answers the engines in JSON. On the
-  # default network (it needs the internet), with no host port. Its secret is random at every start.
+  # residential proxy (SEARCH_PROXY_URL in .env). It answers the engines in JSON. On the default
+  # network (it needs the internet), with no host port. Its secret is random at every start.
   search:
     <<: *hardened
     image: searxng/searxng:2026.10.13-22c64b8d3@sha256:9b61996edcc679fb6665290f95fda15389a14eda6060e41a25c63ab2758f2436
@@ -226,9 +270,8 @@ services:
       - /tmp
       - /var/cache/searxng:uid=977,gid=977
     entrypoint: ["sh", "/etc/searxng/start.sh"]
-    env_file:
-      - path: .env.search
-        required: false
+    environment:
+      SEARCH_PROXY_URL: ${SEARCH_PROXY_URL:-}
     volumes:
       - ./packages/wire/docker/searxng.yml:/etc/searxng/settings.yml:ro
       - ./packages/wire/docker/searxng-start.sh:/etc/searxng/start.sh:ro

@@ -4,8 +4,9 @@ import { HOST_DB } from "@mb/core/host"
 import { z } from "zod"
 
 /**
- * The agent's configuration: `.env.host` at the repo root (template `.env.host.example`), loaded by
- * Node's `--env-file` (docs/SERVER.md §11). Secrets: the MongoDB URI and the VeSync login.
+ * The agent's configuration: the repo's `.env` (template `.env.example`), loaded by Node's
+ * `--env-file` (docs/SERVER.md §11.1). It reads the SHARED section's MONGODB_URI and the HOST
+ * section; the bots' variables in the file are ignored. Secrets: the MongoDB URI and the VeSync login.
  */
 
 /** apps/host-agent: the bundle runs from dist/, the sources from src/. */
@@ -41,7 +42,7 @@ export type Env = z.infer<typeof schema> & { LHM_CONNECTION_FILE: string }
 
 export const loadEnv = (source: NodeJS.ProcessEnv = process.env): Env => {
   const parsed = schema.safeParse(source)
-  if (!parsed.success) throw new Error(`.env.host: ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`)
+  if (!parsed.success) throw new Error(`.env: ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`)
   const env = parsed.data
   return { ...env, LHM_CONNECTION_FILE: env.LHM_CONNECTION_FILE || join(env.HOST_DATA_DIR, "lhm.json") }
 }

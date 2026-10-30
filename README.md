@@ -87,13 +87,12 @@ packages/stock-core/    stock schemas and types
 contracts/              behavior snapshots per bot
 docs/                   architecture, per-bot design, server runbook
 compose.yml             the marketbots stack: both engines, the local LLM, search, the scraper, the history store
-.env.crypto.example     every crypto variable, by where it's used (copy to .env.crypto)
-.env.stock.example      every stock variable, by where it's used (copy to .env.stock)
+.env.example            every variable of the stack, in sections by who reads it (copy to .env)
 ```
 
 ## Development
 
-Node 22.12+ and pnpm 10. Copy `.env.crypto.example` to `.env.crypto` and `.env.stock.example` to `.env.stock` at the repo root, and put local overrides (a `_dev` database, no Discord, fake Alpaca keys) in `.env.crypto.local` / `.env.stock.local`. See [docs/SERVER.md §3](docs/SERVER.md#3-the-env-files).
+Node 22.12+ and pnpm 10. Copy `.env.example` to `.env` at the repo root, and put local overrides (a `_dev` database, no Discord, fake Alpaca keys) in `.env.local`. See [docs/SERVER.md §3](docs/SERVER.md#3-the-env-file).
 
 ```bash
 pnpm install
@@ -108,13 +107,13 @@ pnpm dev:stock-web        # stock dashboard (next dev)
 pnpm backtest -- --symbols BTC/USD,ETH/USD,SOL/USD --strategies trend,momentum --interval 240
 ```
 
-`build`, `test`, `typecheck` and `lint` run in every workspace package (`pnpm -r`). The dev scripts read `.env.<bot>`, then `.env.<bot>.local`. The scraper sits outside the pnpm workspace (own npm lockfile) and is built only as its Docker image.
+`build`, `test`, `typecheck` and `lint` run in every workspace package (`pnpm -r`). The dev scripts read `.env`, then `.env.local`, through `mb-env` (`@mb/config`), which hands each process its bot's variables without the `CRYPTO_` / `STOCK_` prefix. The scraper sits outside the pnpm workspace (own npm lockfile) and is built only as its Docker image.
 
 ## Docs
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): the platform: topology, layout, what is shared and what stays per bot.
 - [docs/CRYPTO.md](docs/CRYPTO.md), [docs/STOCK.md](docs/STOCK.md): each bot's design.
-- [docs/SERVER.md](docs/SERVER.md): the server, the Docker stack, env files, deploys, Vercel, troubleshooting.
+- [docs/SERVER.md](docs/SERVER.md): the server, the Docker stack, the env file, deploys, Vercel, troubleshooting.
 - [docs/plans/LOCAL-AI.md](docs/plans/LOCAL-AI.md): the local model, the history store and the agent: the plan, the measurements behind it, and what was built.
 - [AGENTS.md](AGENTS.md): conventions for changing this repo (package boundaries, shared code, safety rules).
 

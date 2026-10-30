@@ -452,7 +452,7 @@ function FanControl({ fans, live, command }: { fans: HostFans; live: boolean; co
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 px-4">
-        {off && <p className="text-muted-foreground text-sm">Fan control is off on the server (FAN_CONTROL=off in .env.host): the agent only reads the fans.</p>}
+        {off && <p className="text-muted-foreground text-sm">Fan control is off on the server (FAN_CONTROL=off in .env): the agent only reads the fans.</p>}
         <fieldset disabled={off || !live || busy} className="space-y-4 disabled:opacity-60">
           <div className="space-y-1.5">
             <Label htmlFor="fan-mode">Mode</Label>
@@ -650,7 +650,7 @@ function HostSettingsForm({ status, saving, finding }: { status: HostStatusView;
                   Discover
                 </Button>
               </div>
-              <Muted>{status.power.configured ? "The VeSync login stays on the server (.env.host)." : "Set VESYNC_USERNAME and VESYNC_PASSWORD in .env.host on the server."}</Muted>
+              <Muted>{status.power.configured ? "The VeSync login stays on the server (.env)." : "Set VESYNC_USERNAME and VESYNC_PASSWORD in .env on the server."}</Muted>
               <CommandResult result={finding.result} error={finding.error} />
             </div>
           </div>

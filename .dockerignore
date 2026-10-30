@@ -7,7 +7,7 @@
 **/*.tsbuildinfo
 .git
 .vercel
-# Real keys never enter a build context: compose passes them at runtime (env_file).
+# Real keys never enter a build context: compose passes them at runtime (environment, from .env).
 *.env
 .env
 .env.*

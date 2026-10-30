@@ -12,11 +12,11 @@ Conventions for anyone, human or AI agent, changing this repo. Read [docs/ARCHIT
 
    `compose.smoke.yml` does all three.
 3. **Live settings change only from the dashboard's Admin page** (an audited `settings.update` command). Don't write settings to a live database from scripts. Editing `DEFAULT_SETTINGS` is not a settings change: it doesn't reach a running bot. Staging databases are throwaway, so scripts may change their settings.
-4. **Never commit env files** (`.env.crypto`, `.env.stock`, `.env.history`, `.env.host`, `.env.<bot>.local`); only the `.example` files are committed, and they never hold a real value. Never print, log or copy secret values: that includes `docker compose config` without `--quiet` and the env section of `docker inspect`. A new variable goes into the right section (SHARED, ENGINE or DASHBOARD) of the bot's `.env.<bot>.example`, and a SHARED or DASHBOARD one also into the Vercel table in [docs/SERVER.md §3.4](docs/SERVER.md#34-what-goes-into-each-vercel-project).
+4. **Never commit env files** (`.env`, `.env.local`); only `.env.example` is committed, and it never holds a real value. Never print, log or copy secret values: that includes `docker compose config` without `--quiet` and the env section of `docker inspect`. A new variable goes into the right section of `.env.example` (SHARED without a prefix if both bots use the same value, else the bot's section as `CRYPTO_*` / `STOCK_*`), into the `environment` of each service that reads it in `compose.yml` (under the name the code reads), and, if a dashboard reads it, into the Vercel table in [docs/SERVER.md §3.4](docs/SERVER.md#34-what-goes-into-each-vercel-project).
 5. **LF line endings** everywhere (`.gitattributes`: `* text=auto eol=lf`; run `git config core.autocrlf false` in your clone). The engines run in Linux containers, and Dockerfiles, YAML and env files break with CRLF. To copy files from the old repos, `git archive HEAD` the whole tree; never copy from a working tree or archive a `HEAD:<path>` subtree (that skips the root `.gitattributes` and writes CRLF on Windows).
 6. **Never touch the paper wallet volume** `cryptomarketbot_kraken-paper`: no `down -v`, no `docker volume rm`, and it stays `external` in `compose.yml` ([docs/SERVER.md §6](docs/SERVER.md#6-the-paper-wallet-volume)). The same goes for `marketbots_history-data`: its news archive is the only copy of news older than 30 days ([§6.4](docs/SERVER.md#64-the-history-stores-volume-and-backups)). Never `docker volume prune`: other stacks share this Docker.
 7. **One bot's change never redeploys the other bot.** Deploy engines by name (`docker compose up -d --build <bot>-engine`).
-8. **Never run two fan controllers.** The host agent sets the server's motherboard fans only with `FAN_CONTROL=on` in `.env.host`, and only when nothing else does ([docs/SERVER.md §11.4](docs/SERVER.md#114-fans)). After a change to its fan code, restart its task with someone at the machine and check the RPMs follow.
+8. **Never run two fan controllers.** The host agent sets the server's motherboard fans only with `FAN_CONTROL=on` in `.env`, and only when nothing else does ([docs/SERVER.md §11.4](docs/SERVER.md#114-fans)). After a change to its fan code, restart its task with someone at the machine and check the RPMs follow.
 
 ## Package boundaries
 
@@ -91,7 +91,7 @@ After each change:
 
 - A bot's behavior changes → its design doc (docs/CRYPTO.md, docs/STOCK.md).
 - Shared packages, layout or topology change → docs/ARCHITECTURE.md.
-- Stack, env files, deploys or Vercel change → docs/SERVER.md.
+- Stack, the env file, deploys or Vercel change → docs/SERVER.md.
 - Each web app keeps its own `apps/*-web/AGENTS.md` (Next.js notes). `next dev` rewrites its block; leave those files alone.
 
 ## Notes for agents on the Windows server

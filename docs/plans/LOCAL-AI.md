@@ -509,7 +509,7 @@ No new tab: the agent fits the five-section navigation ([ARCHITECTURE.md](../ARC
 - **The history store**: its own migrations, in `@mb/history` and each engine.
 - **Events**: `agent.woke`, `agent.step` and `agent.thinking` (`seq: 0`; thinking owner-only by default), `agent.answered`, `agent.watch.*`, `agent.approval.*`, `agent.breaker`, `agent.level`.
 - **Contracts**: every step that adds settings, events, indexes, prompts or schemas changes the `contracts/<bot>/` snapshots on purpose, in its own commit with the reason ([AGENTS.md](../../AGENTS.md)). New snapshots: the agent prompts rendered for fixed briefs, the tool schemas, the answer schema, the envelope defaults.
-- **Env**: `QUANT_URL` and `HISTORY_URL` (a secret: the ENGINE section); `LLM_URL` keeps its name and points at the new server. After the switch, `AI_GATEWAY_API_KEY` leaves `.env.<bot>.example` and the Vercel table in [SERVER.md §3.4](../SERVER.md#34-what-goes-into-each-vercel-project).
+- **Env**: `QUANT_URL` and `HISTORY_URL` (a secret: the ENGINE section); `LLM_URL` keeps its name and points at the new server. After the switch, `AI_GATEWAY_API_KEY` leaves the env example and the Vercel table in [SERVER.md §3.4](../SERVER.md#34-what-goes-into-each-vercel-project).
 - **`compose.smoke.yml`** gets its own history databases (`<bot>_staging`) and boots with the agent at level 0.
 
 ## 14. Rollout

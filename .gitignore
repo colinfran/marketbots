@@ -14,11 +14,11 @@ next-env.d.ts
 # testing
 coverage/
 
-# env & secrets: .env.crypto / .env.stock (+ .env.<bot>.local overrides) hold real keys
+# env & secrets: .env (+ .env.local overrides) holds real keys; only .env.example is committed
 *.env
 .env
 .env.*
-!.env.*.example
+!.env.example
 
 # wallet backups (compose service wallet-backup)
 /backups/

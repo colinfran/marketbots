@@ -27,6 +27,11 @@ describe("parseEnv", () => {
     })
   })
 
+  it("reads an empty value as unset, so the default applies", () => {
+    const env = parseEnv(schema, { MONGODB_URI: "mongodb://db", MONGODB_DB_NAME: "", STREAM_TOKEN_SECRET: "x".repeat(40), STREAM_PORT: " ", STREAM_TRUST_PROXY: "" })
+    expect(env).toMatchObject({ MONGODB_DB_NAME: "testbot", STREAM_PORT: 8799, STREAM_TRUST_PROXY: false })
+  })
+
   it("lists every problem in one readable error, in the schema's order", () => {
     expect(() => parseEnv(schema, { STREAM_TOKEN_SECRET: "short" })).toThrow(
       "Invalid engine environment:\n  - MONGODB_URI: Invalid input: expected string, received undefined\n  - STREAM_TOKEN_SECRET: STREAM_TOKEN_SECRET must be at least 32 characters",

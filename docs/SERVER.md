@@ -1,6 +1,6 @@
 # Server setup and operations
 
-How the `marketbots` Docker stack runs on the Windows server: first-time setup, the env files, everyday commands, the paper wallet volume, the swap from the old stacks, the Vercel projects, the local LLM and troubleshooting. Commands are for **PowerShell** on the server, run from the repo root (`C:\Users\colin\Documents\GitHub\marketbots`) unless noted.
+How the `marketbots` Docker stack runs on the Windows server: first-time setup, the env file, everyday commands, the paper wallet volume, the swap from the old stacks, the Vercel projects, the local LLM and troubleshooting. Commands are for **PowerShell** on the server, run from the repo root (`C:\Users\colin\Documents\GitHub\marketbots`) unless noted.
 
 This replaces both old `docs/WINDOWS_SERVER_SETUP.md` guides (cryptomarketbot and stockmarketbot). How the pieces fit together: [ARCHITECTURE.md](ARCHITECTURE.md).
 
@@ -8,14 +8,14 @@ What runs where:
 
 | Where | What | Config |
 | --- | --- | --- |
-| Windows server, Docker stack `marketbots` | `crypto-engine` on 127.0.0.1:8787 (with the Kraken CLI paper wallet), `stock-engine` on 127.0.0.1:8788, `scraper` (no host port), `llm` (llama.cpp with the local model on both GPUs, no host port), `search` (SearXNG for local research, no host port), `history` (Postgres with TimescaleDB and pgvector, no host port) and `history-backup` | `compose.yml`, `.env.crypto`, `.env.stock`, `.env.history`, `.env.search` (optional) at the repo root |
+| Windows server, Docker stack `marketbots` | `crypto-engine` on 127.0.0.1:8787 (with the Kraken CLI paper wallet), `stock-engine` on 127.0.0.1:8788, `scraper` (no host port), `llm` (llama.cpp with the local model on both GPUs, no host port), `search` (SearXNG for local research, no host port), `history` (Postgres with TimescaleDB and pgvector, no host port) and `history-backup` | `compose.yml`, `.env` at the repo root |
 | Caddy on the Windows host | `engine.cryptomarketbot.app` → 127.0.0.1:8787, `engine.stockmarketbot.app` → 127.0.0.1:8788 (WebSocket) | `C:\Caddy\Caddyfile` |
-| The Windows host, outside Docker | The host agent and its LibreHardwareMonitor (Admin → Server, the motherboard fans; §11) | `.env.host` at the repo root |
+| The Windows host, outside Docker | The host agent and its LibreHardwareMonitor (Admin → Server, the motherboard fans; §11) | `.env` at the repo root (its HOST section) |
 | Vercel | two projects: `apps/crypto-web` at cryptomarketbot.app, `apps/stock-web` at stockmarketbot.app | each project's environment variables |
 | Azure DocumentDB (MongoDB-compatible, free tier) | one cluster, databases `cryptomarketbot`, `stockmarketbot` and `serverstats` | `MONGODB_URI` |
-| Alpaca | the stock bot's paper account | `.env.stock` (engine only) |
+| Alpaca | the stock bot's paper account | `.env` (`STOCK_ALPACA_*`, engine only) |
 
-The two engines are independent: separate images, containers, ports, env files, databases, leases and stream secrets. Deploying, restarting or crashing one never touches the other. At runtime they share only the scraper, the LLM, the history service (each with its own database and role on it) and the server's IP address.
+The two engines are independent: separate images, containers, ports, variables, databases, leases and stream secrets. Deploying, restarting or crashing one never touches the other. At runtime they share only the scraper, the LLM, the history service (each with its own database and role on it) and the server's IP address.
 
 ---
 
@@ -35,7 +35,7 @@ $id = az resource list --resource-type Microsoft.DocumentDB/mongoClusters --quer
 az ad sp create-for-rbac --name marketbots-metrics --role "Monitoring Reader" --scopes $id --years 2
 ```
 
-Its output has `tenant`, `appId` and `password`: they go into `AZURE_TENANT_ID`, `AZURE_CLIENT_ID` and `AZURE_CLIENT_SECRET`, and `$id` into `AZURE_DOCUMENTDB_RESOURCE_ID`, on both Vercel projects (§3.4) and in `.env.crypto` / `.env.stock` for local dev. The secret expires after 2 years: the card then shows *Azure sign-in failed (HTTP 401)*; run `az ad sp credential reset --id <appId> --years 2` and update the four places.
+Its output has `tenant`, `appId` and `password`: they go into `AZURE_TENANT_ID`, `AZURE_CLIENT_ID` and `AZURE_CLIENT_SECRET`, and `$id` into `AZURE_DOCUMENTDB_RESOURCE_ID`, on both Vercel projects (§3.4) and in `.env` (SHARED) for local dev. The secret expires after 2 years: the card then shows *Azure sign-in failed (HTTP 401)*; run `az ad sp credential reset --id <appId> --years 2` and update the four places.
 
 **Alpaca (stock)**: the paper account, reset to **10,000**. Total return is measured from $10,000 and every P&L number comes from Alpaca, so the account belongs to this bot alone. A reset can issue new keys. Debit spreads need **options level 3** (Admin shows the level the engine sees). Alpaca's free market-data stream allows **one connection per account**: never run a second engine, script or notebook with these keys.
 
@@ -51,7 +51,7 @@ Its output has `tenant`, `appId` and `password`: they go into `AZURE_TENANT_ID`,
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-**News API keys** (optional, free): listed in the ENGINE section of each `.env.<bot>.example`. A source whose key is empty stays off.
+**News API keys** (optional, free): listed in `.env.example`, the ones both bots use in SHARED, each bot's own in its section. A source whose key is empty stays off.
 
 ---
 
@@ -103,39 +103,39 @@ cd C:\Users\colin\Documents\GitHub
 git clone https://github.com/colinfran/marketbots.git
 cd marketbots
 git config core.autocrlf false        # the repo is LF only (.gitattributes)
-Copy-Item .env.crypto.example .env.crypto
-Copy-Item .env.stock.example .env.stock
-Copy-Item .env.history.example .env.history
-Copy-Item .env.search.example .env.search   # optional: the search proxy (§3.7)
-notepad .env.crypto
-notepad .env.stock
-notepad .env.history
-notepad .env.search
+Copy-Item .env.example .env
+notepad .env                          # every secret and setting, in sections (§3)
 ```
 
 **The wallet volume**: on this server `cryptomarketbot_kraken-paper` already exists and holds the live paper wallet (§6). Only on a brand-new server, create it once with `docker volume create cryptomarketbot_kraken-paper`; the engine creates the workspace on first boot.
 
 ---
 
-## 3. The env files
+## 3. The env file
 
-### 3.1 One file per bot
+### 3.1 One file, in sections
 
-`.env.crypto` and `.env.stock` at the repo root hold everything the bot's engine and dashboard read, under the same variable names as before the merge. Both are git-ignored and kept out of Docker build contexts (`.dockerignore`); only the `.env.<bot>.example` files are committed. Each file has three sections:
+`.env` at the repo root holds every secret and setting of the stack: both engines, both dashboards (for local dev; Vercel keeps its own copy), the history and search services, and the host agent. It is git-ignored and kept out of Docker build contexts (`.dockerignore`); only its template, `.env.example`, is committed. Its sections:
 
-| Section | Read by |
-| --- | --- |
-| SHARED | the engine and the dashboard |
-| ENGINE | the engine only |
-| DASHBOARD | the dashboard only (Vercel, local dev) |
+| Section | Names | Read by |
+| --- | --- | --- |
+| SHARED | no prefix: `MONGODB_URI`, the news and research keys, `OWNER_EMAIL`, useSend, Azure Monitor, the time zone | both bots; `MONGODB_URI` also the host agent |
+| CRYPTO | `CRYPTO_*` | the crypto engine and dashboard |
+| STOCK | `STOCK_*` | the stock engine and dashboard |
+| HISTORY | `HISTORY_*` | the history service (§3.6) |
+| SEARCH | `SEARCH_PROXY_URL` | the search service (§3.7) |
+| HOST | `FAN_CONTROL`, `VESYNC_*`, `HOST_*` | the host agent (§11.1) |
 
-- **Engine container**: compose loads the whole file (`env_file`). The engine also receives the DASHBOARD values and ignores them (an accepted trade-off).
-- **Vercel** can't read the file. The SHARED and DASHBOARD values are set in the Vercel project (§3.4).
-- **Local dev**: the `pnpm dev:*` scripts read the file, then `.env.<bot>.local` (§3.5).
+The code reads a bot's variables without the prefix: `CRYPTO_MONGODB_DB_NAME` is the crypto engine's and dashboard's `MONGODB_DB_NAME`. In each bot's section, the comments say which variables its engine reads, which its dashboard, and which both.
 
-### 3.2 What compose sets itself
+- **Containers**: compose reads `.env` by itself (for the `${…}` in `compose.yml`), and `compose.yml` gives each service only its own variables, renamed (§3.2). An engine never sees the other bot's keys or the dashboards' secrets.
+- **Vercel** can't read the file. Each project gets its dashboard's values under the names without the prefix (§3.4).
+- **Local dev**: the `pnpm dev:*` scripts read `.env`, then `.env.local`, through `mb-env` (`packages/config/mb-env.mjs`), which renames them the same way (§3.5).
+- **The host agent** reads `.env` directly (`node --env-file`); its names have no prefix (§11.1).
 
-Don't put these in the env files. `compose.yml` sets them, and its values win over `env_file`:
+### 3.2 What each service gets
+
+`compose.yml` lists every variable each service gets, and where from. Both engines get the SHARED section's `MONGODB_URI`, news keys (`SEC_USER_AGENT`, `FINNHUB_API_KEY`, `FRED_API_KEY`, `BLS_API_KEY`) and research keys (`TAVILY_API_KEY`, `EXA_API_KEY`, `BRIGHTDATA_*`), and their own section's variables without the prefix. compose sets these itself; don't put them in `.env`:
 
 | Variable | crypto-engine | stock-engine |
 | --- | --- | --- |
@@ -144,117 +144,113 @@ Don't put these in the env files. `compose.yml` sets them, and its values win ov
 | `SCRAPER_URL` | `http://scraper:8790` | `http://scraper:8790` |
 | `LLM_URL` | `http://llm:8080` | `http://llm:8080` |
 | `SEARCH_URL` | `http://search:8080` | `http://search:8080` |
+| `LOG_DIR` | `/logs` | `/logs` |
+| `HISTORY_URL` | `postgres://crypto_history:<HISTORY_CRYPTO_PASSWORD>@history:5432/crypto_history` | `postgres://stock_history:<HISTORY_STOCK_PASSWORD>@history:5432/stock_history` |
 
-Crypto also gets `KRAKEN_OHLCVT_DIR=/data/ohlcvt`, the read-only mount of Kraken's history files (§6.5). `HISTORY_URL` is not among them: it carries the bot's history password, so it lives in the bot's env file (§3.6).
+Crypto also gets `KRAKEN_OHLCVT_DIR=/data/ohlcvt`, the read-only mount of Kraken's history files (§6.5). `history` gets the three `HISTORY_*` passwords, under the names its image and `initdb.sh` read (`POSTGRES_PASSWORD`, `CRYPTO_HISTORY_PASSWORD`, `STOCK_HISTORY_PASSWORD`); `history-backup` gets only the superuser's, and `search` only `SEARCH_PROXY_URL`.
+
+A variable that isn't in `.env` reaches its container empty, and the engines read an empty value as unset, so the code's default applies. **A new variable** goes into `.env.example` and into the `environment` of each service that reads it in `compose.yml`: one that is only in `.env` reaches no container.
 
 ### 3.3 Rules
 
-- One value per line, no quotes, no trailing spaces. The engine trims stray `\r`.
-- **A value containing `$`** (a Mongo password, say) goes in single quotes: `MONGODB_URI='mongodb+srv://user:pa$word@…'`. Compose expands `$` in unquoted values; single quotes keep it literal for both compose and Node's `--env-file` (local dev). The old `$$` escape doesn't work here: Node reads it as two dollar signs. On Vercel, paste the value without the quotes.
-- **All three files must exist** (`.env.crypto`, `.env.stock`, `.env.history`) for any compose command, even one that touches a single engine: compose reads every `env_file` when it loads the project.
-- **After editing** a file, run `docker compose up -d <bot>-engine`. That recreates the container with the new values; `restart` keeps the old ones.
-- Never commit them or paste their contents anywhere. `docker compose config` without `--quiet` prints every value; don't share its output.
+- One value per line, no trailing spaces. The engine trims stray `\r`.
+- **A value containing `$`, a space or `#`** (a Mongo password, a sender like `CryptoMarketBot <no-reply@…>`) goes in single quotes: `MONGODB_URI='mongodb+srv://user:pa$word@…'`. Compose expands `$` in unquoted values; single quotes keep it literal for both compose and Node's `--env-file` (local dev, the host agent). The old `$$` escape doesn't work here: Node reads it as two dollar signs. On Vercel, paste the value without the quotes.
+- compose finds `.env` in the project folder, so run compose from the repo root. Without the file every variable reaches the containers empty, and the engines stop at start (`Invalid engine environment`).
+- **After editing** it, run `docker compose up -d <service>` for each service that reads what you changed (§3.2). That recreates the container with the new values; `restart` keeps the old ones.
+- Never commit it or paste its contents anywhere. `docker compose config` without `--quiet` prints every value; don't share its output.
 
 ### 3.4 What goes into each Vercel project
 
-Set for Production and Preview, with the same values as the bot's env file. Vercel applies env changes to new deployments only, so redeploy after changing one.
+Set for Production and Preview, under the Vercel name, with the value of the `.env` variable beside it. Vercel applies env changes to new deployments only, so redeploy after changing one.
 
 **Crypto** (the cryptomarketbot.app project):
 
-| Variable | Section | Value |
+| Vercel variable | `.env` variable | Value |
 | --- | --- | --- |
-| `MONGODB_URI` | SHARED | same as the engine |
-| `MONGODB_DB_NAME` | SHARED | `cryptomarketbot` |
-| `STREAM_TOKEN_SECRET` | SHARED | **identical** to the engine's |
-| `BETTER_AUTH_SECRET` | DASHBOARD | 32+ characters; changing it signs you out everywhere |
-| `OWNER_EMAIL` | DASHBOARD | the only address that can sign in; required, no default |
-| `USESEND_API_KEY`, `USESEND_BASE_URL`, `USESEND_FROM_EMAIL` | DASHBOARD | the useSend key, its instance's URL and the verified sender; required, no defaults |
-| `ENGINE_STREAM_URL` | DASHBOARD | `wss://engine.cryptomarketbot.app/v1/stream` |
-| `NEXT_PUBLIC_DISPLAY_TIMEZONE` | DASHBOARD | `America/Los_Angeles` |
-| `HOST_DB_NAME` | DASHBOARD | optional: the host agent's database (default `serverstats`, §11) |
-| `SITE_URL` | DASHBOARD | optional: defaults to the project's production domain |
-| `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_DOCUMENTDB_RESOURCE_ID` | DASHBOARD | optional, all four or none: Azure Monitor's count of the database's storage on Admin → System (§1) |
+| `MONGODB_URI` | `MONGODB_URI` | same as the engine |
+| `MONGODB_DB_NAME` | `CRYPTO_MONGODB_DB_NAME` | `cryptomarketbot` |
+| `STREAM_TOKEN_SECRET` | `CRYPTO_STREAM_TOKEN_SECRET` | **identical** to the engine's |
+| `BETTER_AUTH_SECRET` | `CRYPTO_BETTER_AUTH_SECRET` | 32+ characters; changing it signs you out everywhere |
+| `OWNER_EMAIL` | `OWNER_EMAIL` | the only address that can sign in; required, no default |
+| `USESEND_API_KEY`, `USESEND_BASE_URL` | the same names | the useSend key and its instance's URL; required, no defaults |
+| `USESEND_FROM_EMAIL` | `CRYPTO_USESEND_FROM_EMAIL` | the verified sender; required, no default |
+| `ENGINE_STREAM_URL` | `CRYPTO_ENGINE_STREAM_URL` | `wss://engine.cryptomarketbot.app/v1/stream` |
+| `NEXT_PUBLIC_DISPLAY_TIMEZONE` | `NEXT_PUBLIC_DISPLAY_TIMEZONE` | `America/Los_Angeles` |
+| `HOST_DB_NAME` | `HOST_DB_NAME` | optional: the host agent's database (default `serverstats`, §11) |
+| `SITE_URL` | `CRYPTO_SITE_URL` | optional: defaults to the project's production domain |
+| `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_DOCUMENTDB_RESOURCE_ID` | the same names | optional, all four or none: Azure Monitor's count of the database's storage on Admin → System (§1) |
 
 **Stock** (the stockmarketbot.app project):
 
-| Variable | Section | Value |
+| Vercel variable | `.env` variable | Value |
 | --- | --- | --- |
-| `MONGODB_URI` | SHARED | same as the engine |
-| `MONGODB_DB_NAME` | SHARED | `stockmarketbot` |
-| `STREAM_TOKEN_SECRET` | SHARED | **identical** to the engine's |
-| `BETTER_AUTH_SECRET` | DASHBOARD | 32+ characters; changing it signs you out everywhere |
-| `OWNER_EMAIL` | DASHBOARD | the only address that can sign in; required, no default |
-| `USESEND_API_KEY`, `USESEND_BASE_URL`, `USESEND_FROM_EMAIL` | DASHBOARD | the useSend key, its instance's URL and the verified sender; required, no defaults |
-| `ENGINE_STREAM_URL` | DASHBOARD | `wss://engine.stockmarketbot.app/v1/stream` |
-| `DISCORD_WEBHOOK_URL` | DASHBOARD | optional: unhandled dashboard errors go to Discord (the engine reads the same variable for its alerts) |
-| `HOST_DB_NAME` | DASHBOARD | optional: the host agent's database (default `serverstats`, §11) |
-| `SITE_URL` | DASHBOARD | optional: defaults to the project's production domain |
-| `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_DOCUMENTDB_RESOURCE_ID` | DASHBOARD | optional, all four or none: Azure Monitor's count of the database's storage on Admin → System (§1) |
+| `MONGODB_URI` | `MONGODB_URI` | same as the engine |
+| `MONGODB_DB_NAME` | `STOCK_MONGODB_DB_NAME` | `stockmarketbot` |
+| `STREAM_TOKEN_SECRET` | `STOCK_STREAM_TOKEN_SECRET` | **identical** to the engine's |
+| `BETTER_AUTH_SECRET` | `STOCK_BETTER_AUTH_SECRET` | 32+ characters; changing it signs you out everywhere |
+| `OWNER_EMAIL` | `OWNER_EMAIL` | the only address that can sign in; required, no default |
+| `USESEND_API_KEY`, `USESEND_BASE_URL` | the same names | the useSend key and its instance's URL; required, no defaults |
+| `USESEND_FROM_EMAIL` | `STOCK_USESEND_FROM_EMAIL` | the verified sender; required, no default |
+| `ENGINE_STREAM_URL` | `STOCK_ENGINE_STREAM_URL` | `wss://engine.stockmarketbot.app/v1/stream` |
+| `DISCORD_WEBHOOK_URL` | `STOCK_DISCORD_WEBHOOK_URL` | optional: unhandled dashboard errors go to the engine's Discord channel |
+| `HOST_DB_NAME` | `HOST_DB_NAME` | optional: the host agent's database (default `serverstats`, §11) |
+| `SITE_URL` | `STOCK_SITE_URL` | optional: defaults to the project's production domain |
+| `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_DOCUMENTDB_RESOURCE_ID` | the same names | optional, all four or none: Azure Monitor's count of the database's storage on Admin → System (§1) |
 
-Nothing from the ENGINE sections goes to Vercel: the dashboards hold no broker or AI keys. Vercel sets `VERCEL_PROJECT_PRODUCTION_URL` itself (the default for `SITE_URL`); sign in on the production domain, not on preview URLs.
+Nothing else goes to Vercel: the dashboards hold no broker or AI keys. Vercel sets `VERCEL_PROJECT_PRODUCTION_URL` itself (the default for `SITE_URL`); sign in on the production domain, not on preview URLs.
 
 ### 3.5 Local dev overrides
 
-`.env.crypto.local` and `.env.stock.local` (git-ignored) are read after the main file, and their values win. Local engines must not touch live state:
+`.env.local` (git-ignored) is read after `.env`, under the same names, and its values win. Local engines must not touch live state:
 
 ```ini
-# .env.crypto.local
-MONGODB_DB_NAME=cryptomarketbot_dev
-DISCORD_WEBHOOK_URL=
-HISTORY_URL=
+# .env.local
+CRYPTO_MONGODB_DB_NAME=cryptomarketbot_dev
+CRYPTO_DISCORD_WEBHOOK_URL=
+STOCK_MONGODB_DB_NAME=stockmarketbot_dev
+STOCK_DISCORD_WEBHOOK_URL=
+STOCK_ALPACA_API_KEY=fake-key
+STOCK_ALPACA_SECRET_KEY=fake-secret
 ```
 
-```ini
-# .env.stock.local
-MONGODB_DB_NAME=stockmarketbot_dev
-DISCORD_WEBHOOK_URL=
-HISTORY_URL=
-ALPACA_API_KEY=fake-key
-ALPACA_SECRET_KEY=fake-secret
-```
-
+- `mb-env <bot>` gives a dev process the variables without a bot prefix under their own names (the HISTORY, SEARCH and HOST ones too, which it doesn't read) and its bot's without the prefix, a bot's winning over a shared one of the same name; the other bot's are left out. The shell's own variables win over both files.
 - On the live database a local engine would wait for the live engine's lease, and take over trading as soon as the live one stopped.
-- A local engine can't reach the `history` service (no host port), and shouldn't write to it anyway: leave `HISTORY_URL=` empty in the `.local` file.
+- A local engine keeps no history (only `compose.yml` builds `HISTORY_URL`, and `history` has no host port) and runs no AI (`LLM_URL` too is set only by compose), so it spends none of the research allowances.
 - A local stock engine with the live keys would knock out the live engine's market data (one connection per account). With fake keys it boots and logs Alpaca auth errors.
-- A local crypto engine needs the Kraken CLI on `PATH` (or `KRAKEN_CLI_PATH`) and uses that machine's own CLI workspace, never the server's volume.
+- A local crypto engine needs the Kraken CLI on `PATH` (or `CRYPTO_KRAKEN_CLI_PATH` in `.env.local`) and uses that machine's own CLI workspace, never the server's volume.
 - A local dashboard on the live database writes real commands that the live engine executes.
 
-### 3.6 The history service's file
+### 3.6 The history passwords
 
-`.env.history` (git-ignored; template `.env.history.example`) holds the history service's three passwords. compose loads it into `history` and `history-backup` only; the engines never see it.
+The HISTORY section holds the history service's three passwords:
 
 | Variable | What |
 | --- | --- |
-| `POSTGRES_PASSWORD` | the Postgres superuser: creates the databases on the first start, and runs the nightly backup |
-| `CRYPTO_HISTORY_PASSWORD` | the `crypto_history` role, which owns the `crypto_history` database and nothing else |
-| `STOCK_HISTORY_PASSWORD` | the `stock_history` role, likewise |
+| `HISTORY_POSTGRES_PASSWORD` | the Postgres superuser: creates the databases on the first start, and runs the nightly backup |
+| `HISTORY_CRYPTO_PASSWORD` | the `crypto_history` role, which owns the `crypto_history` database and nothing else |
+| `HISTORY_STOCK_PASSWORD` | the `stock_history` role, likewise |
 
-Each bot's env file carries its own password in `HISTORY_URL` (ENGINE section), so an engine can reach only its own database:
+compose builds each engine's `HISTORY_URL` from its bot's password (§3.2), so an engine can reach only its own database, and its URL can't drift from the password.
 
-```ini
-# .env.crypto
-HISTORY_URL=postgres://crypto_history:<CRYPTO_HISTORY_PASSWORD>@history:5432/crypto_history
-```
+- The passwords take effect when the `history-data` volume is created (the first start, by `packages/history/docker/initdb.sh`). Changing one in `.env` afterwards changes nothing until Postgres changes too: `docker compose exec history psql -U postgres -c "alter role crypto_history password '…'"`, then the value in `.env`, then `docker compose up -d crypto-engine` (and `history history-backup` for the superuser's).
+- Generate them like the other secrets (§1). They go into a URL as they are: keep them hex.
+- Without its bot's password an engine's `HISTORY_URL` has none, and the history store refuses it: the engine keeps trading and retries every minute (§10).
 
-- The passwords take effect when the `history-data` volume is created (the first start, by `packages/history/docker/initdb.sh`). Changing one in the file afterwards changes nothing: change it in Postgres too (`docker compose exec history psql -U postgres -c "alter role crypto_history password '…'"`), then in the bot's `HISTORY_URL`, then run `docker compose up -d <bot>-engine`.
-- Generate them like the other secrets (§1). Hex values need no quoting in a URL.
-- Without `HISTORY_URL` an engine keeps no history, and nothing else changes.
+### 3.7 The search accounts
 
-### 3.7 The search service's file
+Research's search accounts (§9):
 
-`.env.search` (git-ignored; template `.env.search.example`) holds research's search accounts (§9). compose loads it, if it exists, into `search` and both engines; each reads only its own variable.
-
-| Variable | Read by | What |
-| --- | --- | --- |
-| `SEARCH_PROXY_URL` | `search` | The residential proxy (Evomi) for the paid search engine: `http://<user>:<password>_country-US@core-residential.evomi.com:1000`. Evomi's dashboard shows `host:port:user:password`, which doesn't work here. `_country-US` (an Evomi option, after the password) keeps the exits in the US. Percent-encode special characters in the password. Without it, the paid engine goes direct, and our IP is blocked by it. |
-| `TAVILY_API_KEY` | both engines | Tavily's search API, one key for both bots. Without it, research skips Tavily. |
-| `EXA_API_KEY` | both engines | Exa's search API, likewise. |
-| `BRIGHTDATA_API_KEY` | both engines | Bright Data's API key, likewise. |
-| `BRIGHTDATA_ZONE` | both engines | Bright Data's SERP zone; unset, `serp_api1`. |
+| Variable | Section | Read by | What |
+| --- | --- | --- | --- |
+| `SEARCH_PROXY_URL` | SEARCH | `search` | The residential proxy (Evomi) for the paid search engine: `http://<user>:<password>_country-US@core-residential.evomi.com:1000`. Evomi's dashboard shows `host:port:user:password`, which doesn't work here. `_country-US` (an Evomi option, after the password) keeps the exits in the US. Percent-encode special characters in the password. Without it, the paid engine goes direct, and our IP is blocked by it. |
+| `TAVILY_API_KEY` | SHARED | both engines | Tavily's search API, one key for both bots. Without it, research skips Tavily. |
+| `EXA_API_KEY` | SHARED | both engines | Exa's search API, likewise. |
+| `BRIGHTDATA_API_KEY` | SHARED | both engines | Bright Data's API key, likewise. |
+| `BRIGHTDATA_ZONE` | SHARED | both engines | Bright Data's SERP zone; unset, `serp_api1`. |
 
 - The proxy is billed per GB, and the search APIs have monthly allowances, so research uses them sparingly and paces them (§9).
 - At start, `packages/wire/docker/searxng-start.sh` writes the proxy URL into a copy of the settings in the container's `/tmp`; the committed `searxng.yml` holds only a placeholder.
-- After changing the file, recreate whatever reads the variable you changed: `docker compose up -d search` for the proxy, `docker compose up -d crypto-engine stock-engine` for the search APIs.
+- After changing one, recreate whatever reads it: `docker compose up -d search` for the proxy, `docker compose up -d crypto-engine stock-engine` for the search APIs.
 
 ---
 
@@ -262,7 +258,7 @@ HISTORY_URL=postgres://crypto_history:<CRYPTO_HISTORY_PASSWORD>@history:5432/cry
 
 ```powershell
 docker volume inspect cryptomarketbot_kraken-paper   # must exist: the paper wallet (§6)
-docker compose config --quiet                       # checks compose.yml and the three env files; silent when fine
+docker compose config --quiet                       # checks compose.yml and .env; silent when fine
 docker compose build                                # several minutes the first time
 docker compose up -d                                # the engines, scraper, history, the backups, llm (the first start downloads its 12 GB model, §9)
 docker compose ps                                   # engines "healthy" within ~90 s (crypto) / ~60 s (stock)
@@ -316,7 +312,7 @@ docker compose logs --since 24h stock-engine | Select-String '"level":"error"'
 Get-Content logs\crypto-engine\2026-10-27.log -Tail 50 -Wait   # the history, across deploys (below)
 Select-String '"level":"error"' logs\stock-engine\*.log    # every error in the kept history
 docker compose restart stock-engine                        # same image, same env
-docker compose up -d stock-engine                          # after editing .env.stock
+docker compose up -d stock-engine                          # after editing a STOCK_ value in .env
 docker compose stop crypto-engine                          # one engine; the other keeps running
 docker compose start crypto-engine
 docker stats --no-stream marketbots-crypto-engine marketbots-stock-engine marketbots-scraper
@@ -373,7 +369,7 @@ Check with `docker stats --no-stream` (§5.2).
 
 ### 5.6 Settings
 
-Live trading settings (risk, AI models and timeouts, news engine, schedule) live in MongoDB and change only from the dashboard's **Admin** page, as an audited `settings.update` command. The env files hold only first-boot defaults such as `STARTING_CAPITAL`; changing those, or `DEFAULT_SETTINGS` in code, doesn't change a running bot.
+Live trading settings (risk, AI models and timeouts, news engine, schedule) live in MongoDB and change only from the dashboard's **Admin** page, as an audited `settings.update` command. `.env` holds only first-boot defaults such as `STOCK_STARTING_CAPITAL`; changing those, or `DEFAULT_SETTINGS` in code, doesn't change a running bot.
 
 ### 5.7 Starting over
 
@@ -589,11 +585,11 @@ On 2026-10-30 the three databases (`cryptomarketbot`, `stockmarketbot`, `servers
 
 - With both engines stopped (95 s): `mongodump` from Atlas into `backups\mongo-atlas-2026-10-30\` (`mongo:8.0` image), the Azure collections emptied, `mongorestore --noIndexRestore` into them, then a check that every collection's documents (each one compared) and indexes match. Only then did the env files switch and the engines restart. The host agent was restarted after them; the samples it wrote to Atlas meanwhile were copied over.
 - **Restoring into the free tier:** `mongorestore`'s parallel index builds exhausted its connections (`TooManyLogicalSessions: The worker node connections have exceeded the limit`), and the aborted builds left index objects behind that made later builds fail (`NamespaceExists: relation "documents_rum_index_…" already exists`) until retried. So the collections and indexes were created once, one index at a time with retries, and the move only refilled documents: `--noIndexRestore`, `--numParallelCollections=1`, `--numInsertionWorkersPerCollection=1`.
-- `.env.crypto`, `.env.stock` and `.env.host` keep the Atlas `MONGODB_URI` as a comment until the cleanup; the originals are in `backups\mongo-atlas-2026-10-30\env\`.
+- `.env` keeps the Atlas `MONGODB_URI` as a comment under the live one until the cleanup (the three env files of the time became the one `.env` later that day, §3); the originals are in `backups\mongo-atlas-2026-10-30\env\`.
 
-**Rollback** (only soon after the move: anything written since is only on Azure, and crypto's books would no longer match the wallet): put the commented line back in each env file, `docker compose up -d --no-deps --force-recreate crypto-engine stock-engine`, restart the host agent (§11.3), and set both Vercel projects' `MONGODB_URI` back.
+**Rollback** (only soon after the move: anything written since is only on Azure, and crypto's books would no longer match the wallet): swap the commented `MONGODB_URI` in `.env` with the live one, `docker compose up -d --no-deps --force-recreate crypto-engine stock-engine`, restart the host agent (§11.3), and set both Vercel projects' `MONGODB_URI` back.
 
-**Cleanup after 14 days** (with owner approval, from 2026-11-13): delete the commented lines from the three env files, delete the Atlas clusters, and delete `backups\mongo-atlas-2026-10-30\`.
+**Cleanup after 14 days** (with owner approval, from 2026-11-13): delete the commented line from `.env`, delete the Atlas clusters, and delete `backups\mongo-atlas-2026-10-30\`.
 
 ---
 
@@ -728,7 +724,7 @@ A run takes about a minute, and costs nothing (`ai_calls`: `cost_source: "local"
 - **Check it:** `docker compose ps search`, and `docker logs marketbots-search` for engines that fail.
 - **When research runs:** Admin's *Web research* (auto: only when our feeds leave a gap) and *Event research* (*web check*: a quick search before an event decision; stored as `x_verify`).
 
-**Metered providers** (`@mb/wire/research/metered`; keys in `.env.search`, §3.7): search APIs with a free monthly allowance. The engines call them directly, not through `search`, in this order, for a search still short of 3 results:
+**Metered providers** (`@mb/wire/research/metered`; keys in `.env`'s SHARED section, §3.7): search APIs with a free monthly allowance. The engines call them directly, not through `search`, in this order, for a search still short of 3 results:
 
 | Provider | Free allowance | A search | Per day, both bots (31-day month) | Per bot |
 | --- | --- | --- | --- | --- |
@@ -752,10 +748,10 @@ A run takes about a minute, and costs nothing (`ai_calls`: `cost_source: "local"
 
 | Symptom | Likely cause / fix |
 | --- | --- |
-| `env file ...\.env.stock not found` from any compose command | Both `.env.crypto` and `.env.stock` must exist at the repo root, even to start one engine. |
+| `Invalid engine environment` for every variable, `MONGODB_URI` first | No `.env` at the repo root, or compose was run from another folder: compose reads `.env` from the project folder (§3.3). |
 | `external volume "cryptomarketbot_kraken-paper" not found` | The wallet volume is missing. Don't create an empty one on this server: check `docker volume ls`, then restore a backup (§6.2). |
 | `port is already allocated` on `docker compose up` | Another container holds 8787/8788, usually an old engine (`docker ps`). Stop it. Don't move the port: Caddy targets it. |
-| `Invalid engine environment` in logs | A required variable is missing or too short (secrets need 32+ characters). Fix the env file, then `docker compose up -d <bot>-engine`. |
+| `Invalid engine environment` in logs | A required variable is missing or too short (secrets need 32+ characters). Fix it in `.env` (the bot's names have its prefix there), then `docker compose up -d <bot>-engine`. |
 | `MongoDB connection failed; retrying` | The cluster's firewall (Azure portal → the cluster → *Networking*) doesn't allow the server's IP, or the URI/password is wrong (a `$` in it: §3.3). |
 | `another engine holds the lease; waiting for it to expire` | Another engine is on the same database: an old container (`docker ps`), or a local dev engine without a `_dev` database (§3.5). |
 | `Kraken CLI paper wallet unavailable` | Run the §6.1 commands to see the CLI's own error. No orders are placed until it works (retried every minute). |
@@ -780,8 +776,8 @@ A run takes about a minute, and costs nothing (`ai_calls`: `cost_source: "local"
 | `llm-model` ends with `SHA-256 mismatch` | The download is corrupt or the pinned file changed. It was removed; run `llm-model` again to download it again. |
 | *enrich:summaries* degraded: `… wrote 12.3 tokens/s (floor 20): paused for 30 min` | The model ran slowly: spilled into system RAM, or the GPUs are busy with something else. Summaries resume by themselves after 30 minutes; check `nvidia-smi`. |
 | *enrich:summaries* degraded: `GET /v1/models failed (503)` | The server is still loading the model (~1 minute after a start). |
-| `env file ...\.env.history not found` | Create it from `.env.history.example` (§3.6). |
-| Admin → System: *History store: unreachable*, log `history store unavailable; retrying in a minute` | `docker compose ps history`: not running, or still starting. A `password authentication failed` means the bot's `HISTORY_URL` doesn't match the role's password (§3.6). The engine keeps trading and retries every minute. |
+| `initdb: CRYPTO_HISTORY_PASSWORD is not set` on the first start of `history` | `HISTORY_CRYPTO_PASSWORD` (or the stock one) is missing from `.env` (§3.6). |
+| Admin → System: *History store: unreachable*, log `history store unavailable; retrying in a minute` | `docker compose ps history`: not running, or still starting. A `password authentication failed` means the bot's `HISTORY_<BOT>_PASSWORD` in `.env` doesn't match the role's password (§3.6). The engine keeps trading and retries every minute. |
 | *History store* shows bars *dropped* | It was down long enough for an engine's 50,000-bar buffer to fill. The backfills can fetch those minutes again. |
 | `history-backup` logs `backup of … failed (no news archive yet?)` | Normal until the engine has migrated its database; otherwise check `docker compose logs history`. |
 
@@ -796,7 +792,7 @@ The containers can't read any of this (they see the Docker VM), so it runs on Wi
 | What | Where | Started by |
 | --- | --- | --- |
 | LibreHardwareMonitor 0.9.6 | `apps\host-agent\data\LibreHardwareMonitor`. Its sensor server listens on 127.0.0.1:8086 behind a generated password (`data\lhm.json`); firewall rule `marketbots-host-sensors-block` blocks the port from the network | `\marketbots\Host sensors` at sign-in, elevated (its PawnIO driver reads and sets the board) |
-| The host agent | `apps\host-agent\dist\main.js` on the server's own Node, with `.env.host` | `\marketbots\Host agent` at startup, no window; restarted if it exits |
+| The host agent | `apps\host-agent\dist\main.js` on the server's own Node, with `.env` | `\marketbots\Host agent` at startup, no window; restarted if it exits |
 | The fan watchdog | `dist\fan-watchdog.js`, a detached process the agent starts | the agent, when `FAN_CONTROL=on` |
 
 Every reading (2 s by default) the agent reads Windows, `nvidia-smi` and LibreHardwareMonitor; the VeSync outlet once a minute. It writes into its own database on the bots' cluster, `serverstats` (`HOST_DATABASES`), which both dashboards read (`HOST_DB_NAME`): it is one machine, so one copy.
@@ -807,26 +803,25 @@ Every reading (2 s by default) the agent reads Windows, `nvidia-smi` and LibreHa
 
 Nothing in it touches the bots' databases or trading state, and the engines don't know it exists.
 
-### 11.1 `.env.host`
+### 11.1 Its variables
 
-`.env.host` at the repo root (git-ignored; template `.env.host.example`). Nothing in it goes to Vercel.
+The agent reads the repo's `.env` (§3), started with `node --env-file`: the SHARED section's `MONGODB_URI` and the HOST section, under their own names. It ignores the bots' variables in the file. Nothing in the HOST section goes to Vercel.
 
 | Variable | What |
 | --- | --- |
-| `MONGODB_URI` | The bots' cluster, as in `.env.crypto` |
+| `MONGODB_URI` | The bots' cluster (SHARED) |
 | `HOST_DATABASES` | Optional: its database (default `serverstats`; the dashboards' `HOST_DB_NAME` must match) |
 | `FAN_CONTROL` | `on`: the agent sets the motherboard fans. `off` (default): it only reads them (§11.4) |
 | `VESYNC_USERNAME`, `VESYNC_PASSWORD` | A VeSync account that sees the outlet: a separate one the home or outlet is shared with (accept the share in the VeSync app, signed in as it). Without them, no power or energy readings (the recorded history still shows) |
 | `VESYNC_TIMEZONE`, `VESYNC_COUNTRY_CODE`, `VESYNC_REFRESH_MS` | Optional: the account's time zone (default the server's) and country (`US`), and how often the outlet is read (60000 ms) |
 | `HOST_DATA_DIR`, `LHM_CONNECTION_FILE` | Optional: where the agent keeps its files (`apps\host-agent\data`) and LibreHardwareMonitor's login (`<data>\lhm.json`) |
 
-The agent's own settings (the reading interval, the electricity price and currency, the outlet) aren't in the file: they change in Admin → Server → Settings and are kept in `data\settings.json`. After editing `.env.host`, restart the agent (§11.3).
+The agent's own settings (the reading interval, the electricity price and currency, the outlet) aren't in the file: they change in Admin → Server → Settings and are kept in `data\settings.json`. After editing its variables in `.env`, restart the agent (§11.3).
 
 ### 11.2 First install
 
 ```powershell
-Copy-Item .env.host.example .env.host
-notepad .env.host                                        # MONGODB_URI (as in .env.crypto), the VeSync login
+notepad .env                                             # MONGODB_URI (SHARED), the HOST section: the VeSync login (.env exists from §2)
 pnpm install
 pnpm --filter @mb/host-agent build
 .\apps\host-agent\scripts\install-sensors.ps1            # administrator PowerShell
@@ -849,6 +844,8 @@ Get-ScheduledTask -TaskPath '\marketbots\' | Get-ScheduledTaskInfo      # last r
 ```
 
 Any time is fine: the engines don't depend on it. The page itself deploys with the dashboards (push to `main`).
+
+The task's command line names the env file. Tasks registered before the move to one `.env` (2026-10-30) start the agent with `.env.host`: run `install-tasks.ps1` again once (administrator PowerShell, as the account that signs in), then restart the agent as above.
 
 ### 11.4 Fans
 
@@ -887,7 +884,7 @@ The old monitor's data folder was copied out of its Docker volume (`jellyfin-sys
 
 ```powershell
 cd apps\host-agent
-node --env-file=..\..\.env.host dist\import-history.js ..\..\backups\jellyfin-system-monitor
+node --env-file=..\..\.env dist\import-history.js ..\..\backups\jellyfin-system-monitor
 ```
 
 The import matches the old monitor's own energy totals to the watt-hour. Running it again only fills minutes that are missing; `--replace` rewrites an earlier import's minutes. The imported minutes leave the charts as they turn 30 days old, by 2026-11-29; after that the backup can be deleted.
@@ -896,12 +893,12 @@ The import matches the old monitor's own energy totals to the watt-hour. Running
 
 | Symptom | Likely cause / fix |
 | --- | --- |
-| *The host agent has never reported* | The `Host agent` task isn't running or can't reach the database: `Get-ScheduledTask -TaskPath '\marketbots\' \| Get-ScheduledTaskInfo`, then the log (§11.3). A bad `.env.host` stops it at start: the task's last result is 1. |
+| *The host agent has never reported* | The `Host agent` task isn't running or can't reach the database: `Get-ScheduledTask -TaskPath '\marketbots\' \| Get-ScheduledTaskInfo`, then the log (§11.3). A bad `.env` stops it at start: the task's last result is 1. |
 | *Offline* with a time | The agent stopped or lost the database after that reading. The history stays. |
 | *Motherboard sensors: LibreHardwareMonitor is not responding* | The `Host sensors` task isn't running, or the PawnIO prompt wasn't approved: run `start-sensors.ps1` by hand. |
 | No CPU temperature, every fan at 100% | *Cooling protection*: LibreHardwareMonitor has no `CPU Package` temperature (sensors still loading, or the driver isn't approved). |
-| *Fan control is off on the server* | `FAN_CONTROL=off` in `.env.host` (§11.4). |
+| *Fan control is off on the server* | `FAN_CONTROL=off` in `.env` (§11.4). |
 | *The fan watchdog stopped* | Fan control is off until the agent restarts (§11.3). |
-| *VeSync login failed*, *Several outlets found* | Check the account and region in `.env.host`; pick the outlet in Settings after *Discover*. |
+| *VeSync login failed*, *Several outlets found* | Check the account and region in `.env`; pick the outlet in Settings after *Discover*. |
 | *VeSync lists no devices on this account* | The account logs in but sees no outlet: accept the home (or outlet) share in the VeSync app, signed in as that account. |
 | VeSync: `login temporary auth code expired` | Since 2026-10-26 VeSync completes logins only for its own app's ID, which the agent sends (`VESYNC_APP_ID` in `vesync.ts`); if VeSync changes it again, update it there. |

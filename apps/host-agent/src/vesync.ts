@@ -6,7 +6,7 @@ import { Helpers, VeSync, type VeSyncBaseDevice } from "tsvesync"
 /**
  * The server's power draw, from a VeSync energy-monitoring smart outlet (tsvesync, VeSync's
  * unofficial cloud API). Read every `refreshMs` (a minute by default); between refreshes the last
- * reading stands. The login stays in `.env.host` and never reaches a dashboard.
+ * reading stands. The login stays in `.env` and never reaches a dashboard.
  */
 
 /**
@@ -96,7 +96,7 @@ export class PowerMonitor {
 
   /** The last reading; refreshes it first when it is due. */
   async read(force = false): Promise<PowerState> {
-    if (!this.state.configured) return { ...this.state, error: "VeSync isn't configured: set VESYNC_USERNAME and VESYNC_PASSWORD in .env.host." }
+    if (!this.state.configured) return { ...this.state, error: "VeSync isn't configured: set VESYNC_USERNAME and VESYNC_PASSWORD in .env." }
     if (this.inFlight) return this.inFlight
     if (!force && Date.now() - this.lastAttempt < this.config.refreshMs) return this.state
     this.lastAttempt = Date.now()
@@ -106,7 +106,7 @@ export class PowerMonitor {
 
   /** Logs in and lists the supported outlets on the account. */
   async discover(): Promise<HostOutlet[]> {
-    if (!this.state.configured) throw new Error("VeSync isn't configured: set VESYNC_USERNAME and VESYNC_PASSWORD in .env.host.")
+    if (!this.state.configured) throw new Error("VeSync isn't configured: set VESYNC_USERNAME and VESYNC_PASSWORD in .env.")
     this.manager ??= new VeSync(this.config.username, this.config.password, this.config.timeZone, {
       debug: true,
       redact: true,
