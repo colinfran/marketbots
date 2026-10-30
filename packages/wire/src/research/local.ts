@@ -152,10 +152,6 @@ export type LocalResearchDeps = {
   models?: ModelCalls
 }
 
-type Json = Record<string, unknown>
-const isObject = (v: unknown): v is Json => typeof v === "object" && v !== null && !Array.isArray(v)
-const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0)
-
 /** The search window for research since `fromDate` (a UTC date): yesterday's is "day", up to a week back "week", else "month". */
 export const rangeFor = (fromDate: string, now: Date): SearchRange => {
   const days = (now.getTime() - Date.parse(`${fromDate}T00:00:00Z`)) / 86_400_000

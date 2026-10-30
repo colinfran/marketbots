@@ -1,6 +1,5 @@
 import { createRequire } from "node:module"
 import { COMMAND_LABEL, commandSchema } from "@mb/stock-core/commands"
-import { CORE_ACTIONS, coreReviewSchema } from "@mb/stock-core/core-book"
 import { COLLECTIONS, INDEXES } from "@mb/stock-core/db"
 import { clientFrameSchema, EPHEMERAL_EVENTS, EVENT_SCHEMA_VERSION, eventEnvelopeSchema, OWNER_ONLY_EVENTS, STREAM_PROTOCOL_VERSION } from "@mb/stock-core/events"
 import { FILLED_ORDERS } from "@mb/stock-core/fills"
@@ -42,10 +41,6 @@ const settingsValidation = () => {
     "options.min_delta >= max_delta": { ...S, options: { ...S.options, min_delta: 0.7 } },
     "options.max_premium_per_trade_pct > max_total_premium_pct": { ...S, options: { ...S.options, max_premium_per_trade_pct: 16 } },
     "duplicate benchmarks": { ...S, universe: { ...S.universe, benchmarks: ["SPY", "SPY"] } },
-    "core.min_holdings > max_holdings": { ...S, core: { ...S.core, min_holdings: 9 } },
-    "core.target_pct + risk.cash_reserve_pct > 100": { ...S, core: { ...S.core, target_pct: 90 }, risk: { ...S.risk, cash_reserve_pct: 15 } },
-    "core.review_time_et outside the session": { ...S, core: { ...S.core, review_time_et: "15:45" } },
-    "core.themes malformed": { ...S, core: { ...S.core, themes: ["AI buildout: NVDA, AVGO", "Chips: 2330"] } },
     "unknown keys are dropped": { ...S, extra: 1, risk: { ...S.risk, extra: 2 } },
   }
   return Object.fromEntries(
@@ -130,13 +125,12 @@ describe("contracts: domain constants", () => {
 })
 
 describe("contracts: AI output schema", () => {
-  it("bot report, decision, option order and the core review", () => {
+  it("bot report, decision and option order", () => {
     matchJson("ai.schema.json", {
-      enums: { sentiments: SENTIMENTS, regimes: REGIMES, stances: STANCES, stock_actions: STOCK_ACTIONS, option_actions: OPTION_ACTIONS, actions: ACTIONS, horizons: HORIZONS, setups: SETUPS, impacts: IMPACTS, severities: SEVERITIES, core_actions: CORE_ACTIONS },
+      enums: { sentiments: SENTIMENTS, regimes: REGIMES, stances: STANCES, stock_actions: STOCK_ACTIONS, option_actions: OPTION_ACTIONS, actions: ACTIONS, horizons: HORIZONS, setups: SETUPS, impacts: IMPACTS, severities: SEVERITIES },
       bot_report: jsonSchema(botReportSchema, "input"),
       decision: jsonSchema(decisionSchema, "input"),
       option_order: jsonSchema(optionOrderSchema, "input"),
-      core_review: jsonSchema(coreReviewSchema, "input"),
     })
   })
 })

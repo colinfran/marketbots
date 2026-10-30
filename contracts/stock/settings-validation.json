@@ -107,46 +107,6 @@
       }
     ]
   },
-  "core.min_holdings > max_holdings": {
-    "ok": false,
-    "issues": [
-      {
-        "path": "core.min_holdings",
-        "code": "custom",
-        "message": "min_holdings can't exceed max_holdings"
-      }
-    ]
-  },
-  "core.target_pct + risk.cash_reserve_pct > 100": {
-    "ok": false,
-    "issues": [
-      {
-        "path": "core.target_pct",
-        "code": "custom",
-        "message": "target_pct plus risk.cash_reserve_pct can't exceed 100"
-      }
-    ]
-  },
-  "core.review_time_et outside the session": {
-    "ok": false,
-    "issues": [
-      {
-        "path": "core.review_time_et",
-        "code": "custom",
-        "message": "review_time_et must be between 09:30 and 15:00 (the regular session)"
-      }
-    ]
-  },
-  "core.themes malformed": {
-    "ok": false,
-    "issues": [
-      {
-        "path": "core.themes.1",
-        "code": "custom",
-        "message": "Expected a theme like \"AI buildout: NVDA, AVGO, TSM\""
-      }
-    ]
-  },
   "unknown keys are dropped": {
     "ok": true,
     "equals_input": false

@@ -7,14 +7,11 @@ import {
   type EventDoc as EventDocOf,
   type IndexSpec,
   type SettingsDoc as SettingsDocOf,
-  type TokenUsage,
 } from "@mb/core/db"
 import type { Command } from "./commands"
 import type { CycleState, EngineEvent, EngineRunStatus, EvidenceKind } from "./events"
-import type { PerformanceMetrics, TradeStats } from "./metrics"
 import type { Settings } from "./settings"
 import type { StrategyId } from "./strategies"
-import type { DossierRow } from "./wire"
 import type { AccountId, Mode, Venue } from "./venues"
 
 export { utcDay } from "@mb/core/db"
@@ -300,7 +297,7 @@ export type DecisionDoc = {
   trigger_kind?: CycleKind
   /** Wire items behind an event decision, and items it cited. */
   wire_item_ids?: string[]
-  /** The agent episode that made the decision (level auto); absent on the timed cycles'. */
+  /** The agent episode that made the decision; absent on decisions from before the agent. */
   agent_episode_id?: string
   ai: {
     conviction: number

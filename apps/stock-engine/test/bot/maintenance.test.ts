@@ -182,7 +182,6 @@ describe("enforceOvernightRules", () => {
   })
 
   it("counts a former core holding toward the cap like any other position", async () => {
-    ctx.settings.current.core.enabled = true
     broker.setPosition("SPY", 12, 500) // 6,000: over the cap on its own
     await addPlan("SPY", { book: "core", horizon: "multi_day" })
     broker.setPosition("SWING", 20, 100)
@@ -246,8 +245,7 @@ describe("maintain", () => {
     ])
   })
 
-  it("liquidates a former core holding too, even if the core book's setting is still on", async () => {
-    ctx.settings.current.core.enabled = true
+  it("liquidates a former core holding too", async () => {
     broker.setPosition("AAPL", 10, 100)
     broker.setPosition("SPY", 4, 500)
     broker.lastEquity = 10_500

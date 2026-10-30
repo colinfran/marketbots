@@ -20,8 +20,6 @@ const quiet = (n: number, start = 100, from = T0): Bar[] => {
   return bars
 }
 
-const feed = (d: AnomalyDetector, symbol: string, bars: Bar[]) => bars.flatMap((b) => d.addBar(symbol, b))
-
 describe("AnomalyDetector", () => {
   it("flags volume far above the median", () => {
     const d = new AnomalyDetector("BTC/USD", thresholds)

@@ -1,6 +1,5 @@
 import {
   agentSettingsBase,
-  aiSettingsBase,
   applySettingsPatch as sharedApplySettingsPatch,
   type DeepPartial,
   int,
@@ -21,11 +20,10 @@ export { diffSettings, mergeSettings, MODEL_ID_PATTERN } from "@mb/core/settings
  *
  * Bounds are deliberately wide but finite, so a typo can't set a 5000% position limit.
  *
- * The `ai` and `wire` sections take the fields both bots share from @mb/core/settings, in this
- * bot's key order (the order is part of the settings contract), and add stock's own.
+ * The `wire` section takes the fields both bots share from @mb/core/settings, in this bot's key
+ * order (the order is part of the settings contract), and adds stock's own.
  */
 
-const aiBase = aiSettingsBase.shape
 const wireBase = wireSettingsBase.shape
 
 /** US-listed ticker, e.g. NVDA or BRK.B. */
@@ -35,66 +33,8 @@ const ticker = z.string().regex(TICKER_PATTERN, "Expected an uppercase ticker li
 export const PHASES = ["premarket", "intraday", "close", "postmarket"] as const
 export type Phase = (typeof PHASES)[number]
 
-/** The weekdays a weekly job can be scheduled on. */
-export const WEEKDAYS = ["mon", "tue", "wed", "thu", "fri"] as const
-export type Weekday = (typeof WEEKDAYS)[number]
-
-/** A wall-clock time in New York, "HH:MM" on a 24-hour clock. */
-export const TIME_ET_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/
-
-/** Broad-index ETFs: a core holding of one is capped at core.max_index_etf_pct, a single stock at core.max_holding_pct. */
-export const CORE_INDEX_ETFS = ["SPY", "QQQ", "DIA", "IWM", "VTI", "VOO"] as const
-
-export type CoreTheme = { name: string; tickers: string[] }
-
-/**
- * One of the owner's long-term themes, written as "AI buildout: NVDA, AVGO, TSM". The tickers are
- * optional ("Nuclear power" alone is a theme), separated by commas or spaces, any case. null when
- * the line isn't a theme: no name, a name over 60 characters, or a malformed or 16th ticker.
- */
-export const parseTheme = (line: string): CoreTheme | null => {
-  const colon = line.indexOf(":")
-  const name = (colon < 0 ? line : line.slice(0, colon)).trim()
-  if (!name || name.length > 60) return null
-  const tickers = colon < 0 ? [] : line.slice(colon + 1).split(/[\s,]+/).filter(Boolean).map((t) => t.toUpperCase())
-  if (tickers.length > 15 || !tickers.every((t) => TICKER_PATTERN.test(t))) return null
-  return { name, tickers: [...new Set(tickers)] }
-}
-
-const themeLine = z.string().max(200).refine((s) => parseTheme(s) !== null, 'Expected a theme like "AI buildout: NVDA, AVGO, TSM"')
-
-/**
- * The long-term core book: a share of equity in a handful of holdings, each with a written thesis,
- * reviewed weekly instead of every cycle. Off until the owner turns it on.
- */
-export const coreSettingsSchema = z.object({
-  enabled: z.boolean(),
-  /** Share of equity the core book aims for. */
-  target_pct: pct(0, 90),
-  /** The book is rebalanced toward the target only when it is off by more than this many points. */
-  band_pct: pct(0, 50),
-  min_holdings: int(1, 20),
-  max_holdings: int(1, 20),
-  /** Cap per single stock, as % of equity. */
-  max_holding_pct: pct(1, 50),
-  /** Cap per broad-index ETF (CORE_INDEX_ETFS), as % of equity. */
-  max_index_etf_pct: pct(1, 100),
-  /** Most of the core book any one theme may hold, as % of the book. */
-  max_theme_pct: pct(10, 100),
-  /** Initial stop below entry. Reviews may raise a holding's stop, never lower it. */
-  stop_pct: pct(3, 50),
-  /** 1-10 AI conviction required for a core buy. */
-  min_conviction: int(1, 10),
-  /** Buys + trims + sells in one review. */
-  max_trades_per_review: int(1, 20),
-  review_weekday: z.enum(WEEKDAYS),
-  /** When the weekly review runs, New York time; in the regular session. */
-  review_time_et: z.string().regex(TIME_ET_PATTERN, "Expected a time like 10:15"),
-  /** Candidates taken from the scan universe: the top names by dollar volume. */
-  universe_size: int(20, 500),
-  /** The owner's long-term themes, one per line (parseTheme). */
-  themes: z.array(themeLine).max(12),
-})
+/** Broad-index ETFs the history store always backfills (daily and 1-minute bars), with the benchmarks and held stocks. */
+export const INDEX_ETFS = ["SPY", "QQQ", "DIA", "IWM", "VTI", "VOO"] as const
 
 export const riskSettingsSchema = z.object({
   /** Max % of equity in any single stock position. */
@@ -167,55 +107,33 @@ export const optionsSettingsSchema = z.object({
   fill_timeout_seconds: int(5, 300),
   /** How often open options positions are checked against their exits. */
   monitor_seconds: int(5, 300),
-  /** Underlyings whose option chains are loaded for the AI each cycle. */
-  max_underlyings_per_cycle: int(1, 12),
   /** Contracts shown to the AI per underlying (calls + puts). */
   contracts_per_underlying: int(2, 30),
 })
 
-export const aiSettingsSchema = z.object({
-  models: aiBase.models,
-  /** Stream the model's reasoning summaries to the live feed when the provider returns them. */
-  stream_reasoning: z.boolean(),
-  research_timeout_seconds: aiBase.research_timeout_seconds,
-  decision_timeout_seconds: aiBase.decision_timeout_seconds,
-})
-
 export const scheduleSettingsSchema = z.object({
-  /** How early before the open the premarket briefing may run. */
+  /** How early before the open the agent is woken to plan the day. */
   premarket_lead_minutes: z.number().min(10).max(240),
-  /** Skip the opening auction before the first intraday cycle. */
+  /** No new buys and no news triggers this long after the open: skips the opening auction. */
   open_buffer_minutes: z.number().min(0).max(60),
-  /** Minutes between intraday cycles. */
-  trade_interval_minutes: z.number().min(5).max(240),
-  /** The closing cycle runs this many minutes before the bell. */
+  /** The closing window, this many minutes before the bell: the agent is woken to decide what it carries overnight. */
   close_window_minutes: z.number().min(5).max(60),
-  /** The postmarket review runs this long after the bell. */
+  /** The agent's after-the-close review, and the day's record, come this long after the bell. */
   postmarket_delay_minutes: z.number().min(0).max(120),
-  /** Max attempts for the once-a-day phases (premarket / close / postmarket). */
-  max_phase_attempts: int(1, 5),
-  /** A held stock (or option underlying) moving this % since the last cycle triggers an early intraday cycle. */
+  /** A held stock (or option underlying) moving this % since the agent's last review of it wakes the agent. */
   trigger_move_pct: z.number().min(0.5).max(20),
-  trigger_cooldown_minutes: z.number().min(5).max(240),
-  /** Minimum gap between AI cycles, including triggered ones. Prevents churn and runaway cost. */
-  min_cycle_gap_minutes: z.number().min(1).max(60),
 })
 
 /** The news engine ("wire"). An entry's matching move is a price move. */
 export const wireSettingsSchema = z.object({
   mode: wireBase.mode,
-  research_mode: wireBase.research_mode,
   thresholds: wireBase.thresholds,
   entry_confirmation: wireBase.entry_confirmation,
   unexplained_move_entries: wireBase.unexplained_move_entries,
   trigger_max_age_minutes: wireBase.trigger_max_age_minutes,
   symbol_cooldown_minutes: wireBase.symbol_cooldown_minutes,
-  event_min_gap_seconds: wireBase.event_min_gap_seconds,
   max_event_cycles_per_hour: wireBase.max_event_cycles_per_hour,
   max_event_cycles_per_day: wireBase.max_event_cycles_per_day,
-  event_research: wireBase.event_research,
-  event_research_timeout_seconds: wireBase.event_research_timeout_seconds,
-  event_decision_timeout_seconds: wireBase.event_decision_timeout_seconds,
   /** What happens at once when a held stock meets a critical, confirmed, negative event. review = the AI decides. */
   emergency_action: z.enum(["review", "exit"]),
   /** Price shocks are measured after removing SPY's move, the market-wide shock is SPY's 5-minute z-score, and IEX volume is a small slice. */
@@ -238,7 +156,6 @@ export const settingsSchema = z
     }),
     risk: riskSettingsSchema,
     options: optionsSettingsSchema,
-    ai: aiSettingsSchema,
     schedule: scheduleSettingsSchema,
     universe: z.object({
       /** ETFs always included in the market snapshot so the model can read the tape. */
@@ -247,7 +164,6 @@ export const settingsSchema = z
       stream_max_symbols: int(1, 1_000),
     }),
     wire: wireSettingsSchema,
-    core: coreSettingsSchema,
     /** The agent (docs/plans/LOCAL-AI.md §8), the same in both bots. */
     agent: agentSettingsBase,
   })
@@ -266,9 +182,6 @@ export const settingsSchema = z
       issue(["options", "max_premium_per_trade_pct"], "max_premium_per_trade_pct can't exceed max_total_premium_pct")
     }
     if (new Set(s.universe.benchmarks).size !== s.universe.benchmarks.length) issue(["universe", "benchmarks"], "duplicate symbols")
-    if (s.core.min_holdings > s.core.max_holdings) issue(["core", "min_holdings"], "min_holdings can't exceed max_holdings")
-    if (s.core.target_pct + s.risk.cash_reserve_pct > 100) issue(["core", "target_pct"], "target_pct plus risk.cash_reserve_pct can't exceed 100")
-    if (s.core.review_time_et < "09:30" || s.core.review_time_et > "15:00") issue(["core", "review_time_et"], "review_time_et must be between 09:30 and 15:00 (the regular session)")
   })
 
 export type Settings = z.infer<typeof settingsSchema>
@@ -316,25 +229,14 @@ export const DEFAULT_SETTINGS: Settings = {
     entry_aggression: 0.5,
     fill_timeout_seconds: 30,
     monitor_seconds: 15,
-    max_underlyings_per_cycle: 6,
     contracts_per_underlying: 10,
-  },
-  ai: {
-    models: { research: "local/qwen3.6-35b-a3b-q2", decision: "local/qwen3.6-35b-a3b-q2" },
-    stream_reasoning: true,
-    research_timeout_seconds: 180,
-    decision_timeout_seconds: 240,
   },
   schedule: {
     premarket_lead_minutes: 90,
     open_buffer_minutes: 10,
-    trade_interval_minutes: 30,
     close_window_minutes: 25,
     postmarket_delay_minutes: 10,
-    max_phase_attempts: 3,
     trigger_move_pct: 3,
-    trigger_cooldown_minutes: 30,
-    min_cycle_gap_minutes: 8,
   },
   universe: {
     benchmarks: ["SPY", "QQQ", "IWM", "DIA", "VIXY", "TLT", "GLD", "USO", "UUP", "XLK", "SMH", "XLF", "XLE", "XLV", "XLY", "XLP", "XLI", "XLU", "XLC", "XLRE"],
@@ -342,18 +244,13 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   wire: {
     mode: "live",
-    research_mode: "auto",
     thresholds: { annotate: 30, review: 55, evaluate: 70, critical: 85 },
     entry_confirmation: true,
     unexplained_move_entries: false,
     trigger_max_age_minutes: 15,
     symbol_cooldown_minutes: 30,
-    event_min_gap_seconds: 60,
     max_event_cycles_per_hour: 4,
     max_event_cycles_per_day: 24,
-    event_research: "x_verify",
-    event_research_timeout_seconds: 45,
-    event_decision_timeout_seconds: 90,
     emergency_action: "review",
     anomaly: { price_z: 4, volume_multiple: 5, market_z: 4 },
     disabled_sources: [],
@@ -369,23 +266,6 @@ export const DEFAULT_SETTINGS: Settings = {
       skip_domains: ["wsj.com", "ft.com", "bloomberg.com", "nytimes.com", "economist.com", "barrons.com", "seekingalpha.com"],
       pause_hours: [],
     },
-  },
-  core: {
-    enabled: false,
-    target_pct: 50,
-    band_pct: 5,
-    min_holdings: 4,
-    max_holdings: 8,
-    max_holding_pct: 15,
-    max_index_etf_pct: 25,
-    max_theme_pct: 50,
-    stop_pct: 15,
-    min_conviction: 7,
-    max_trades_per_review: 6,
-    review_weekday: "mon",
-    review_time_et: "10:15",
-    universe_size: 100,
-    themes: [],
   },
   agent: {
     level: "on",

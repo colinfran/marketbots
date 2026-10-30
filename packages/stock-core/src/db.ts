@@ -7,17 +7,13 @@ import {
   type EventDoc as EventDocOf,
   type IndexSpec,
   type SettingsDoc as SettingsDocOf,
-  type TokenUsage,
 } from "@mb/core/db"
 import type { AlpacaAccount, AlpacaClock, AlpacaPosition, AssetClass, Bar, PortfolioHistory } from "./alpaca"
 import type { Command } from "./commands"
-import type { MarketContext } from "./context"
-import type { CoreAction, CoreHoldingDecision, CoreReviewContext, CoreReviewOutput, CoreWatchItem } from "./core-book"
 import type { CycleState, EngineEvent, EngineRunStatus, RiskCheck } from "./events"
 import type { OptionRight, OptionStrategy } from "./options"
-import type { Action, BotReport, Decision, Horizon } from "./report"
+import type { Action, Decision, Horizon } from "./report"
 import type { Phase, Settings } from "./settings"
-import type { DossierRow } from "./wire"
 
 export { utcDay } from "@mb/core/db"
 export type { AgentEpisodeDoc, AgentNoteDoc, AgentWatchDoc } from "@mb/core/agent"
@@ -139,7 +135,7 @@ export type DecisionDoc = {
   trigger_kind?: CycleKind
   /** Wire items behind an event decision. */
   wire_item_ids?: string[]
-  /** The agent episode that made the decision (level auto); absent on the timed cycles'. */
+  /** The agent episode that made the decision; absent on decisions from before the agent. */
   agent_episode_id?: string
   request: Decision
   status: DecisionStatus
@@ -188,7 +184,7 @@ export type OrderDoc = {
 }
 
 /** A core review's word on a holding, kept with its plan. */
-export type CorePlanNote = { at: Date; review_id: string; action: CoreAction | "adopted"; text: string }
+export type CorePlanNote = { at: Date; review_id: string; action: string; text: string }
 
 /** The core book keeps this many notes per holding (newest last). */
 export const CORE_PLAN_NOTES = 12

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { DEFAULT_SETTINGS } from "@mb/stock-core/settings"
+import { DEFAULT_SETTINGS, settingsSchema } from "@mb/stock-core/settings"
 import { computeRiskState as compute } from "../../src/bot/risk"
 import { account } from "../helpers/factories"
 
@@ -108,9 +108,9 @@ describe("computeRiskState", () => {
     expect(computeRiskState(acct(10_000, 10_000, 12_000), 0, 0).deployable_cash).toBe(9_500)
   })
 
-  it("keeps no share of equity for the old core book, even if its setting is still on", () => {
-    const on = { ...DEFAULT_SETTINGS, core: { ...DEFAULT_SETTINGS.core, enabled: true } }
-    const risk = compute(acct(10_000, 10_000, 6_000), 1, 0, on)
+  it("keeps no share of equity for the old core book, even with its section still stored", () => {
+    const stored = settingsSchema.parse({ ...DEFAULT_SETTINGS, core: { enabled: true, target_pct: 50 } })
+    const risk = compute(acct(10_000, 10_000, 6_000), 1, 0, stored)
     expect(risk.deployable_cash).toBe(5_500)
     expect(risk.notes).toEqual([])
   })

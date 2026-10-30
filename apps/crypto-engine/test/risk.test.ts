@@ -49,17 +49,9 @@ describe("evaluateCryptoEntry", () => {
     expect(r.checks.map((c) => c.name)).toEqual(expect.arrayContaining(["engine_running", "kill_switch_off", "fresh_quote", "edge_after_costs", "max_position", "cash"]))
   })
 
-  it("owner-directed seed buys skip only the conviction, edge and reward:risk gates", () => {
-    const weak = entry({ conviction: 10, netEdgeBps: -50, rewardRisk: 0.5, ownerDirected: true })
-    const r = evaluateCryptoEntry(weak, account(), gate, DEFAULT_SETTINGS)
-    expect(r.approved).toBe(true)
-    expect(r.checks.map((c) => c.name)).toContain("owner_directed")
-    expect(r.checks.map((c) => c.name)).not.toContain("conviction")
-    // Every other gate and cap still applies.
-    expect(failed(evaluateCryptoEntry(weak, account(), { ...gate, killSwitch: true }, DEFAULT_SETTINGS))).toContain("kill_switch_off")
-    expect(failed(evaluateCryptoEntry({ ...weak, stopPrice: 64_900 }, account(), gate, DEFAULT_SETTINGS))).toContain("stop_distance")
-    expect(evaluateCryptoEntry({ ...weak, qty: 0.1 }, account(), gate, DEFAULT_SETTINGS)).toMatchObject({ approved: true, resized: true })
-    expect(failed(evaluateCryptoEntry({ ...weak, conviction: 10, ownerDirected: false }, account(), gate, DEFAULT_SETTINGS))).toEqual(expect.arrayContaining(["conviction", "edge_after_costs", "reward_risk"]))
+  it("rejects a weak buy on conviction, edge and reward:risk", () => {
+    const weak = entry({ conviction: 10, netEdgeBps: -50, rewardRisk: 0.5 })
+    expect(failed(evaluateCryptoEntry(weak, account(), gate, DEFAULT_SETTINGS))).toEqual(["conviction", "edge_after_costs", "reward_risk"])
   })
 
   it("rejects whenever a gate fails", () => {

@@ -7,7 +7,6 @@ import {
   type ServerFrame as ServerFrameOf,
 } from "@mb/core/events"
 import type { AssetClass } from "./alpaca"
-import type { Phase } from "./settings"
 import type { WireCategory } from "./wire"
 
 export { clientFrameSchema, EVENT_SCHEMA_VERSION, eventEnvelopeSchema, STREAM_PROTOCOL_VERSION } from "@mb/core/events"

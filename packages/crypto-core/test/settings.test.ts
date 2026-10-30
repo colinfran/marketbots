@@ -7,13 +7,13 @@ describe("settings", () => {
   })
 
   it("merges a deep patch and keeps everything else", () => {
-    const result = applySettingsPatch(DEFAULT_SETTINGS, { kraken: { max_position_pct: 8 }, ai: { research_timeout_seconds: 240 } })
+    const result = applySettingsPatch(DEFAULT_SETTINGS, { kraken: { max_position_pct: 8 }, agent: { sweep_minutes: 240 } })
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.settings.kraken.max_position_pct).toBe(8)
     expect(result.settings.kraken.max_asset_exposure_pct).toBe(DEFAULT_SETTINGS.kraken.max_asset_exposure_pct)
-    expect(result.settings.ai.research_timeout_seconds).toBe(240)
-    expect(result.settings.ai.models).toEqual(DEFAULT_SETTINGS.ai.models)
+    expect(result.settings.agent.sweep_minutes).toBe(240)
+    expect(result.settings.agent.model).toBe(DEFAULT_SETTINGS.agent.model)
   })
 
   it("replaces arrays instead of merging them", () => {
@@ -35,10 +35,10 @@ describe("settings", () => {
   })
 
   it("rejects malformed model ids and symbols", () => {
-    expect(applySettingsPatch(DEFAULT_SETTINGS, { ai: { models: { decision: "grok 4" } } }).ok).toBe(false)
+    expect(applySettingsPatch(DEFAULT_SETTINGS, { agent: { model: "grok 4" } }).ok).toBe(false)
     expect(applySettingsPatch(DEFAULT_SETTINGS, { universe: { kraken_symbols: ["btc-usd"] } }).ok).toBe(false)
-    expect(applySettingsPatch(DEFAULT_SETTINGS, { ai: { models: { research: "spacexai/grok-4.5" } } }).ok).toBe(false)
-    expect(applySettingsPatch(DEFAULT_SETTINGS, { ai: { models: { research: "local/qwen3.6-35b-a3b-q2" } } }).ok).toBe(true)
+    expect(applySettingsPatch(DEFAULT_SETTINGS, { agent: { model: "spacexai/grok-4.5" } }).ok).toBe(false)
+    expect(applySettingsPatch(DEFAULT_SETTINGS, { agent: { model: "local/qwen3.6-35b-a3b-q2" } }).ok).toBe(true)
   })
 
   it("drops unknown keys rather than storing them", () => {
@@ -48,9 +48,20 @@ describe("settings", () => {
   })
 
   it("loads settings saved in the Grok days: their X search and fallback model are dropped", () => {
-    const saved = { ...DEFAULT_SETTINGS, ai: { ...DEFAULT_SETTINGS.ai, models: { ...DEFAULT_SETTINGS.ai.models, fallback: null }, x_search: true } }
+    const saved = { ...DEFAULT_SETTINGS, ai: { ...DEFAULT_SETTINGS.ai, models: { research: "local/m", decision: "local/m", fallback: null }, x_search: true } }
     const parsed = settingsSchema.safeParse(saved)
     expect(parsed.success && parsed.data.ai).toEqual(DEFAULT_SETTINGS.ai)
+  })
+
+  it("loads settings saved before the agent-only bot: the cycles' models, timeouts and schedule are dropped", () => {
+    const saved = {
+      ...DEFAULT_SETTINGS,
+      ai: { ...DEFAULT_SETTINGS.ai, models: { research: "local/m", decision: "local/m" }, max_candidates_per_cycle: 4, research_timeout_seconds: 180, decision_timeout_seconds: 240 },
+      schedule: { ...DEFAULT_SETTINGS.schedule, crypto_scan_minutes: 15, position_review_minutes: 240, trigger_cooldown_minutes: 30, min_ai_interval_minutes: 10 },
+      wire: { ...DEFAULT_SETTINGS.wire, research_mode: "auto", event_min_gap_seconds: 60, event_research: "x_verify", event_research_timeout_seconds: 45, event_decision_timeout_seconds: 90 },
+    }
+    const parsed = settingsSchema.safeParse(saved)
+    expect(parsed.success && parsed.data).toEqual(DEFAULT_SETTINGS)
   })
 
   it("loads settings saved with a daily AI budget: the budget and the event reserve are dropped", () => {

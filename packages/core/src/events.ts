@@ -1,6 +1,6 @@
 import { z } from "zod"
 import type { AgentActionOutcome, AgentStepKind, EpisodeStatus, ObservationKind, Priority, WatchKind } from "./agent"
-import type { DossierRow, NotableReason, WireKind, WireSourceState, WireTier, WireTriggerAction, WireTriggerStatus } from "./wire"
+import type { NotableReason, WireKind, WireSourceState, WireTier, WireTriggerAction, WireTriggerStatus } from "./wire"
 
 /**
  * Versioned event schema for the live activity stream (engine → dashboard) and the persisted

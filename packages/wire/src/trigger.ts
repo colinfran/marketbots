@@ -57,7 +57,7 @@ export type PolicyDeps<C extends string, S extends PolicySettings> = {
   settings: () => S
   rules: Rules<C, S>
   engine: () => { running: boolean; killSwitch: boolean }
-  /** Stocks: whether event cycles can run now (regular session, past the opening buffer, before the close). */
+  /** Stocks: whether the market is open for a trigger now (regular session, past the opening buffer, before the close). */
   session?: () => { open: boolean; reason: string }
   held: () => string[]
   universe: () => string[]
@@ -70,7 +70,7 @@ export type PolicyDeps<C extends string, S extends PolicySettings> = {
   /**
    * The agent (docs/plans/LOCAL-AI.md §8.1) sees every candidate that passes the gates on the item
    * itself (`itemGate`: fresh, not old news, confirmed when it is an entry), once per item and rule,
-   * whatever the caps, cooldown or session say: those exist for the timed cycles.
+   * whatever the caps, cooldown or session say: those only limit the trigger's alerts and the emergency exit.
    */
   observe?: (item: WireItemDoc<C>, candidate: Candidate) => void
   now?: () => Date

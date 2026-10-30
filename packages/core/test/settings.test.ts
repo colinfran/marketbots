@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest"
 import { z } from "zod"
-import { aiSettingsBase, applySettingsPatch, int, mergeSettings, refineWireThresholds, upgradeStoredSettings, wireSettingsBase, wireSummariesSettings } from "../src/settings"
+import { agentSettingsBase, applySettingsPatch, int, mergeSettings, refineWireThresholds, upgradeStoredSettings, wireSettingsBase, wireSummariesSettings } from "../src/settings"
 
 /** A small bot built the way the real ones are: base fields in the bot's own order, refined last. */
+const agent = agentSettingsBase.shape
 const wire = wireSettingsBase.shape
 const schema = z
   .object({
-    ai: aiSettingsBase,
+    agent: z.object({ model: agent.model, wake_cooldown_minutes: agent.wake_cooldown_minutes }),
     wire: z.object({ thresholds: wire.thresholds, own_knob: int(1, 10), retention_days: wire.retention_days }),
   })
   .superRefine((s, ctx) => {
@@ -16,11 +17,7 @@ const schema = z
 type Settings = z.infer<typeof schema>
 
 const defaults: Settings = {
-  ai: {
-    models: { research: "local/qwen3.6-35b-a3b-q2", decision: "local/qwen3.6-35b-a3b-q2" },
-    research_timeout_seconds: 180,
-    decision_timeout_seconds: 240,
-  },
+  agent: { model: "local/qwen3.6-35b-a3b-q2", wake_cooldown_minutes: 5 },
   wire: { thresholds: { annotate: 30, review: 55, evaluate: 70, critical: 85 }, own_knob: 3, retention_days: 30 },
 }
 
@@ -34,9 +31,9 @@ describe("settings helpers", () => {
   })
 
   it("apply a patch against the bot's schema", () => {
-    const r = applySettingsPatch(schema, defaults, { ai: { research_timeout_seconds: 240 } })
-    expect(r.ok && r.settings.ai.research_timeout_seconds).toBe(240)
-    expect(r.ok && r.settings.ai.models).toEqual(defaults.ai.models)
+    const r = applySettingsPatch(schema, defaults, { agent: { wake_cooldown_minutes: 10 } })
+    expect(r.ok && r.settings.agent.wake_cooldown_minutes).toBe(10)
+    expect(r.ok && r.settings.agent.model).toBe(defaults.agent.model)
   })
 
   it("check the wire thresholds first, then the bot's own rules", () => {
@@ -48,9 +45,9 @@ describe("settings helpers", () => {
   })
 
   it("reject malformed model ids", () => {
-    expect(applySettingsPatch(schema, defaults, { ai: { models: { decision: "grok 4" } } }).ok).toBe(false)
+    expect(applySettingsPatch(schema, defaults, { agent: { model: "grok 4" } }).ok).toBe(false)
     // Only local models: a gateway id is rejected.
-    expect(applySettingsPatch(schema, defaults, { ai: { models: { decision: "spacexai/grok-4.7" } } }).ok).toBe(false)
+    expect(applySettingsPatch(schema, defaults, { agent: { model: "spacexai/grok-4.7" } }).ok).toBe(false)
   })
 })
 

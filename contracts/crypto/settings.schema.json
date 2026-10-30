@@ -160,87 +160,27 @@
       "ai": {
         "type": "object",
         "properties": {
-          "models": {
-            "type": "object",
-            "properties": {
-              "research": {
-                "type": "string",
-                "pattern": "^local\\/[a-z0-9][a-z0-9.\\-]*$"
-              },
-              "decision": {
-                "type": "string",
-                "pattern": "^local\\/[a-z0-9][a-z0-9.\\-]*$"
-              }
-            },
-            "required": [
-              "research",
-              "decision"
-            ]
-          },
-          "max_candidates_per_cycle": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 12
-          },
           "probability_shrink": {
             "type": "number",
             "minimum": 0,
             "maximum": 1
-          },
-          "research_timeout_seconds": {
-            "type": "number",
-            "minimum": 30,
-            "maximum": 600
-          },
-          "decision_timeout_seconds": {
-            "type": "number",
-            "minimum": 20,
-            "maximum": 300
           }
         },
         "required": [
-          "models",
-          "max_candidates_per_cycle",
-          "probability_shrink",
-          "research_timeout_seconds",
-          "decision_timeout_seconds"
+          "probability_shrink"
         ]
       },
       "schedule": {
         "type": "object",
         "properties": {
-          "crypto_scan_minutes": {
-            "type": "number",
-            "minimum": 5,
-            "maximum": 240
-          },
-          "position_review_minutes": {
-            "type": "number",
-            "minimum": 15,
-            "maximum": 1440
-          },
           "trigger_move_atr": {
             "type": "number",
             "minimum": 0.5,
             "maximum": 10
-          },
-          "trigger_cooldown_minutes": {
-            "type": "number",
-            "minimum": 5,
-            "maximum": 720
-          },
-          "min_ai_interval_minutes": {
-            "type": "number",
-            "minimum": 1,
-            "maximum": 240
           }
         },
         "required": [
-          "crypto_scan_minutes",
-          "position_review_minutes",
-          "trigger_move_atr",
-          "trigger_cooldown_minutes",
-          "min_ai_interval_minutes"
+          "trigger_move_atr"
         ]
       },
       "strategies": {
@@ -399,14 +339,6 @@
               "live"
             ]
           },
-          "research_mode": {
-            "type": "string",
-            "enum": [
-              "full",
-              "gap_fill",
-              "auto"
-            ]
-          },
           "thresholds": {
             "type": "object",
             "properties": {
@@ -454,11 +386,6 @@
             "minimum": 1,
             "maximum": 720
           },
-          "event_min_gap_seconds": {
-            "type": "number",
-            "minimum": 15,
-            "maximum": 3600
-          },
           "max_event_cycles_per_hour": {
             "type": "integer",
             "minimum": 0,
@@ -468,23 +395,6 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 200
-          },
-          "event_research": {
-            "type": "string",
-            "enum": [
-              "none",
-              "x_verify"
-            ]
-          },
-          "event_research_timeout_seconds": {
-            "type": "number",
-            "minimum": 15,
-            "maximum": 300
-          },
-          "event_decision_timeout_seconds": {
-            "type": "number",
-            "minimum": 20,
-            "maximum": 300
           },
           "emergency_action": {
             "type": "string",
@@ -602,18 +512,13 @@
         },
         "required": [
           "mode",
-          "research_mode",
           "thresholds",
           "entry_confirmation",
           "unexplained_move_entries",
           "trigger_max_age_minutes",
           "symbol_cooldown_minutes",
-          "event_min_gap_seconds",
           "max_event_cycles_per_hour",
           "max_event_cycles_per_day",
-          "event_research",
-          "event_research_timeout_seconds",
-          "event_decision_timeout_seconds",
           "emergency_action",
           "anomaly",
           "disabled_sources",
@@ -1006,89 +911,28 @@
       "ai": {
         "type": "object",
         "properties": {
-          "models": {
-            "type": "object",
-            "properties": {
-              "research": {
-                "type": "string",
-                "pattern": "^local\\/[a-z0-9][a-z0-9.\\-]*$"
-              },
-              "decision": {
-                "type": "string",
-                "pattern": "^local\\/[a-z0-9][a-z0-9.\\-]*$"
-              }
-            },
-            "required": [
-              "research",
-              "decision"
-            ],
-            "additionalProperties": false
-          },
-          "max_candidates_per_cycle": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 12
-          },
           "probability_shrink": {
             "type": "number",
             "minimum": 0,
             "maximum": 1
-          },
-          "research_timeout_seconds": {
-            "type": "number",
-            "minimum": 30,
-            "maximum": 600
-          },
-          "decision_timeout_seconds": {
-            "type": "number",
-            "minimum": 20,
-            "maximum": 300
           }
         },
         "required": [
-          "models",
-          "max_candidates_per_cycle",
-          "probability_shrink",
-          "research_timeout_seconds",
-          "decision_timeout_seconds"
+          "probability_shrink"
         ],
         "additionalProperties": false
       },
       "schedule": {
         "type": "object",
         "properties": {
-          "crypto_scan_minutes": {
-            "type": "number",
-            "minimum": 5,
-            "maximum": 240
-          },
-          "position_review_minutes": {
-            "type": "number",
-            "minimum": 15,
-            "maximum": 1440
-          },
           "trigger_move_atr": {
             "type": "number",
             "minimum": 0.5,
             "maximum": 10
-          },
-          "trigger_cooldown_minutes": {
-            "type": "number",
-            "minimum": 5,
-            "maximum": 720
-          },
-          "min_ai_interval_minutes": {
-            "type": "number",
-            "minimum": 1,
-            "maximum": 240
           }
         },
         "required": [
-          "crypto_scan_minutes",
-          "position_review_minutes",
-          "trigger_move_atr",
-          "trigger_cooldown_minutes",
-          "min_ai_interval_minutes"
+          "trigger_move_atr"
         ],
         "additionalProperties": false
       },
@@ -1257,14 +1101,6 @@
               "live"
             ]
           },
-          "research_mode": {
-            "type": "string",
-            "enum": [
-              "full",
-              "gap_fill",
-              "auto"
-            ]
-          },
           "thresholds": {
             "type": "object",
             "properties": {
@@ -1313,11 +1149,6 @@
             "minimum": 1,
             "maximum": 720
           },
-          "event_min_gap_seconds": {
-            "type": "number",
-            "minimum": 15,
-            "maximum": 3600
-          },
           "max_event_cycles_per_hour": {
             "type": "integer",
             "minimum": 0,
@@ -1327,23 +1158,6 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 200
-          },
-          "event_research": {
-            "type": "string",
-            "enum": [
-              "none",
-              "x_verify"
-            ]
-          },
-          "event_research_timeout_seconds": {
-            "type": "number",
-            "minimum": 15,
-            "maximum": 300
-          },
-          "event_decision_timeout_seconds": {
-            "type": "number",
-            "minimum": 20,
-            "maximum": 300
           },
           "emergency_action": {
             "type": "string",
@@ -1463,18 +1277,13 @@
         },
         "required": [
           "mode",
-          "research_mode",
           "thresholds",
           "entry_confirmation",
           "unexplained_move_entries",
           "trigger_max_age_minutes",
           "symbol_cooldown_minutes",
-          "event_min_gap_seconds",
           "max_event_cycles_per_hour",
           "max_event_cycles_per_day",
-          "event_research",
-          "event_research_timeout_seconds",
-          "event_decision_timeout_seconds",
           "emergency_action",
           "anomaly",
           "disabled_sources",

@@ -26,7 +26,6 @@ const db = useTestDb()
 let bus: EventBus
 let engine: Engine
 let events: EngineEvent[]
-let queues: (string[] | undefined)[]
 let lines: Record<string, unknown>[]
 
 // Generous: the engine polls commands every second, and on the busy trading server (backfills,
@@ -57,7 +56,6 @@ const internals = () => engine as unknown as Internals
 beforeEach(async () => {
   bus = await makeBus(db.col)
   events = []
-  queues = []
   lines = []
   bus.subscribe((e) => events.push(e))
   const env = loadEnv({ MONGODB_URI: "mongodb://test", STREAM_TOKEN_SECRET: "x".repeat(40), ENGINE_INSTANCE: "test" })
@@ -91,10 +89,7 @@ beforeEach(async () => {
       onItem: () => undefined,
       markNotable: async () => [],
       healthy: () => false,
-      health: (extra: { event_queue?: string[] } = {}) => {
-        queues.push(extra.event_queue)
-        return { mode: "live", sources: [], items_last_hour: 0, triggers_today: 0, event_queue: extra.event_queue ?? [] }
-      },
+      health: () => ({ mode: "live", sources: [], items_last_hour: 0, triggers_today: 0 }),
     } as unknown as Wire,
   })
   await engine.start()
@@ -172,10 +167,10 @@ describe("Engine", () => {
     expect(await db.col.engineState.findOne({ _id: "engine" })).toMatchObject({ status: "paused", pause_reason: "lunch" })
     expect(await command({ type: "resume" })).toMatchObject({ status: "done", result: "running" })
     expect(engine.status).toBe("running")
-    const updated = await command({ type: "settings.update", patch: { schedule: { crypto_scan_minutes: 45 } }, expected_version: 1 })
+    const updated = await command({ type: "settings.update", patch: { schedule: { trigger_move_atr: 2 } }, expected_version: 1 })
     expect(updated).toMatchObject({ status: "done", result: "1 setting updated (v2)" })
-    expect((await db.col.settings.findOne({ _id: "current" }))!.settings.schedule.crypto_scan_minutes).toBe(45)
-    expect(await command({ type: "settings.update", patch: { schedule: { crypto_scan_minutes: 50 } }, expected_version: 1 })).toMatchObject({ status: "failed", error: expect.stringContaining("reload and retry") })
+    expect((await db.col.settings.findOne({ _id: "current" }))!.settings.schedule.trigger_move_atr).toBe(2)
+    expect(await command({ type: "settings.update", patch: { schedule: { trigger_move_atr: 2.5 } }, expected_version: 1 })).toMatchObject({ status: "failed", error: expect.stringContaining("reload and retry") })
     expect(await command({ type: "strategy.set_enabled", strategy: "trend", enabled: false })).toMatchObject({ status: "done", result: "trend disabled" })
     expect(await db.col.audit.countDocuments({ action: "settings.update" })).toBe(2)
     expect(events.filter((e) => e.type === "engine.status").map((e) => e.summary)).toEqual(["Engine running: startup complete", "Engine paused: lunch", "Engine running: resumed from the dashboard"])

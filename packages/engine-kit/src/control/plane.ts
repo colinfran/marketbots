@@ -1,7 +1,6 @@
 import type { BaseCommand } from "@mb/core/commands"
 import type { EngineStateDoc } from "@mb/core/db"
 import type { BaseEventDataMap } from "@mb/core/events"
-import type { Collection } from "mongodb"
 import type { AlertLevel, AlertOptions } from "../alerts"
 import type { EmitMeta } from "../bus"
 

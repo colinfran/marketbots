@@ -67,24 +67,12 @@ export type DecisionInput = {
   matrix: ReturnType<typeof correlationMatrix>
   decisionModel: string
   triggerKind: CycleKind
-  /**
-   * One-time seed buys: the owner set the dollar amount, so it replaces risk-based sizing, and the
-   * risk engine skips only its conviction, edge and reward:risk gates. Every cap still applies.
-   */
-  seed?: { notionalUsd: number }
   /** The agent's prompt version. */
   promptVersion: string
   /** Event decisions: the wire items behind them. */
   wireItemIds?: string[]
   /** The agent's decisions (level auto): the episode, recorded on the decision, and the most its envelope lets a buy commit. */
   agent?: { episodeId: string; maxNotionalUsd: number }
-}
-
-/** A stop the seed can use as given: below the price and inside the configured stop range. */
-const withinStopRange = (price: number, stop: number | null, k: Settings["kraken"]) => {
-  if (stop === null || stop >= price) return false
-  const pct = ((price - stop) / price) * 100
-  return pct >= k.min_stop_pct && pct <= k.max_stop_pct
 }
 
 export const processDecision = async (ctx: EngineContext, i: DecisionInput): Promise<DecisionDoc> => {
@@ -153,15 +141,11 @@ export const processDecision = async (ctx: EngineContext, i: DecisionInput): Pro
   if (d.action === "buy" && i.candidate && quote?.book) {
     ctx.setCycleState("risk_check", d.symbol)
     const pair = ctx.hub.pairs.get(d.symbol)!
-    const seed = i.seed
-    // A seed stop outside the configured range would only fail the stop check; the bounded hint is used instead.
-    const stop = seed ? (withinStopRange(quote.mid, d.stop_loss, settings.kraken) ? d.stop_loss! : i.candidate.stop_hint) : d.stop_loss && d.stop_loss < quote.mid ? d.stop_loss : i.candidate.stop_hint
+    const stop = d.stop_loss && d.stop_loss < quote.mid ? d.stop_loss : i.candidate.stop_hint
     const target = d.take_profit && d.take_profit > quote.mid ? d.take_profit : i.candidate.target_hint
     const riskState = await ctx.ledger.riskState()
     const limit = roundPrice(pair, quote.ask * (1 + settings.kraken.max_slippage_bps / 10_000))
-    const size = seed
-      ? { qty: seed.notionalUsd / limit, notional: seed.notionalUsd, riskUsd: (seed.notionalUsd / limit) * Math.max(0, quote.ask - stop) }
-      : cryptoSize({
+    const size = cryptoSize({
           equity: riskState?.equityUsd ?? 0,
           price: quote.ask,
           stop,
@@ -210,7 +194,6 @@ export const processDecision = async (ctx: EngineContext, i: DecisionInput): Pro
             takerFeeBps: i.takerBps,
             roundQty: (q) => roundQty(pair, q),
             minViolation: (q, p) => minimumViolation(pair, q, p),
-            ownerDirected: !!seed,
           },
           riskState,
           ctx.gate(),
@@ -250,7 +233,7 @@ export const processDecision = async (ctx: EngineContext, i: DecisionInput): Pro
       const { filled_qty: filled, avg_fill_price: avg, fees_usd: fees } = report.order
       if (filled > 0 && avg !== null) {
         const cost = filled * avg + fees
-        await ctx.alerts.success(seed ? `Seed buy: ${d.symbol}` : `Bought ${d.symbol}`, `[paper] ${cleanLine(d.thesis, 400)}`, {
+        await ctx.alerts.success(`Bought ${d.symbol}`, `[paper] ${cleanLine(d.thesis, 400)}`, {
           path: `/decisions/${doc._id}`,
           key: `buy|${report.order._id}`,
           fields: {

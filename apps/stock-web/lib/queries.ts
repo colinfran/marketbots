@@ -103,12 +103,6 @@ export const getLiveAccount = async () => {
 
 export type LiveAccount = NonNullable<Awaited<ReturnType<typeof getLiveAccount>>>
 
-/** The days the core book held or traded something, oldest first, with each book's day and SPY's. */
-export const getBookDays = async () => {
-  await connection()
-  return (await collections()).dailyStats.find({ books: { $exists: true } }).sort({ trading_day: 1 }).toArray()
-}
-
 
 const HISTORY = [
   { key: "1D", label: "1D" },

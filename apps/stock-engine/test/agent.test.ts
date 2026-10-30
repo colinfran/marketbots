@@ -10,7 +10,7 @@ import type { Session } from "../src/bot/session"
 import { fakeBroker } from "./helpers/broker"
 import { makeCtx } from "./helpers/ctx"
 import { useTestDb } from "./helpers/db"
-import { afterOpen, beforeClose, NVDA_CALL_150, OPEN, session } from "./helpers/factories"
+import { afterOpen, NVDA_CALL_150, OPEN, session } from "./helpers/factories"
 
 const db = useTestDb()
 

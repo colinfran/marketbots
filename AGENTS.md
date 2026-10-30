@@ -74,7 +74,7 @@ The shared packages are `packages/config`, `packages/core`, `packages/engine-kit
   ```
 
   In PowerShell: `$env:UPDATE_CONTRACTS = "1"; pnpm --filter @mb/crypto-engine test; Remove-Item Env:UPDATE_CONTRACTS`.
-- **Test counts** never go down (1,078 across the repo on 2026-10-30, after the timed cycles, the seed, the backtester and the old AI runner were removed with their tests).
+- **Test counts** never go down (1,072 across the repo on 2026-10-30, after the timed cycles, the seed, the backtester, the core book and the old AI runner were removed with their tests).
 - A commit that changes behavior names the change in its message.
 
 ## Gate, commit, deploy

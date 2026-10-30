@@ -1,4 +1,4 @@
-import type { DecisionDoc, PositionDoc } from "@mb/crypto-core/db"
+import type { DecisionDoc } from "@mb/crypto-core/db"
 import { DEFAULT_SETTINGS } from "@mb/crypto-core/settings"
 import { describe, expect, it } from "vitest"
 import { classifyRegime, computeFeatures } from "../src/market/features"
@@ -8,11 +8,8 @@ import { correlatedWith, correlationMatrix } from "../src/risk/correlation"
 import { dailyTrendStrategy } from "../src/strategies/daily-trend"
 import { meanReversionStrategy } from "../src/strategies/mean-reversion"
 import { screenCrypto } from "../src/strategies/registry"
-import { useTestDb } from "./helpers/db"
 import type { Candle } from "../src/venues/kraken/rest"
 import { candles, quote } from "./helpers/fakes"
-
-const HOUR = 3_600_000
 
 /** A steady uptrend with small noise, then a fresh push to new highs. */
 const uptrend = (n: number, start = 100) => Array.from({ length: n }, (_, i) => start * (1 + 0.002 * i) * (1 + (i % 3 === 0 ? 0.001 : -0.0005)))
@@ -123,7 +120,6 @@ describe("long-term trend", () => {
 })
 
 describe("setups the AI is asked about", () => {
-  const db = useTestDb()
   const base = featureSet(uptrend(24 * 45))!
   const range = { label: "range" as const, btc_trend: "up" as const, btc_vol_pct: 30, breadth_pct: 40, notes: [] }
   const oversold = (ema20: number) => ({ ...base, price: 100, rsi14_1h: 22, bb_pct_b_1h: 0, trend_1d: "up" as const, move_zscore_24h: -2.5, ema20_1h: ema20, atr_pct_4h: 0.6 })

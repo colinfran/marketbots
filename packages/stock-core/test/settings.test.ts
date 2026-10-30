@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { commandSchema } from "../src/commands"
-import { applySettingsPatch, DEFAULT_SETTINGS, diffSettings, parseTheme, settingsSchema } from "../src/settings"
+import { applySettingsPatch, DEFAULT_SETTINGS, diffSettings, settingsSchema } from "../src/settings"
 
 describe("settings", () => {
   it("ships valid defaults matching the old risk rules", () => {
@@ -10,10 +10,11 @@ describe("settings", () => {
   })
 
   it("merges a deep patch and keeps everything else", () => {
-    const r = applySettingsPatch(DEFAULT_SETTINGS, { options: { max_open_positions: 2 }, ai: { models: { decision: "local/gpt-oss-20b" } } })
+    const r = applySettingsPatch(DEFAULT_SETTINGS, { options: { max_open_positions: 2 }, agent: { model: "local/gpt-oss-20b" } })
     expect(r.ok && r.settings.options.max_open_positions).toBe(2)
     expect(r.ok && r.settings.options.min_dte).toBe(14)
-    expect(r.ok && r.settings.ai.models).toEqual({ research: "local/qwen3.6-35b-a3b-q2", decision: "local/gpt-oss-20b" })
+    expect(r.ok && r.settings.agent.model).toBe("local/gpt-oss-20b")
+    expect(r.ok && r.settings.agent.limits).toEqual(DEFAULT_SETTINGS.agent.limits)
   })
 
   it("replaces arrays instead of merging them", () => {
@@ -42,7 +43,7 @@ describe("settings", () => {
   })
 
   it("rejects malformed model ids and tickers", () => {
-    expect(applySettingsPatch(DEFAULT_SETTINGS, { ai: { models: { decision: "grok" } } }).ok).toBe(false)
+    expect(applySettingsPatch(DEFAULT_SETTINGS, { agent: { model: "grok" } }).ok).toBe(false)
     expect(applySettingsPatch(DEFAULT_SETTINGS, { universe: { benchmarks: ["spy"] } }).ok).toBe(false)
   })
 
@@ -51,56 +52,38 @@ describe("settings", () => {
     expect(r.ok && "yolo" in r.settings.risk).toBe(false)
   })
 
-  it("loads settings saved in the Grok days: their X search and fallback model are dropped", () => {
-    const saved = { ...DEFAULT_SETTINGS, ai: { ...DEFAULT_SETTINGS.ai, models: { ...DEFAULT_SETTINGS.ai.models, fallback: null }, x_search: true } }
-    const parsed = settingsSchema.safeParse(saved)
-    expect(parsed.success && parsed.data.ai).toEqual(DEFAULT_SETTINGS.ai)
-  })
-
-  it("loads settings saved with a daily AI budget: the budget and the event reserve are dropped", () => {
-    const saved = { ...DEFAULT_SETTINGS, ai: { ...DEFAULT_SETTINGS.ai, daily_budget_usd: 10 }, wire: { ...DEFAULT_SETTINGS.wire, event_budget_reserve_pct: 30 } }
+  it("loads settings saved in the Grok days: their AI section, X search and fallback model are dropped", () => {
+    const saved = { ...DEFAULT_SETTINGS, ai: { models: { research: "local/m", decision: "local/m", fallback: null }, x_search: true } }
     const parsed = settingsSchema.safeParse(saved)
     expect(parsed.success && parsed.data).toEqual(DEFAULT_SETTINGS)
   })
 
-  it("ships the core book switched off", () => {
-    expect(DEFAULT_SETTINGS.core).toMatchObject({ enabled: false, target_pct: 50, max_holding_pct: 15, max_index_etf_pct: 25, stop_pct: 15, review_weekday: "mon", review_time_et: "10:15", themes: [] })
+  it("loads settings saved with a daily AI budget: the budget and the event reserve are dropped", () => {
+    const saved = { ...DEFAULT_SETTINGS, ai: { daily_budget_usd: 10 }, wire: { ...DEFAULT_SETTINGS.wire, event_budget_reserve_pct: 30 } }
+    const parsed = settingsSchema.safeParse(saved)
+    expect(parsed.success && parsed.data).toEqual(DEFAULT_SETTINGS)
   })
 
-  it("migrates stored settings from before the core book by filling it from the defaults", () => {
-    const { core: _core, ...stored } = { ...DEFAULT_SETTINGS, risk: { ...DEFAULT_SETTINGS.risk, max_open_positions: 4 } }
+  it("loads settings saved before the agent-only bot: the cycles' AI section and schedule, and the core book, are dropped", () => {
+    const saved = {
+      ...DEFAULT_SETTINGS,
+      options: { ...DEFAULT_SETTINGS.options, max_underlyings_per_cycle: 6 },
+      ai: { models: { research: "local/m", decision: "local/m" }, stream_reasoning: true, research_timeout_seconds: 180, decision_timeout_seconds: 240 },
+      schedule: { ...DEFAULT_SETTINGS.schedule, trade_interval_minutes: 30, max_phase_attempts: 3, trigger_cooldown_minutes: 30, min_cycle_gap_minutes: 8 },
+      wire: { ...DEFAULT_SETTINGS.wire, research_mode: "auto", event_min_gap_seconds: 60, event_research: "x_verify", event_research_timeout_seconds: 45, event_decision_timeout_seconds: 90 },
+      // Even a core book that no longer validated (its refinements are gone with it).
+      core: { enabled: true, target_pct: 90, min_holdings: 9, max_holdings: 8, review_time_et: "16:00", themes: ["Chips: 2330"] },
+    }
+    const parsed = settingsSchema.safeParse(saved)
+    expect(parsed.success && parsed.data).toEqual(DEFAULT_SETTINGS)
+  })
+
+  it("migrates stored settings from before the agent by filling it from the defaults", () => {
+    const { agent: _agent, ...stored } = { ...DEFAULT_SETTINGS, risk: { ...DEFAULT_SETTINGS.risk, max_open_positions: 4 } }
     expect(settingsSchema.safeParse(stored).success).toBe(false)
     const r = applySettingsPatch(DEFAULT_SETTINGS, stored)
-    expect(r.ok && r.settings.core).toEqual(DEFAULT_SETTINGS.core)
+    expect(r.ok && r.settings.agent).toEqual(DEFAULT_SETTINGS.agent)
     expect(r.ok && r.settings.risk.max_open_positions).toBe(4)
-  })
-
-  it.each([
-    [{ core: { min_holdings: 9 } }, "core.min_holdings: min_holdings can't exceed max_holdings"],
-    [{ core: { target_pct: 90 }, risk: { cash_reserve_pct: 15 } }, "core.target_pct: target_pct plus risk.cash_reserve_pct can't exceed 100"],
-    [{ core: { review_time_et: "09:00" } }, "core.review_time_et: review_time_et must be between 09:30 and 15:00 (the regular session)"],
-    [{ core: { review_time_et: "15:30" } }, "core.review_time_et: review_time_et must be between 09:30 and 15:00 (the regular session)"],
-  ])("rejects an inconsistent core book: %j", (patch, error) => {
-    const r = applySettingsPatch(DEFAULT_SETTINGS, patch)
-    expect(r.ok).toBe(false)
-    expect(!r.ok && r.errors).toContain(error)
-  })
-
-  it("validates core themes and review times", () => {
-    expect(applySettingsPatch(DEFAULT_SETTINGS, { core: { themes: ["AI buildout: NVDA, AVGO, TSM", "Nuclear power"] } }).ok).toBe(true)
-    expect(applySettingsPatch(DEFAULT_SETTINGS, { core: { themes: ["AI buildout: NVDA, $AVGO"] } })).toEqual({ ok: false, errors: ['core.themes.0: Expected a theme like "AI buildout: NVDA, AVGO, TSM"'] })
-    expect(applySettingsPatch(DEFAULT_SETTINGS, { core: { review_time_et: "9:45" } }).ok).toBe(false)
-    expect(applySettingsPatch(DEFAULT_SETTINGS, { core: { review_weekday: "sat" as never } }).ok).toBe(false)
-  })
-
-  it("parses theme lines", () => {
-    expect(parseTheme("AI buildout: NVDA, AVGO, TSM")).toEqual({ name: "AI buildout", tickers: ["NVDA", "AVGO", "TSM"] })
-    expect(parseTheme("  Nuclear power  ")).toEqual({ name: "Nuclear power", tickers: [] })
-    expect(parseTheme("Banks: jpm bac  JPM,brk.b")).toEqual({ name: "Banks", tickers: ["JPM", "BAC", "BRK.B"] })
-    expect(parseTheme("Space:")).toEqual({ name: "Space", tickers: [] })
-    expect(parseTheme(": NVDA")).toBeNull()
-    expect(parseTheme("Chips: NVDA, 2330")).toBeNull()
-    expect(parseTheme(`${"x".repeat(61)}: NVDA`)).toBeNull()
   })
 
   it("diffs leaf paths for the audit log", () => {

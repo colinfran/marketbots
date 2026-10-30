@@ -1,4 +1,4 @@
-import { cryptoReportSchema, normalizeCryptoReport, type CryptoDecision, type CryptoReport } from "@mb/crypto-core/report"
+import { normalizeCryptoReport, type CryptoDecision, type CryptoReport } from "@mb/crypto-core/report"
 import { describe, expect, it } from "vitest"
 
 const decision = (overrides: Partial<CryptoDecision> = {}): CryptoDecision => ({

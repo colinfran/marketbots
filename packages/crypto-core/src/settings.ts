@@ -1,6 +1,5 @@
 import {
   agentSettingsBase,
-  aiSettingsBase,
   applySettingsPatch as sharedApplySettingsPatch,
   type DeepPartial,
   int,
@@ -23,11 +22,10 @@ export { diffSettings, mergeSettings, MODEL_ID_PATTERN } from "@mb/core/settings
  *
  * Bounds are deliberately wide but finite, so a typo can't set a 5000% position limit.
  *
- * The `ai` and `wire` sections take the fields both bots share from @mb/core/settings, in this
- * bot's key order (the order is part of the settings contract), and add crypto's own.
+ * The `wire` section takes the fields both bots share from @mb/core/settings, in this bot's key
+ * order (the order is part of the settings contract), and adds crypto's own.
  */
 
-const aiBase = aiSettingsBase.shape
 const wireBase = wireSettingsBase.shape
 
 export const krakenRiskSchema = z.object({
@@ -76,25 +74,16 @@ export const portfolioRiskSchema = z.object({
 })
 
 export const aiSettingsSchema = z.object({
-  models: aiBase.models,
-  max_candidates_per_cycle: int(1, 12),
   /**
    * Weight on the AI's probability that the target hits before the stop, vs the zero-drift prior
    * stop / (stop + target). 0.5 halves every claimed edge until calibration data says otherwise.
    */
   probability_shrink: z.number().min(0).max(1),
-  research_timeout_seconds: aiBase.research_timeout_seconds,
-  decision_timeout_seconds: aiBase.decision_timeout_seconds,
 })
 
 export const scheduleSettingsSchema = z.object({
-  crypto_scan_minutes: z.number().min(5).max(240),
-  position_review_minutes: z.number().min(15).max(1440),
   /** A held asset moving this many 1h ATRs since its last review triggers a reassessment. */
   trigger_move_atr: z.number().min(0.5).max(10),
-  trigger_cooldown_minutes: z.number().min(5).max(720),
-  /** Minimum gap between crypto AI cycles, even when triggers fire. Prevents churn and runaway cost. */
-  min_ai_interval_minutes: z.number().min(1).max(240),
 })
 
 export const strategySettingsSchema = z.object({
@@ -106,18 +95,13 @@ export const strategySettingsSchema = z.object({
 /** The news engine ("wire"). An entry's matching move can be in price or volume. */
 export const wireSettingsSchema = z.object({
   mode: wireBase.mode,
-  research_mode: wireBase.research_mode,
   thresholds: wireBase.thresholds,
   entry_confirmation: wireBase.entry_confirmation,
   unexplained_move_entries: wireBase.unexplained_move_entries,
   trigger_max_age_minutes: wireBase.trigger_max_age_minutes,
   symbol_cooldown_minutes: wireBase.symbol_cooldown_minutes,
-  event_min_gap_seconds: wireBase.event_min_gap_seconds,
   max_event_cycles_per_hour: wireBase.max_event_cycles_per_hour,
   max_event_cycles_per_day: wireBase.max_event_cycles_per_day,
-  event_research: wireBase.event_research,
-  event_research_timeout_seconds: wireBase.event_research_timeout_seconds,
-  event_decision_timeout_seconds: wireBase.event_decision_timeout_seconds,
   /** What happens at once when a held position meets a critical, confirmed, negative event. review = the AI decides. */
   emergency_action: z.enum(["review", "tighten_stop", "exit"]),
   /** The market-wide shock is BTC's 5-minute z-score. */
@@ -205,21 +189,10 @@ export const DEFAULT_SETTINGS: Settings = {
     drawdown_action: "halt",
   },
   ai: {
-    models: {
-      research: "local/qwen3.6-35b-a3b-q2",
-      decision: "local/qwen3.6-35b-a3b-q2",
-    },
-    max_candidates_per_cycle: 4,
     probability_shrink: 0.6,
-    research_timeout_seconds: 180,
-    decision_timeout_seconds: 240,
   },
   schedule: {
-    crypto_scan_minutes: 15,
-    position_review_minutes: 240,
     trigger_move_atr: 1.5,
-    trigger_cooldown_minutes: 30,
-    min_ai_interval_minutes: 10,
   },
   strategies: {
     trend: { enabled: true, max_exposure_pct: 65 },
@@ -237,18 +210,13 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   wire: {
     mode: "live",
-    research_mode: "auto",
     thresholds: { annotate: 30, review: 55, evaluate: 70, critical: 85 },
     entry_confirmation: true,
     unexplained_move_entries: false,
     trigger_max_age_minutes: 15,
     symbol_cooldown_minutes: 30,
-    event_min_gap_seconds: 60,
     max_event_cycles_per_hour: 4,
     max_event_cycles_per_day: 24,
-    event_research: "x_verify",
-    event_research_timeout_seconds: 45,
-    event_decision_timeout_seconds: 90,
     emergency_action: "review",
     anomaly: { price_z: 4, volume_multiple: 5, market_z: 4 },
     disabled_sources: [],

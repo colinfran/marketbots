@@ -5,7 +5,7 @@ import { httpClient } from "@mb/engine-kit/util/http"
 import { localResearcher } from "@mb/wire/research/local"
 import { newsMovesJob } from "@mb/history/moves"
 import { HistoryStore } from "@mb/history/store"
-import { CORE_INDEX_ETFS } from "@mb/stock-core/settings"
+import { INDEX_ETFS } from "@mb/stock-core/settings"
 import { marketDay } from "@mb/stock-core/time"
 import { stockBackfillJobs } from "./history/backfill"
 import { Alerts } from "./alerts"
@@ -126,7 +126,7 @@ void bootstrap({
     })
 
     if (history) {
-      const extra = () => [...new Set([...settings.current.universe.benchmarks, ...CORE_INDEX_ETFS, ...(engine?.wireSymbols().held ?? [])])]
+      const extra = () => [...new Set([...settings.current.universe.benchmarks, ...INDEX_ETFS, ...(engine?.wireSymbols().held ?? [])])]
       for (const job of stockBackfillJobs({ alpaca, universe: () => universe.symbols, extra })) history.addJob(job)
       history.addJob(newsMovesJob("SPY"))
       history.start()

@@ -1,4 +1,3 @@
-import type { EngineEvent } from "@mb/crypto-core/events"
 import { DEFAULT_SETTINGS, type Settings } from "@mb/crypto-core/settings"
 import type { EventFocus, WireItemDoc } from "@mb/crypto-core/wire"
 import { silentLogger } from "@mb/engine-kit/log"

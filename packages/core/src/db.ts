@@ -1,5 +1,4 @@
 import type { AgentStatus } from "./agent"
-import type { AiSettingsBase } from "./settings"
 import type { WireStatus } from "./wire"
 
 /**
@@ -122,7 +121,6 @@ export type EngineStatusBase<RunStatus extends string, CycleState extends string
   ws_clients: number
   event_seq: number
   ai: {
-    models: AiSettingsBase["models"]
     calls_today: number
     last_call_at: Date | null
     last_error: string | null

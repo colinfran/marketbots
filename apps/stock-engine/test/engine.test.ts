@@ -83,7 +83,7 @@ beforeEach(async () => {
       onItem: () => undefined,
       markNotable: async () => [],
       healthy: () => false,
-      health: () => ({ mode: "live", sources: [], items_last_hour: 0, triggers_today: 0, event_queue: [] }),
+      health: () => ({ mode: "live", sources: [], items_last_hour: 0, triggers_today: 0 }),
     } as unknown as Wire,
     coverage: { setSymbols: () => undefined, price: () => null },
   })

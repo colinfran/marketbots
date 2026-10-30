@@ -432,7 +432,7 @@ export class Wire<C extends string, W extends WireSettingsBase> {
   }
 
   /** Health for the heartbeat: every catalog source, then the article summaries. `extra` comes from the policy and the engine's event queue. */
-  health(extra: { triggers_today?: number; event_queue?: string[] } = {}): WireStatus {
+  health(extra: { triggers_today?: number } = {}): WireStatus {
     const now = this.now().getTime()
     const s = this.d.settings()
     const within = (list: number[], ms: number) => list.filter((t) => t >= now - ms).length
@@ -444,7 +444,7 @@ export class Wire<C extends string, W extends WireSettingsBase> {
     })
     if (this.enricher) sources.push(this.enricher.health())
     const itemsLastHour = [...this.counters.values()].reduce((n, c) => n + within(c.items, 3_600_000), 0)
-    return { mode: s.mode, sources, items_last_hour: itemsLastHour, triggers_today: extra.triggers_today ?? 0, event_queue: extra.event_queue ?? [] }
+    return { mode: s.mode, sources, items_last_hour: itemsLastHour, triggers_today: extra.triggers_today ?? 0 }
   }
 
   /** Healthy enough for gap-fill research: at least half the running wave-1 sources are ok. */

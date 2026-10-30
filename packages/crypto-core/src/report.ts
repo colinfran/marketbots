@@ -1,6 +1,6 @@
 import { z } from "zod"
 import type { EvidenceItem } from "./db"
-import { clamp, roundTo } from "./math"
+import { clamp } from "./math"
 
 /**
  * Structured output for the AI decision task. As in stockmarketbot, the schemas sent to the

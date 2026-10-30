@@ -3,7 +3,6 @@ import { upgradeStoredSettings } from "@mb/core/settings"
 import type { Logger } from "@mb/engine-kit/log"
 import { SettingsStore as SettingsStoreOf, type SettingsView as SettingsViewOf } from "@mb/engine-kit/state/stores"
 import type { Collections } from "../db/mongo"
-import type { Env } from "../env"
 
 export { EngineStateStore } from "@mb/engine-kit/state/stores"
 

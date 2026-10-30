@@ -705,9 +705,8 @@ describe("executeDecisions: adjust_exits", () => {
 })
 
 describe("executeDecisions: former core holdings", () => {
-  /** SPY was a core holding (with its plain stop) next to a trading position in AAPL; the core book's setting is still on. */
+  /** SPY was a core holding (with its plain stop) next to a trading position in AAPL. */
   const withCoreHolding = async () => {
-    ctx.settings.current.core.enabled = true
     broker.setPosition("SPY", 6, 500)
     broker.addOrder(alpacaOrder({ symbol: "SPY", side: "sell", type: "stop", qty: "6", stop_price: "425", status: "new", time_in_force: "gtc" }))
     await (await collections()).plans.insertOne(planDoc("SPY", { book: "core", horizon: "multi_day", stop_loss: 425, take_profit: null }))

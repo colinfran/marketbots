@@ -106,11 +106,6 @@ export type CryptoEntry = {
   roundQty: (qty: number) => number
   /** Venue minimum-size violation for a quantity, or null. */
   minViolation: (qty: number, price: number) => string | null
-  /**
-   * The owner chose to buy (the one-time seed): skips only the conviction, net-edge and
-   * reward:risk gates. Every other gate and every cap still applies.
-   */
-  ownerDirected?: boolean
 }
 
 export const evaluateCryptoEntry = (p: CryptoEntry, account: AccountState, gate: Gate, settings: Settings, now = Date.now()): RiskResult => {
@@ -130,13 +125,9 @@ export const evaluateCryptoEntry = (p: CryptoEntry, account: AccountState, gate:
   const lastExit = account.lastExitAt.get(p.symbol)
   const cooldownLeft = lastExit ? k.reentry_cooldown_minutes - (now - lastExit) / 60_000 : 0
   c.check("reentry_cooldown", cooldownLeft <= 0, cooldownLeft > 0 ? `exited ${p.symbol} recently; ${Math.ceil(cooldownLeft)} min of cooldown left` : "no recent exit")
-  if (p.ownerDirected) {
-    c.check("owner_directed", true, "owner-directed seed buy: conviction, edge and reward:risk gates don't apply")
-  } else {
-    c.check("conviction", p.conviction >= k.min_conviction, `conviction ${p.conviction} (min ${k.min_conviction})`)
-    c.check("edge_after_costs", p.netEdgeBps >= k.min_edge_bps, `expected net edge ${p.netEdgeBps.toFixed(1)} bps (min ${k.min_edge_bps})`)
-    c.check("reward_risk", p.rewardRisk >= k.min_reward_risk, `reward:risk ${p.rewardRisk.toFixed(2)} (min ${k.min_reward_risk})`)
-  }
+  c.check("conviction", p.conviction >= k.min_conviction, `conviction ${p.conviction} (min ${k.min_conviction})`)
+  c.check("edge_after_costs", p.netEdgeBps >= k.min_edge_bps, `expected net edge ${p.netEdgeBps.toFixed(1)} bps (min ${k.min_edge_bps})`)
+  c.check("reward_risk", p.rewardRisk >= k.min_reward_risk, `reward:risk ${p.rewardRisk.toFixed(2)} (min ${k.min_reward_risk})`)
   const stopPct = ((p.mid - p.stopPrice) / p.mid) * 100
   c.check(
     "stop_distance",

@@ -6,8 +6,7 @@ import type { Collections } from "../db/mongo"
 
 /**
  * The dashboard command processor (@mb/engine-kit/commands) for stock's commands. The ones that
- * increase risk (resume, releasing the kill switch, running a cycle, scheduling a seed) expire
- * after 10 minutes.
+ * increase risk (resume, releasing the kill switch, waking the agent) expire after 10 minutes.
  */
 
 const EXPIRING = new Set<Command["type"]>(["resume", "agent.review", "kill_switch.release"])

@@ -126,10 +126,9 @@ export type WireStatus = {
   sources: WireSourceHealth[]
   items_last_hour: number
   triggers_today: number
-  event_queue: string[]
 }
 
-/** What an event cycle focuses on: one symbol (or market-wide), the rule and the items behind it. */
+/** What a trigger is about: one symbol (or market-wide), the rule and the items behind it. */
 export type EventFocus = {
   symbol: string | null
   rule: string

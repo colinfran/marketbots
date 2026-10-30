@@ -155,7 +155,6 @@ export function WireSourcesSection({ wire, note }: { wire: NonNullable<Status["w
     <section>
       <SectionTitle>
         News engine sources · mode {wire.mode} · {wire.items_last_hour} items in the last hour · {wire.triggers_today} triggers today
-        {wire.event_queue.length ? ` · queued: ${wire.event_queue.join(", ")}` : ""}
       </SectionTitle>
       <Table>
         <TableHeader>

@@ -218,11 +218,6 @@
             "minimum": 5,
             "maximum": 300
           },
-          "max_underlyings_per_cycle": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 12
-          },
           "contracts_per_underlying": {
             "type": "integer",
             "minimum": 2,
@@ -250,49 +245,7 @@
           "entry_aggression",
           "fill_timeout_seconds",
           "monitor_seconds",
-          "max_underlyings_per_cycle",
           "contracts_per_underlying"
-        ]
-      },
-      "ai": {
-        "type": "object",
-        "properties": {
-          "models": {
-            "type": "object",
-            "properties": {
-              "research": {
-                "type": "string",
-                "pattern": "^local\\/[a-z0-9][a-z0-9.\\-]*$"
-              },
-              "decision": {
-                "type": "string",
-                "pattern": "^local\\/[a-z0-9][a-z0-9.\\-]*$"
-              }
-            },
-            "required": [
-              "research",
-              "decision"
-            ]
-          },
-          "stream_reasoning": {
-            "type": "boolean"
-          },
-          "research_timeout_seconds": {
-            "type": "number",
-            "minimum": 30,
-            "maximum": 600
-          },
-          "decision_timeout_seconds": {
-            "type": "number",
-            "minimum": 20,
-            "maximum": 300
-          }
-        },
-        "required": [
-          "models",
-          "stream_reasoning",
-          "research_timeout_seconds",
-          "decision_timeout_seconds"
         ]
       },
       "schedule": {
@@ -308,11 +261,6 @@
             "minimum": 0,
             "maximum": 60
           },
-          "trade_interval_minutes": {
-            "type": "number",
-            "minimum": 5,
-            "maximum": 240
-          },
           "close_window_minutes": {
             "type": "number",
             "minimum": 5,
@@ -323,37 +271,18 @@
             "minimum": 0,
             "maximum": 120
           },
-          "max_phase_attempts": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 5
-          },
           "trigger_move_pct": {
             "type": "number",
             "minimum": 0.5,
             "maximum": 20
-          },
-          "trigger_cooldown_minutes": {
-            "type": "number",
-            "minimum": 5,
-            "maximum": 240
-          },
-          "min_cycle_gap_minutes": {
-            "type": "number",
-            "minimum": 1,
-            "maximum": 60
           }
         },
         "required": [
           "premarket_lead_minutes",
           "open_buffer_minutes",
-          "trade_interval_minutes",
           "close_window_minutes",
           "postmarket_delay_minutes",
-          "max_phase_attempts",
-          "trigger_move_pct",
-          "trigger_cooldown_minutes",
-          "min_cycle_gap_minutes"
+          "trigger_move_pct"
         ]
       },
       "universe": {
@@ -388,14 +317,6 @@
               "off",
               "shadow",
               "live"
-            ]
-          },
-          "research_mode": {
-            "type": "string",
-            "enum": [
-              "full",
-              "gap_fill",
-              "auto"
             ]
           },
           "thresholds": {
@@ -445,11 +366,6 @@
             "minimum": 1,
             "maximum": 720
           },
-          "event_min_gap_seconds": {
-            "type": "number",
-            "minimum": 15,
-            "maximum": 3600
-          },
           "max_event_cycles_per_hour": {
             "type": "integer",
             "minimum": 0,
@@ -459,23 +375,6 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 200
-          },
-          "event_research": {
-            "type": "string",
-            "enum": [
-              "none",
-              "x_verify"
-            ]
-          },
-          "event_research_timeout_seconds": {
-            "type": "number",
-            "minimum": 15,
-            "maximum": 300
-          },
-          "event_decision_timeout_seconds": {
-            "type": "number",
-            "minimum": 20,
-            "maximum": 300
           },
           "emergency_action": {
             "type": "string",
@@ -582,18 +481,13 @@
         },
         "required": [
           "mode",
-          "research_mode",
           "thresholds",
           "entry_confirmation",
           "unexplained_move_entries",
           "trigger_max_age_minutes",
           "symbol_cooldown_minutes",
-          "event_min_gap_seconds",
           "max_event_cycles_per_hour",
           "max_event_cycles_per_day",
-          "event_research",
-          "event_research_timeout_seconds",
-          "event_decision_timeout_seconds",
           "emergency_action",
           "anomaly",
           "disabled_sources",
@@ -602,108 +496,6 @@
           "scan_max_symbols",
           "scan_min_dollar_volume",
           "summaries"
-        ]
-      },
-      "core": {
-        "type": "object",
-        "properties": {
-          "enabled": {
-            "type": "boolean"
-          },
-          "target_pct": {
-            "type": "number",
-            "minimum": 0,
-            "maximum": 90
-          },
-          "band_pct": {
-            "type": "number",
-            "minimum": 0,
-            "maximum": 50
-          },
-          "min_holdings": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 20
-          },
-          "max_holdings": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 20
-          },
-          "max_holding_pct": {
-            "type": "number",
-            "minimum": 1,
-            "maximum": 50
-          },
-          "max_index_etf_pct": {
-            "type": "number",
-            "minimum": 1,
-            "maximum": 100
-          },
-          "max_theme_pct": {
-            "type": "number",
-            "minimum": 10,
-            "maximum": 100
-          },
-          "stop_pct": {
-            "type": "number",
-            "minimum": 3,
-            "maximum": 50
-          },
-          "min_conviction": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 10
-          },
-          "max_trades_per_review": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 20
-          },
-          "review_weekday": {
-            "type": "string",
-            "enum": [
-              "mon",
-              "tue",
-              "wed",
-              "thu",
-              "fri"
-            ]
-          },
-          "review_time_et": {
-            "type": "string",
-            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
-          },
-          "universe_size": {
-            "type": "integer",
-            "minimum": 20,
-            "maximum": 500
-          },
-          "themes": {
-            "maxItems": 12,
-            "type": "array",
-            "items": {
-              "type": "string",
-              "maxLength": 200
-            }
-          }
-        },
-        "required": [
-          "enabled",
-          "target_pct",
-          "band_pct",
-          "min_holdings",
-          "max_holdings",
-          "max_holding_pct",
-          "max_index_etf_pct",
-          "max_theme_pct",
-          "stop_pct",
-          "min_conviction",
-          "max_trades_per_review",
-          "review_weekday",
-          "review_time_et",
-          "universe_size",
-          "themes"
         ]
       },
       "agent": {
@@ -915,11 +707,9 @@
       "account",
       "risk",
       "options",
-      "ai",
       "schedule",
       "universe",
       "wire",
-      "core",
       "agent"
     ]
   },
@@ -1144,11 +934,6 @@
             "minimum": 5,
             "maximum": 300
           },
-          "max_underlyings_per_cycle": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 12
-          },
           "contracts_per_underlying": {
             "type": "integer",
             "minimum": 2,
@@ -1176,51 +961,7 @@
           "entry_aggression",
           "fill_timeout_seconds",
           "monitor_seconds",
-          "max_underlyings_per_cycle",
           "contracts_per_underlying"
-        ],
-        "additionalProperties": false
-      },
-      "ai": {
-        "type": "object",
-        "properties": {
-          "models": {
-            "type": "object",
-            "properties": {
-              "research": {
-                "type": "string",
-                "pattern": "^local\\/[a-z0-9][a-z0-9.\\-]*$"
-              },
-              "decision": {
-                "type": "string",
-                "pattern": "^local\\/[a-z0-9][a-z0-9.\\-]*$"
-              }
-            },
-            "required": [
-              "research",
-              "decision"
-            ],
-            "additionalProperties": false
-          },
-          "stream_reasoning": {
-            "type": "boolean"
-          },
-          "research_timeout_seconds": {
-            "type": "number",
-            "minimum": 30,
-            "maximum": 600
-          },
-          "decision_timeout_seconds": {
-            "type": "number",
-            "minimum": 20,
-            "maximum": 300
-          }
-        },
-        "required": [
-          "models",
-          "stream_reasoning",
-          "research_timeout_seconds",
-          "decision_timeout_seconds"
         ],
         "additionalProperties": false
       },
@@ -1237,11 +978,6 @@
             "minimum": 0,
             "maximum": 60
           },
-          "trade_interval_minutes": {
-            "type": "number",
-            "minimum": 5,
-            "maximum": 240
-          },
           "close_window_minutes": {
             "type": "number",
             "minimum": 5,
@@ -1252,37 +988,18 @@
             "minimum": 0,
             "maximum": 120
           },
-          "max_phase_attempts": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 5
-          },
           "trigger_move_pct": {
             "type": "number",
             "minimum": 0.5,
             "maximum": 20
-          },
-          "trigger_cooldown_minutes": {
-            "type": "number",
-            "minimum": 5,
-            "maximum": 240
-          },
-          "min_cycle_gap_minutes": {
-            "type": "number",
-            "minimum": 1,
-            "maximum": 60
           }
         },
         "required": [
           "premarket_lead_minutes",
           "open_buffer_minutes",
-          "trade_interval_minutes",
           "close_window_minutes",
           "postmarket_delay_minutes",
-          "max_phase_attempts",
-          "trigger_move_pct",
-          "trigger_cooldown_minutes",
-          "min_cycle_gap_minutes"
+          "trigger_move_pct"
         ],
         "additionalProperties": false
       },
@@ -1319,14 +1036,6 @@
               "off",
               "shadow",
               "live"
-            ]
-          },
-          "research_mode": {
-            "type": "string",
-            "enum": [
-              "full",
-              "gap_fill",
-              "auto"
             ]
           },
           "thresholds": {
@@ -1377,11 +1086,6 @@
             "minimum": 1,
             "maximum": 720
           },
-          "event_min_gap_seconds": {
-            "type": "number",
-            "minimum": 15,
-            "maximum": 3600
-          },
           "max_event_cycles_per_hour": {
             "type": "integer",
             "minimum": 0,
@@ -1391,23 +1095,6 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 200
-          },
-          "event_research": {
-            "type": "string",
-            "enum": [
-              "none",
-              "x_verify"
-            ]
-          },
-          "event_research_timeout_seconds": {
-            "type": "number",
-            "minimum": 15,
-            "maximum": 300
-          },
-          "event_decision_timeout_seconds": {
-            "type": "number",
-            "minimum": 20,
-            "maximum": 300
           },
           "emergency_action": {
             "type": "string",
@@ -1516,18 +1203,13 @@
         },
         "required": [
           "mode",
-          "research_mode",
           "thresholds",
           "entry_confirmation",
           "unexplained_move_entries",
           "trigger_max_age_minutes",
           "symbol_cooldown_minutes",
-          "event_min_gap_seconds",
           "max_event_cycles_per_hour",
           "max_event_cycles_per_day",
-          "event_research",
-          "event_research_timeout_seconds",
-          "event_decision_timeout_seconds",
           "emergency_action",
           "anomaly",
           "disabled_sources",
@@ -1536,109 +1218,6 @@
           "scan_max_symbols",
           "scan_min_dollar_volume",
           "summaries"
-        ],
-        "additionalProperties": false
-      },
-      "core": {
-        "type": "object",
-        "properties": {
-          "enabled": {
-            "type": "boolean"
-          },
-          "target_pct": {
-            "type": "number",
-            "minimum": 0,
-            "maximum": 90
-          },
-          "band_pct": {
-            "type": "number",
-            "minimum": 0,
-            "maximum": 50
-          },
-          "min_holdings": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 20
-          },
-          "max_holdings": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 20
-          },
-          "max_holding_pct": {
-            "type": "number",
-            "minimum": 1,
-            "maximum": 50
-          },
-          "max_index_etf_pct": {
-            "type": "number",
-            "minimum": 1,
-            "maximum": 100
-          },
-          "max_theme_pct": {
-            "type": "number",
-            "minimum": 10,
-            "maximum": 100
-          },
-          "stop_pct": {
-            "type": "number",
-            "minimum": 3,
-            "maximum": 50
-          },
-          "min_conviction": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 10
-          },
-          "max_trades_per_review": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 20
-          },
-          "review_weekday": {
-            "type": "string",
-            "enum": [
-              "mon",
-              "tue",
-              "wed",
-              "thu",
-              "fri"
-            ]
-          },
-          "review_time_et": {
-            "type": "string",
-            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
-          },
-          "universe_size": {
-            "type": "integer",
-            "minimum": 20,
-            "maximum": 500
-          },
-          "themes": {
-            "maxItems": 12,
-            "type": "array",
-            "items": {
-              "type": "string",
-              "maxLength": 200
-            }
-          }
-        },
-        "required": [
-          "enabled",
-          "target_pct",
-          "band_pct",
-          "min_holdings",
-          "max_holdings",
-          "max_holding_pct",
-          "max_index_etf_pct",
-          "max_theme_pct",
-          "stop_pct",
-          "min_conviction",
-          "max_trades_per_review",
-          "review_weekday",
-          "review_time_et",
-          "universe_size",
-          "themes"
         ],
         "additionalProperties": false
       },
@@ -1858,11 +1437,9 @@
       "account",
       "risk",
       "options",
-      "ai",
       "schedule",
       "universe",
       "wire",
-      "core",
       "agent"
     ],
     "additionalProperties": false

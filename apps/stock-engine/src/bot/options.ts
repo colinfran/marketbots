@@ -360,7 +360,7 @@ export const executeOptionDecision = async (ctx: TradingContext, i: OptionDecisi
 }
 
 const openFromDecision = async (ctx: TradingContext, i: OptionDecisionInput): Promise<OptionOutcome> => {
-  const { col, alpaca, settings, bus, prices } = ctx
+  const { col, settings, bus, prices } = ctx
   const s = settings.current.options
   const d = i.decision
   const o = d.option

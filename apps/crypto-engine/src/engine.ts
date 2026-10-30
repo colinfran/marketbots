@@ -180,7 +180,6 @@ export class Engine {
       col: d.db.col,
       bus: d.bus,
       calls: d.calls,
-      settings: d.settings,
       ai: { available: !!d.env.LLM_URL },
       state: d.state,
       stream: d.stream,
@@ -216,12 +215,6 @@ export class Engine {
     return this.control.ready
   }
 
-  /**
-   * A news-engine trigger asks for a focused cycle. It starts at once when nothing is running and
-   * the minimum gap since the last event cycle has passed; otherwise it waits, merged by symbol
-   * (highest severity kept), and runs the moment the current cycle ends, or is dropped unrun once
-   * it has waited 30 minutes.
-   */
   /** When the agent was turned on or its entries resumed: its time and equity, for the total-loss breaker. */
   private async promoteAgent(p: { at: Date; equity_usd: number }) {
     await this.d.state.update({ agent_promotion: p }, "engine", "agent.promoted", {})
@@ -394,7 +387,7 @@ export class Engine {
 
   /** Crypto's own commands; the shared ones (pause, kill switch, settings, replay, the agent's) go to the control plane. */
   private async handleCommand(command: Command, doc: CommandDoc): Promise<string> {
-    const { state, settings, ledger, cli } = this.d
+    const { settings, ledger, cli } = this.d
     const by = doc.created_by
     switch (command.type) {
       case "strategy.set_enabled": {

@@ -34,6 +34,19 @@ describe("settings store", () => {
     expect(await db.col.audit.countDocuments()).toBe(1)
   })
 
+  it("reads stored settings with fields the schema no longer has as they are, and drops them at the next change", async () => {
+    const old = { agent: { level: "on", model: "local/x", models: { research: "local/x" } }, limit: 7, ai: { research_timeout_seconds: 180 } }
+    await db.col.settings.insertOne({ _id: "current", settings: old as unknown as S, version: 3, updated_at: new Date(), updated_by: "owner" })
+    const store = await SettingsStore.load(db.col, binding, silentLogger)
+    expect(store.current).toEqual({ agent: { level: "on", model: "local/x" }, limit: 7 })
+    // No migration: the stored document stays as it is until the owner changes something.
+    expect(store.version).toBe(3)
+    expect((await db.col.settings.findOne({ _id: "current" }))!.settings).toEqual(old)
+    expect(await db.col.audit.countDocuments()).toBe(0)
+    expect(await store.apply({ limit: 8 }, "owner", 3)).toEqual({ ok: true, changes: 1 })
+    expect((await db.col.settings.findOne({ _id: "current" }))!.settings).toEqual({ agent: { level: "on", model: "local/x" }, limit: 8 })
+  })
+
   it("never turns a stored shadow level on", async () => {
     await db.col.settings.insertOne({ _id: "current", settings: { agent: { level: "shadow", model: "local/x" }, limit: 7 } as unknown as S, version: 2, updated_at: new Date(), updated_by: "owner" })
     expect((await SettingsStore.load(db.col, binding, silentLogger)).current.agent.level).toBe("off")

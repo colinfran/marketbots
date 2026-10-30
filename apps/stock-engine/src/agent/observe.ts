@@ -31,7 +31,6 @@ import { bookText, envelopeHistory, heldPositions, heldSymbols } from "./view"
  */
 
 const EXITS_MS = 5_000
-const MARK_MS = 15_000
 const CALENDAR_LEAD_MS = 15 * 60_000
 const OVERNIGHT_MINUTES = 3
 const MIN = 60_000
@@ -39,7 +38,7 @@ const MIN = 60_000
 const MAX_SETUPS = 5
 
 export class StockObserver {
-  private last = { exits: 0, mark: 0, calendar: 0, sweep: Date.now() }
+  private last = { exits: 0, calendar: 0, sweep: Date.now() }
   private readonly done = new Set<string>()
   private readonly moves = new Map<string, string>()
   private readonly screen = new StockScreen()
@@ -78,7 +77,6 @@ export class StockObserver {
 
   async tick(now: Date) {
     const t = now.getTime()
-    const s = this.d.session()
     const window = sessionWindow(this.d, now)
     await this.phases(now)
     // Stops and targets rest at the broker, and the overnight rule is the engine's maintenance; the agent watches the moves.

@@ -43,9 +43,7 @@ import type { Wire } from "./wire/wire"
 
 export const ENGINE_VERSION = "0.1.0"
 
-const usdText = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
-
-/** Stock's words in the shared control results and seed alerts (@mb/engine-kit/control/plane). */
+/** Stock's words in the shared control results (@mb/engine-kit/control/plane). */
 const WORDING: ControlWording = {
   paused: "paused: no new entries; stops, targets and options exits stay active",
   halted: "halted: no new orders; stops, targets and options exits stay active",
@@ -202,7 +200,6 @@ export class Engine {
       col: d.db.col,
       bus: d.bus,
       calls: d.calls,
-      settings: d.settings,
       ai: { available: !!d.env.LLM_URL },
       state: d.state,
       stream: d.stream,
@@ -558,9 +555,9 @@ export class Engine {
 
   // ─── Commands ────────────────────────────────────────────────────────────
 
-  /** Stock's own commands; the shared ones (pause, kill switch, settings, seed, replay) go to the control plane. */
+  /** Stock's own commands; the shared ones (pause, kill switch, settings, replay, the agent's) go to the control plane. */
   private async handleCommand(command: Command, doc: CommandDoc): Promise<string> {
-    const { state, alpaca, db } = this.d
+    const { alpaca, db } = this.d
     const by = doc.created_by
     switch (command.type) {
       case "position.close": {

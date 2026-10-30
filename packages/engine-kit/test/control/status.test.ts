@@ -19,27 +19,25 @@ const setup = async (overrides: Partial<StatusReporterDeps<TestStatusDoc>> = {})
   const state: { state: EngineStateDoc } = {
     state: { _id: "engine", status: "running", pause_reason: null, kill_switch: { engaged: true, reason: "test", at: null, by: "owner", liquidate: false }, updated_at: new Date() },
   }
-  const healthCalls: { triggers_today: number; event_queue: string[] }[] = []
+  const healthCalls: { triggers_today: number }[] = []
   const triggers = { fail: false }
   const reporter = new StatusReporter<TestStatusDoc>({
     col: db.col,
     bus,
     calls: { today: async () => ({ calls: 7 }) },
-    settings: { current: { ai: { models: { research: "x/r-model", decision: "x/d-model" } } } },
     ai: { available: true },
     state,
     stream: { clientCount: 2 },
     wire: {
       health: (extra) => {
         healthCalls.push(extra)
-        return { mode: "live", sources: [], items_last_hour: 5, triggers_today: extra.triggers_today, event_queue: extra.event_queue } satisfies WireStatus
+        return { mode: "live", sources: [], items_last_hour: 5, triggers_today: extra.triggers_today } satisfies WireStatus
       },
     },
     policy: { triggersToday: async () => (triggers.fail ? Promise.reject(new Error("db down")) : 4) },
     instance: "kit-1",
     version: "9.9.9",
     run: () => run,
-    eventQueue: () => ["AAA", "MARKET"],
     // The bot's own fields go between the shared ones, in its order.
     doc: (p) => ({ ...p.run, ...p.live, venue: { ok: true }, ...p.usage, last_cycle: "cycle-1", ...p.health }),
     ...overrides,
@@ -92,13 +90,14 @@ describe("StatusReporter", () => {
       ws_clients: 2,
       event_seq: bus.lastSeq,
       venue: { ok: true },
-      ai: { models: { research: "x/r-model", decision: "x/d-model" }, calls_today: 7, last_error: "gateway timeout", enabled: true },
+      ai: { calls_today: 7, last_error: "gateway timeout", enabled: true },
       last_cycle: "cycle-1",
       errors_last_hour: 1,
-      wire: { mode: "live", items_last_hour: 5, triggers_today: 4, event_queue: ["AAA", "MARKET"] },
+      wire: { mode: "live", items_last_hour: 5, triggers_today: 4 },
     })
+    expect(Object.keys(doc.ai)).toEqual(["calls_today", "last_call_at", "last_error", "enabled"])
     expect(doc.system).toEqual({ cpu_pct: expect.any(Number), rss_mb: expect.any(Number), heap_mb: expect.any(Number), load_avg: expect.any(Array), uptime_s: expect.any(Number) })
-    expect(healthCalls).toEqual([{ triggers_today: 4, event_queue: ["AAA", "MARKET"] }])
+    expect(healthCalls).toEqual([{ triggers_today: 4 }])
     // Replaced in place on every beat.
     await reporter.write()
     expect(await db.col.engineStatus.countDocuments()).toBe(1)

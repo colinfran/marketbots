@@ -9,8 +9,8 @@ import { cleanLine } from "@mb/engine-kit/util/text"
 
 /**
  * A news trigger candidate that passed the wire's gates on the item itself (fresh, confirmed): one
- * observation per symbol it names, or one about the market. The trigger's hourly and daily caps,
- * which exist for the timed cycles' AI cost, don't apply: the envelope limits what the agent does.
+ * observation per symbol it names, or one about the market. The trigger's hourly and daily caps
+ * don't apply (they limit its alerts and the emergency exit): the envelope limits what the agent does.
  */
 export const newsObservations = (
   item: Pick<WireItemDoc<string>, "_id" | "title" | "severity" | "first_seen_at" | "category" | "source">,

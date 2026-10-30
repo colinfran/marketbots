@@ -22,17 +22,6 @@ export const int = (min: number, max: number) => z.number().int().min(min).max(m
 export const MODEL_ID_PATTERN = /^local\/[a-z0-9][a-z0-9.\-]*$/
 export const modelId = z.string().regex(MODEL_ID_PATTERN, "Expected a local model id like local/qwen3.6-35b-a3b-q2")
 
-/** The AI settings both bots have. */
-export const aiSettingsBase = z.object({
-  models: z.object({
-    research: modelId,
-    decision: modelId,
-  }),
-  research_timeout_seconds: z.number().min(30).max(600),
-  decision_timeout_seconds: z.number().min(20).max(300),
-})
-export type AiSettingsBase = z.infer<typeof aiSettingsBase>
-
 /** A bare lowercase domain, e.g. "wsj.com". */
 export const DOMAIN_PATTERN = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/
 /** A range of UTC hours, start-end with the end excluded: "22-6" is 22:00 to 06:00 UTC, "0-24" all day. */
@@ -65,28 +54,23 @@ export type WireSummariesSettings = z.infer<typeof wireSummariesSettings>
 /**
  * The news engine ("wire") settings both bots have. It ships live: `SettingsStore.load` fills this
  * section (and any field added to it later, like `summaries`) from the defaults on the first boot
- * after deploy. Setting `mode` to "off" (or "shadow": log triggers, act on none) returns trading to
- * scheduled cycles with full web research at once.
+ * after deploy. `mode` "off" stops the news engine (no sources, no triggers); "shadow" logs its
+ * triggers but sends no alerts and takes no emergency action. The agent hears about news in both
+ * live and shadow.
  */
 export const wireSettingsBase = z.object({
   mode: z.enum(["off", "shadow", "live"]),
-  /** full = research every cycle; gap_fill = research only what the wire lacks; auto = gap_fill, skipped when there's no gap. */
-  research_mode: z.enum(["full", "gap_fill", "auto"]),
   /** Severity (0-100) for: annotating the dossier, a held-position review, a new-entry evaluation, critical. Ascending. */
   thresholds: z.object({ annotate: int(0, 100), review: int(0, 100), evaluate: int(0, 100), critical: int(0, 100) }),
   /** Event-driven entries need a tier-1 source, two tier-2 domains, or tier 2 plus a matching market move. */
   entry_confirmation: z.boolean(),
-  /** An unexplained move in something we don't hold starts an entry check (an event cycle where the AI looks for the cause). Off: it's only context. */
+  /** An unexplained move in something we don't hold wakes the agent to look for the cause, as an entry idea. Off: it's only context. */
   unexplained_move_entries: z.boolean(),
   /** Only items first seen this recently can trigger (nothing fires from a backlog after a restart). */
   trigger_max_age_minutes: z.number().min(1).max(240),
   symbol_cooldown_minutes: z.number().min(1).max(720),
-  event_min_gap_seconds: z.number().min(15).max(3_600),
   max_event_cycles_per_hour: int(0, 30),
   max_event_cycles_per_day: int(0, 200),
-  event_research: z.enum(["none", "x_verify"]),
-  event_research_timeout_seconds: z.number().min(15).max(300),
-  event_decision_timeout_seconds: z.number().min(20).max(300),
   anomaly: z.object({
     /** 1-minute return z-score that counts as an idiosyncratic price shock. */
     price_z: z.number().min(2).max(20),
