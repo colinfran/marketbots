@@ -1,5 +1,19 @@
 import { describe, expect, it } from "vitest"
-import { ago, duration, until, zonedFormat } from "../src/lib/format"
+import { ago, bytes, duration, until, zonedFormat } from "../src/lib/format"
+
+describe("bytes", () => {
+  it("shows MB below a gigabyte, then GB and TB", () => {
+    expect(bytes(191.9 * 1024 ** 2)).toBe("192 MB")
+    expect(bytes(31.8 * 1024 ** 3)).toBe("31.8 GB")
+    expect(bytes(32 * 1024 ** 3)).toBe("32 GB")
+    expect(bytes(2.5 * 1024 ** 4)).toBe("2.5 TB")
+  })
+
+  it("renders a missing size as a dash", () => {
+    expect(bytes(null)).toBe("—")
+    expect(bytes(undefined)).toBe("—")
+  })
+})
 
 describe("zonedFormat", () => {
   const at = "2026-10-26T14:30:15Z"

@@ -12,7 +12,7 @@ import { SettingsForm } from "@mb/ui/settings-form"
 import { Empty, PageHeader, SectionTitle, StatusBadge } from "@/components/bits"
 import { CommandButton } from "@/components/command"
 import { getViewer } from "@/lib/auth"
-import { getAudit, getCommands, getEngine, getEngineState, getNotifications, getRecentEvents, getSettings } from "@/lib/data"
+import { getAudit, getCommands, getDatabaseStorage, getEngine, getEngineState, getNotifications, getRecentEvents, getSettings } from "@/lib/data"
 import { ago, dateTime, titleCase, usd } from "@/lib/format"
 import { SETTINGS_SECTIONS } from "./settings-sections"
 import { SystemHealth } from "./system-health"
@@ -22,7 +22,7 @@ export const metadata: Metadata = { title: "Admin", robots: { index: false, foll
 export default async function AdminPage() {
   const viewer = await getViewer()
   if (!viewer.owner) redirect("/login")
-  const [doc, state, engine, audit, problems, notifications, commands] = await Promise.all([
+  const [doc, state, engine, audit, problems, notifications, commands, storage] = await Promise.all([
     getSettings(),
     getEngineState(),
     getEngine(),
@@ -30,6 +30,7 @@ export default async function AdminPage() {
     getRecentEvents(viewer, { limit: 40, levels: ["warn", "error"] }),
     getNotifications(20),
     getCommands(20),
+    getDatabaseStorage(),
   ])
   const parsed = settingsSchema.safeParse(doc?.settings)
   const settings = parsed.success ? parsed.data : DEFAULT_SETTINGS
@@ -155,7 +156,7 @@ export default async function AdminPage() {
           <TabsTrigger value="logs">Logs</TabsTrigger>
         </TabsList>
         <TabsContent value="system" className="mt-4">
-          <SystemHealth engine={engine} problems={problems} />
+          <SystemHealth engine={engine} problems={problems} storage={storage} />
         </TabsContent>
         {/* Kept mounted so unsaved edits survive switching tabs. */}
         <TabsContent value="settings" forceMount className="mt-4 data-[state=inactive]:hidden">

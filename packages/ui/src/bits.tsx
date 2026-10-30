@@ -153,3 +153,12 @@ export function KV({ label, children }: { label: string; children: React.ReactNo
     </div>
   )
 }
+
+/** A 0–100% bar. */
+export function Meter({ value, className }: { value: number | null; className?: string }) {
+  return (
+    <div className={cn("bg-muted h-1.5 overflow-hidden rounded-full", className)} role="presentation">
+      <div className="bg-primary h-full rounded-full transition-[width]" style={{ width: `${Math.max(0, Math.min(100, value ?? 0))}%` }} />
+    </div>
+  )
+}

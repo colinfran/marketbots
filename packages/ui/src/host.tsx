@@ -20,7 +20,7 @@ import {
 import { cn } from "cn"
 import { CpuIcon, FanIcon, GpuIcon, LoaderIcon, MemoryStickIcon, PlugZapIcon, TriangleAlertIcon } from "lucide-react"
 import { useEffect, useState, type ReactNode } from "react"
-import { Empty, KV, SectionTitle } from "./bits"
+import { Empty, KV, Meter, SectionTitle } from "./bits"
 import { ChartTabsList, LinesChart, type LineSpec } from "./charts"
 import { CommandResult, useCommand } from "./command"
 import { Button } from "./components/button"
@@ -74,15 +74,6 @@ const COMMANDS = { endpoint: "/api/host/commands", runner: "the server's host ag
 type Command = ReturnType<typeof useCommand<HostCommand>>
 
 // ─── Pieces ──────────────────────────────────────────────────────────────────
-
-/** A 0–100% bar. */
-function Meter({ value, className }: { value: number | null; className?: string }) {
-  return (
-    <div className={cn("bg-muted h-1.5 overflow-hidden rounded-full", className)} role="presentation">
-      <div className="bg-primary h-full rounded-full transition-[width]" style={{ width: `${Math.max(0, Math.min(100, value ?? 0))}%` }} />
-    </div>
-  )
-}
 
 function SummaryCard({ icon: Icon, label, value, children }: { icon: typeof CpuIcon; label: string; value: ReactNode; children: ReactNode }) {
   return (

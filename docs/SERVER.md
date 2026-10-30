@@ -26,7 +26,7 @@ The two engines are independent: separate images, containers, ports, env files, 
 2. *Networking*: the firewall rule `0.0.0.0 – 255.255.255.255`. Vercel connects from changing IPs (and isn't on Azure, so *Allow Azure services* doesn't cover it); the strong password is the protection. With no rule, nothing connects.
 3. *Connection strings*: copy the `mongodb+srv://…` string and put the password in.
 
-The free tier has no backups and no high availability, and pauses after 60 days without a connection (the engines are always connected). One free cluster per Azure subscription.
+The free tier has no backups and no high availability, and pauses after 60 days without a connection (the engines are always connected). One free cluster per Azure subscription. Admin → System's *Database storage* card shows how much of the 32 GB the databases take (`DB_STORAGE_LIMIT_BYTES` in `@mb/core/db`: change it with the tier). It counts what MongoDB reports; Azure's own storage metric (portal → the cluster → *Metrics*) also counts its logs and system files.
 
 **Alpaca (stock)**: the paper account, reset to **10,000**. Total return is measured from $10,000 and every P&L number comes from Alpaca, so the account belongs to this bot alone. A reset can issue new keys. Debit spreads need **options level 3** (Admin shows the level the engine sees). Alpaca's free market-data stream allows **one connection per account**: never run a second engine, script or notebook with these keys.
 

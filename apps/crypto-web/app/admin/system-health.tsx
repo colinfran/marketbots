@@ -1,14 +1,14 @@
 import type { EngineEvent } from "@mb/crypto-core/events"
 import { Card, CardContent, CardHeader, CardTitle } from "@mb/ui/components/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mb/ui/components/table"
-import { AiHealthCard, EngineHealthCard, HealthDot, HistoryHealthCard, ProblemsSection, ServerHealthCard, StreamHealthCard, WireSourcesSummary } from "@mb/ui/system-health"
+import { AiHealthCard, DatabaseStorageCard, EngineHealthCard, HealthDot, HistoryHealthCard, ProblemsSection, ServerHealthCard, StreamHealthCard, WireSourcesSummary } from "@mb/ui/system-health"
 import { Empty, KV, SectionTitle } from "@/components/bits"
-import type { EngineSummary } from "@/lib/data"
+import type { EngineSummary, getDatabaseStorage } from "@/lib/data"
 import { ago, dateTime, num, price, titleCase } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
 /** Health of the engine on the trading server and everything it depends on (@mb/ui/system-health), with Kraken's cards. */
-export function SystemHealth({ engine, problems }: { engine: EngineSummary; problems: EngineEvent[] }) {
+export function SystemHealth({ engine, problems, storage }: { engine: EngineSummary; problems: EngineEvent[]; storage: Awaited<ReturnType<typeof getDatabaseStorage>> }) {
   const s = engine.status
   return (
     <div className="space-y-8">
@@ -67,6 +67,7 @@ export function SystemHealth({ engine, problems }: { engine: EngineSummary; prob
             <AiHealthCard ai={s.ai} model={s.agent?.model ?? null} />
             <ServerHealthCard system={s.system} />
             {s.history && <HistoryHealthCard history={s.history} />}
+            <DatabaseStorageCard storage={storage} />
             <StreamHealthCard status={s} />
           </div>
 

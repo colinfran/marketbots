@@ -1,16 +1,16 @@
-import type { EngineStatusBase } from "@mb/core/db"
+import type { DatabaseStorageView, EngineStatusBase } from "@mb/core/db"
 import type { WireSourceHealth } from "@mb/core/wire"
 import { cn } from "cn"
 import Link from "next/link"
-import { Empty, KV, SectionTitle } from "./bits"
+import { Empty, KV, Meter, SectionTitle } from "./bits"
 import { Badge } from "./components/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "./components/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./components/table"
-import { ago, duration, num, titleCase } from "./lib/format"
+import { ago, bytes, duration, num, titleCase } from "./lib/format"
 
 /**
- * The building blocks of the Admin page's system health: the engine, AI, server and stream cards,
- * the news engine's summary and the recent problems. Each app lays them out with its own venue or
+ * The building blocks of the Admin page's system health: the engine, AI, server, database and stream
+ * cards, the news engine's summary and the recent problems. Each app lays them out with its own venue or
  * broker cards and its own price table. The news-source table is on the News page, for the owner.
  */
 
@@ -128,6 +128,36 @@ export function HistoryHealthCard({ history }: { history: NonNullable<Status["hi
           </ul>
         )}
         {history.last_error && <p className="text-loss mt-2 text-xs">{history.last_error}</p>}
+      </CardContent>
+    </Card>
+  )
+}
+
+/** The MongoDB cluster both bots share: its databases on disk against the storage cap, read when the page loads. */
+export function DatabaseStorageCard({ storage }: { storage: DatabaseStorageView }) {
+  const used = storage.used_bytes
+  const usedPct = used === null ? null : (used / storage.limit_bytes) * 100
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <HealthDot ok={usedPct !== null && usedPct < 80} /> Database storage
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Meter value={usedPct} className="mb-2" />
+        <KV label="Used">{used === null ? "—" : `${bytes(used)} of ${bytes(storage.limit_bytes)} (${num(usedPct, 1)}%)`}</KV>
+        <KV label="Free">{used === null ? "—" : bytes(Math.max(0, storage.limit_bytes - used))}</KV>
+        {storage.databases.map((d) => (
+          <KV key={d.name} label={d.name}>
+            {bytes(d.bytes)}
+          </KV>
+        ))}
+        {storage.error ? (
+          <p className="text-loss mt-2 line-clamp-3 text-xs">{storage.error}</p>
+        ) : (
+          <p className="text-muted-foreground mt-2 text-xs">The Azure DocumentDB free tier, shared by both bots. Azure&apos;s own storage metric also counts its logs and system files.</p>
+        )}
       </CardContent>
     </Card>
   )

@@ -12,7 +12,7 @@ import { Empty, PageHeader, SectionTitle, StatusBadge } from "@/components/bits"
 import { CommandButton } from "@/components/command"
 import { getViewer } from "@/lib/auth"
 import { ago, titleCase, usd } from "@/lib/format"
-import { getAudit, getCommands, getEngine, getEngineState, getLiveAccount, getNotifications, getRecentEvents, getSettings, getSettingsDoc } from "@/lib/queries"
+import { getAudit, getCommands, getDatabaseStorage, getEngine, getEngineState, getLiveAccount, getNotifications, getRecentEvents, getSettings, getSettingsDoc } from "@/lib/queries"
 import { SETTINGS_SECTIONS } from "./settings-sections"
 import { SystemHealth } from "./system-health"
 
@@ -21,7 +21,7 @@ export const metadata: Metadata = { title: "Admin", robots: { index: false, foll
 export default async function AdminPage() {
   const viewer = await getViewer()
   if (!viewer.owner) redirect("/login")
-  const [doc, settings, state, engine, audit, problems, notifications, commands, live] = await Promise.all([
+  const [doc, settings, state, engine, audit, problems, notifications, commands, live, storage] = await Promise.all([
     getSettingsDoc(),
     getSettings(),
     getEngineState(),
@@ -31,6 +31,7 @@ export default async function AdminPage() {
     getNotifications(20),
     getCommands(20),
     getLiveAccount(),
+    getDatabaseStorage(),
   ])
   const ks = state?.kill_switch
   const running = state?.status === "running" && !ks?.engaged
@@ -127,7 +128,7 @@ export default async function AdminPage() {
           <TabsTrigger value="logs">Logs</TabsTrigger>
         </TabsList>
         <TabsContent value="system" className="mt-4">
-          <SystemHealth engine={engine} problems={problems} />
+          <SystemHealth engine={engine} problems={problems} storage={storage} />
         </TabsContent>
         {/* Kept mounted so unsaved edits survive switching tabs. */}
         <TabsContent value="settings" forceMount className="mt-4 data-[state=inactive]:hidden">

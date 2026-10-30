@@ -4,9 +4,10 @@ import { eventForViewer } from "@mb/crypto-core/events"
 import { brierScore, calibrationTable, drawdownSeries, performanceMetrics, tradeStats } from "@mb/crypto-core/metrics"
 import { ACCOUNT_ID } from "@mb/crypto-core/venues"
 import { createQueries, decisionLatency, type EngineSummary as EngineSummaryOf } from "@mb/web-kit/queries"
+import { databaseStorage } from "@mb/web-kit/storage"
 import { connection } from "next/server"
 import { getEpisodesBetween } from "./agent"
-import { collections } from "./db"
+import { collections, mongoClient } from "./db"
 
 /**
  * Read queries for the dashboard. Each awaits `connection()`, so pages render at request time
@@ -34,6 +35,12 @@ export const {
   eventForViewer,
   recentEventsFilter: { level: { $ne: "debug" } },
 })
+
+/** Admin → System: the cluster's storage, both bots' databases included (@mb/web-kit/storage). */
+export const getDatabaseStorage = async () => {
+  await connection()
+  return databaseStorage(mongoClient())
+}
 
 export const getAccount = async () => {
   await connection()

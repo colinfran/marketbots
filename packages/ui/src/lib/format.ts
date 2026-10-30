@@ -27,6 +27,13 @@ export const pct = (value: number | null | undefined, { sign = true, digits = 2 
 export const num = (value: number | null | undefined, digits = 2) =>
   value === null || value === undefined || !Number.isFinite(value) ? "—" : value.toLocaleString("en-US", { maximumFractionDigits: digits })
 
+/** A size in binary units: whole MB below a GB, then GB and TB with one decimal. */
+export const bytes = (value: number | null | undefined) => {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "—"
+  const gb = value / 1024 ** 3
+  return gb >= 1024 ? `${num(gb / 1024, 1)} TB` : gb >= 1 ? `${num(gb, 1)} GB` : `${num(value / 1024 ** 2, 0)} MB`
+}
+
 /** Text color for a signed number. Always paired with a sign or arrow, never color alone. */
 export const tone = (value: number | null | undefined) =>
   !value || Math.abs(value) < 0.005 ? "text-muted-foreground" : value > 0 ? "text-gain" : "text-loss"
