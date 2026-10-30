@@ -1,5 +1,5 @@
 import { atr, bollinger, ema, highest, lowest, pctReturn, realizedVol, rsi, sma, trendOf } from "@mb/core/indicators"
-import type { RegimeSnapshot } from "@mb/crypto-core/db"
+import type { RegimeSnapshot, SymbolFeatures } from "@mb/crypto-core/db"
 import { round } from "@mb/crypto-core/math"
 import type { Candle } from "../venues/kraken/rest"
 import type { Quote } from "./hub"
@@ -151,6 +151,20 @@ export const classifyRegime = (all: Features[]): RegimeSnapshot => {
   if (breadth !== null) notes.push(`${Math.round(breadth)}% of the universe trades above its 4h EMA50`)
   return { label, btc_trend: btc.trend_1d, btc_vol_pct: btc.vol_30d_pct, breadth_pct: round(breadth, 1), notes }
 }
+
+/** The features the dashboard shows for a pair (the engine status's symbol health). */
+export const symbolFeatures = (f: Features): SymbolFeatures => ({
+  ret_24h_pct: f.ret_24h_pct,
+  ret_7d_pct: f.ret_7d_pct,
+  ret_30d_pct: f.ret_30d_pct,
+  rsi14_1h: f.rsi14_1h,
+  trend_4h: f.trend_4h,
+  trend_1d: f.trend_1d,
+  vol_30d_pct: f.vol_30d_pct,
+  atr_pct_1h: f.atr_pct_1h,
+  volume_ratio_24h: f.volume_ratio_24h,
+  as_of: new Date(f.as_of),
+})
 
 /** The subset of features worth showing the AI (no raw series). */
 export const featuresForPrompt = (f: Features) => {

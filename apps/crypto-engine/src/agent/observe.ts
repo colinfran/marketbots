@@ -6,7 +6,7 @@ import type { RegimeSnapshot } from "@mb/crypto-core/db"
 import { roundTo } from "@mb/crypto-core/math"
 import { errorMessage } from "@mb/engine-kit/log"
 import { upcomingMacro } from "@mb/wire/calendar"
-import { classifyRegime, featuresForPrompt, type Features } from "../market/features"
+import { classifyRegime, featuresForPrompt, symbolFeatures, type Features } from "../market/features"
 import { loadFeatures, viableSetup } from "../orchestrator/decide"
 import { roundTripCostBps } from "../risk/sizing"
 import { screenCrypto } from "../strategies/registry"
@@ -57,6 +57,8 @@ export class CryptoMarketView {
     const { features } = await loadFeatures(this.d.ctx, this.d.ctx.hub.universe)
     if (!features.length) return
     this.features = new Map(features.map((f) => [f.symbol, f]))
+    // The dashboard's indicators (Markets) are these too.
+    for (const f of features) this.d.ctx.hub.features.set(f.symbol, symbolFeatures(f))
     this.regime = classifyRegime(features)
     this.at = Date.now()
   }
