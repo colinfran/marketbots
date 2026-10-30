@@ -10,7 +10,7 @@ The platform view of marketbots: how the two bots run side by side, what the rep
 | Engine | `apps/crypto-engine` → container `marketbots-crypto-engine`, 127.0.0.1:8787 | `apps/stock-engine` → container `marketbots-stock-engine`, 127.0.0.1:8788 |
 | Dashboard | `apps/crypto-web` → Vercel, cryptomarketbot.app | `apps/stock-web` → Vercel, stockmarketbot.app |
 | Live stream | `wss://engine.cryptomarketbot.app/v1/stream` | `wss://engine.stockmarketbot.app/v1/stream` |
-| Database (Atlas) | `cryptomarketbot` | `stockmarketbot` |
+| Database (Azure DocumentDB) | `cryptomarketbot` | `stockmarketbot` |
 | Config | `.env.crypto` | `.env.stock` |
 | Design doc | [CRYPTO.md](CRYPTO.md) | [STOCK.md](STOCK.md) |
 
@@ -24,7 +24,7 @@ The rules behind the layout:
 ## Runtime topology
 
 ```
-Browser ──https──▶ Vercel: cryptomarketbot.app, stockmarketbot.app ──▶ MongoDB Atlas
+Browser ──https──▶ Vercel: cryptomarketbot.app, stockmarketbot.app ──▶ Azure DocumentDB
    │                                                                              ▲
    └── wss://engine.<domain>/v1/stream ──▶ Caddy (Windows host)                   │
                                              ├─▶ 127.0.0.1:8787  crypto-engine ───┤
@@ -34,7 +34,7 @@ Browser ──https──▶ Vercel: cryptomarketbot.app, stockmarketbot.app ─
                                                                     ──▶ llm (llama.cpp, Qwen 3.6, both GPUs),
                                                                     ──▶ history (Postgres + TimescaleDB + pgvector),
                                                                         both on network `ai`: no host port, no internet
-Windows host, outside Docker: host agent (+ LibreHardwareMonitor, nvidia-smi, the VeSync outlet) ──▶ MongoDB Atlas (`serverstats`)
+Windows host, outside Docker: host agent (+ LibreHardwareMonitor, nvidia-smi, the VeSync outlet) ──▶ Azure DocumentDB (`serverstats`)
 External: Kraken (CLI wallet in its volume), Alpaca, ~150 news sources, and the search engines behind `search`
 ```
 
@@ -51,12 +51,12 @@ External: Kraken (CLI wallet in its volume), Alpaca, ~150 news sources, and the 
 | Local model | One llama.cpp server on both GPUs (`llm`, Qwen 3.6 35B-A3B at 2-bit) on the internal `ai` network, `http://llm:8080` (OpenAI-compatible), with a slot per bot and one for news. It runs every AI call of both engines: the agents' episodes, their research and the article summaries. If it is down, the engines still protect positions but make no new decisions ([SERVER.md §9](SERVER.md#9-the-local-model-server-llm)). |
 | Search service | One SearXNG container, `http://search:8080` on the compose network, that runs the web searches of the agents' research tool (`@mb/wire/research`) for both engines, on free search engines only. If it is down, research fails and the agent decides without it. |
 | History store | One Postgres container (TimescaleDB, pgvector) on the internal `ai` network, with a database and a role per bot (`crypto_history`, `stock_history`): each engine's `HISTORY_URL` holds only its own password. Each engine writes its closed 1-minute bars and archives its news there (`@mb/history`, [plans/LOCAL-AI.md §6](plans/LOCAL-AI.md#6-the-history-store-history)). If it is down, only history stops. |
-| Atlas cluster | One cluster, a separate database per bot, and `serverstats` for the host agent. |
+| Database cluster (Azure DocumentDB) | One cluster, a separate database per bot, and `serverstats` for the host agent. |
 | Host agent | One process on Windows ([SERVER.md §11](SERVER.md#11-the-host-agent-admin--server)) writes the machine's readings into `serverstats`, which both dashboards read, and either dashboard can send it commands. If it is down, only Admin → Server goes stale (and the BIOS runs the fans). |
 | The server's IP | Outbound rate limits (SEC, GDELT, ForexFactory…) apply to both bots together. |
 | Caddy | One host process, one site per engine. |
 
-Not shared: databases (Atlas and history), leases, env files, auth secrets, stream token secrets (whose HMAC context prefixes, `cmb-stream.` and `smb-stream.`, also keep tokens from crossing bots), and the Kraken wallet volume (crypto only).
+Not shared: databases (MongoDB and history), leases, env files, auth secrets, stream token secrets (whose HMAC context prefixes, `cmb-stream.` and `smb-stream.`, also keep tokens from crossing bots), and the Kraken wallet volume (crypto only).
 
 ## Repo layout
 

@@ -5,7 +5,7 @@ import { cap } from "./tools"
  * The journal (docs/plans/LOCAL-AI.md §8.6). Every episode is kept twice:
  *
  * - in MongoDB (`agent_episodes`) for the dashboard, with its long text capped (the brief, each
- *   step's thinking and tool result) and a 14-day TTL, because the Atlas tier may be the free one.
+ *   step's thinking and tool result) and a 14-day TTL, set when the database was Atlas's free 512 MB tier.
  *   An episode that traded is kept for good, so the dashboard can always show why;
  * - in the history store (`EpisodeArchive`), uncapped, for replays and debugging.
  */

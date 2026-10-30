@@ -23,7 +23,7 @@ export const ensureIndexes = async (db: Db, indexes: Readonly<Record<string, rea
 export type ConnectOptions<Col> = {
   uri: string
   dbName: string
-  /** Shown in Atlas's connection list, e.g. "cryptomarketbot-engine". */
+  /** Shown in the database's connection list, e.g. "cryptomarketbot-engine". */
   appName: string
   indexes: Readonly<Record<string, readonly IndexSpec[] | undefined>>
   collections: (db: Db) => Col

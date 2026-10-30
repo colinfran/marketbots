@@ -72,7 +72,7 @@ const NODES: Record<Exclude<NodeId, Bot | "services">, { Icon: LucideIcon; rows:
     rows: [title("Vercel dashboards"), detail(hot("cryptomarketbot.app", "dashboards:crypto"), " · ", hot("stockmarketbot.app", "dashboards:stock"))],
     tall: [title("Vercel dashboards"), detail(hot("cryptomarketbot.app", "dashboards:crypto")), detail(hot("stockmarketbot.app", "dashboards:stock"))],
   },
-  atlas: { Icon: DatabaseIcon, rows: [title("MongoDB Atlas"), detail("separate database per bot")] },
+  db: { Icon: DatabaseIcon, rows: [title("Azure DocumentDB"), detail("separate database per bot")] },
   llm: {
     Icon: SparklesIcon,
     rows: [title("Local LLM"), detail("Qwen 3.6 on two GPUs"), detail(hot("the agents", "llm:agents"), ", ", hot("summaries", "llm:summaries"), ", research")],
@@ -106,7 +106,7 @@ const STEPS = [
 const NAMES: Record<NodeId, string> = {
   browser: "Browser",
   dashboards: "Vercel dashboards",
-  atlas: "MongoDB Atlas, a separate database per bot",
+  db: "Azure DocumentDB (MongoDB), a separate database per bot",
   services: "the Kraken paper wallet and the Alpaca paper account",
   news: "news sources",
   internet: "search engines and article pages",

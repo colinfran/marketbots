@@ -3,7 +3,7 @@ import { MongoClient, type Db } from "mongodb"
 import type { DashboardEnv } from "./env"
 
 /**
- * MongoDB (Atlas) access for a dashboard. The dashboard reads everything the engine writes and
+ * MongoDB (Azure DocumentDB) access for a dashboard. The dashboard reads everything the engine writes and
  * writes only three things: commands, audit entries and owner sign-in records (via Better Auth).
  * One client is reused per serverless instance (and across hot reloads in dev, under
  * `globalThis[globalKey]`). It connects on first use and reconnects on its own after a failure.

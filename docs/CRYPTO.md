@@ -9,13 +9,13 @@ This document explains how CryptoMarketBot is built and why: the deployment boun
 | **Kraken spot, paper only** | Orders execute in a Kraken CLI paper workspace at live Kraken prices. Kraken has no self-service *spot* sandbox (Spot UAT is on request via an account manager; the self-service demo is Futures only), and the official CLI's paper wallet is the closest thing to a Kraken-hosted paper account. The engine has no live-trading code path and holds no exchange keys. |
 | **No Polymarket** | Polymarket US has no paper/demo environment, so prediction markets were removed from scope. |
 | **A local model** | Qwen 3.6 35B-A3B on the server's two GPUs (llama.cpp), as `local/qwen3.6-35b-a3b-q2`, through llama.cpp's OpenAI-compatible API: no outside AI service, no key, no cost. The agent runs on it, and researches through our own search service and scraper, without X ([SERVER.md §9](SERVER.md#9-the-local-model-server-llm)). Grok, through Vercel AI Gateway, did both until 2026-10-28. |
-| **Hosted MongoDB (Atlas)** | One cluster shared by the engine and the Vercel dashboard. No database container on the server. |
+| **Hosted MongoDB (Azure DocumentDB)** | One cluster shared by the engine and the Vercel dashboard. No database container on the server. |
 | **Monorepo (pnpm workspaces)** | `packages/core` holds everything both apps must agree on: settings schema, event schema, commands, DB types, metrics. |
 
 ## Components and boundaries
 
 ```
-Browser ──https──▶ Vercel (Next.js dashboard) ──▶ MongoDB Atlas ◀── Engine (Docker, your server)
+Browser ─https─▶ Vercel (Next.js dashboard) ─▶ Azure DocumentDB ◀── Engine (Docker, your server)
    │                                                                    │   ▲
    └──────── wss://engine.<domain>/v1/stream (via your reverse proxy) ──┘   │
                                                        Kraken public API ───┘ (WebSocket v2 + REST)

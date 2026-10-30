@@ -12,7 +12,7 @@ What runs where:
 | Caddy on the Windows host | `engine.cryptomarketbot.app` → 127.0.0.1:8787, `engine.stockmarketbot.app` → 127.0.0.1:8788 (WebSocket) | `C:\Caddy\Caddyfile` |
 | The Windows host, outside Docker | The host agent and its LibreHardwareMonitor (Admin → Server, the motherboard fans; §11) | `.env.host` at the repo root |
 | Vercel | two projects: `apps/crypto-web` at cryptomarketbot.app, `apps/stock-web` at stockmarketbot.app | each project's environment variables |
-| MongoDB Atlas | one cluster, databases `cryptomarketbot` and `stockmarketbot` | `MONGODB_URI` |
+| Azure DocumentDB (MongoDB-compatible, free tier) | one cluster, databases `cryptomarketbot`, `stockmarketbot` and `serverstats` | `MONGODB_URI` |
 | Alpaca | the stock bot's paper account | `.env.stock` (engine only) |
 
 The two engines are independent: separate images, containers, ports, env files, databases, leases and stream secrets. Deploying, restarting or crashing one never touches the other. At runtime they share only the scraper, the LLM, the history service (each with its own database and role on it) and the server's IP address.
@@ -21,10 +21,12 @@ The two engines are independent: separate images, containers, ports, env files, 
 
 ## 1. Accounts and secrets (once)
 
-**MongoDB Atlas**: one cluster serves both bots, each in its own database.
-1. *Database Access*: a user with read/write access.
-2. *Network Access*: the server's public IP, plus `0.0.0.0/0` for Vercel (it connects from changing IPs; the strong password is the protection).
-3. *Connect → Drivers*: copy the `mongodb+srv://…` string.
+**Azure DocumentDB** (MongoDB-compatible; the free tier: 32 GB): one cluster serves both bots, each in its own database, and the host agent's `serverstats` (§11).
+1. The cluster's admin user, with a long random password (no `$`, §3.3). Users can't be limited to one database: every user sees the whole cluster.
+2. *Networking*: the firewall rule `0.0.0.0 – 255.255.255.255`. Vercel connects from changing IPs (and isn't on Azure, so *Allow Azure services* doesn't cover it); the strong password is the protection. With no rule, nothing connects.
+3. *Connection strings*: copy the `mongodb+srv://…` string and put the password in.
+
+The free tier has no backups and no high availability, and pauses after 60 days without a connection (the engines are always connected). One free cluster per Azure subscription.
 
 **Alpaca (stock)**: the paper account, reset to **10,000**. Total return is measured from $10,000 and every P&L number comes from Alpaca, so the account belongs to this bot alone. A reset can issue new keys. Debit spreads need **options level 3** (Admin shows the level the engine sees). Alpaca's free market-data stream allows **one connection per account**: never run a second engine, script or notebook with these keys.
 
@@ -566,11 +568,19 @@ Until 2026-10-28 each bot had its own Atlas cluster: `cryptomarketbot` on the `c
 
 - Per bot, with the engine stopped: `mongodump | mongorestore` (`mongo:8.0` image, `--nsFrom`/`--nsTo` for the rename), then a check that every collection's count, indexes and documents match. Only then did `.env.<bot>` switch, and the engine was recreated on the same image.
 - The crypto engine must never boot against an empty or partial `cryptomarketbot`: a missing `accounts` document means fresh books, and the wallet is reset to match (§6).
-- Each `.env.<bot>` keeps the old `MONGODB_URI` / `MONGODB_DB_NAME` as comments until the cleanup.
+The env files' rollback comments for this move were replaced at the move to Azure (below). What is left, with owner approval: delete the two old clusters in Atlas, together with the `marketbots` one.
 
-**Rollback** (only soon after the move: anything written since is only on the new cluster, and crypto's old books would no longer match the wallet): put the commented lines back in `.env.<bot>`, `docker compose up -d --no-deps --force-recreate <bot>-engine`, and set the Vercel project's `MONGODB_URI` / `MONGODB_DB_NAME` back.
+### The move to Azure DocumentDB (2026-10-30)
 
-**Cleanup after 14 days** (with owner approval, from 2026-11-11): delete the commented lines from both env files, and delete the two old clusters in Atlas.
+On 2026-10-30 the three databases (`cryptomarketbot`, `stockmarketbot`, `serverstats`) moved from the Atlas `marketbots` cluster (the free tier, 512 MB, about 80 MB used) to an Azure DocumentDB free-tier cluster (32 GB), under the same names. No code changed: a probe against the new cluster passed every index both bots and the host agent create (TTL, partial, the unique partial one on open positions), duplicate-key code 11000 (the lease, the bus, the wire), transactions (Better Auth), pipeline updates, `$dateTrunc` and writes with `retryWrites` on.
+
+- With both engines stopped (95 s): `mongodump` from Atlas into `backups\mongo-atlas-2026-10-30\` (`mongo:8.0` image), the Azure collections emptied, `mongorestore --noIndexRestore` into them, then a check that every collection's documents (each one compared) and indexes match. Only then did the env files switch and the engines restart. The host agent was restarted after them; the samples it wrote to Atlas meanwhile were copied over.
+- **Restoring into the free tier:** `mongorestore`'s parallel index builds exhausted its connections (`TooManyLogicalSessions: The worker node connections have exceeded the limit`), and the aborted builds left index objects behind that made later builds fail (`NamespaceExists: relation "documents_rum_index_…" already exists`) until retried. So the collections and indexes were created once, one index at a time with retries, and the move only refilled documents: `--noIndexRestore`, `--numParallelCollections=1`, `--numInsertionWorkersPerCollection=1`.
+- `.env.crypto`, `.env.stock` and `.env.host` keep the Atlas `MONGODB_URI` as a comment until the cleanup; the originals are in `backups\mongo-atlas-2026-10-30\env\`.
+
+**Rollback** (only soon after the move: anything written since is only on Azure, and crypto's books would no longer match the wallet): put the commented line back in each env file, `docker compose up -d --no-deps --force-recreate crypto-engine stock-engine`, restart the host agent (§11.3), and set both Vercel projects' `MONGODB_URI` back.
+
+**Cleanup after 14 days** (with owner approval, from 2026-11-13): delete the commented lines from the three env files, delete the Atlas clusters, and delete `backups\mongo-atlas-2026-10-30\`.
 
 ---
 
@@ -733,7 +743,7 @@ A run takes about a minute, and costs nothing (`ai_calls`: `cost_source: "local"
 | `external volume "cryptomarketbot_kraken-paper" not found` | The wallet volume is missing. Don't create an empty one on this server: check `docker volume ls`, then restore a backup (§6.2). |
 | `port is already allocated` on `docker compose up` | Another container holds 8787/8788, usually an old engine (`docker ps`). Stop it. Don't move the port: Caddy targets it. |
 | `Invalid engine environment` in logs | A required variable is missing or too short (secrets need 32+ characters). Fix the env file, then `docker compose up -d <bot>-engine`. |
-| `MongoDB connection failed; retrying` | Atlas *Network Access* doesn't include the server's IP, or the URI/password is wrong (a `$` in it: §3.3). |
+| `MongoDB connection failed; retrying` | The cluster's firewall (Azure portal → the cluster → *Networking*) doesn't allow the server's IP, or the URI/password is wrong (a `$` in it: §3.3). |
 | `another engine holds the lease; waiting for it to expire` | Another engine is on the same database: an old container (`docker ps`), or a local dev engine without a `_dev` database (§3.5). |
 | `Kraken CLI paper wallet unavailable` | Run the §6.1 commands to see the CLI's own error. No orders are placed until it works (retried every minute). |
 | Admin → System: *Books vs wallet: mismatch* | Something traded the workspace outside the engine, or a fill was lost. New entries are blocked. The owner view lists the differences; *Reset paper wallet* clears it. |
@@ -790,7 +800,7 @@ Nothing in it touches the bots' databases or trading state, and the engines don'
 
 | Variable | What |
 | --- | --- |
-| `MONGODB_URI` | The bots' Atlas cluster (a user with read/write on `serverstats`) |
+| `MONGODB_URI` | The bots' cluster, as in `.env.crypto` |
 | `HOST_DATABASES` | Optional: its database (default `serverstats`; the dashboards' `HOST_DB_NAME` must match) |
 | `FAN_CONTROL` | `on`: the agent sets the motherboard fans. `off` (default): it only reads them (§11.4) |
 | `VESYNC_USERNAME`, `VESYNC_PASSWORD` | A VeSync account that sees the outlet: a separate one the home or outlet is shared with (accept the share in the VeSync app, signed in as it). Without them, no power or energy readings (the recorded history still shows) |
@@ -873,8 +883,8 @@ The import matches the old monitor's own energy totals to the watt-hour. Running
 
 | Symptom | Likely cause / fix |
 | --- | --- |
-| *The host agent has never reported* | The `Host agent` task isn't running or can't reach Atlas: `Get-ScheduledTask -TaskPath '\marketbots\' \| Get-ScheduledTaskInfo`, then the log (§11.3). A bad `.env.host` stops it at start: the task's last result is 1. |
-| *Offline* with a time | The agent stopped or lost Atlas after that reading. The history stays. |
+| *The host agent has never reported* | The `Host agent` task isn't running or can't reach the database: `Get-ScheduledTask -TaskPath '\marketbots\' \| Get-ScheduledTaskInfo`, then the log (§11.3). A bad `.env.host` stops it at start: the task's last result is 1. |
+| *Offline* with a time | The agent stopped or lost the database after that reading. The history stays. |
 | *Motherboard sensors: LibreHardwareMonitor is not responding* | The `Host sensors` task isn't running, or the PawnIO prompt wasn't approved: run `start-sensors.ps1` by hand. |
 | No CPU temperature, every fan at 100% | *Cooling protection*: LibreHardwareMonitor has no `CPU Package` temperature (sensors still loading, or the driver isn't approved). |
 | *Fan control is off on the server* | `FAN_CONTROL=off` in `.env.host` (§11.4). |

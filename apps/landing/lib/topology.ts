@@ -5,7 +5,7 @@
  * paper account. Pure geometry and timing, no React or DOM: components/topology.tsx draws it.
  *
  * Both layouts mirror the bots around what they share: crypto on the left, stock on the right, the
- * stack's shared services down the middle, Browser, Vercel and Atlas above, the outside world
+ * stack's shared services down the middle, Browser, Vercel and the database above, the outside world
  * below. Laid out that way no two engine edges cross; the one crossing left (search to the
  * internet, over the stock engine's scraper edge) is drawn as a hop.
  *
@@ -18,21 +18,21 @@
 export type Bot = "crypto" | "stock"
 export const BOTS = ["crypto", "stock"] as const satisfies readonly Bot[]
 
-export type NodeId = "browser" | "dashboards" | "atlas" | "services" | "news" | "internet" | Bot | "llm" | "search" | "scraper" | "history"
+export type NodeId = "browser" | "dashboards" | "db" | "services" | "news" | "internet" | Bot | "llm" | "search" | "scraper" | "history"
 
-/** What both engines connect to: `crypto & stock --> …` in the chart, plus each one's own state in Atlas. */
-type Shared = "atlas" | "llm" | "history" | "search" | "scraper" | "services" | "news"
+/** What both engines connect to: `crypto & stock --> …` in the chart, plus each one's own state in the database. */
+type Shared = "db" | "llm" | "history" | "search" | "scraper" | "services" | "news"
 
-export type EdgeId = "browser-dashboards" | "dashboards-atlas" | `browser-${Bot}` | `${Bot}-${Shared}` | "search-internet" | "scraper-internet"
+export type EdgeId = "browser-dashboards" | "dashboards-db" | `browser-${Bot}` | `${Bot}-${Shared}` | "search-internet" | "scraper-internet"
 
 /** The chart's edges, caller to callee, with its labels. */
 export const EDGES: Record<EdgeId, { from: NodeId; to: NodeId; label?: string }> = {
   "browser-dashboards": { from: "browser", to: "dashboards", label: "HTTPS" },
-  "dashboards-atlas": { from: "dashboards", to: "atlas", label: "Read data and write commands" },
+  "dashboards-db": { from: "dashboards", to: "db", label: "Read data and write commands" },
   "browser-crypto": { from: "browser", to: "crypto", label: "Engine WebSocket stream" },
   "browser-stock": { from: "browser", to: "stock", label: "Engine WebSocket stream" },
-  "crypto-atlas": { from: "crypto", to: "atlas", label: "Own trading state" },
-  "stock-atlas": { from: "stock", to: "atlas", label: "Own trading state" },
+  "crypto-db": { from: "crypto", to: "db", label: "Own trading state" },
+  "stock-db": { from: "stock", to: "db", label: "Own trading state" },
   "crypto-llm": { from: "crypto", to: "llm" },
   "stock-llm": { from: "stock", to: "llm" },
   "crypto-history": { from: "crypto", to: "history" },
@@ -170,7 +170,7 @@ function mirrored(
   base: Omit<Layout, "nodes" | "routes" | "labels"> & {
     nodes: Omit<Record<NodeId, Box>, "stock">
     crypto: Record<"browser" | Shared, Spec>
-    middle: Record<"browser-dashboards" | "dashboards-atlas" | "search-internet" | "scraper-internet", Spec>
+    middle: Record<"browser-dashboards" | "dashboards-db" | "search-internet" | "scraper-internet", Spec>
     labels: Label[]
   },
 ): Layout {
@@ -201,7 +201,7 @@ const WIDE = mirrored({
   nodes: {
     browser: { x: 420, y: 8, w: 120, h: 30 },
     dashboards: { x: 335, y: 56, w: 290, h: 42 },
-    atlas: { x: 335, y: 116, w: 290, h: 42 },
+    db: { x: 335, y: 116, w: 290, h: 42 },
     crypto: { x: 52, y: 259, w: 180, h: 48 },
     llm: { x: 326, y: 198, w: 308, h: 56 },
     history: { x: 326, y: 262, w: 308, h: 42 },
@@ -213,7 +213,7 @@ const WIDE = mirrored({
   },
   crypto: {
     browser: { pts: [{ x: 420, y: 23 }, { x: 142, y: 23 }, { x: 142, y: 259 }] },
-    atlas: { pts: [{ x: 196, y: 259 }, { x: 196, y: 137 }, { x: 335, y: 137 }] },
+    db: { pts: [{ x: 196, y: 259 }, { x: 196, y: 137 }, { x: 335, y: 137 }] },
     llm: { pts: [{ x: 232, y: 283 }, { x: 296, y: 283 }, { x: 296, y: 226 }, { x: 326, y: 226 }] },
     history: { pts: [{ x: 232, y: 283 }, { x: 326, y: 283 }] },
     search: { pts: [{ x: 232, y: 283 }, { x: 296, y: 283 }, { x: 296, y: 333 }, { x: 326, y: 333 }] },
@@ -223,15 +223,15 @@ const WIDE = mirrored({
   },
   middle: {
     "browser-dashboards": { pts: [{ x: 480, y: 38 }, { x: 480, y: 56 }] },
-    "dashboards-atlas": { pts: [{ x: 480, y: 98 }, { x: 480, y: 116 }] },
+    "dashboards-db": { pts: [{ x: 480, y: 98 }, { x: 480, y: 116 }] },
     "search-internet": { pts: [{ x: 634, y: 343 }, { x: 650, y: 343 }, { x: 650, y: 426 }], hops: [{ x: 650, y: 377, side: 1 }] },
     "scraper-internet": { pts: [{ x: 480, y: 392 }, { x: 480, y: 426 }] },
   },
   labels: [
     { edge: "browser-dashboards", x: 488, y: 50.5, anchor: "start", lines: ["HTTPS"] },
-    { edge: "dashboards-atlas", x: 488, y: 110.5, anchor: "start", lines: ["Read data and write commands"] },
+    { edge: "dashboards-db", x: 488, y: 110.5, anchor: "start", lines: ["Read data and write commands"] },
     { edge: "browser-crypto", x: 281, y: 16.5, anchor: "middle", lines: ["Engine WebSocket stream"] },
-    { edge: "crypto-atlas", x: 265, y: 130.5, anchor: "middle", lines: ["Own trading state"] },
+    { edge: "crypto-db", x: 265, y: 130.5, anchor: "middle", lines: ["Own trading state"] },
   ],
 })
 
@@ -249,7 +249,7 @@ const TALL = mirrored({
   nodes: {
     browser: { x: 134, y: 8, w: 112, h: 30 },
     dashboards: { x: 100, y: 58, w: 180, h: 52 },
-    atlas: { x: 92, y: 134, w: 196, h: 42 },
+    db: { x: 92, y: 134, w: 196, h: 42 },
     crypto: { x: 24, y: 232, w: 152, h: 50 },
     llm: { x: 66, y: 304, w: 248, h: 70 },
     history: { x: 66, y: 382, w: 248, h: 42 },
@@ -261,7 +261,7 @@ const TALL = mirrored({
   },
   crypto: {
     browser: { pts: [{ x: 134, y: 23 }, { x: 6, y: 23 }, { x: 6, y: 257 }, { x: 24, y: 257 }] },
-    atlas: { pts: [{ x: 44, y: 232 }, { x: 44, y: 155 }, { x: 92, y: 155 }] },
+    db: { pts: [{ x: 44, y: 232 }, { x: 44, y: 155 }, { x: 92, y: 155 }] },
     llm: { pts: [{ x: 48, y: 282 }, { x: 48, y: 339 }, { x: 66, y: 339 }] },
     history: { pts: [{ x: 48, y: 282 }, { x: 48, y: 403 }, { x: 66, y: 403 }] },
     search: { pts: [{ x: 48, y: 282 }, { x: 48, y: 453 }, { x: 66, y: 453 }] },
@@ -271,15 +271,15 @@ const TALL = mirrored({
   },
   middle: {
     "browser-dashboards": { pts: [{ x: 190, y: 38 }, { x: 190, y: 58 }] },
-    "dashboards-atlas": { pts: [{ x: 190, y: 110 }, { x: 190, y: 134 }] },
+    "dashboards-db": { pts: [{ x: 190, y: 110 }, { x: 190, y: 134 }] },
     "search-internet": { pts: [{ x: 314, y: 463 }, { x: 324, y: 463 }, { x: 324, y: 548 }], hops: [{ x: 324, y: 498 }] },
     "scraper-internet": { pts: [{ x: 190, y: 514 }, { x: 190, y: 548 }] },
   },
   labels: [
     { edge: "browser-dashboards", x: 197, y: 51, anchor: "start", lines: ["HTTPS"] },
-    { edge: "dashboards-atlas", x: 197, y: 120, anchor: "start", lines: ["Read data and", "write commands"] },
+    { edge: "dashboards-db", x: 197, y: 120, anchor: "start", lines: ["Read data and", "write commands"] },
     { edge: "browser-crypto", x: 70, y: 16.5, anchor: "middle", lines: ["Engine WebSocket stream"] },
-    { edge: "crypto-atlas", x: 50, y: 190, anchor: "start", lines: ["Own trading state"] },
+    { edge: "crypto-db", x: 50, y: 190, anchor: "start", lines: ["Own trading state"] },
   ],
 })
 
@@ -375,11 +375,11 @@ function build() {
     go(4.3, e("history"), 0.35)
     lit(4.65, bot === "crypto" ? "history:archive" : "history:bars", 0.9)
     go(4.65, e("history"), 0.35, true)
-    go(5, e("atlas"), 0.35)
-    go(5.35, e("atlas"), 0.35, true)
+    go(5, e("db"), 0.35)
+    go(5.35, e("db"), 0.35, true)
 
     // Decide: the agent answers, its limits and the risk engine check the order in code, and it goes
-    // to the paper account. The fill is recorded in Atlas and streamed live, and a dashboard reads it.
+    // to the paper account. The fill is recorded in the database and streamed live, and a dashboard reads it.
     say(5.7, "Agent deciding")
     go(5.7, e("llm"), 0.35)
     think(6.05, 0.8)
@@ -391,12 +391,12 @@ function build() {
     lit(8.1, account)
     go(8.25, e("services"), 0.5, true)
     say(8.75, "Order filled")
-    go(8.75, e("atlas"), 0.5)
+    go(8.75, e("db"), 0.5)
     for (const t of [8.75, 8.9, 9.05]) go(t, `browser-${bot}`, 0.7, true)
     go(9.3, "browser-dashboards", 0.35)
     lit(9.65, bot === "crypto" ? "dashboards:crypto" : "dashboards:stock")
-    go(9.65, "dashboards-atlas", 0.3)
-    go(9.95, "dashboards-atlas", 0.3, true)
+    go(9.65, "dashboards-db", 0.3)
+    go(9.95, "dashboards-db", 0.3, true)
     go(10.25, "browser-dashboards", 0.35, true)
     say(10.6, REST)
   }

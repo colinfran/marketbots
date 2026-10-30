@@ -9,7 +9,7 @@
 # shouldn't remove it, but there is no reason to rely on that.)
 #
 # Safe beside the live engines by construction: its own project name, a throwaway local MongoDB
-# (nothing touches Atlas) and history store (crypto_staging, stock_staging, in memory), loopback ports 18787/18788, a COPY of the paper wallet, fake Alpaca
+# (nothing touches the live cluster) and history store (crypto_staging, stock_staging, in memory), loopback ports 18787/18788, a COPY of the paper wallet, fake Alpaca
 # keys (the live ones would knock out the live engine's market-data stream: one connection per
 # account), and no AI, Discord, email or news API keys. No local model either: the live `llm` fills
 # both GPUs, so there is no LLM_URL here and article summaries stay off.

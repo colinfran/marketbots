@@ -1,5 +1,5 @@
 # The marketbots stack on the trading server: both engines, one shared scraper, the local model
-# server and the history store. The dashboards run on Vercel; their MongoDB is hosted on Atlas.
+# server and the history store. The dashboards run on Vercel; their MongoDB is Azure DocumentDB.
 #
 #   docker compose up -d --build                         build and start (restarts after reboots)
 #   docker compose up -d --build stock-engine            redeploy one engine; the other is untouched

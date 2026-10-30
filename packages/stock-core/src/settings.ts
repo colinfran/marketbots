@@ -254,7 +254,7 @@ export const DEFAULT_SETTINGS: Settings = {
     emergency_action: "review",
     anomaly: { price_z: 4, volume_multiple: 5, market_z: 4 },
     disabled_sources: [],
-    // Short because the Atlas tier may be the free 512 MB one. Raise it from Admin.
+    // Short from when the database was Atlas's free 512 MB tier. Raise it from Admin.
     retention_days: 30,
     odds_swing_pts: 15,
     scan_max_symbols: 1_500,

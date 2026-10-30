@@ -5,7 +5,7 @@ Two autonomous, AI-driven paper-trading bots in one pnpm monorepo:
 - **CryptoMarketBot** trades Kraken spot pairs 24/7 in a Kraken CLI paper wallet. Dashboard: [cryptomarketbot.app](https://cryptomarketbot.app).
 - **StockMarketBot** trades US stocks and defined-risk options on market days in an Alpaca paper account. Dashboard: [stockmarketbot.app](https://stockmarketbot.app).
 
-Both run on a local model (Qwen 3.6 35B-A3B, on the server's two GPUs), and in both, deterministic code sizes and checks every order. Each bot has its own always-on engine, its own Next.js dashboard on Vercel with its own owner sign-in, and its own database on MongoDB Atlas. One Docker stack, `marketbots`, runs on the owner's Windows server: both engines, the local model server, a web search service (SearXNG), a shared headless scraper and the history store (Postgres with TimescaleDB: price bars and the news archive).
+Both run on a local model (Qwen 3.6 35B-A3B, on the server's two GPUs), and in both, deterministic code sizes and checks every order. Each bot has its own always-on engine, its own Next.js dashboard on Vercel with its own owner sign-in, and its own database on Azure DocumentDB (MongoDB). One Docker stack, `marketbots`, runs on the owner's Windows server: both engines, the local model server, a web search service (SearXNG), a shared headless scraper and the history store (Postgres with TimescaleDB: price bars and the news archive).
 
 **Paper trading only.** Neither engine has a live-trading code path.
 
@@ -39,7 +39,7 @@ The plan behind the agent, and how it earns more authority, is [docs/plans/LOCAL
 flowchart LR
     browser[Browser]
     dashboards[Vercel dashboards]
-    atlas[(MongoDB Atlas<br/>separate database per bot)]
+    db[(Azure DocumentDB<br/>separate database per bot)]
     services[Kraken paper wallet<br/>Alpaca paper account<br/>news sources]
     internet[Search engines<br/>and article pages]
 
@@ -53,11 +53,11 @@ flowchart LR
     end
 
     browser -->|HTTPS| dashboards
-    dashboards -->|Read data and write commands| atlas
+    dashboards -->|Read data and write commands| db
     browser -->|Engine WebSocket stream| crypto
     browser -->|Engine WebSocket stream| stock
-    crypto -->|Own trading state| atlas
-    stock -->|Own trading state| atlas
+    crypto -->|Own trading state| db
+    stock -->|Own trading state| db
     crypto & stock --> llm
     crypto & stock --> search
     crypto & stock --> scraper

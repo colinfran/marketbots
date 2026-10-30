@@ -24,7 +24,7 @@ import { hostCollections } from "@mb/web-kit/host"
 import { env } from "./env"
 
 /**
- * MongoDB (Atlas) access for the dashboard (@mb/web-kit/db). The dashboard reads everything the
+ * MongoDB (Azure DocumentDB) access for the dashboard (@mb/web-kit/db). The dashboard reads everything the
  * engine writes and writes only three things: commands, audit entries and owner sign-in records
  * (via Better Auth). One client is reused per serverless instance (and across hot reloads in dev).
  */

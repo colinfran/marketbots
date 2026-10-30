@@ -10,13 +10,13 @@ How StockMarketBot is built and why: the deployment boundaries, the engine's loo
 | **Alpaca paper only** | Trading always goes to `paper-api.alpaca.markets`; there is no live-trading code path. Only the engine holds the keys. |
 | **Defined-risk options only** | Long calls, long puts, call/put debit spreads. The most any position can lose is what was paid, so there are no margin calls, a spread's short leg is always covered by its long leg, and engine downtime can't turn into an unbounded loss. |
 | **A local model** | Qwen 3.6 35B-A3B on the server's two GPUs (llama.cpp), as `local/qwen3.6-35b-a3b-q2`, through llama.cpp's OpenAI-compatible API: no outside AI service, no key, no cost. The agent runs on it, and researches through our own search service and scraper, without X ([SERVER.md §9](SERVER.md#9-the-local-model-server-llm)). Grok, through Vercel AI Gateway, did both until 2026-10-28. |
-| **MongoDB Atlas** | One database shared by the engine (the only writer of trading state) and the Vercel dashboard. |
+| **MongoDB (Azure DocumentDB)** | One database shared by the engine (the only writer of trading state) and the Vercel dashboard. |
 | **Monorepo (pnpm workspaces)** | `packages/core` holds what both apps must agree on: settings, events, commands, document types, the report schema, options helpers, FIFO P&L. |
 
 ## Components and boundaries
 
 ```
-Browser ──https──▶ Vercel (Next.js dashboard) ──▶ MongoDB Atlas ◀── Engine (Docker, your server)
+Browser ─https─▶ Vercel (Next.js dashboard) ─▶ Azure DocumentDB ◀── Engine (Docker, your server)
    │                                                                   │  ▲  ▲
    └──────── wss://engine.stockmarketbot.app/v1/stream (reverse proxy) ─┘  │  │
                                        Alpaca paper: REST, trade_updates WS, IEX data WS
