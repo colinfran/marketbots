@@ -1,20 +1,18 @@
 import { formatDateTime } from "@mb/stock-core/time"
 import type { Metadata } from "next"
-import Link from "next/link"
 import { redirect } from "next/navigation"
+import { WakeAgentForm } from "@mb/ui/agent"
 import { StreamBadge } from "@mb/ui/live"
 import { Badge } from "@mb/ui/components/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@mb/ui/components/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mb/ui/components/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@mb/ui/components/tabs"
-import { SeedCard } from "@mb/ui/seed-card"
 import { SettingsForm } from "@mb/ui/settings-form"
 import { Empty, PageHeader, SectionTitle, StatusBadge } from "@/components/bits"
 import { CommandButton } from "@/components/command"
 import { getViewer } from "@/lib/auth"
-import { ago, titleCase, usd, WEEKDAY_PLURAL } from "@/lib/format"
-import { getAudit, getCommands, getEngine, getEngineState, getLiveAccount, getNotifications, getRecentEvents, getSeedRuns, getSettings, getSettingsDoc } from "@/lib/queries"
-import { EvaluateForm } from "./evaluate-form"
+import { ago, titleCase, usd } from "@/lib/format"
+import { getAudit, getCommands, getEngine, getEngineState, getLiveAccount, getNotifications, getRecentEvents, getSettings, getSettingsDoc } from "@/lib/queries"
 import { SETTINGS_SECTIONS } from "./settings-sections"
 import { SystemHealth } from "./system-health"
 
@@ -23,7 +21,7 @@ export const metadata: Metadata = { title: "Admin", robots: { index: false, foll
 export default async function AdminPage() {
   const viewer = await getViewer()
   if (!viewer.owner) redirect("/login")
-  const [doc, settings, state, engine, audit, problems, notifications, commands, live, seedRuns] = await Promise.all([
+  const [doc, settings, state, engine, audit, problems, notifications, commands, live] = await Promise.all([
     getSettingsDoc(),
     getSettings(),
     getEngineState(),
@@ -33,7 +31,6 @@ export default async function AdminPage() {
     getNotifications(20),
     getCommands(20),
     getLiveAccount(),
-    getSeedRuns(5),
   ])
   const ks = state?.kill_switch
   const running = state?.status === "running" && !ks?.engaged
@@ -57,8 +54,8 @@ export default async function AdminPage() {
               {ks?.engaged
                 ? `Halted ${formatDateTime(ks.at!)} by ${ks.by}: ${ks.reason}`
                 : state?.status === "paused"
-                  ? `Paused${state.pause_reason ? `: ${state.pause_reason}` : ""}. No new cycles or entries; stops, targets and options exits stay active.`
-                  : "Running: scheduled cycles, AI decisions and entries are active."}
+                  ? `Paused${state.pause_reason ? `: ${state.pause_reason}` : ""}. No new entries; stops, targets and options exits stay active.`
+                  : "Running: the agent decides and enters; stops, targets and options exits are active."}
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-3">
@@ -70,10 +67,10 @@ export default async function AdminPage() {
             <CommandButton command={{ type: "broker.sync" }} label="Sync with Alpaca" />
             <div className="w-full border-t pt-3">
               <p className="text-muted-foreground mb-2 text-xs">
-                Run a cycle now, optionally asking the AI to evaluate specific tickers (as stock or options ideas). It goes through the same research, decision and risk checks; doing nothing is a
-                normal answer.
+                Wake the agent for a review now: of the tickers you name (up to 5, as stock or options ideas), or of its book and the market. It looks things up and may act, inside
+                its envelope and the risk rules; doing nothing is a normal answer.
               </p>
-              <EvaluateForm disabled={!running} />
+              <WakeAgentForm disabled={!running} placeholder="e.g. NVDA, SPY (optional)" />
             </div>
           </CardContent>
         </Card>
@@ -122,39 +119,6 @@ export default async function AdminPage() {
           </CardHeader>
         </Card>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            Core book <Badge variant={settings.core.enabled ? "default" : "secondary"}>{settings.core.enabled ? "On" : "Off"}</Badge>
-          </CardTitle>
-          <CardDescription>
-            Long-term holdings with written theses, about {settings.core.target_pct}% of equity, reviewed {WEEKDAY_PLURAL[settings.core.review_weekday]} at {settings.core.review_time_et} ET (turn it on and tune it under Settings → Core book). Running the
-            review now counts as this week&apos;s and trades in the regular session. A dry run does the research and the decision and shows the trades it would make, without placing any; it works while the
-            book is off and outside market hours. Results are on the{" "}
-            <Link href="/core" className="text-foreground underline underline-offset-2">
-              Core page
-            </Link>
-            .
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-3">
-          <CommandButton command={{ type: "core.review", dry_run: true }} label="Dry run (plan only)" />
-          <CommandButton
-            command={{ type: "core.review" }}
-            label="Run core review now"
-            variant="default"
-            disabled={!settings.core.enabled || !running}
-            confirm={{ title: "Run the core review now?", description: "Research, then a decision on every core holding and any new buys, placed at market within the core book's rules. It counts as this week's review.", action: "Run it" }}
-          />
-        </CardContent>
-      </Card>
-
-      <SeedCard
-        runs={seedRuns}
-        weekdaysOnly
-        note="Puts about the amount into long-term core holdings, once. It runs in the regular session (after the opening buffer): research that morning decides what to buy, the AI picks 1-3 core holds, and the buys go through the normal risk checks (conviction, position size, cash reserve) as multi-day positions with broker-side stops. A failed run is never retried."
-      />
 
       <Tabs defaultValue="system">
         <TabsList>

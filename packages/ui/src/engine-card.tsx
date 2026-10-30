@@ -11,9 +11,9 @@ export type EngineCardEngine = {
 
 /**
  * The engine at a glance: run state, AI calls today, the bot's own health rows (venue or broker,
- * market), an optional note, and the latest cycle (`latest`, laid out by each app).
+ * market) and an optional note.
  */
-export function EngineCard({ engine, rows, note, latest }: { engine: EngineCardEngine; rows: [string, React.ReactNode][]; note?: React.ReactNode; latest?: React.ReactNode }) {
+export function EngineCard({ engine, rows, note }: { engine: EngineCardEngine; rows: [string, React.ReactNode][]; note?: React.ReactNode }) {
   const s = engine.status
   const all: [string, React.ReactNode][] = s
     ? [
@@ -48,7 +48,6 @@ export function EngineCard({ engine, rows, note, latest }: { engine: EngineCardE
           </dl>
         )}
         {note}
-        {latest && <div className="border-t pt-3">{latest}</div>}
       </CardContent>
     </Card>
   )

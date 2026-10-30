@@ -1,4 +1,4 @@
-import { AGENT_SETTINGS_SECTIONS, AI_MODEL_FIELDS, type SettingsSection } from "@mb/ui/lib/settings-fields"
+import { AGENT_SETTINGS_SECTIONS, type SettingsSection } from "@mb/ui/lib/settings-fields"
 
 /**
  * Every tunable setting on the Admin page, grouped. The shared form (@mb/ui/settings-form) sends
@@ -10,7 +10,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     fields: [
       { path: "risk.max_position_pct", label: "Max per position (% of equity)", kind: "number" },
       { path: "risk.max_open_positions", label: "Max open stock positions", kind: "number" },
-      { path: "risk.max_new_buys_per_cycle", label: "Max new buys per cycle", kind: "number" },
+      { path: "risk.max_new_buys_per_cycle", label: "Max new buys in one answer", kind: "number" },
       { path: "risk.cash_reserve_pct", label: "Cash always kept (% of equity)", kind: "number" },
       { path: "risk.max_overnight_pct", label: "Max carried overnight (% of equity)", kind: "number" },
     ],
@@ -18,7 +18,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
     title: "Stock entries & exits",
     fields: [
-      { path: "risk.min_conviction", label: "Min AI conviction to buy (1-10)", kind: "number" },
+      { path: "risk.min_conviction", label: "Min agent conviction to buy (1-10)", kind: "number" },
       { path: "risk.min_reward_risk", label: "Min reward:risk", kind: "number", step: 0.1 },
       { path: "risk.min_stop_pct", label: "Min stop distance (%)", kind: "number", step: 0.1 },
       { path: "risk.max_stop_pct", label: "Max stop distance (%)", kind: "number", step: 0.5 },
@@ -34,26 +34,6 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
       { path: "risk.max_daily_loss_pct", label: "Day loss that blocks new buys (%)", kind: "number", step: 0.5 },
       { path: "risk.flatten_loss_pct", label: "Day loss that liquidates everything (%)", kind: "number", step: 0.5 },
       { path: "risk.profit_lock_pct", label: "Day gain that halves new sizes (%)", kind: "number", step: 0.5 },
-    ],
-  },
-  {
-    title: "Core book (long-term holdings, reviewed weekly)",
-    fields: [
-      { path: "core.enabled", label: "Core book enabled", kind: "boolean" },
-      { path: "core.target_pct", label: "Target share of equity (%)", kind: "number" },
-      { path: "core.band_pct", label: "Rebalance only when off target by more than (pts)", kind: "number" },
-      { path: "core.min_holdings", label: "Min holdings", kind: "number" },
-      { path: "core.max_holdings", label: "Max holdings", kind: "number" },
-      { path: "core.max_holding_pct", label: "Max per single stock (% of equity)", kind: "number" },
-      { path: "core.max_index_etf_pct", label: "Max per index ETF: SPY, QQQ, DIA, IWM, VTI, VOO (% of equity)", kind: "number" },
-      { path: "core.max_theme_pct", label: "Max in one theme (% of the core book)", kind: "number" },
-      { path: "core.stop_pct", label: "Initial stop below entry (%)", kind: "number" },
-      { path: "core.min_conviction", label: "Min AI conviction for a core buy (1-10)", kind: "number" },
-      { path: "core.max_trades_per_review", label: "Max trades per review", kind: "number" },
-      { path: "core.review_weekday", label: "Weekly review day", kind: "select", options: ["mon", "tue", "wed", "thu", "fri"] },
-      { path: "core.review_time_et", label: "Weekly review time (ET, HH:MM)", kind: "text" },
-      { path: "core.universe_size", label: "Candidates: top names in the scan universe by dollar volume", kind: "number" },
-      { path: "core.themes", label: "Long-term themes, one per line (e.g. AI buildout: NVDA, AVGO, TSM)", kind: "lines" },
     ],
   },
   {
@@ -79,52 +59,31 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
       { path: "options.entry_aggression", label: "Entry price: 0 = mid, 1 = ask", kind: "number", step: 0.1 },
       { path: "options.fill_timeout_seconds", label: "Cancel unfilled entries after (s)", kind: "number" },
       { path: "options.monitor_seconds", label: "Check exits every (s)", kind: "number" },
-      { path: "options.max_underlyings_per_cycle", label: "Option chains loaded per cycle", kind: "number" },
-      { path: "options.contracts_per_underlying", label: "Contracts shown to the AI per stock", kind: "number" },
+      { path: "options.contracts_per_underlying", label: "Contracts on the agent's option menu per stock", kind: "number" },
     ],
   },
   {
-    title: "AI",
+    title: "Session",
     fields: [
-      ...AI_MODEL_FIELDS,
-      { path: "ai.stream_reasoning", label: "Stream model reasoning summaries", kind: "boolean" },
-      { path: "ai.research_timeout_seconds", label: "Research timeout (s)", kind: "number" },
-      { path: "ai.decision_timeout_seconds", label: "Decision timeout (s)", kind: "number" },
-    ],
-  },
-  {
-    title: "Schedule",
-    fields: [
-      { path: "schedule.premarket_lead_minutes", label: "Premarket briefing before the open (min)", kind: "number" },
-      { path: "schedule.open_buffer_minutes", label: "Wait after the open (min)", kind: "number" },
-      { path: "schedule.trade_interval_minutes", label: "Intraday cycle every (min)", kind: "number" },
-      { path: "schedule.close_window_minutes", label: "Closing cycle before the bell (min)", kind: "number" },
-      { path: "schedule.postmarket_delay_minutes", label: "Postmarket review after the bell (min)", kind: "number" },
-      { path: "schedule.max_phase_attempts", label: "Attempts for once-a-day phases", kind: "number" },
-      { path: "schedule.trigger_move_pct", label: "Extra cycle when a holding moves (%)", kind: "number", step: 0.5 },
-      { path: "schedule.trigger_cooldown_minutes", label: "Price-move trigger cooldown (min)", kind: "number" },
-      { path: "schedule.min_cycle_gap_minutes", label: "Min gap between cycles (min)", kind: "number" },
+      { path: "schedule.premarket_lead_minutes", label: "Premarket wake-up before the open (min)", kind: "number" },
+      { path: "schedule.open_buffer_minutes", label: "No buys for this long after the open (min)", kind: "number" },
+      { path: "schedule.close_window_minutes", label: "Closing window before the bell (min)", kind: "number" },
+      { path: "schedule.postmarket_delay_minutes", label: "After-close review after the bell (min)", kind: "number" },
+      { path: "schedule.trigger_move_pct", label: "A holding moving this much since the agent's last look wakes it (%)", kind: "number", step: 0.5 },
     ],
   },
   {
     title: "News engine",
     fields: [
-      { path: "wire.mode", label: "Mode (off = scheduled cycles only; shadow = log triggers, act on none)", kind: "select", options: ["live", "shadow", "off"] },
-      { path: "wire.research_mode", label: "Web research (auto: only when our feeds leave a gap on a stock in the cycle or the market)", kind: "select", options: ["auto", "gap_fill", "full"] },
+      { path: "wire.mode", label: "Mode (off: the news engine stops, and no news reaches the agent)", kind: "select", options: ["live", "off"] },
       { path: "wire.thresholds.annotate", label: "Severity: annotate", kind: "number" },
       { path: "wire.thresholds.review", label: "Severity: review a holding", kind: "number" },
       { path: "wire.thresholds.evaluate", label: "Severity: evaluate an entry", kind: "number" },
       { path: "wire.thresholds.critical", label: "Severity: critical", kind: "number" },
       { path: "wire.entry_confirmation", label: "Entries need confirmation", kind: "boolean" },
-      { path: "wire.unexplained_move_entries", label: "An unexplained move in a stock we don't hold starts an entry check", kind: "boolean" },
+      { path: "wire.unexplained_move_entries", label: "An unexplained move in a stock we don't hold wakes the agent for an entry", kind: "boolean" },
       { path: "wire.trigger_max_age_minutes", label: "Only items newer than this can trigger (min)", kind: "number" },
-      { path: "wire.max_event_cycles_per_hour", label: "Max event cycles per hour", kind: "number" },
-      { path: "wire.max_event_cycles_per_day", label: "Max event cycles per day", kind: "number" },
       { path: "wire.symbol_cooldown_minutes", label: "Per-symbol trigger cooldown (min)", kind: "number" },
-      { path: "wire.event_min_gap_seconds", label: "Min gap between event cycles (s)", kind: "number" },
-      { path: "wire.event_research", label: "Event research (a quick web check before an event decision)", kind: "select", options: [{ value: "x_verify", label: "web check" }, { value: "none", label: "none" }] },
-      { path: "wire.event_research_timeout_seconds", label: "Event research timeout (s)", kind: "number" },
-      { path: "wire.event_decision_timeout_seconds", label: "Event decision timeout (s)", kind: "number" },
       { path: "wire.emergency_action", label: "Critical bad news on a holding", kind: "select", options: ["review", "exit"] },
       { path: "wire.anomaly.price_z", label: "Price shock z-score (after SPY's move)", kind: "number", step: 0.5 },
       { path: "wire.anomaly.volume_multiple", label: "Volume shock (× median)", kind: "number", step: 0.5 },
@@ -137,7 +96,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     ],
   },
   {
-    title: "Article summaries (local model, News page only)",
+    title: "Article summaries (local model: the News page and the agent's news)",
     fields: [
       { path: "wire.summaries.enabled", label: "Summarize important articles", kind: "boolean" },
       { path: "wire.summaries.min_severity", label: "Min severity (notable items always)", kind: "number" },

@@ -28,7 +28,7 @@ export type MapTicker = (data: unknown) => { symbol: string; bid: number | null;
 
 export type StreamConfig = { maxEvents: number; mapTicker: MapTicker }
 
-/** Engine run status and cycle state as the stream last reported them. */
+/** Engine run status and what its execution path is doing, as the stream last reported them. */
 export type StreamEngine = { status: string; cycle_state: string | null; at: number }
 
 /** A model call as the live model feed shows it: what it is for, what it has written, how it ended. */
@@ -246,9 +246,6 @@ class StreamStore {
     } else if (e.type === "engine.heartbeat" || e.type === "engine.status") {
       const d = e.data as { status: string; cycle_state?: string }
       patch.engine = { status: d.status, cycle_state: d.cycle_state ?? this.snapshot.engine?.cycle_state ?? null, at: Date.now() }
-    } else if (e.type === "cycle.state") {
-      const d = e.data as { state: string }
-      patch.engine = { status: this.snapshot.engine?.status ?? "running", cycle_state: d.state, at: Date.now() }
     }
     if (e.type !== "market.ticker" && e.type !== "engine.heartbeat") {
       patch.events = [e, ...this.snapshot.events].slice(0, this.config.maxEvents)

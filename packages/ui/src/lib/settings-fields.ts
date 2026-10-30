@@ -46,17 +46,8 @@ export const selectChoices = (f: SettingsField, current: unknown): SelectOption[
   return f.none !== undefined ? [{ value: "", label: f.none }, ...choices] : choices
 }
 
-/**
- * The models Admin offers: what the local model server serves (docs/SERVER.md §9). It researches
- * through our own search service. The engine still validates whatever is picked.
- */
+/** The models Admin offers: what the local model server serves (docs/SERVER.md §9). The engine still validates whatever is picked. */
 export const AI_MODELS: SelectOption[] = [{ value: "local/qwen3.6-35b-a3b-q2", label: "Qwen 3.6 35B-A3B" }]
-
-/** The model settings, as both bots' Admin pages show them. */
-export const AI_MODEL_FIELDS: SettingsField[] = [
-  { path: "ai.models.research", label: "Research model", kind: "select", options: AI_MODELS },
-  { path: "ai.models.decision", label: "Decision model", kind: "select", options: AI_MODELS },
-]
 
 /** The agent's settings (docs/plans/LOCAL-AI.md §8–§10), the same in both bots. */
 export const AGENT_SETTINGS_SECTIONS: SettingsSection[] = [

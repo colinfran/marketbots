@@ -7,8 +7,8 @@ import { Badge } from "@mb/ui/components/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mb/ui/components/table"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@mb/ui/components/tooltip"
 import { decisionHref, price, qty, titleCase, usd } from "@/lib/format"
-import type { DecisionRow, LiveAccount, ReportSummary, TradeRow } from "@/lib/queries"
-import { ActionBadge, Delta, Empty, PhaseBadge, ResearchModeBadge, StatusBadge, SymbolLink } from "./bits"
+import type { DecisionRow, LiveAccount, TradeRow } from "@/lib/queries"
+import { ActionBadge, Delta, Empty, StatusBadge, SymbolLink } from "./bits"
 import { CommandButton } from "./command"
 
 function Scroll({ children }: { children: React.ReactNode }) {
@@ -192,10 +192,10 @@ const decisionDetail = (d: DecisionDoc) => {
   return `${d.qty ? `${qty(d.qty)} sh @ ${price(d.price)}` : ""}${d.notional ? ` (${usd(d.notional)})` : ""}${d.stop_loss ? ` · stop ${price(d.stop_loss)} · target ${price(d.take_profit)}` : ""}`
 }
 
-/** What started the decision, when it wasn't the schedule: the news items behind an event cycle, or the seed buy. */
+/** What started the decision: the news items that woke the agent (or an event cycle, before it), or the seed buy. */
 function TriggeredBy({ d }: { d: DecisionRow }) {
   if (d.trigger_kind === "seed") return <p className="text-muted-foreground mt-1 text-xs">Part of the owner&apos;s one-time seed buy.</p>
-  if (d.trigger_kind !== "event") return null
+  if (!d.triggered_by?.length) return null
   const items = d.triggered_by ?? []
   return (
     <p className="mt-1 text-xs text-amber-800 dark:text-amber-300">
@@ -239,9 +239,15 @@ export function DecisionsTable({ decisions, showDay = false }: { decisions: Deci
             return (
               <TableRow key={d._id} className="align-top">
                 <TableCell className="text-muted-foreground whitespace-nowrap">
-                  <Link href={decisionHref(d) ?? `/research/${d.report_id}`} className="hover:underline">
-                    {showDay ? formatDateTime(d.created_at) : formatTime(d.created_at)}
-                  </Link>
+                  {decisionHref(d) ? (
+                    <Link href={decisionHref(d)!} className="hover:underline">
+                      {showDay ? formatDateTime(d.created_at) : formatTime(d.created_at)}
+                    </Link>
+                  ) : showDay ? (
+                    formatDateTime(d.created_at)
+                  ) : (
+                    formatTime(d.created_at)
+                  )}
                 </TableCell>
                 <TableCell>
                   <SymbolLink symbol={d.symbol} />
@@ -356,30 +362,6 @@ export function TradesTable({ trades, showDay = true }: { trades: TradeRow[]; sh
         </TableBody>
       </Table>
     </Scroll>
-  )
-}
-
-export function ReportList({ reports, showDay = true }: { reports: ReportSummary[]; showDay?: boolean }) {
-  if (reports.length === 0) return <Empty>No reports yet. The first one is written at the next premarket briefing.</Empty>
-  return (
-    <div className="divide-y rounded-xl border">
-      {reports.map((r) => (
-        <Link key={r._id} href={`/research/${r._id}`} className="hover:bg-muted/50 flex flex-col gap-1.5 p-4 transition-colors sm:flex-row sm:items-center sm:gap-4">
-          <div className="flex shrink-0 items-center gap-2 sm:w-48">
-            <PhaseBadge phase={r.phase} />
-            <span className="text-muted-foreground text-xs whitespace-nowrap">{showDay ? formatDateTime(r.created_at) : formatTime(r.created_at)}</span>
-          </div>
-          <p className="flex-1 text-sm font-medium">{r.headline}</p>
-          <div className="text-muted-foreground flex shrink-0 items-center gap-3 text-xs">
-            <ResearchModeBadge mode={r.research_mode} />
-            <span>{titleCase(r.sentiment)}</span>
-            <span>
-              {r.execution.executed}/{r.decisions} executed
-            </span>
-          </div>
-        </Link>
-      ))}
-    </div>
   )
 }
 

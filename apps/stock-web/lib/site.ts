@@ -7,7 +7,7 @@ export const site = {
   title: "StockMarketBot: an AI stock and options trading bot running on its own GPUs",
   tagline: "An AI that runs on its own hardware, reads the news as it breaks and trades stocks and options with a $10,000 paper account, in public, live.",
   description:
-    "StockMarketBot is an autonomous AI trading experiment by Colin Franceschini. An open-weight AI model on the bot's own server researches the web in real time, then trades US stocks and defined-risk options throughout every market day with a $10,000 paper account. Every search, decision, risk check and trade streams live.",
+    "StockMarketBot is an autonomous AI trading experiment by Colin Franceschini. An open-weight AI agent on the bot's own server wakes on news, setups and price moves as they happen, looks things up step by step, and trades US stocks and defined-risk options throughout every market day with a $10,000 paper account. Everything the model writes, every decision, risk check and trade streams live.",
   keywords: [
     "AI stock trading bot",
     "AI trading bot",
@@ -23,15 +23,13 @@ export const site = {
     "autonomous trading agent",
     "Alpaca paper trading",
     "stock market sentiment",
-    "X Twitter stock sentiment",
-    "daily stock market report",
     "Colin Franceschini",
   ],
   author: {
     name: "Colin Franceschini",
     url: "https://colinfran.com",
   },
-  /** Default share image (public/ogimage-stockmarketbot.png). Report pages generate their own. */
+  /** Default share image (public/ogimage-stockmarketbot.png). */
   ogImage: {
     url: "/ogimage-stockmarketbot.png",
     width: 2746,

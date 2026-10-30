@@ -1,4 +1,4 @@
-import type { CycleDoc, DailyStatsDoc, DecisionDoc, FillDoc, OrderDoc, PositionDoc } from "@mb/crypto-core/db"
+import type { DailyStatsDoc, DecisionDoc, FillDoc, OrderDoc, PositionDoc } from "@mb/crypto-core/db"
 import Link from "next/link"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mb/ui/components/table"
 import { ActionBadge, Delta, Empty, StatusBadge, SymbolLink } from "@/components/bits"
@@ -250,48 +250,6 @@ export function DecisionsTable({ decisions }: { decisions: DecisionDoc[] }) {
               )}
             </TableCell>
             <TableCell className="text-muted-foreground line-clamp-2 text-xs">{d.ai.thesis}</TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-  )
-}
-
-export function CyclesTable({ cycles }: { cycles: CycleDoc[] }) {
-  if (!cycles.length) return <Empty>No cycles yet. The engine runs one every scan interval.</Empty>
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Started</TableHead>
-          <TableHead>Trigger</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Regime</TableHead>
-          <TableHead className="text-right">Candidates</TableHead>
-          <TableHead className="text-right">Decisions</TableHead>
-          <TableHead className="text-right">AI cost</TableHead>
-          <TableHead className="text-right">Duration</TableHead>
-          <TableHead className="w-[34%]">Summary</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {cycles.map((c) => (
-          <TableRow key={c._id}>
-            <TableCell className="text-sm whitespace-nowrap">
-              <Link href={`/research/${c._id}`} className="hover:underline">
-                {dateTime(c.started_at)}
-              </Link>
-            </TableCell>
-            <TableCell className="text-muted-foreground max-w-40 truncate text-xs">{c.trigger}</TableCell>
-            <TableCell>
-              <StatusBadge status={c.status} />
-            </TableCell>
-            <TableCell className="text-sm">{c.regime ? titleCase(c.regime.label) : "—"}</TableCell>
-            <TableCell className="text-right font-mono tabular-nums">{c.candidates.length}</TableCell>
-            <TableCell className="text-right font-mono tabular-nums">{c.decision_ids.length}</TableCell>
-            <TableCell className="text-right font-mono text-xs tabular-nums">{c.ai_cost_usd ? `$${c.ai_cost_usd.toFixed(3)}` : "—"}</TableCell>
-            <TableCell className="text-muted-foreground text-right text-xs">{duration(c.duration_ms)}</TableCell>
-            <TableCell className="text-muted-foreground line-clamp-2 text-xs">{c.error ?? c.summary}</TableCell>
           </TableRow>
         ))}
       </TableBody>

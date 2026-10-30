@@ -2,8 +2,9 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { cache } from "react"
+import { EpisodeTable } from "@mb/ui/agent"
 import { Delta, SectionTitle, Stat } from "@/components/bits"
-import { ClosedPositionsTable, CyclesTable, DecisionsTable, FillsTable } from "@/components/tables"
+import { ClosedPositionsTable, DecisionsTable, FillsTable } from "@/components/tables"
 import { getDay } from "@/lib/data"
 import { formatDay, pct, usd } from "@/lib/format"
 import { pageMetadata } from "@/lib/site"
@@ -22,7 +23,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const result = stats ? `finished the day ${usd(stats.pnl_usd, { sign: true })} (${pct(stats.pnl_pct)}) with ${stats.wins} winning and ${stats.losses} losing exits` : "day in progress"
   return pageMetadata({
     title: `Trading journal: ${formatDay(day)}`,
-    description: `CryptoMarketBot's AI ${result} on ${formatDay(day)} (UTC). Every AI research cycle, decision and trade from the day.`,
+    description: `CryptoMarketBot's AI ${result} on ${formatDay(day)} (UTC). Every episode of the AI agent, decision and trade from the day.`,
     path: `/journal/${day}`,
   })
 }
@@ -30,7 +31,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function DayPage({ params }: Props) {
   const { day } = await params
   if (!DAY.test(day)) notFound()
-  const { stats, cycles, decisions, fills, closed } = await loadDay(day)
+  const { stats, episodes, decisions, fills, closed } = await loadDay(day)
   const realized = fills.reduce((sum, f) => sum + (f.realized_pnl_usd ?? 0), 0)
 
   return (
@@ -55,8 +56,8 @@ export default async function DayPage({ params }: Props) {
       </div>
 
       <section>
-        <SectionTitle>Research</SectionTitle>
-        <CyclesTable cycles={cycles} />
+        <SectionTitle>The agent</SectionTitle>
+        <EpisodeTable rows={episodes} />
       </section>
       <section>
         <SectionTitle>Decisions</SectionTitle>

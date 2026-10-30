@@ -15,7 +15,7 @@ import type { AnyEvent, StreamConfig } from "./stream"
 export type FeedFilter = "ai" | "news" | "trades" | "system"
 
 export type EventCatalog<E extends AnyEvent = AnyEvent> = {
-  /** Cycle states as words (status pill, current work, live trail). */
+  /** What the engine's execution path is doing, as words (the status pill). */
   stateLabels: Record<string, string>
   /** Activity-feed icons by event type (default: a dot). */
   icons: Partial<Record<string, LucideIcon>>
@@ -31,10 +31,8 @@ export type EventCatalog<E extends AnyEvent = AnyEvent> = {
   summary(e: E): ReactNode
   /** The extra line under an event (thesis, risk reasons, a source link…). */
   detail(e: E): ReactNode
-  /** Links under an event (its symbol, its cycle or report). */
+  /** Links under an event (its symbol, its episode). */
   links(e: E): ReactNode
-  /** Current work: the running cycle's events worth a line, and how each reads. */
-  work: { events: ReadonlySet<string>; text(e: E): string }
 }
 
 export type BotKit<E extends AnyEvent = AnyEvent> = {
@@ -56,9 +54,7 @@ export type BotKit<E extends AnyEvent = AnyEvent> = {
   sourceLabel(source: string, domain?: string | null): string
   /** Status badge colors where the bot differs from the shared map. */
   statusStyles: Record<string, string>
-  /** What a trigger's link is called ("cycle", "report"). */
-  triggerLink: string
-  /** Extra classes on the status pill's cycle-state label. */
+  /** Extra classes on the status pill's state label. */
   pillStateClassName?: string
   events: EventCatalog<E>
 }

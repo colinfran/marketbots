@@ -1,19 +1,19 @@
 import { DEFAULT_SETTINGS, settingsSchema } from "@mb/crypto-core/settings"
+import { STRATEGIES, STRATEGY_IDS } from "@mb/crypto-core/strategies"
 import type { Metadata } from "next"
 import { redirect } from "next/navigation"
+import { WakeAgentForm } from "@mb/ui/agent"
 import { StreamBadge } from "@mb/ui/live"
 import { Badge } from "@mb/ui/components/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@mb/ui/components/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mb/ui/components/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@mb/ui/components/tabs"
-import { SeedCard } from "@mb/ui/seed-card"
 import { SettingsForm } from "@mb/ui/settings-form"
 import { Empty, PageHeader, SectionTitle, StatusBadge } from "@/components/bits"
 import { CommandButton } from "@/components/command"
 import { getViewer } from "@/lib/auth"
-import { getAudit, getCommands, getEngine, getEngineState, getNotifications, getRecentEvents, getSeedRuns, getSettings } from "@/lib/data"
+import { getAudit, getCommands, getEngine, getEngineState, getNotifications, getRecentEvents, getSettings } from "@/lib/data"
 import { ago, dateTime, titleCase, usd } from "@/lib/format"
-import { EvaluateForm } from "./evaluate-form"
 import { SETTINGS_SECTIONS } from "./settings-sections"
 import { SystemHealth } from "./system-health"
 
@@ -22,7 +22,7 @@ export const metadata: Metadata = { title: "Admin", robots: { index: false, foll
 export default async function AdminPage() {
   const viewer = await getViewer()
   if (!viewer.owner) redirect("/login")
-  const [doc, state, engine, audit, problems, notifications, commands, seedRuns] = await Promise.all([
+  const [doc, state, engine, audit, problems, notifications, commands] = await Promise.all([
     getSettings(),
     getEngineState(),
     getEngine(),
@@ -30,7 +30,6 @@ export default async function AdminPage() {
     getRecentEvents(viewer, { limit: 40, levels: ["warn", "error"] }),
     getNotifications(20),
     getCommands(20),
-    getSeedRuns(5),
   ])
   const parsed = settingsSchema.safeParse(doc?.settings)
   const settings = parsed.success ? parsed.data : DEFAULT_SETTINGS
@@ -57,7 +56,7 @@ export default async function AdminPage() {
                 ? `Halted ${dateTime(ks.at)} by ${ks.by}: ${ks.reason}`
                 : state?.status === "paused"
                   ? `Paused${state.pause_reason ? `: ${state.pause_reason}` : ""}. No new decisions or entries; stops and targets stay active.`
-                  : "Running: scheduled scans, AI decisions and entries are active."}
+                  : "Running: the agent decides and enters; stops and targets are active."}
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-3">
@@ -66,12 +65,12 @@ export default async function AdminPage() {
             ) : !ks?.engaged ? (
               <CommandButton command={{ type: "resume" }} label="Resume" variant="default" />
             ) : null}
-            <CommandButton command={{ type: "cycle.run_now" }} label="Run a cycle now" disabled={!running} />
             <div className="w-full border-t pt-3">
               <p className="text-muted-foreground mb-2 text-xs">
-                Ask the AI to evaluate a pair now, even if no screen flagged it. It goes through the same research, decision and risk checks; no_trade is a normal answer.
+                Wake the agent for a review now: of the pairs you name (up to 5), or of its book and the market. It looks things up and may act, inside its envelope and the
+                risk checks; no trade is a normal answer.
               </p>
-              <EvaluateForm universe={settings.universe.kraken_symbols} disabled={!running || !settings.strategies.discretionary.enabled} />
+              <WakeAgentForm disabled={!running} placeholder={`e.g. ${settings.universe.kraken_symbols.slice(0, 2).join(", ")} (optional)`} />
             </div>
           </CardContent>
         </Card>
@@ -126,11 +125,28 @@ export default async function AdminPage() {
         </Card>
       </div>
 
-      <SeedCard
-        runs={seedRuns}
-        weekdaysOnly={false}
-        note="Puts about the amount into long-term core holdings, once. Research that morning decides what to buy: the AI allocates it across 1-4 pairs, then the normal risk checks apply (only the conviction, edge and reward:risk gates are skipped). Positions are then managed like any long-term trend position. A failed run is never retried."
-      />
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Screens</CardTitle>
+          <CardDescription>Code screens every pair as each minute&apos;s bars arrive; a setup from an enabled screen wakes the agent, which looks it up and decides. A disabled screen wakes it for nothing.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ul className="divide-y">
+            {STRATEGY_IDS.map((id) => {
+              const cfg = settings.strategies[id]
+              return (
+                <li key={id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm">
+                  <span className="font-medium">{STRATEGIES[id].name}</span>
+                  <Badge variant={cfg.enabled ? "secondary" : "outline"}>{cfg.enabled ? "Enabled" : "Disabled"}</Badge>
+                  <span className="text-muted-foreground min-w-0 flex-1 text-xs">{STRATEGIES[id].summary}</span>
+                  <span className="text-muted-foreground text-xs">max {cfg.max_exposure_pct}% of equity</span>
+                  <CommandButton command={{ type: "strategy.set_enabled", strategy: id, enabled: !cfg.enabled }} label={cfg.enabled ? "Disable" : "Enable"} size="xs" />
+                </li>
+              )
+            })}
+          </ul>
+        </CardContent>
+      </Card>
 
       <Tabs defaultValue="system">
         <TabsList>

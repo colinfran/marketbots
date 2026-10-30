@@ -68,6 +68,13 @@ export const createAgentQueries = <Cols extends AgentCollections>({ collections 
     }
   }
 
+  /** The episodes that started in [from, to), oldest first (a journal day). */
+  const getEpisodesBetween = async (from: Date, to: Date) => {
+    await connection()
+    const { agentEpisodes } = await collections()
+    return (await agentEpisodes.find({ started_at: { $gte: from, $lt: to } }, { projection: { brief: 0, answer: 0 } }).sort({ started_at: 1 }).limit(500).toArray()).map(toRow)
+  }
+
   /** The agent's active watches and its notes. */
   const getAgentMemory = async () => {
     await connection()
@@ -79,5 +86,5 @@ export const createAgentQueries = <Cols extends AgentCollections>({ collections 
     }
   }
 
-  return { getEpisodes, getEpisode, getAgentMemory }
+  return { getEpisodes, getEpisodesBetween, getEpisode, getAgentMemory }
 }

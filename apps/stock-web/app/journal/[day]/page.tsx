@@ -2,9 +2,9 @@ import { formatDay } from "@mb/stock-core/time"
 import type { Metadata } from "next"
 import Link from "next/link"
 import { notFound } from "next/navigation"
+import { EpisodeTable } from "@mb/ui/agent"
 import { Delta, SectionTitle, Stat } from "@/components/bits"
-import { CyclesList } from "@/components/report-view"
-import { DecisionsTable, ReportList, TradesTable } from "@/components/tables"
+import { DecisionsTable, TradesTable } from "@/components/tables"
 import { collections } from "@/lib/db"
 import { pct, usd } from "@/lib/format"
 import { getDay } from "@/lib/queries"
@@ -19,7 +19,7 @@ export async function generateMetadata({ params }: { params: Promise<{ day: stri
   const result = stats ? `finished the day ${usd(stats.pnl, { sign: true })} (${pct(stats.pnl_pct)}) with ${stats.wins} winning and ${stats.losses} losing trades` : "trading day in progress"
   return pageMetadata({
     title: `Trading journal: ${formatDay(day)}`,
-    description: `StockMarketBot's AI ${result} on ${formatDay(day)}. Every AI market report, decision and trade from the session.`,
+    description: `StockMarketBot's AI ${result} on ${formatDay(day)}. Every episode of the AI agent, decision and trade from the session.`,
     path: `/journal/${day}`,
   })
 }
@@ -27,7 +27,7 @@ export async function generateMetadata({ params }: { params: Promise<{ day: stri
 export default async function DayPage({ params }: { params: Promise<{ day: string }> }) {
   const { day } = await params
   if (!DAY.test(day)) notFound()
-  const { stats, cycles, reports, decisions, trades } = await getDay(day)
+  const { stats, episodes, decisions, trades } = await getDay(day)
   const realized = trades.reduce((sum, t) => sum + (t.realized_pnl ?? 0), 0)
 
   return (
@@ -62,8 +62,8 @@ export default async function DayPage({ params }: { params: Promise<{ day: strin
       </div>
 
       <section>
-        <SectionTitle>Reports</SectionTitle>
-        <ReportList reports={reports} showDay={false} />
+        <SectionTitle>The agent</SectionTitle>
+        <EpisodeTable rows={episodes} />
       </section>
       <section>
         <SectionTitle>Decisions</SectionTitle>
@@ -73,12 +73,6 @@ export default async function DayPage({ params }: { params: Promise<{ day: strin
         <SectionTitle>Trades</SectionTitle>
         <TradesTable trades={trades} showDay={false} />
       </section>
-      {cycles.length > 0 && (
-        <section>
-          <SectionTitle>Cycles</SectionTitle>
-          <CyclesList cycles={cycles} />
-        </section>
-      )}
     </div>
   )
 }

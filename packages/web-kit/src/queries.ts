@@ -52,7 +52,6 @@ export type TriggerView = {
   reason: string
   symbols: string[]
   severity: number
-  href: string | null
   item_title: string | null
 }
 
@@ -99,15 +98,12 @@ export const createQueries = <Cols extends Record<QueryCollectionName, unknown>,
   collections,
   eventForViewer,
   recentEventsFilter = {},
-  triggerLinks,
 }: {
   collections: () => Promise<Cols>
   /** The bot core's visibility check (its owner-only events). */
   eventForViewer: (event: E, scope: EventVisibility) => E | null
   /** Which events the default recent-events query reads. */
   recentEventsFilter?: Filter<LooseDoc>
-  /** The page each trigger's cycle produced, by cycle id. */
-  triggerLinks: (cycleIds: string[]) => Promise<Map<string, string>>
 }) => {
   type S = DocOf<Cols["engineStatus"]>
   /**
@@ -147,12 +143,6 @@ export const createQueries = <Cols extends Record<QueryCollectionName, unknown>,
     return (await (await loose()).commands.find({}).sort({ created_at: -1 }).limit(limit).toArray()) as unknown as DocOf<Cols["commands"]>[]
   }
 
-  /** One-time seed runs, newest first (the Admin card shows the current or last one). */
-  const getSeedRuns = async (limit = 5) => {
-    await connection()
-    return (await typed()).seedRuns.find({}).sort({ created_at: -1 }).limit(limit).toArray()
-  }
-
   const getNotifications = async (limit = 30) => {
     await connection()
     return (await typed()).notifications.find({}).sort({ at: -1 }).limit(limit).toArray()
@@ -172,26 +162,6 @@ export const createQueries = <Cols extends Record<QueryCollectionName, unknown>,
     await connection()
     const docs = await (await loose()).events.find(levels ? { level: { $in: levels } } : recentEventsFilter).sort({ _id: -1 }).limit(limit).toArray()
     return toEvents(docs, viewer)
-  }
-
-  /** Every stored event of one cycle, oldest first: the full trail of what the AI did. */
-  const getCycleEvents = async (cycleId: string, viewer: Viewer): Promise<E[]> => {
-    await connection()
-    const docs = await (await loose()).events.find({ cycle_id: cycleId }).sort({ _id: 1 }).limit(2_000).toArray()
-    return toEvents(docs, viewer)
-  }
-
-  /** AI spend per day (the bot's day): cost, calls and failures. */
-  const getAiCosts = async (days = 30) => {
-    await connection()
-    const since = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10)
-    return (await typed()).aiCalls
-      .aggregate<{ _id: string; cost: number; calls: number; failures: number }>([
-        { $match: { day: { $gte: since } } },
-        { $group: { _id: "$day", cost: { $sum: "$cost_usd" }, calls: { $sum: 1 }, failures: { $sum: { $cond: ["$ok", 0, 1] } } } },
-        { $sort: { _id: 1 } },
-      ])
-      .toArray()
   }
 
   // ─── News engine ("wire") ──────────────────────────────────────────────────
@@ -226,11 +196,10 @@ export const createQueries = <Cols extends Record<QueryCollectionName, unknown>,
     return { categories: (categories as string[]).sort(), sources: (sources as string[]).sort() }
   }
 
-  /** Trigger docs for display, with the first item's title and the page of the cycle each one started. */
+  /** Trigger docs for display, with the first item's title. */
   const toTriggerViews = async (triggers: WireTriggerDoc[]): Promise<TriggerView[]> => {
     const itemIds = [...new Set(triggers.flatMap((t) => t.item_ids.slice(0, 1)))]
-    const cycleIds = [...new Set(triggers.flatMap((t) => (t.cycle_id ? [t.cycle_id] : [])))]
-    const [items, links] = await Promise.all([itemIds.length ? (await wireItems()).find({ _id: { $in: itemIds } }, { projection: { title: 1 } }).toArray() : [], triggerLinks(cycleIds)])
+    const items = itemIds.length ? await (await wireItems()).find({ _id: { $in: itemIds } }, { projection: { title: 1 } }).toArray() : []
     const titles = new Map(items.map((i) => [String(i._id), String(i.title)]))
     return triggers.map((t) => ({
       id: t._id,
@@ -241,7 +210,6 @@ export const createQueries = <Cols extends Record<QueryCollectionName, unknown>,
       reason: t.reason,
       symbols: t.symbols,
       severity: t.severity,
-      href: t.cycle_id ? (links.get(t.cycle_id) ?? null) : null,
       item_title: titles.get(t.item_ids[0] ?? "") ?? null,
     }))
   }
@@ -251,26 +219,13 @@ export const createQueries = <Cols extends Record<QueryCollectionName, unknown>,
     return toTriggerViews(await (await typed()).wireTriggers.find({}).sort({ at: -1 }).limit(limit).toArray())
   }
 
-  /**
-   * The news-engine numbers both bots count the same way: items stored and triggers acted on in
-   * the last 7 days, event cycles, and the AI spend per day by task (last 14 days).
-   */
+  /** The news-engine numbers both bots count the same way: items stored and triggers acted on in the last 7 days. */
   const getWireActivity = async () => {
     await connection()
-    const { wireTriggers, aiCalls } = await typed()
-    const cycles = (await loose()).cycles
+    const { wireTriggers } = await typed()
     const week = new Date(Date.now() - 7 * 86_400_000)
-    const [items, triggers, eventCycles, calls] = await Promise.all([
-      (await wireItems()).countDocuments({ first_seen_at: { $gte: week } }),
-      wireTriggers.countDocuments({ at: { $gte: week }, status: { $in: ["fired", "queued"] } }),
-      cycles.countDocuments({ kind: "event", started_at: { $gte: week } }),
-      aiCalls
-        .aggregate<{ _id: { day: string; task: string }; cost: number }>([{ $match: { at: { $gte: new Date(Date.now() - 14 * 86_400_000) } } }, { $group: { _id: { day: "$day", task: "$task" }, cost: { $sum: "$cost_usd" } } }])
-        .toArray(),
-    ])
-    const days = [...new Set(calls.map((c) => c._id.day))].sort()
-    const spend = (day: string, task: string) => calls.filter((c) => c._id.day === day && c._id.task === task).reduce((s, c) => s + c.cost, 0)
-    return { items, triggers, eventCycles, researchSpend: days.map((day) => ({ day, research: spend(day, "research"), gap: spend(day, "research_gap"), decision: spend(day, "decision") })) }
+    const [items, triggers] = await Promise.all([(await wireItems()).countDocuments({ first_seen_at: { $gte: week } }), wireTriggers.countDocuments({ at: { $gte: week }, status: { $in: ["fired", "queued"] } })])
+    return { items, triggers }
   }
 
   return {
@@ -278,11 +233,8 @@ export const createQueries = <Cols extends Record<QueryCollectionName, unknown>,
     getEngineState,
     getAudit,
     getCommands,
-    getSeedRuns,
     getNotifications,
     getRecentEvents,
-    getCycleEvents,
-    getAiCosts,
     getWireItems,
     getWireItemsById,
     getWireFacets,

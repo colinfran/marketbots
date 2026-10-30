@@ -4,7 +4,6 @@ import type { BaseEventDataMap } from "@mb/core/events"
 import type { DossierRow, NotableReason, WireSourceHealth } from "@mb/core/wire"
 import { cn } from "cn"
 import { ZapIcon } from "lucide-react"
-import Link from "next/link"
 import { useMemo } from "react"
 import { SymbolLink } from "./bits"
 import { Badge } from "./components/badge"
@@ -57,7 +56,6 @@ export type TriggerView = {
   symbols: string[]
   severity: number
   /** The page of the cycle it started (crypto: the cycle's research page; stock: its report). */
-  href: string | null
   item_title: string | null
 }
 
@@ -284,7 +282,7 @@ const TRIGGER_STYLE: Record<string, string> = {
 
 /** Stored triggers plus the ones the stream adds (fired, queued and suppressed alike). */
 export function TriggerList({ triggers, limit = 40 }: { triggers: TriggerView[]; limit?: number }) {
-  const { format, triggerLink } = useKit()
+  const { format } = useKit()
   const now = useNow(30_000)
   const { events } = useStream()
   const rows = useMemo(() => {
@@ -295,7 +293,7 @@ export function TriggerList({ triggers, limit = 40 }: { triggers: TriggerView[];
       .filter((e) => e.type === "wire.trigger" && !known.has((e.data as WireEvent["wire.trigger"]).trigger_id))
       .map((e): TriggerView => {
         const d = e.data as WireEvent["wire.trigger"]
-        return { id: d.trigger_id, at: e.ts, rule: d.rule, action: d.action, status: d.status, reason: d.reason, symbols: d.symbols, severity: d.severity, href: null, item_title: titles.get(d.item_ids[0] ?? "") ?? null }
+        return { id: d.trigger_id, at: e.ts, rule: d.rule, action: d.action, status: d.status, reason: d.reason, symbols: d.symbols, severity: d.severity, item_title: titles.get(d.item_ids[0] ?? "") ?? null }
       })
     return [...live, ...triggers].sort((a, b) => b.at.localeCompare(a.at)).slice(0, limit)
   }, [triggers, events, limit])
@@ -316,17 +314,7 @@ export function TriggerList({ triggers, limit = 40 }: { triggers: TriggerView[];
             {ago(t.at, now)}
           </time>
           {t.item_title && <span className="text-muted-foreground basis-full text-xs">{t.item_title}</span>}
-          <span className="text-muted-foreground basis-full text-xs">
-            {t.reason}
-            {t.href && (
-              <>
-                {" · "}
-                <Link href={t.href} className="underline underline-offset-2">
-                  {triggerLink}
-                </Link>
-              </>
-            )}
-          </span>
+          <span className="text-muted-foreground basis-full text-xs">{t.reason}</span>
         </li>
       ))}
     </ol>

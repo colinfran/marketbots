@@ -26,7 +26,6 @@ export function SystemHealth({ engine, problems }: { engine: EngineSummary; prob
                   {s.current_task ? ` · ${s.current_task}` : ""}
                 </>
               }
-              lastCycle={s.last_cycle ? `${s.last_cycle.status}, ${ago(s.last_cycle.at)}` : "—"}
             />
             <Card>
               <CardHeader>
@@ -65,12 +64,10 @@ export function SystemHealth({ engine, problems }: { engine: EngineSummary; prob
                 )}
               </CardContent>
             </Card>
-            <AiHealthCard ai={s.ai} />
+            <AiHealthCard ai={s.ai} model={s.agent?.model ?? null} />
             <ServerHealthCard system={s.system} />
             {s.history && <HistoryHealthCard history={s.history} />}
-            <StreamHealthCard status={s}>
-              <KV label="Next scheduled scan">{dateTime(s.next_cycle_at)}</KV>
-            </StreamHealthCard>
+            <StreamHealthCard status={s} />
           </div>
 
           <section>

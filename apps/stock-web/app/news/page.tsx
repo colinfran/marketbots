@@ -15,7 +15,7 @@ import { pageMetadata } from "@/lib/site"
 export const metadata: Metadata = pageMetadata({
   title: "Stock market news engine",
   description:
-    "What StockMarketBot's own news engine sees around the clock: newswires, SEC filings, regulators, exchange halts, the Fed, economic calendars and its own market data, and the triggers that start a focused AI cycle.",
+    "What StockMarketBot's own news engine sees around the clock: newswires, SEC filings, regulators, exchange halts, the Fed, economic calendars and its own market data, and the triggers that wake the AI agent.",
   path: "/news",
 })
 
@@ -97,7 +97,7 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
         <section className="min-w-0">
           <SectionTitle>Triggers</SectionTitle>
           <p className="text-muted-foreground mb-2 text-xs">
-            When an item is out of the ordinary, the engine starts a focused cycle (during the regular session). Suppressed triggers show why they were held back.
+            When an item is out of the ordinary, it wakes the agent. Suppressed triggers show why they were held back.
           </p>
           <TriggerList triggers={triggers} />
         </section>

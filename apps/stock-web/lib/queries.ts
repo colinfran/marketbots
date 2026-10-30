@@ -1,15 +1,13 @@
 import "server-only"
 import type { Bar, PortfolioHistory } from "@mb/stock-core/alpaca"
-import { CORE_RANKING_KEY, type CoreRanking } from "@mb/stock-core/core-book"
-import type { AccountSnapshot, ChartBars, CycleDoc, DecisionDoc, EngineStatusDoc, OrderDoc, ReportDoc, ResearchResult } from "@mb/stock-core/db"
+import type { AccountSnapshot, ChartBars, DecisionDoc, EngineStatusDoc, OrderDoc } from "@mb/stock-core/db"
 import { eventForViewer } from "@mb/stock-core/events"
 import { FILLED_ORDERS, fillsFromOrders, type OrderFill } from "@mb/stock-core/fills"
-import { SETUPS } from "@mb/stock-core/report"
-import { DEFAULT_SETTINGS, settingsSchema, type Phase, type Settings } from "@mb/stock-core/settings"
-import type { Setup } from "@mb/stock-core/setups"
-import { marketDay } from "@mb/stock-core/time"
-import { createQueries, decisionLatency, ITEM_PROJECTION, toRowView, type EngineSummary as EngineSummaryOf, type TriggerView, type WireRowView } from "@mb/web-kit/queries"
+import { DEFAULT_SETTINGS, settingsSchema, type Settings } from "@mb/stock-core/settings"
+import { addDays, marketDay, marketTime } from "@mb/stock-core/time"
+import { createQueries, decisionLatency, type EngineSummary as EngineSummaryOf } from "@mb/web-kit/queries"
 import { connection } from "next/server"
+import { getEpisodesBetween } from "./agent"
 import { collections } from "./db"
 
 /**
@@ -28,11 +26,8 @@ export const {
   getEngineState,
   getAudit,
   getCommands,
-  getSeedRuns,
   getNotifications,
   getRecentEvents,
-  getCycleEvents,
-  getAiCosts,
   getWireItems,
   getWireFacets,
   toTriggerViews,
@@ -41,12 +36,6 @@ export const {
 } = createQueries({
   collections,
   eventForViewer,
-  // A trigger links to the report of the cycle it started (the research page is keyed by report).
-  triggerLinks: async (cycleIds) => {
-    if (!cycleIds.length) return new Map<string, string>()
-    const cycles = await (await collections()).cycles.find({ _id: { $in: cycleIds } }, { projection: { report_id: 1 } }).toArray()
-    return new Map(cycles.flatMap((c) => (c.report_id ? [[c._id, `/research/${c.report_id}`] as const] : [])))
-  },
 })
 
 export const getSettingsDoc = async () => {
@@ -59,11 +48,6 @@ export const getSettings = async (): Promise<Settings> => {
   const doc = await getSettingsDoc().catch(() => null)
   const parsed = settingsSchema.safeParse(doc?.settings)
   return parsed.success ? parsed.data : DEFAULT_SETTINGS
-}
-
-export const getCycles = async (limit = 30) => {
-  await connection()
-  return (await collections()).cycles.find({}).sort({ started_at: -1 }).limit(limit).toArray()
 }
 
 // ─── Account ─────────────────────────────────────────────────────────────────
@@ -119,36 +103,12 @@ export const getLiveAccount = async () => {
 
 export type LiveAccount = NonNullable<Awaited<ReturnType<typeof getLiveAccount>>>
 
-// ─── Core book ───────────────────────────────────────────────────────────────
-
-/** Whether an id is a core book review's (its trades link to it where a cycle report's id would be). */
-export const isCoreReview = async (id: string) => {
-  await connection()
-  return !!(await (await collections()).coreReviews.findOne({ _id: id }, { projection: { _id: 1 } }))
-}
-
-/** Recent core reviews, newest first, without their heavy parts (what they were shown, the research, the model's raw answer). */
-export const listCoreReviews = async (limit = 12) => {
-  await connection()
-  return (await collections()).coreReviews.find({}, { projection: { context: 0, research: 0, output: 0 } }).sort({ created_at: -1 }).limit(limit).toArray()
-}
-
-export const getCoreReview = async (id: string) => {
-  await connection()
-  return (await collections()).coreReviews.findOne({ _id: id })
-}
-
 /** The days the core book held or traded something, oldest first, with each book's day and SPY's. */
 export const getBookDays = async () => {
   await connection()
   return (await collections()).dailyStats.find({ books: { $exists: true } }).sort({ trading_day: 1 }).toArray()
 }
 
-/** The core book's latest daily ranking (built every trading morning, whether the book is on or not). */
-export const getCoreRanking = async () => {
-  await connection()
-  return (await readCache<CoreRanking>(CORE_RANKING_KEY))?.data ?? null
-}
 
 const HISTORY = [
   { key: "1D", label: "1D" },
@@ -172,85 +132,17 @@ export const getEquitySeries = async (): Promise<EquitySeries[]> => {
   )
 }
 
-// ─── Reports, decisions, days ────────────────────────────────────────────────
+// ─── Decisions, days ─────────────────────────────────────────────────────────
 
-export type ReportSummary = Pick<ReportDoc, "_id" | "phase" | "trading_day" | "created_at" | "execution"> & {
-  headline: string
-  sentiment: string
-  stance: string
-  decisions: number
-  /** How much web research ran (absent on reports from before the news engine). */
-  research_mode: ResearchResult["mode"] | null
-}
-
-const REPORT_SUMMARY_PROJECTION = {
-  phase: 1,
-  trading_day: 1,
-  created_at: 1,
-  execution: 1,
-  "report.headline": 1,
-  "report.market.sentiment": 1,
-  "report.market.stance": 1,
-  "report.decisions.symbol": 1,
-  "research.mode": 1,
-} as const
-
-const toSummary = (doc: ReportDoc): ReportSummary => ({
-  _id: doc._id,
-  phase: doc.phase,
-  trading_day: doc.trading_day,
-  created_at: doc.created_at,
-  execution: doc.execution,
-  headline: doc.report.headline,
-  sentiment: doc.report.market.sentiment,
-  stance: doc.report.market.stance,
-  decisions: doc.report.decisions.length,
-  research_mode: doc.research?.mode ?? null,
-})
-
-/** A decision with the news items behind it, when an event cycle made it (the "Triggered by" line). */
+/** A decision with the news items behind it, when news woke the agent (the "Triggered by" line). */
 export type DecisionRow = DecisionDoc & { triggered_by?: { id: string; title: string; url: string | null }[] }
 
 const withTriggers = async (decisions: DecisionDoc[]): Promise<DecisionRow[]> => {
-  const ids = [...new Set(decisions.flatMap((d) => (d.trigger_kind === "event" ? (d.wire_item_ids ?? []) : [])))]
+  const ids = [...new Set(decisions.flatMap((d) => d.wire_item_ids ?? []))]
   if (!ids.length) return decisions
   const items = await (await collections()).wireItems.find({ _id: { $in: ids } }, { projection: { title: 1, url: 1 } }).toArray()
   const byId = new Map(items.map((i) => [i._id, { id: i._id, title: i.title, url: i.url }]))
-  return decisions.map((d) => (d.trigger_kind === "event" ? { ...d, triggered_by: (d.wire_item_ids ?? []).flatMap((id) => byId.get(id) ?? []) } : d))
-}
-
-export const getLatestReport = async (): Promise<ReportDoc | null> => {
-  await connection()
-  return (await collections()).reports.find({}, { projection: { context: 0 } }).sort({ created_at: -1 }).limit(1).next()
-}
-
-export const listReports = async (limit = 150, phase?: Phase): Promise<ReportSummary[]> => {
-  await connection()
-  const docs = await (await collections()).reports.find(phase ? { phase } : {}, { projection: REPORT_SUMMARY_PROJECTION }).sort({ created_at: -1 }).limit(limit).toArray()
-  return docs.map(toSummary)
-}
-
-export const getReport = async (id: string) => {
-  await connection()
-  const { reports, decisions, cycles } = await collections()
-  const report = await reports.findOne({ _id: id })
-  if (!report) return null
-  const [decisionDocs, cycle] = await Promise.all([decisions.find({ report_id: id }).sort({ created_at: 1 }).toArray().then(withTriggers), cycles.findOne({ _id: report.cycle_id })])
-  return { report, decisions: decisionDocs, cycle }
-}
-
-/** Lightweight report fields for page metadata and share images. */
-export const getReportMeta = async (id: string) => {
-  await connection()
-  return (await collections()).reports.findOne(
-    { _id: id },
-    { projection: { phase: 1, trading_day: 1, created_at: 1, "report.headline": 1, "report.summary": 1, "report.market.sentiment": 1 } },
-  )
-}
-
-export const listDecisions = async (day: string): Promise<DecisionRow[]> => {
-  await connection()
-  return withTriggers(await (await collections()).decisions.find({ trading_day: day }).sort({ created_at: -1 }).toArray())
+  return decisions.map((d) => (d.wire_item_ids?.length ? { ...d, triggered_by: d.wire_item_ids.flatMap((id) => byId.get(id) ?? []) } : d))
 }
 
 export const listRecentDecisions = async (limit = 60): Promise<DecisionRow[]> => {
@@ -316,22 +208,24 @@ export const listTrades = async (limit = 300): Promise<TradeRow[]> => {
 export const getDay = async (day: string) => {
   await connection()
   const db = await collections()
-  const [stats, cycles, reports, decisions, fills] = await Promise.all([
+  // The trading day in New York, midnight to midnight.
+  const from = marketTime(day, "00:00")
+  const to = marketTime(addDays(day, 1), "00:00")
+  const [stats, episodes, decisions, fills] = await Promise.all([
     db.dailyStats.findOne({ _id: day }),
-    db.cycles.find({ trading_day: day }).sort({ started_at: 1 }).toArray(),
-    db.reports.find({ trading_day: day }, { projection: REPORT_SUMMARY_PROJECTION }).sort({ created_at: 1 }).toArray(),
+    getEpisodesBetween(from, to),
     db.decisions.find({ trading_day: day }).sort({ created_at: 1 }).toArray(),
     loadFills(),
   ])
   const [trades, decisionRows] = await Promise.all([withRationale(fills.filter((f) => marketDay(f.at) === day)), withTriggers(decisions)])
-  return { stats, cycles, reports: reports.map(toSummary), decisions: decisionRows, trades }
+  return { stats, episodes, decisions: decisionRows, trades }
 }
 
 /** Days with any activity, newest first, merged with their stats. */
 export const listDays = async () => {
   await connection()
   const db = await collections()
-  const [stats, days] = await Promise.all([listDailyStats(), db.cycles.distinct("trading_day")])
+  const [stats, days] = await Promise.all([listDailyStats(), db.decisions.distinct("trading_day")])
   const byDay = new Map(stats.map((s) => [s.trading_day, s]))
   const all = [...new Set([...days, ...stats.map((s) => s.trading_day)])].sort().reverse()
   const counts = await db.decisions
@@ -443,7 +337,6 @@ export const BOOKS = [
   { key: "day", label: "Day trades" },
   { key: "swing", label: "Swing holds" },
   { key: "options", label: "Options" },
-  { key: "core", label: "Core book" },
 ] as const
 
 export type Book = (typeof BOOKS)[number]["key"]
@@ -486,48 +379,12 @@ const tally = <D extends Pick<DecisionDoc, "_id" | "action" | "status">>(
   }
 }
 
-/**
- * Results per AI setup and per book (day trades, swing holds, options). Realized P&L belongs to the
- * decision that opened the position: option fills map through their options position, and stock
- * fills to the latest bought entry of that symbol (positions are never added to, so that buy opened it).
- */
-export const getSetupStats = async () => {
-  await connection()
-  const db = await collections()
-  const [fills, decisions, structures] = await Promise.all([
-    loadFills(),
-    db.decisions.find({}, { projection: { action: 1, status: 1, instrument: 1, trigger_kind: 1, "request.setup": 1, "request.horizon": 1 } }).toArray(),
-    db.optionPositions.find({}, { projection: { decision_id: 1 } }).toArray(),
-  ])
-  const bySetup = new Map<Setup, SetupTally>(SETUPS.map((s) => [s, emptyTally()]))
-  const byBook = new Map<Book, SetupTally>(BOOKS.map((b) => [b.key, emptyTally()]))
-  const setupOf = (d: Pick<DecisionDoc, "request">) => bySetup.get(d.request?.setup) ?? bySetup.get("other")!
-  const bookOf = (d: Pick<DecisionDoc, "instrument" | "request">) => byBook.get(d.instrument === "option" ? "options" : d.request?.horizon === "intraday" ? "day" : "swing")!
-  // The core book's trades carry no trading setup: they count toward the core book alone.
-  tally({ fills, decisions, structures }, (d) => (d.trigger_kind === "core" ? [byBook.get("core")!] : [setupOf(d), bookOf(d)]))
-  return { setups: [...bySetup].map(([key, t]) => ({ key, ...t })), books: BOOKS.map((b) => ({ ...b, ...byBook.get(b.key)! })) }
-}
-
 // ─── News engine ("wire") ────────────────────────────────────────────────────
 
-export type WireCycleContext = { trigger: TriggerView | null; items: WireRowView[] }
-
-/** What started an event cycle: its trigger and the items behind it (report pages). */
-export const getWireForCycle = async (cycle: Pick<CycleDoc, "kind" | "wire_trigger_id" | "wire_item_ids"> | null): Promise<WireCycleContext> => {
-  await connection()
-  if (cycle?.kind !== "event") return { trigger: null, items: [] }
-  const { wireTriggers, wireItems } = await collections()
-  const [trigger, items] = await Promise.all([
-    cycle.wire_trigger_id ? wireTriggers.findOne({ _id: cycle.wire_trigger_id }) : null,
-    cycle.wire_item_ids?.length ? wireItems.find({ _id: { $in: cycle.wire_item_ids } }, { projection: ITEM_PROJECTION }).toArray() : [],
-  ])
-  return { trigger: trigger ? (await toTriggerViews([trigger]))[0] : null, items: items.map(toRowView) }
-}
-
 /** What started a decision, for the analytics tables. Decisions from before it was recorded have no kind. */
-const KIND_LABEL: Record<string, string> = { scheduled: "Schedule", price_move: "Price move", manual: "Owner (manual)", event: "News event", seed: "Seed buy", core: "Core review", unrecorded: "Not recorded (older)" }
+const KIND_LABEL: Record<string, string> = { agent: "The agent", scheduled: "Schedule (before the agent)", price_move: "Price move (before the agent)", manual: "Owner (manual)", event: "News event (before the agent)", seed: "Seed buy", core: "Core review", unrecorded: "Not recorded (older)" }
 
-/** News-engine analytics: does acting on events pay, how fast is it, and what does research cost now. */
+/** News-engine analytics: does acting on news pay, and how fast is it. */
 export const getWireAnalytics = async () => {
   await connection()
   const db = await collections()
@@ -553,7 +410,8 @@ export const getWireAnalytics = async () => {
     return [slot(byKind, d.trigger_kind ?? "unrecorded"), ...(category ? [slot(byCategory, category)] : [])]
   })
 
-  const eventDecisions = decisions.filter((d) => d.trigger_kind === "event")
+  // Decisions on news: the agent's carry the items that woke it.
+  const eventDecisions = decisions.filter((d) => (d.wire_item_ids?.length ?? 0) > 0)
   const weekDecisions = eventDecisions.filter((d) => d.created_at >= week)
   const filled = new Set(fills.flatMap((f) => (f.decision_id ? [f.decision_id] : [])))
   return {
@@ -562,7 +420,6 @@ export const getWireAnalytics = async () => {
     funnel: {
       items: activity.items,
       triggers: activity.triggers,
-      eventCycles: activity.eventCycles,
       decisions: weekDecisions.length,
       approved: weekDecisions.filter((d) => d.status !== "noop" && d.status !== "rejected" && d.checks?.length && d.checks.every((c) => c.ok)).length,
       filled: weekDecisions.filter((d) => filled.has(d._id)).length,
@@ -571,6 +428,5 @@ export const getWireAnalytics = async () => {
       eventDecisions.filter((d) => d.created_at >= month),
       (id) => itemById.get(id)?.first_seen_at,
     ),
-    researchSpend: activity.researchSpend,
   }
 }

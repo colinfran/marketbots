@@ -5,30 +5,33 @@ import { LivePrice } from "@mb/ui/live"
 import { Badge } from "@mb/ui/components/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mb/ui/components/table"
 import { ActionBadge, Empty, PageHeader, SymbolLink } from "@/components/bits"
+import { getAgentMemory } from "@/lib/agent"
 import { ago, decisionHref, price, titleCase } from "@/lib/format"
-import { getEngine, getLatestDecisions, getLatestReport, getLiveAccount, getSettings } from "@/lib/queries"
+import { getEngine, getLatestDecisions, getLiveAccount, getSettings } from "@/lib/queries"
 import { pageMetadata } from "@/lib/site"
 
 export const metadata: Metadata = pageMetadata({
-  title: "Stock market board: live prices and AI watchlist",
-  description: "Live prices for every stock StockMarketBot holds or watches, the index and sector ETFs it reads the tape with, and the AI's latest setup and decision on each.",
+  title: "Stock market board: live prices, holdings and the AI's watches",
+  description: "Live prices for every stock StockMarketBot holds or its AI agent is watching, the index and sector ETFs it reads the tape with, and the agent's latest decision on each.",
   path: "/markets",
 })
 
-const ROLES = ["Held", "Options", "Watchlist", "Benchmark"] as const
+const ROLES = ["Held", "Options", "Watched", "Benchmark"] as const
 type Role = (typeof ROLES)[number]
 
 export default async function MarketsPage() {
-  const [engine, live, report, settings, latest] = await Promise.all([getEngine(), getLiveAccount(), getLatestReport(), getSettings(), getLatestDecisions()])
+  const [engine, live, settings, latest, memory] = await Promise.all([getEngine(), getLiveAccount(), getSettings(), getLatestDecisions(), getAgentMemory()])
   const status = engine.status
   const quotes = new Map((status?.quotes ?? []).map((q) => [q.symbol, q]))
-  const watch = new Map((report?.report.watchlist ?? []).map((w) => [w.symbol, w]))
   const held = new Map((live?.positions ?? []).map((p) => [p.symbol, p]))
+  // The agent's watches name what it is waiting for on a stock.
+  const watches = new Map<string, string[]>()
+  for (const w of memory.watches) if (w.symbol) watches.set(w.symbol, [...(watches.get(w.symbol) ?? []), w.what])
   const roles = new Map<string, Set<Role>>()
   const tag = (symbol: string, role: Role) => roles.set(symbol, (roles.get(symbol) ?? new Set()).add(role))
   for (const s of held.keys()) tag(s, "Held")
   for (const o of live?.options ?? []) tag(o.underlying, "Options")
-  for (const s of watch.keys()) tag(s, "Watchlist")
+  for (const s of watches.keys()) tag(s, "Watched")
   for (const s of settings.universe.benchmarks) tag(s, "Benchmark")
   // Anything else the engine streams (e.g. a symbol the owner asked about) still gets a row.
   for (const s of quotes.keys()) if (!roles.has(s)) roles.set(s, new Set())
@@ -39,23 +42,7 @@ export default async function MarketsPage() {
     <div>
       <PageHeader
         title="Markets"
-        description={
-          <>
-            Every stock the bot holds or is watching, plus the index and sector ETFs it reads the tape with. Prices stream live from Alpaca through the engine. The watchlist
-            comes from the latest report
-            {report && (
-              <>
-                {" "}
-                (
-                <Link href={`/research/${report._id}`} className="hover:underline">
-                  {titleCase(report.phase)}, {ago(report.created_at)}
-                </Link>
-                )
-              </>
-            )}
-            .
-          </>
-        }
+        description="Every stock the bot holds or its agent is watching, plus the index and sector ETFs it reads the tape with. Prices stream live from Alpaca through the engine."
       />
       {!symbols.length ? (
         <Empty>No market data yet: the engine hasn&apos;t reported in.</Empty>
@@ -68,9 +55,8 @@ export default async function MarketsPage() {
                 <TableHead>Last (today)</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Setup</TableHead>
-                <TableHead className="min-w-72">Trigger</TableHead>
+                <TableHead className="min-w-72">Thesis or watch</TableHead>
                 <TableHead className="text-right">Stop / target</TableHead>
-                <TableHead className="text-right">Conv.</TableHead>
                 <TableHead>Latest AI call</TableHead>
                 <TableHead>Data</TableHead>
               </TableRow>
@@ -78,10 +64,9 @@ export default async function MarketsPage() {
             <TableBody>
               {symbols.map((symbol) => {
                 const q = quotes.get(symbol)
-                const w = watch.get(symbol)
                 const plan = held.get(symbol)?.plan
                 const d = latest[symbol]
-                const setup = w?.setup ?? plan?.setup
+                const href = d ? decisionHref(d) : null
                 return (
                   <TableRow key={symbol} className="align-top">
                     <TableCell>
@@ -99,17 +84,20 @@ export default async function MarketsPage() {
                         ))}
                       </div>
                     </TableCell>
-                    <TableCell className="text-sm">{setup ? (SETUP_INFO[setup as Setup]?.name ?? titleCase(setup)) : "—"}</TableCell>
-                    <TableCell className="text-muted-foreground text-xs whitespace-normal">{w ? w.trigger : plan ? plan.thesis : "—"}</TableCell>
-                    <TableCell className="text-muted-foreground text-right font-mono text-xs tabular-nums">
-                      {w || plan ? `${price(w?.stop_loss ?? plan?.stop_loss)} / ${price(w?.take_profit ?? plan?.take_profit)}` : "—"}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">{w ? `${w.conviction}/10` : "—"}</TableCell>
+                    <TableCell className="text-sm">{plan?.setup ? (SETUP_INFO[plan.setup as Setup]?.name ?? titleCase(plan.setup)) : "—"}</TableCell>
+                    <TableCell className="text-muted-foreground text-xs whitespace-normal">{plan ? plan.thesis : (watches.get(symbol)?.join("; ") ?? "—")}</TableCell>
+                    <TableCell className="text-muted-foreground text-right font-mono text-xs tabular-nums">{plan ? `${price(plan.stop_loss)} / ${price(plan.take_profit)}` : "—"}</TableCell>
                     <TableCell className="text-sm">
                       {d ? (
-                        <Link href={decisionHref(d) ?? `/research/${d.report_id}`} className="inline-flex items-center gap-1.5 hover:underline">
-                          <ActionBadge action={d.action} /> <span className="text-muted-foreground text-xs">{ago(d.at)}</span>
-                        </Link>
+                        href ? (
+                          <Link href={href} className="inline-flex items-center gap-1.5 hover:underline">
+                            <ActionBadge action={d.action} /> <span className="text-muted-foreground text-xs">{ago(d.at)}</span>
+                          </Link>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5">
+                            <ActionBadge action={d.action} /> <span className="text-muted-foreground text-xs">{ago(d.at)}</span>
+                          </span>
+                        )
                       ) : (
                         <span className="text-muted-foreground text-xs">none yet</span>
                       )}

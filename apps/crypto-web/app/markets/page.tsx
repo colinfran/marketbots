@@ -22,7 +22,7 @@ export default async function MarketsPage() {
     <div>
       <PageHeader
         title="Markets"
-        description="The Kraken spot universe the engine watches. Prices stream live from Kraken's WebSocket feed through the engine; indicators are computed in code each cycle."
+        description="The Kraken spot universe the engine watches. Prices stream live from Kraken's WebSocket feed through the engine; indicators are computed in code as each minute's bars arrive."
       />
       {!symbols.length ? (
         <Empty>No market data yet: the engine hasn&apos;t reported in.</Empty>

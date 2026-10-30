@@ -3,8 +3,9 @@ import type { DecisionDoc, EngineStatusDoc } from "@mb/crypto-core/db"
 import { eventForViewer } from "@mb/crypto-core/events"
 import { brierScore, calibrationTable, drawdownSeries, performanceMetrics, tradeStats } from "@mb/crypto-core/metrics"
 import { ACCOUNT_ID } from "@mb/crypto-core/venues"
-import { createQueries, decisionLatency, ITEM_PROJECTION, toRowView, type EngineSummary as EngineSummaryOf } from "@mb/web-kit/queries"
+import { createQueries, decisionLatency, type EngineSummary as EngineSummaryOf } from "@mb/web-kit/queries"
 import { connection } from "next/server"
+import { getEpisodesBetween } from "./agent"
 import { collections } from "./db"
 
 /**
@@ -20,11 +21,8 @@ export const {
   getEngineState,
   getAudit,
   getCommands,
-  getSeedRuns,
   getNotifications,
   getRecentEvents,
-  getCycleEvents,
-  getAiCosts,
   getWireItems,
   getWireItemsById,
   getWireFacets,
@@ -34,10 +32,7 @@ export const {
 } = createQueries({
   collections,
   eventForViewer,
-  // Idle cycles end with a debug-level cycle.completed; it's included so live views know the cycle is over.
-  recentEventsFilter: { $or: [{ level: { $ne: "debug" } }, { type: "cycle.completed" }] },
-  // A trigger links to the research page of the cycle it started.
-  triggerLinks: async (cycleIds) => new Map(cycleIds.map((id) => [id, `/research/${id}`])),
+  recentEventsFilter: { level: { $ne: "debug" } },
 })
 
 export const getAccount = async () => {
@@ -105,36 +100,6 @@ export const getFills = async (limit = 200, symbol?: string) => {
   return (await collections()).fills.find({ account_id: ACCOUNT_ID, ...(symbol ? { symbol } : {}) }).sort({ at: -1 }).limit(limit).toArray()
 }
 
-export const getCycles = async (limit = 50) => {
-  await connection()
-  return (await collections()).cycles.find({}, { projection: { steps: 0 } }).sort({ started_at: -1 }).limit(limit).toArray()
-}
-
-export const getCycle = async (id: string) => {
-  await connection()
-  const { cycles, research, decisions } = await collections()
-  const cycle = await cycles.findOne({ _id: id })
-  if (!cycle) return null
-  const [memo, items] = await Promise.all([
-    cycle.research_id ? research.findOne({ _id: cycle.research_id }) : null,
-    decisions.find({ cycle_id: id }).sort({ created_at: 1 }).toArray(),
-  ])
-  return { cycle, research: memo, decisions: items }
-}
-
-/** The newest cycle that reached the AI, with its research subjects and decisions (the "latest research" card). */
-export const getLatestAiCycle = async () => {
-  await connection()
-  const { cycles, research, decisions } = await collections()
-  const cycle = await cycles.find({ "decision_ids.0": { $exists: true } }, { projection: { steps: 0, candidates: 0 } }).sort({ started_at: -1 }).limit(1).next()
-  if (!cycle) return null
-  const [memo, items] = await Promise.all([
-    cycle.research_id ? research.findOne({ _id: cycle.research_id }, { projection: { subjects: 1, sources: 1, error: 1 } }) : null,
-    decisions.find({ cycle_id: cycle._id }, { projection: { symbol: 1, action: 1, "ai.conviction": 1, "execution.status": 1 } }).sort({ created_at: 1 }).toArray(),
-  ])
-  return { cycle, research: memo, decisions: items }
-}
-
 export const getDecisions = async ({ limit = 100, symbol }: { limit?: number; symbol?: string } = {}) => {
   await connection()
   return (await collections()).decisions.find(symbol ? { symbol } : {}).sort({ created_at: -1 }).limit(limit).toArray()
@@ -142,17 +107,13 @@ export const getDecisions = async ({ limit = 100, symbol }: { limit?: number; sy
 
 export const getDecision = async (id: string) => {
   await connection()
-  const { decisions, orders, fills, research } = await collections()
+  const { decisions, orders, fills } = await collections()
   const decision = await decisions.findOne({ _id: id })
   if (!decision) return null
-  const [ord, fl, memo] = await Promise.all([
-    orders.find({ decision_id: id }).toArray(),
-    fills.find({ decision_id: id }).sort({ at: 1 }).toArray(),
-    decision.research_id ? research.findOne({ _id: decision.research_id }, { projection: { memo: 1, sources: 1, model: 1, error: 1 } }) : null,
-  ])
+  const [ord, fl] = await Promise.all([orders.find({ decision_id: id }).toArray(), fills.find({ decision_id: id }).sort({ at: 1 }).toArray()])
   // How the thesis is doing now: the position it opened, if any.
   const position = await (await collections()).positions.findOne({ decision_id: id })
-  return { decision, orders: ord, fills: fl, research: memo, position }
+  return { decision, orders: ord, fills: fl, position }
 }
 
 export const getSettings = async () => {
@@ -190,29 +151,19 @@ export const getDays = async (limit = 180) => {
   return all.map((day) => ({ day, stats: byDay.get(day) ?? null, decisions: countByDay.get(day) ?? { total: 0, executed: 0 } }))
 }
 
-/** Everything that happened on one UTC day, oldest first. Only cycles that reached the AI are listed. */
+/** Everything that happened on one UTC day, oldest first: the agent's episodes, its decisions, fills and closed positions. */
 export const getDay = async (day: string) => {
   await connection()
-  const { dailyStats, cycles, decisions, fills, positions } = await collections()
+  const { dailyStats, decisions, fills, positions } = await collections()
   const range = dayRange(day)
-  const [stats, research, decisionDocs, fillDocs, closed] = await Promise.all([
+  const [stats, episodes, decisionDocs, fillDocs, closed] = await Promise.all([
     dailyStats.findOne({ account_id: ACCOUNT_ID, day }),
-    cycles.find({ started_at: range, "decision_ids.0": { $exists: true } }, { projection: { steps: 0 } }).sort({ started_at: 1 }).toArray(),
+    getEpisodesBetween(range.$gte, range.$lt),
     decisions.find({ created_at: range }).sort({ created_at: 1 }).toArray(),
     fills.find({ account_id: ACCOUNT_ID, at: range }).sort({ at: 1 }).toArray(),
     positions.find({ account_id: ACCOUNT_ID, status: "closed", closed_at: range }).sort({ closed_at: 1 }).toArray(),
   ])
-  return { stats, cycles: research, decisions: decisionDocs, fills: fillDocs, closed }
-}
-
-export const getBacktests = async (limit = 20) => {
-  await connection()
-  return (await collections()).backtests.find({}, { projection: { trades: 0 } }).sort({ created_at: -1 }).limit(limit).toArray()
-}
-
-export const getBacktest = async (id: string) => {
-  await connection()
-  return (await collections()).backtests.findOne({ _id: id })
+  return { stats, episodes, decisions: decisionDocs, fills: fillDocs, closed }
 }
 
 /**
@@ -297,16 +248,6 @@ export const getAnalytics = async () => {
   }
 }
 
-/** Recent research that covered a symbol, newest first (memo excerpt and sources). */
-export const getResearchFor = async (symbol: string, limit = 5) => {
-  await connection()
-  return (await collections()).research
-    .find({ subjects: symbol }, { projection: { memo: 1, sources: 1, started_at: 1, cycle_id: 1, model: 1, error: 1 } })
-    .sort({ started_at: -1 })
-    .limit(limit)
-    .toArray()
-}
-
 /** Latest decision per symbol (for the market board). */
 export const getLatestDecisions = async () => {
   await connection()
@@ -319,24 +260,7 @@ export const getLatestDecisions = async () => {
   return Object.fromEntries(rows.map((r) => [r._id, r]))
 }
 
-/** A cycle's wire context: what started it (event cycles) and the dossier the AI was given. */
-export const getWireForCycle = async (cycleId: string) => {
-  await connection()
-  const { cycles, research, wireTriggers, wireItems } = await collections()
-  const [cycle, memo] = await Promise.all([cycles.findOne({ _id: cycleId }, { projection: { kind: 1, wire_trigger_id: 1, wire_item_ids: 1, research_skip_reason: 1 } }), research.findOne({ cycle_id: cycleId }, { projection: { mode: 1, dossier: 1 } })])
-  const trigger = cycle?.wire_trigger_id ? await wireTriggers.findOne({ _id: cycle.wire_trigger_id }) : null
-  const items = cycle?.wire_item_ids?.length ? (await wireItems.find({ _id: { $in: cycle.wire_item_ids } }, { projection: ITEM_PROJECTION }).toArray()).map(toRowView) : []
-  return {
-    kind: cycle?.kind ?? null,
-    trigger: trigger ? (await toTriggerViews([trigger]))[0] : null,
-    items,
-    dossier: memo?.dossier ?? [],
-    mode: memo?.mode ?? null,
-    skipReason: cycle?.research_skip_reason ?? null,
-  }
-}
-
-/** News-engine analytics: does acting on events pay, how fast is it, and what does research cost now. */
+/** News-engine analytics: does acting on events pay, and how fast is it. */
 export const getWireAnalytics = async () => {
   await connection()
   const { decisions, wireItems } = await collections()
@@ -345,7 +269,8 @@ export const getWireAnalytics = async () => {
   const [scored, activity, eventDecisions] = await Promise.all([
     decisions.find({ outcome: { $ne: null } }, { projection: { trigger_kind: 1, outcome: 1, wire_item_ids: 1 } }).toArray(),
     getWireActivity(),
-    decisions.find({ trigger_kind: "event", created_at: { $gte: month } }, { projection: { created_at: 1, wire_item_ids: 1, risk: 1, execution: 1 } }).toArray(),
+    // The agent's decisions on news (they carry the items that woke it).
+    decisions.find({ "wire_item_ids.0": { $exists: true }, created_at: { $gte: month } }, { projection: { created_at: 1, wire_item_ids: 1, risk: 1, execution: 1 } }).toArray(),
   ])
   const rate = (list: { outcome: DecisionDoc["outcome"] }[]) => {
     const judged = list.filter((d) => d.outcome?.correct === true || d.outcome?.correct === false)
@@ -368,12 +293,10 @@ export const getWireAnalytics = async () => {
     funnel: {
       items: activity.items,
       triggers: activity.triggers,
-      eventCycles: activity.eventCycles,
       decisions: eventDecisions.filter((d) => d.created_at >= week).length,
       approved: eventDecisions.filter((d) => d.created_at >= week && d.risk?.approved).length,
       filled: eventDecisions.filter((d) => d.created_at >= week && (d.execution.status === "filled" || d.execution.status === "partial")).length,
     },
     ...decisionLatency(eventDecisions, (id) => itemById.get(id)?.first_seen_at),
-    researchSpend: activity.researchSpend,
   }
 }

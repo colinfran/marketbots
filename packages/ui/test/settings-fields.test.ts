@@ -1,19 +1,18 @@
 import { MODEL_ID_PATTERN } from "@mb/core/settings"
 import { describe, expect, it } from "vitest"
-import { AI_MODEL_FIELDS, AI_MODELS, parseField, selectChoices, type SettingsField } from "../src/lib/settings-fields"
+import { AGENT_SETTINGS_SECTIONS, AI_MODELS, parseField, selectChoices, type SettingsField } from "../src/lib/settings-fields"
 
-const field = (path: string) => AI_MODEL_FIELDS.find((f) => f.path === path)!
+const field = (path: string) => AGENT_SETTINGS_SECTIONS.flatMap((s) => s.fields).find((f) => f.path === path)!
 
-describe("the model dropdowns", () => {
-  it("offer the local model for research and decisions", () => {
-    expect(AI_MODEL_FIELDS.map((f) => f.path)).toEqual(["ai.models.research", "ai.models.decision"])
-    expect(selectChoices(field("ai.models.research"), "local/qwen3.6-35b-a3b-q2")).toEqual([{ value: "local/qwen3.6-35b-a3b-q2", label: "Qwen 3.6 35B-A3B" }])
-    expect(parseField(field("ai.models.decision"), "local/qwen3.6-35b-a3b-q2")).toBe("local/qwen3.6-35b-a3b-q2")
+describe("the model dropdown", () => {
+  it("offers the local model for the agent", () => {
+    expect(selectChoices(field("agent.model"), "local/qwen3.6-35b-a3b-q2")).toEqual([{ value: "local/qwen3.6-35b-a3b-q2", label: "Qwen 3.6 35B-A3B" }])
+    expect(parseField(field("agent.model"), "local/qwen3.6-35b-a3b-q2")).toBe("local/qwen3.6-35b-a3b-q2")
   })
 
-  it("keep offering a saved model that's no longer listed, so showing the form never changes it", () => {
-    expect(selectChoices(field("ai.models.decision"), "spacexai/grok-4.7").at(-1)).toEqual({ value: "spacexai/grok-4.7", label: "spacexai/grok-4.7" })
-    expect(selectChoices(field("ai.models.decision"), "local/qwen3.6-35b-a3b-q2")).toHaveLength(AI_MODELS.length)
+  it("keeps offering a saved model that's no longer listed, so showing the form never changes it", () => {
+    expect(selectChoices(field("agent.model"), "local/an-older-model").at(-1)).toEqual({ value: "local/an-older-model", label: "local/an-older-model" })
+    expect(selectChoices(field("agent.model"), "local/qwen3.6-35b-a3b-q2")).toHaveLength(AI_MODELS.length)
   })
 
   it("use ids the settings schema accepts", () => {
@@ -32,9 +31,9 @@ describe("dropdowns", () => {
   })
 
   it("label a stored value without changing it", () => {
-    const f: SettingsField = { path: "wire.event_research", label: "Event research", kind: "select", options: [{ value: "x_verify", label: "web check" }, { value: "none", label: "none" }] }
-    expect(selectChoices(f, "x_verify").map((c) => c.label)).toEqual(["web check", "none"])
-    expect(parseField(f, "x_verify")).toBe("x_verify")
+    const f: SettingsField = { path: "wire.emergency_action", label: "Critical bad news", kind: "select", options: [{ value: "tighten_stop", label: "tighten the stop" }, { value: "exit", label: "sell" }] }
+    expect(selectChoices(f, "tighten_stop").map((c) => c.label)).toEqual(["tighten the stop", "sell"])
+    expect(parseField(f, "tighten_stop")).toBe("tighten_stop")
   })
 
   it("store a None choice as null", () => {

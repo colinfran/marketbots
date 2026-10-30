@@ -11,7 +11,7 @@ import { Button } from "./components/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./components/table"
 import { CommandButton, CommandResult, useCommand } from "./command"
-import { Step, type StepStatus } from "./cycle-trail"
+import { Step, type StepStatus } from "./steps"
 import { useKit } from "./kit"
 import { ago, num, usd } from "./lib/format"
 import { useNow } from "./live"
@@ -429,6 +429,41 @@ export function AskAgentForm({ disabled }: { disabled: boolean }) {
         <Button type="submit" size="sm" disabled={busy || disabled || question.trim().length < 3}>
           {busy ? <LoaderIcon className="animate-spin" aria-hidden /> : <MessageCircleQuestionIcon aria-hidden />}
           Ask
+        </Button>
+      </div>
+      <CommandResult result={result} error={error} />
+    </form>
+  )
+}
+
+/** The owner's Wake the agent: a review of the named symbols, or of its book and the market, that it may act on. */
+export function WakeAgentForm({ disabled, placeholder }: { disabled: boolean; placeholder: string }) {
+  const [symbols, setSymbols] = useState("")
+  const { busy, result, error, send } = useCommand<{ type: "cycle.run_now"; symbols?: string[] }>()
+  const list = symbols
+    .split(/[\s,]+/)
+    .map((s) => s.trim().toUpperCase())
+    .filter(Boolean)
+    .slice(0, 5)
+  return (
+    <form
+      className="space-y-2"
+      onSubmit={(ev) => {
+        ev.preventDefault()
+        void send(list.length ? { type: "cycle.run_now", symbols: list } : { type: "cycle.run_now" }).then((ok) => ok && setSymbols(""))
+      }}
+    >
+      <div className="flex gap-2">
+        <input
+          aria-label="Symbols to review (optional)"
+          className="bg-background h-8 min-w-0 flex-1 rounded-md border px-2 text-sm"
+          placeholder={placeholder}
+          value={symbols}
+          onChange={(ev) => setSymbols(ev.target.value)}
+        />
+        <Button type="submit" size="sm" disabled={busy || disabled}>
+          {busy ? <LoaderIcon className="animate-spin" aria-hidden /> : null}
+          Wake the agent
         </Button>
       </div>
       <CommandResult result={result} error={error} />

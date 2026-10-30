@@ -14,7 +14,7 @@ import { pageMetadata } from "@/lib/site"
 
 export const metadata: Metadata = pageMetadata({
   title: "Crypto news engine",
-  description: "What CryptoMarketBot's own news engine sees around the clock: news outlets, regulators, exchanges, calendars and its own market data, and the triggers that start a focused AI cycle.",
+  description: "What CryptoMarketBot's own news engine sees around the clock: news outlets, regulators, exchanges, calendars and its own market data, and the triggers that wake the AI agent.",
   path: "/news",
 })
 
@@ -85,7 +85,7 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
         </section>
         <section>
           <SectionTitle>Triggers</SectionTitle>
-          <p className="text-muted-foreground mb-2 text-xs">When an item is out of the ordinary, the engine starts a focused cycle. Suppressed triggers show why they were held back.</p>
+          <p className="text-muted-foreground mb-2 text-xs">When an item is out of the ordinary, it wakes the agent. Suppressed triggers show why they were held back.</p>
           <TriggerList triggers={triggers} />
         </section>
       </div>

@@ -25,7 +25,7 @@ export function EvidenceList({ items, empty = "None given." }: { items: Evidence
     <ul className="space-y-1.5 text-sm">
       {items.map((e, i) => (
         <li key={i} className="flex gap-2">
-          <Badge variant="outline" className="mt-0.5 shrink-0 text-[10px] font-normal" title={e.verified_source ? "Backed by a source research retrieved" : undefined}>
+          <Badge variant="outline" className="mt-0.5 shrink-0 text-[10px] font-normal" title={e.verified_source ? "Backed by a source the AI saw" : undefined}>
             {KIND_LABEL[e.kind]}
           </Badge>
           <span className="leading-snug">

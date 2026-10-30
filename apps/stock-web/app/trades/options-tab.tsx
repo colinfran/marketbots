@@ -52,8 +52,8 @@ export async function OptionsTab() {
         <h2 className="text-foreground text-base font-semibold">How options trades work</h2>
         <ul className="list-disc space-y-1.5 pl-5">
           <li>
-            Each cycle, code loads a short menu of liquid contracts per stock: {o.min_dte}–{o.max_dte} days to expiration, open interest of at least {o.min_open_interest}, bid-ask
-            spread under {o.max_spread_pct}%. The AI can only choose from that menu.
+            When the agent asks, code loads a short menu of liquid contracts per stock: {o.min_dte}–{o.max_dte} days to expiration, open interest of at least {o.min_open_interest}, bid-ask
+            spread under {o.max_spread_pct}%. The agent can only choose from that menu.
           </li>
           <li>
             The contract bought must have a delta between {o.min_delta} and {o.max_delta}. Spreads buy one strike and sell a further one in the same expiration, as one order.

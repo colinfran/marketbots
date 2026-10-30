@@ -24,14 +24,10 @@ export function SystemHealth({ engine, problems }: { engine: EngineSummary; prob
               activity={
                 <>
                   {titleCase(s.cycle_state)}
-                  {s.current_phase ? ` · ${s.current_phase}` : ""}
                   {s.current_task ? ` · ${s.current_task}` : ""}
                 </>
               }
-              lastCycle={s.last_cycle ? `${s.last_cycle.phase} ${s.last_cycle.status}, ${ago(s.last_cycle.at)}` : "—"}
-            >
-              <KV label="Scheduler">{s.schedule.phase ? `${s.schedule.phase} due` : s.schedule.reason}</KV>
-            </EngineHealthCard>
+            />
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
@@ -52,7 +48,7 @@ export function SystemHealth({ engine, problems }: { engine: EngineSummary; prob
                 ))}
               </CardContent>
             </Card>
-            <AiHealthCard ai={s.ai} />
+            <AiHealthCard ai={s.ai} model={s.agent?.model ?? null} />
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Market</CardTitle>

@@ -12,9 +12,9 @@ export const site = {
   name: "CryptoMarketBot",
   url: origin(),
   title: "CryptoMarketBot: an AI crypto trading bot running on its own GPUs",
-  tagline: "An AI that runs on its own hardware, researches the crypto market on the web, then trades a Kraken paper wallet 24/7, in public.",
+  tagline: "An AI agent that runs on its own hardware, wakes when the crypto market moves, and trades a Kraken paper wallet 24/7, in public.",
   description:
-    "CryptoMarketBot is an autonomous AI crypto-trading experiment by Colin Franceschini. An open-weight AI model on the bot's own server researches Bitcoin, Ethereum, Solana and other coins with live web search, then buys and sells around the clock in a Kraken paper wallet while a risk engine checks every order. Every research memo, decision and trade is published live.",
+    "CryptoMarketBot is an autonomous AI crypto-trading experiment by Colin Franceschini. An open-weight AI agent on the bot's own server wakes on news, setups and price moves in Bitcoin, Ethereum, Solana and other coins, looks things up step by step, and buys and sells around the clock in a Kraken paper wallet while a risk engine checks every order. Everything the model writes, every decision and every trade is published live.",
   keywords: [
     "AI crypto trading bot",
     "crypto trading bot",

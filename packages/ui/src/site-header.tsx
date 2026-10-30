@@ -18,32 +18,30 @@ export type NavPage = { href: string; label: string; also?: string[] }
 type Section = { label: string; pages: NavPage[] }
 
 /**
- * Both dashboards have the same pages under the same URLs, in five sections. The header links to
- * each section's first page; a section with more than one page lists them in a second row.
+ * Both dashboards have the same pages under the same URLs. The header links to each section's first
+ * page; a section with more than one page lists them in a second row.
  */
 const SECTIONS: Section[] = [
   { label: "Live", pages: [{ href: "/", label: "Live" }] },
+  { label: "Agent", pages: [{ href: "/agent", label: "Agent" }] },
   {
     label: "Portfolio",
     pages: [
       { href: "/holdings", label: "Holdings" },
-      { href: "/trades", label: "Trades" },
+      { href: "/trades", label: "Trades", also: ["/decisions"] },
     ],
   },
   {
-    label: "Research",
+    label: "Markets",
     pages: [
-      { href: "/research", label: "AI research", also: ["/decisions"] },
-      { href: "/agent", label: "Agent" },
-      { href: "/news", label: "News" },
       { href: "/markets", label: "Markets" },
+      { href: "/news", label: "News" },
     ],
   },
   {
     label: "Performance",
     pages: [
       { href: "/analytics", label: "Analytics" },
-      { href: "/strategies", label: "Strategies" },
       { href: "/journal", label: "Journal" },
     ],
   },

@@ -128,7 +128,7 @@ const newsWorthy = (e: AnyEvent) => {
 type Filter = "all" | FeedFilter
 const FILTERS: Filter[] = ["all", "ai", "news", "trades", "system"]
 
-/** The real-time activity timeline: research, AI decisions, risk checks, orders, fills, system events. */
+/** The real-time activity timeline: the agent's wake-ups and lookups, decisions, risk checks, orders, fills, system events. */
 export function ActivityFeed({ limit = 60, className, compact = false }: { limit?: number; className?: string; compact?: boolean }) {
   const { events: catalog } = useKit()
   const { events, status } = useStream()

@@ -53,7 +53,7 @@ const rules = (s: Settings) => {
     `No entries on quotes older than ${num(k.max_quote_age_seconds)} s or spreads wider than ${num(k.max_spread_bps)} bps, and no re-buying a coin within ${minutes(k.reentry_cooldown_minutes)} of selling it. The AI can't close a position younger than ${minutes(k.min_hold_minutes)} unless its stop or invalidation hits, and stops only ever move up.`,
     `The agent has limits of its own: ${e.entries_per_day} new entries a day and ${e.entries_per_hour} an hour, ${e.max_open_positions} open positions it opened, at most 3 new coins per wake-up, no entry in a coin it acted on in the last ${minutes(e.symbol_action_minutes)}, and no re-entry within ${num(e.reentry_after_stop_hours)} h of a stop-out or ${num(e.flip_hours)} h of a sale. Each entry is sized at ${num(e.size_pct)}% of what the rules above allow, and an hour's entries can't commit more than ${num(e.commit_per_hour_pct)}% of equity.`,
     `A day down ${num(p.max_daily_loss_pct)}% blocks new entries until the next UTC day. A ${num(p.max_drawdown_pct)}% drawdown from peak equity engages the kill switch${p.drawdown_action === "halt_and_liquidate" ? " and sells everything" : ""}.`,
-    "Circuit breakers take trading away from the agent: 5 entries in a row rejected by the risk checks, most entries rejected in an hour, over 10% invalid answers, its own limits refusing 3 entries in a day, or the wallet down 3% in a day or 6% since the agent took over. Positions keep their stops, and only the owner can put it back in charge. A slow model only pauses its entries.",
+    "Circuit breakers pause the agent's new entries: 5 entries in a row rejected by the risk checks, most entries rejected in an hour, over 10% invalid answers, its own limits refusing 3 entries in a day, or the wallet down 3% in a day or 6% since the agent took over. It keeps managing what it holds, and only the owner can resume its entries. A slow model pauses them only until it is fast again.",
     "Stale data or an invalid answer means no trade.",
     "The AI can't change any of this: settings change only through audited owner commands. Every episode (each step, what it looked up and its answer), decision (including no-trades and rejected orders), risk check, order and fill is stored and shown on this site.",
   ]
@@ -129,12 +129,7 @@ export default async function AboutPage() {
         <h2 className="mb-3 text-base font-semibold">Is there an edge?</h2>
         <ul className="text-muted-foreground list-disc space-y-2 pl-5 text-sm leading-relaxed">
           <li>
-            The quant screens are{" "}
-            <Link href="/strategies" className="text-foreground underline underline-offset-2">
-              backtested
-            </Link>{" "}
-            bar by bar with fees and slippage, in-sample and out-of-sample, against buy-and-hold BTC. The AI isn&apos;t: a model asked about past prices has
-            probably seen what happened next.
+            The agent can&apos;t be backtested: a model asked about past prices has probably seen what happened next.
           </li>
           <li>
             So the AI is judged going forward: every decision, including the trades it passed on, is scored against what the price actually did.{" "}

@@ -19,18 +19,16 @@ type Status = EngineStatusBase<string, string>
 /** Green (up) or red (down). */
 export const HealthDot = ({ ok }: { ok: boolean }) => <span className={cn("inline-block size-2 rounded-full", ok ? "bg-up" : "bg-down")} aria-hidden />
 
-/** The engine card. The bot fills in what it's doing (`activity`), its last cycle, and any rows before it. */
+/** The engine card. The bot fills in what it's doing (`activity`) and any rows of its own. */
 export function EngineHealthCard({
   engine,
   dateTime,
   activity,
-  lastCycle,
   children,
 }: {
   engine: { online: boolean; heartbeatAgeS: number | null; status: Status }
   dateTime: (value: Date) => string
   activity: React.ReactNode
-  lastCycle: React.ReactNode
   children?: React.ReactNode
 }) {
   const s = engine.status
@@ -51,14 +49,14 @@ export function EngineHealthCard({
           {s.version} / {s.instance}
         </KV>
         {children}
-        <KV label="Last cycle">{lastCycle}</KV>
         <KV label="Errors (1h)">{s.errors_last_hour}</KV>
       </CardContent>
     </Card>
   )
 }
 
-export function AiHealthCard({ ai }: { ai: Status["ai"] }) {
+/** The model server as the engine sees it, and the agent's model. */
+export function AiHealthCard({ ai, model }: { ai: Status["ai"]; model: string | null }) {
   return (
     <Card>
       <CardHeader>
@@ -68,8 +66,7 @@ export function AiHealthCard({ ai }: { ai: Status["ai"] }) {
       </CardHeader>
       <CardContent>
         <KV label="Enabled">{ai.enabled ? "yes" : "no (LLM_URL missing)"}</KV>
-        <KV label="Research model">{ai.models.research}</KV>
-        <KV label="Decision model">{ai.models.decision}</KV>
+        <KV label="Agent's model">{model ? model.replace(/^local\//, "") : "—"}</KV>
         <KV label="Calls today">{ai.calls_today}</KV>
         <KV label="Last call">{ago(ai.last_call_at)}</KV>
         {ai.last_error && <p className="text-loss mt-2 line-clamp-3 text-xs">{ai.last_error}</p>}

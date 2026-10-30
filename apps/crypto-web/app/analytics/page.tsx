@@ -1,11 +1,10 @@
 import type { Metadata } from "next"
-import Link from "next/link"
-import { AiCostRows, NewsFunnelCard, SpendByTaskCard } from "@mb/ui/analytics"
+import { NewsFunnelCard } from "@mb/ui/analytics"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@mb/ui/components/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mb/ui/components/table"
 import { Delta, Empty, PageHeader, SectionTitle, Stat } from "@/components/bits"
 import { DailyPnlChart, DrawdownChart, EquityChart } from "@/components/charts"
-import { getAccount, getAiCosts, getAnalytics, getDailyStats, getEquitySeries, getWireAnalytics } from "@/lib/data"
+import { getAccount, getAnalytics, getDailyStats, getEquitySeries, getWireAnalytics } from "@/lib/data"
 import { num, pct, titleCase, usd } from "@/lib/format"
 import { pageMetadata } from "@/lib/site"
 
@@ -18,12 +17,11 @@ export const metadata: Metadata = pageMetadata({
 const rate = (correct: number, judged: number) => (judged ? `${Math.round((correct / judged) * 100)}%` : "—")
 
 export default async function AnalyticsPage() {
-  const [a, account, curve, daily, costs, w] = await Promise.all([getAnalytics(), getAccount(), getEquitySeries(365), getDailyStats(120), getAiCosts(30), getWireAnalytics()])
+  const [a, account, curve, daily, w] = await Promise.all([getAnalytics(), getAccount(), getEquitySeries(365), getDailyStats(120), getWireAnalytics()])
   const t = a.trades
   const r = a.risk
   const base = a.decisions.baseline
   const cal = a.decisions.calibration
-  const totalCost = costs.reduce((s, c) => s + c.cost, 0)
   // Today (UTC) is still running, so only finished days count toward green days.
   const today = new Date().toISOString().slice(0, 10)
   const finished = daily.filter((d) => d.day < today)
@@ -78,15 +76,7 @@ export default async function AnalyticsPage() {
       </div>
 
       <section>
-        <SectionTitle
-          action={
-            <Link href="/strategies" className="text-muted-foreground text-sm hover:underline">
-              By strategy
-            </Link>
-          }
-        >
-          By pair
-        </SectionTitle>
+        <SectionTitle>By pair</SectionTitle>
         {a.bySymbol.length === 0 ? (
           <Empty>No closed trades yet.</Empty>
         ) : (
@@ -235,34 +225,12 @@ export default async function AnalyticsPage() {
               )}
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">AI cost, last 30 days: ${totalCost.toFixed(2)}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {costs.length === 0 ? (
-                <p className="text-muted-foreground text-sm">No AI calls yet.</p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-xs">Day (UTC)</TableHead>
-                      <TableHead className="text-right text-xs">Calls</TableHead>
-                      <TableHead className="text-right text-xs">Failed</TableHead>
-                      <TableHead className="text-right text-xs">Cost</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <AiCostRows costs={costs} />
-                </Table>
-              )}
-            </CardContent>
-          </Card>
         </div>
       </section>
 
       <section>
         <SectionTitle>News engine</SectionTitle>
-        <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid gap-4 lg:grid-cols-2">
           <NewsFunnelCard funnel={w.funnel} medianLatencyS={w.medianLatencyS} latencySamples={w.latencySamples} />
           <Card>
             <CardHeader>
@@ -289,7 +257,6 @@ export default async function AnalyticsPage() {
               </Table>
             </CardContent>
           </Card>
-          <SpendByTaskCard title="AI spend per day by task" dayLabel="Day (UTC)" days={w.researchSpend} />
         </div>
       </section>
     </div>
