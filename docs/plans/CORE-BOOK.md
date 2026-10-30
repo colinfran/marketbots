@@ -1,6 +1,6 @@
 # Plan: a long-term core book
 
-Status: **approved on 2026-10-27**, with every recommendation in §12 taken. Steps 1–5 of §11 are built and deployed to the stock engine (2026-10-27); step 6 (switching it on) is the owner's, and crypto (step 7) follows two weeks of stock results. The design as built is in [STOCK.md](../STOCK.md#core-book-long-term-holdings); where it refined this plan:
+Status: **removed on 2026-10-29** (agent only, [LOCAL-AI.md §8.11](LOCAL-AI.md#811-agent-only-2026-102930)): the agent manages every position, including the ones the core book opened, and nothing below runs any more. Kept as the record of what was built. Before that: **approved on 2026-10-27**, with every recommendation in §12 taken. Steps 1–5 of §11 are built and deployed to the stock engine (2026-10-27); step 6 (switching it on) is the owner's, and crypto (step 7) follows two weeks of stock results. The design as built was in STOCK.md's "Core book" section until 2026-10-29 (in git history); where it refined this plan:
 
 - The score divides by volatility floored at 15% (§5), and the ranking uses completed sessions only.
 - A buy is clamped to its caps (per holding, the book's room to target, the theme's room, the cash) rather than rejected, and rejected under 2% of equity; a buy's own stop must be at least 3% below the price; there are no buys when the review's research failed.

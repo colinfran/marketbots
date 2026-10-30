@@ -74,7 +74,7 @@ The shared packages are `packages/config`, `packages/core`, `packages/engine-kit
   ```
 
   In PowerShell: `$env:UPDATE_CONTRACTS = "1"; pnpm --filter @mb/crypto-engine test; Remove-Item Env:UPDATE_CONTRACTS`.
-- **Test counts** never go down (1,084 across the repo on 2026-10-27).
+- **Test counts** never go down (1,078 across the repo on 2026-10-30, after the timed cycles, the seed, the backtester and the old AI runner were removed with their tests).
 - A commit that changes behavior names the change in its message.
 
 ## Gate, commit, deploy
@@ -83,7 +83,7 @@ After each change:
 
 1. **Gate**: `pnpm typecheck && pnpm test && pnpm lint && pnpm build`, all green (the baseline had no warnings; keep it that way). (Git Bash or PowerShell 7; Windows PowerShell 5.1 has no `&&`, so run them one by one there.) Refactors also need unchanged contract snapshots, and a change to engine startup, a Dockerfile or `compose.yml` a boot test of the new engine images with `compose.smoke.yml` ([docs/SERVER.md §6.3](docs/SERVER.md#63-boot-testing-new-images-against-a-copy)).
 2. **One commit.** The owner pushes to GitHub; a push to `main` deploys the dashboards whose paths changed.
-3. **Deploy the engines** whose images changed: `docker compose up -d --build <bot>-engine` (a change in a package both engines use means both). Timing and the after-deploy checks: [docs/SERVER.md §5](docs/SERVER.md#5-everyday-operations). Never deploy an engine during a seed run.
+3. **Deploy the engines** whose images changed: `docker compose up -d --build <bot>-engine` (a change in a package both engines use means both). Timing and the after-deploy checks: [docs/SERVER.md §5](docs/SERVER.md#5-everyday-operations). Never deploy an engine in the middle of an agent episode.
 
 ## Docs
 

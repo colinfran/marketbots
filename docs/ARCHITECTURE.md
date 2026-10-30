@@ -46,8 +46,8 @@ External: Kraken (CLI wallet in its volume), Alpaca, ~150 news sources, and the 
 | Shared | How |
 | --- | --- |
 | Scraper | One container, `http://scraper:8790` on the compose network. Three renders at a time; each caller (the `X-Client` header, else the engine container's address) may hold at most 8 of the 16 queue places, so one bot can't starve the other. If it dies, only the headless news sources go down. |
-| Local model | One llama.cpp server on both GPUs (`llm`, Qwen 3.6 35B-A3B at 2-bit) on the internal `ai` network, `http://llm:8080` (OpenAI-compatible), with a slot per bot and one for news. It runs every AI call of both engines: research, decisions and article summaries. If it is down, the engines still protect positions but make no new decisions ([SERVER.md §9](SERVER.md#9-the-local-model-server-llm)). |
-| Search service | One SearXNG container, `http://search:8080` on the compose network, that runs the web searches of research (`@mb/wire/research`) for both engines. If it is down, research fails and cycles decide without it. |
+| Local model | One llama.cpp server on both GPUs (`llm`, Qwen 3.6 35B-A3B at 2-bit) on the internal `ai` network, `http://llm:8080` (OpenAI-compatible), with a slot per bot and one for news. It runs every AI call of both engines: the agents' episodes, their research and the article summaries. If it is down, the engines still protect positions but make no new decisions ([SERVER.md §9](SERVER.md#9-the-local-model-server-llm)). |
+| Search service | One SearXNG container, `http://search:8080` on the compose network, that runs the web searches of the agents' research tool (`@mb/wire/research`) for both engines, on free search engines only. If it is down, research fails and the agent decides without it. |
 | History store | One Postgres container (TimescaleDB, pgvector) on the internal `ai` network, with a database and a role per bot (`crypto_history`, `stock_history`): each engine's `HISTORY_URL` holds only its own password. Each engine writes its closed 1-minute bars and archives its news there (`@mb/history`, [plans/LOCAL-AI.md §6](plans/LOCAL-AI.md#6-the-history-store-history)). If it is down, only history stops. |
 | Atlas cluster | One cluster, a separate database per bot. |
 | The server's IP | Outbound rate limits (SEC, GDELT, ForexFactory…) apply to both bots together. |
@@ -70,7 +70,7 @@ marketbots/
 │  ├─ core/            @mb/core            pure shared schemas and helpers
 │  ├─ engine-kit/      @mb/engine-kit      engine runtime
 │  ├─ history/         @mb/history         the history store: Postgres client, migrations, bars, news archive
-│  ├─ agent/           @mb/agent           the agent runtime: attention queue, episodes, watches, shadow book
+│  ├─ agent/           @mb/agent           the agent runtime: attention queue, episodes, tools, watches, breakers
 │  ├─ wire/            @mb/wire            the news engine
 │  ├─ ui/              @mb/ui              client-safe React
 │  ├─ web-kit/         @mb/web-kit         server-only dashboard helpers
@@ -92,10 +92,10 @@ Both bots were moved in from their old repos unchanged and then refactored onto 
 | Package | Holds | Used by |
 | --- | --- | --- |
 | `@mb/core` | Pure shared schemas and helpers, no I/O: `math`, `stream-token` (prefix as a parameter), settings base pieces and helpers, the shared command schemas, the event envelope and the events both bots define identically, base collections, indexes and document types, wire types, `metrics`, `indicators`, generic `time` | every app and package |
-| `@mb/engine-kit` | Engine runtime, generic over each bot's settings, events and commands: log, lease, heartbeat, bus, stream server, command processor, Mongo connect, state stores, alerts, AI call log/repair/runner (the local model server)/prompt parts, `ControlPlane`, `StatusReporter`, `EventCycleQueue`, bootstrap, env base, test helpers | both engines |
+| `@mb/engine-kit` | Engine runtime, generic over each bot's settings, events and commands: log, lease, heartbeat, bus, stream server, command processor, Mongo connect, state stores, alerts, the AI call log and prompt parts, the live model feed (`ai/monitor`: every model call's thinking and output, streamed once a second; `ai/model-server`: the server's slots), `ControlPlane`, `StatusReporter`, bootstrap, env base, test helpers | both engines |
 | `@mb/wire` | The news engine: the formerly mirrored files, shared source helpers, `sharedCatalog()`, a `makeLexicon()` skeleton, `enrich/` for article summaries, and `research/` for local research (web search, with the metered search APIs paced through the month, then the local model) | both engines |
 | `@mb/history` | The history store ([plans/LOCAL-AI.md §6](plans/LOCAL-AI.md#6-the-history-store-history)): the Postgres client (node-postgres; PGlite in tests), the migrations, the 1-minute bar writer, the news archive (wire items and triggers copied from MongoDB before their TTL), the moves after each news item, the job runner the backfills use, `HistoryStore`. `docker/initdb.sh` creates each bot's database and role | both engines |
-| `@mb/agent` | The agent runtime ([plans/LOCAL-AI.md §8](plans/LOCAL-AI.md#8-the-agent)), generic over each bot's tools, brief and answer: the attention queue, the episode loop and its llama.cpp client, the tool registry and the tools both bots share (news, the dossier, an item, the calendar, history, past news), watches and notes, the envelope and circuit breakers (pure functions; at level auto a trip drops the agent to shadow through the engine), the shadow book, the journal, `Agent`. Each bot's `src/agent/` decides into the shadow book or, at level auto, the paper account through the bot's own execution path, and the timed cycles stop. The types and settings both bots share are in `@mb/core/agent` and `@mb/core/settings` | both engines |
+| `@mb/agent` | The agent runtime ([plans/LOCAL-AI.md §8](plans/LOCAL-AI.md#8-the-agent)), generic over each bot's tools, brief and answer: the attention queue, the episode loop and its llama.cpp client, the tool registry and the tools both bots share (news, the dossier, an item, the calendar, history, past news, and web research on one question for P2/P3 episodes), watches and notes, the envelope and circuit breakers (pure functions; a trip pauses the agent's new entries until the owner resumes them, and exits continue), the journal, `Agent`. The agent is the only decision-maker: each bot's `src/agent/` trades the paper account through the bot's own execution path, and there are no timed cycles. The types and settings both bots share are in `@mb/core/agent` and `@mb/core/settings` | both engines |
 | `@mb/ui` | Client-safe React: the shadcn primitives, design tokens (`styles.css`), app-shell components (including the navigation, below), the live-UI shell driven by a per-bot event catalog, shared page sections (the Agent page's included: `agent`, `agent-events`), the charts (`@mb/ui/charts`) | both dashboards |
 | `@mb/web-kit` | Server-only dashboard helpers: auth factory, database, command routes, shared queries (the agent's in `agent`), formatting, metadata, error reporting | both dashboards |
 
@@ -105,12 +105,15 @@ Both dashboards have the same pages under the same URLs, in five sections (`pack
 
 | Section | Pages |
 | --- | --- |
-| Live | `/`: the account at a glance, the latest cycle as it runs, the engine card and the activity feed |
-| Portfolio | Holdings (with the owner's sell and close buttons), Trades, and on stock the Core book (`/core`) |
-| Research | AI research (`/research`: cycles or reports, and decisions), Agent (`/agent`: the agent's episodes as they run, its shadow book, watches and notes, the owner's questions; `/agent/<id>`: one episode), News (`/news`: the news engine, its sources and triggers), Markets |
-| Performance | Analytics, Strategies (each strategy's or setup's results beside why it should work), Journal |
+| Live | `/`: the account at a glance, the model's live feed, the engine card and the activity feed |
+| Agent | `/agent`: the model's live feed (every call's thinking and answer as it streams, once a second), the agent's episodes as they run, its watches and notes, the owner's questions and "Wake the agent"; `/agent/<id>`: one episode |
+| Portfolio | Holdings (with the owner's sell and close buttons), Trades (and on crypto each decision, `/decisions/<id>`) |
+| Markets | Markets, News (`/news`: the news engine, its sources and triggers) |
+| Performance | Analytics, Journal |
 | About | How it works |
-| Admin | Owner only |
+| Admin | Owner only: settings (the agent's included, and on crypto the strategy toggles), system health, the audit log |
+
+The live feed and the agent's events push to the page as they happen (the feed batches a model call's text once a second); everything else refreshes every 2 seconds. The model's thinking is owner-only unless `agent.public_thinking` is on: it quotes untrusted news text.
 
 Each piece of information has one page; others link to it. The equity and daily P&L charts are only on Analytics, and the news sources only on News (with their errors when the owner is signed in; Admin → System has a one-line summary).
 
@@ -161,11 +164,11 @@ Live trading settings are not configuration: they live in each bot's database an
 
 | Crypto | Stock |
 | --- | --- |
-| Kraken CLI wallet, books, ledger, reconciliation, WebSocket book, candles, backtester, strategies, risk engine | Alpaca REST and streams, orders/OCO/brackets, options (menus, entries, exits), scheduler and sessions, price board and layers, scan universe |
-| Prompts and the AI output schema | Prompts and the report schema |
+| Kraken CLI wallet, books, ledger, reconciliation, WebSocket book, candles, strategies (the agent's setups), risk engine | Alpaca REST and streams, orders/OCO/brackets, options (menus, entries, exits), sessions, price board and layers, scan universe |
+| The agent's prompts, tools and answer | The agent's prompts, tools and answer |
 | Wire catalog, lexicon rules, policy rules, domain sources (chain, DefiLlama, derivatives, Korea, hacks…) | Wire catalog, lexicon rules, policy rules, domain sources (EDGAR, halts, FDA, insiders, congress, MarketBeat…) |
-| Same-name events with different payloads (`market.ticker`, `cycle.*`, `order.*`, `position.*`, `risk.checked`…), the bot section of `engine_status`, the `cycles` / `decisions` / `daily_stats` shapes | Same |
-| Pages: Live (`/`), holdings, markets/[pair], decisions/[id], strategies and backtests, `/api/candles`, decision card, tables, chart wrappers (crypto's data and formats), `buildTrail` | Pages: Live (`/`), holdings, core book, markets/[symbol], research/[id] report, options tab, public JSON API, report view, market status, tables, chart wrappers (stock's data and formats), `buildTrail` |
+| Same-name events with different payloads (`market.ticker`, `order.*`, `position.*`, `risk.checked`…), the bot section of `engine_status`, the `decisions` / `daily_stats` shapes | Same |
+| Pages: holdings, markets/[pair], decisions/[id], `/api/candles`, decision card, tables, chart wrappers (crypto's data and formats) | Pages: holdings, markets/[symbol], options tab, public JSON API, market status, tables, chart wrappers (stock's data and formats) |
 
 ## Reading CRYPTO.md and STOCK.md
 

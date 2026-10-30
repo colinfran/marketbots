@@ -281,8 +281,8 @@ docker compose up -d --build                   # everything whose image or confi
 ```
 
 - Naming the service is how you deploy one bot without touching the other. Shared code (`packages/*`) is compiled into each image at build time, so a change there reaches an engine only when that engine is rebuilt.
-- **Stock**: any time, market hours included; pick a moment with no cycle or seed run in progress. Stops rest at Alpaca; options exits wait for the engine, which is back in about a minute.
-- **Crypto**: pick a moment with no cycle or seed run in progress. Stops are watched only by the engine; it is back in about a minute.
+- **Stock**: any time, market hours included; pick a moment when the agent isn't in an episode (the Agent page's live feed shows no model call running). Stops rest at Alpaca; options exits wait for the engine, which is back in about a minute.
+- **Crypto**: pick a moment when the agent isn't in an episode. Stops are watched only by the engine; it is back in about a minute.
 - A stop is graceful (30 s grace period): the engine releases its lease, so the new container takes over at once.
 - **History**: any time. While it's down the engines keep up to 50,000 bars each in memory and copy the news they missed when it's back; trading never waits for it.
 - **llm**: any time. Recreating it reloads the model (~1 minute), during which the summaries back off and retry; trading never waits for it.
@@ -665,23 +665,23 @@ nvidia-smi                                                  # ~6.8 GB used on ea
 - **GPU:** ~6.8 GB on each card.
 - **Power:** the 2080 SUPER is capped at 180 W (§2).
 
-**Decisions** (`AiRunner` in `@mb/engine-kit`; the *Decision model* in Admin, `local/<alias>`, the only kind of model id settings accept):
+**The agent** (`@mb/agent/client`; the agent's *Model* in Admin, `local/<alias>`, the only kind of model id settings accept): each step of an episode is one streamed chat completion, constrained by a JSON schema, on the bot's slot.
 - **Cost:** none. Every call is in `ai_calls` with `cost_usd: 0` and `cost_source: "local"`, with its tokens and time.
-- **Thinking:** on, and capped by the call's timeout. The engine keeps ~120 s for reading the prompt and writing the answer (up to ~4,500 tokens), and lets the model think for the rest at 40 tokens/s, between 256 and 4,096 tokens. That gives 4,096 at the 240 s decision timeout and 2,400 at 180 s. At 90 s it gets almost no thinking, and a long answer alone can outrun 90 s, so keep *Event decision timeout* at 180 s or more.
-- **A failed attempt** is asked again, cooler, up to three times, on the same model.
+- **Thinking:** per priority, `agent.limits.pN.thinking_tokens` in Admin: none for P0 and P1 by default (fast answers to price moves and the owner), 1,024 for P2 and 2,048 for P3. 0 turns it off.
+- **The live model feed:** every call's thinking and output stream to the dashboards' live feed (`llm.call`, then `llm.delta` once a second, then `llm.done`), with the server's slots every second while someone is watching (`llm.status`, from `/slots`). The thinking is owner-only unless `agent.public_thinking` is on.
 - **Without LLM_URL:** no AI at all. The engine still protects positions, but opens nothing new.
 
-**Research** (`@mb/wire/research/local`; the *Research model* in Admin): the model can't browse, so the engine does the browsing for it, from the bot's research prompt:
+**Research** (`@mb/wire/research/local`, the agent's `research` tool, offered to P2 and P3 episodes only): the model can't browse, so the engine does the browsing for it, for one question:
 1. The model reads the request and writes up to 6 web searches (no thinking).
-2. They run two at a time, for results from the last day (gap fills and event checks) or week (full research): first on the `search` service's free news engines. A search those find fewer than 3 results for goes to the metered providers in turn, and if it's still short, to the paid web engine (below).
+2. They run two at a time, for results from the last week, on the `search` service's free news engines only. The agent's research never uses the metered providers or the paid engine (below); nothing else calls research since the timed cycles were removed.
 3. The model picks up to 5 results to read in full, and the scraper fetches them (paywalled sites are refused, as for summaries).
 4. The model writes the memo from the results and articles alone, citing their URLs.
 
 A run takes about a minute, and costs nothing (`ai_calls`: `cost_source: "local"`, the searches counted). Its limits:
-- **Time:** the memo gets what the research timeout leaves (~40 s of 60 s). It keeps ~40 s for reading and writing (~1,200 tokens), thinks only with the rest (up to 1,024 tokens, which needs ~66 s), and is capped at what the time left can write at 40 tokens/s. A short timeout gets a shorter memo without thinking, not a timeout. For a memo that thinks, keep *Research timeout* and *Event research timeout* at 90 s or more.
+- **Time:** the tool gets what the episode has left, 45 s to 3 minutes (with less it tells the agent to answer from what it has). The memo gets what the searches and reading leave. It keeps ~40 s for reading and writing (~1,200 tokens), thinks only with the rest (up to 1,024 tokens, which needs ~66 s), and is capped at what the time left can write at 40 tokens/s. A short time gets a shorter memo without thinking, not a timeout.
 - **No X.** The memo says so, rather than guessing at sentiment.
 - **No paywalled articles.** Their search snippets can still be cited.
-- **A search that finds nothing** is reported in the memo, and the cycle decides from our feeds. Only an unreachable search service or model fails the research.
+- **A search that finds nothing** is reported in the memo, and the agent decides from our feeds. Only an unreachable search service or model fails the research.
 
 **The search service (`search`):** SearXNG, pinned by digest, on the default network (it needs the internet), with no host port. The engines reach it at `SEARCH_URL=http://search:8080`. Its settings are `packages/wire/docker/searxng.yml`: only the four engines research uses, JSON answers, no rate limiter (only the engines call it). `searxng-start.sh` starts it with a random secret key (it keeps no sessions) and the proxy's URL (§3.7).
 - **Free engines** answer from our own IP: DuckDuckGo News, Yahoo News and Bing News. Bing News filters by date itself. The other two can't, so SearXNG would skip them on a dated search: they're asked without a date, and only results dated since the research's start date are kept.
