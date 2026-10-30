@@ -26,10 +26,17 @@ const KIND: Record<ModelCallKind, { label: string; icon: typeof BotIcon; classNa
 
 const seconds = (ms: number) => (ms < 60_000 ? `${(ms / 1000).toFixed(ms < 10_000 ? 1 : 0)} s` : `${Math.floor(ms / 60_000)} m ${Math.round((ms % 60_000) / 1000)} s`)
 
-/** A box of streaming text that keeps its newest line in view, unless the reader scrolled up. */
+/** How long a call has run and, once it ended, how fast it wrote and how much. */
+const stats = (call: ModelCallView, ms: number) =>
+  `${seconds(ms)}${call.done?.tokens_per_s ? ` · ${Math.round(call.done.tokens_per_s)} tok/s` : ""}${call.done && call.done.completion_tokens > 0 ? ` · ${num(call.done.completion_tokens, 0)} written` : ""}`
+
+/**
+ * A box of streaming text that keeps its newest line in view, unless the reader scrolled up. Text
+ * that was already finished when the box appeared opens at its first line.
+ */
 function Streaming({ text, label, icon: Icon, live, className }: { text: string; label: string; icon: typeof BrainIcon; live: boolean; className?: string }) {
   const box = useRef<HTMLPreElement>(null)
-  const pinned = useRef(true)
+  const pinned = useRef(live)
   useLayoutEffect(() => {
     const el = box.current
     if (el && pinned.current) el.scrollTop = el.scrollHeight
@@ -66,38 +73,44 @@ function KindBadge({ kind }: { kind: ModelCallKind }) {
   )
 }
 
+/**
+ * A call's failure, its text and its episode. Block children, so the text boxes take the width they
+ * are given: in a grid cell, an unbroken line (an agent step's JSON) would widen the cell past the card.
+ */
+function CallBody({ call, textShown }: { call: ModelCallView; textShown: boolean }) {
+  const running = !call.done
+  const empty = !call.thinking && !call.output
+  return (
+    <>
+      {call.done && !call.done.ok && <p className="text-loss text-xs">Failed: {call.done.error ?? "unknown error"}</p>}
+      {call.thinking && <Streaming text={call.thinking} label="Thinking" icon={BrainIcon} live={running && !call.output} />}
+      {call.output && <Streaming text={call.output} label={call.kind === "agent" ? "Its step" : "Output"} icon={FileTextIcon} live={running} />}
+      {empty && (running || !textShown) && <p className="text-muted-foreground text-xs">{textShown ? "Reading its prompt…" : "Its text is shown to the owner."}</p>}
+      {call.episode_id && (
+        <Link href={`/agent/${call.episode_id}`} className="text-muted-foreground inline-block text-xs hover:underline">
+          The episode{call.step ? `, step ${call.step}` : ""}
+        </Link>
+      )}
+    </>
+  )
+}
+
 /** One call: running, with its text streaming, or ended. */
 export function ModelCallCard({ call, now, textShown }: { call: ModelCallView; now: number; textShown: boolean }) {
   const running = !call.done
-  const ms = call.done ? call.done.ms : now - call.started_at
-  const empty = !call.thinking && !call.output
   return (
-    <article className={cn("rounded-lg border p-3", running && "border-foreground/20 shadow-sm")}>
+    <article className={cn("space-y-2 rounded-lg border p-3", running && "border-foreground/20 shadow-sm")}>
       <header className="flex flex-wrap items-center gap-2">
         <KindBadge kind={call.kind} />
-        <h3 className="min-w-0 flex-1 truncate text-sm font-medium" title={call.label}>
+        <h3 className="min-w-0 grow basis-40 truncate text-sm font-medium" title={call.label}>
           {call.label}
         </h3>
         <span className="text-muted-foreground flex items-center gap-1.5 text-xs tabular-nums">
           {running ? <LoaderIcon className="size-3 motion-safe:animate-spin" aria-hidden /> : null}
-          {seconds(ms)}
-          {call.done?.tokens_per_s ? ` · ${Math.round(call.done.tokens_per_s)} tok/s` : ""}
-          {call.done && call.done.completion_tokens > 0 ? ` · ${num(call.done.completion_tokens, 0)} written` : ""}
+          {stats(call, call.done ? call.done.ms : now - call.started_at)}
         </span>
       </header>
-      {call.done && !call.done.ok && <p className="text-loss mt-1 text-xs">Failed: {call.done.error ?? "unknown error"}</p>}
-      {!empty && (
-        <div className="mt-2 grid gap-2">
-          {call.thinking && <Streaming text={call.thinking} label="Thinking" icon={BrainIcon} live={running && !call.output} />}
-          {call.output && <Streaming text={call.output} label={call.kind === "agent" ? "Its step" : "Output"} icon={FileTextIcon} live={running} />}
-        </div>
-      )}
-      {empty && running && <p className="text-muted-foreground mt-2 text-xs">{textShown ? "Reading its prompt…" : "Its text is shown to the owner."}</p>}
-      {call.episode_id && (
-        <Link href={`/agent/${call.episode_id}`} className="text-muted-foreground mt-2 inline-block text-xs hover:underline">
-          The episode{call.step ? `, step ${call.step}` : ""}
-        </Link>
-      )}
+      <CallBody call={call} textShown={textShown} />
     </article>
   )
 }
@@ -155,15 +168,14 @@ export function ModelFeed({ textShown, recent = 12, className }: { textShown: bo
                 <details className="group rounded-lg border">
                   <summary className="hover:bg-muted/40 flex cursor-pointer list-none flex-wrap items-center gap-2 px-3 py-2">
                     <KindBadge kind={c.kind} />
-                    <span className="min-w-0 flex-1 truncate text-sm">{c.label}</span>
+                    <span className="min-w-0 grow basis-40 truncate text-sm">{c.label}</span>
                     <span className={cn("text-xs tabular-nums", c.done?.ok ? "text-muted-foreground" : "text-loss")}>
                       {c.done?.ok ? "" : "failed · "}
-                      {seconds(c.done?.ms ?? 0)}
-                      {c.done?.tokens_per_s ? ` · ${Math.round(c.done.tokens_per_s)} tok/s` : ""}
+                      {stats(c, c.done?.ms ?? 0)}
                     </span>
                   </summary>
-                  <div className="border-t p-3">
-                    <ModelCallCard call={c} now={now} textShown={textShown} />
+                  <div className="space-y-2 border-t p-3">
+                    <CallBody call={c} textShown={textShown} />
                   </div>
                 </details>
               </li>
