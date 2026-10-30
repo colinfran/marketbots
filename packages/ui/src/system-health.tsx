@@ -161,6 +161,7 @@ export function DatabaseStorageCard({ storage }: { storage: DatabaseStorageView 
             {bytes(d.bytes)}
           </KV>
         ))}
+        {az && storage.used_bytes !== null && <KV label="Logs and system files">{bytes(Math.max(0, az.used_bytes - storage.used_bytes))}</KV>}
         {az && <KV label="Azure measured">{ago(az.at)}</KV>}
         {errors.map((e) => (
           <p key={e} className="text-loss mt-2 line-clamp-3 text-xs">
@@ -169,7 +170,7 @@ export function DatabaseStorageCard({ storage }: { storage: DatabaseStorageView 
         ))}
         <p className="text-muted-foreground mt-2 text-xs">
           {az
-            ? "The Azure DocumentDB free tier, shared by both bots. Azure counts the disk: the databases plus their logs and system files."
+            ? "The Azure DocumentDB free tier, shared by both bots. Azure counts the whole disk; logs and system files are the rest of it beyond the databases (the database engine's write-ahead log, its own files and working space)."
             : "The Azure DocumentDB free tier, shared by both bots: the databases as MongoDB reports them. Azure's own count, with logs and system files, needs the AZURE_* variables."}
         </p>
       </CardContent>
