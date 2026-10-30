@@ -30,3 +30,17 @@ describe("sign-in code email", () => {
     expect(body.html).not.toContain("href")
   })
 })
+
+describe("useSend settings", () => {
+  it.each([
+    ["USESEND_API_KEY", { usesendApiKey: () => null }],
+    ["USESEND_BASE_URL", { usesendBaseUrl: () => null }],
+    ["USESEND_FROM_EMAIL", { usesendFrom: () => null }],
+  ])("sends nothing without %s: there is no default", async (name, missing) => {
+    const fetch = vi.fn()
+    vi.stubGlobal("fetch", fetch)
+    const send = email({ appName: "TestBot", env: { ...env, ...missing } as unknown as DashboardEnv }).sendMagicLinkEmail({ to: "owner@example.com", url: "https://bot.example/x", minutes: 5 })
+    await expect(send).rejects.toThrow(`${name} is not set`)
+    expect(fetch).not.toHaveBeenCalled()
+  })
+})

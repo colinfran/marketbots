@@ -4,7 +4,8 @@ import { HOST_DB } from "@mb/core/host"
 /**
  * Server-side environment for a dashboard (Vercel), under the variable names both bots use.
  * Nothing here is ever sent to the browser: the only value a browser sees is the public engine
- * stream URL, handed out with each token. Each app binds its own defaults (database name, sender).
+ * stream URL, handed out with each token. Each app binds its own default database name; the owner's
+ * address and the email settings have no defaults and come only from the environment.
  */
 
 const read = (name: string) => {
@@ -12,19 +13,19 @@ const read = (name: string) => {
   return v ? v : null
 }
 
-export const dashboardEnv = ({ dbName, appName }: { dbName: string; appName: string }) => ({
+export const dashboardEnv = ({ dbName }: { dbName: string }) => ({
   mongoUri: () => read("MONGODB_URI"),
   mongoDb: () => read("MONGODB_DB_NAME") ?? dbName,
   /** The host agent's database on the same cluster (Admin → Server), shared by both dashboards. */
   hostDb: () => read("HOST_DB_NAME") ?? HOST_DB,
   /** Signs owner session cookies (32+ chars). Better Auth reads it itself; this only checks it's set. */
   betterAuthSecret: () => read("BETTER_AUTH_SECRET"),
-  /** The only address that can sign in. Nobody else gets a sign-in link or an account. */
-  ownerEmail: () => read("OWNER_EMAIL") ?? "colin.franceschini@gmail.com",
-  /** useSend delivers the sign-in emails. */
+  /** The only address that can sign in. Nobody else gets a sign-in link or an account. Without it, nobody can sign in. */
+  ownerEmail: () => read("OWNER_EMAIL"),
+  /** useSend delivers the sign-in emails; all three are needed to send one. */
   usesendApiKey: () => read("USESEND_API_KEY"),
-  usesendBaseUrl: () => read("USESEND_BASE_URL") ?? "https://franceschini.email",
-  usesendFrom: () => read("USESEND_FROM_EMAIL") ?? `${appName} <no-reply@colinfran.com>`,
+  usesendBaseUrl: () => read("USESEND_BASE_URL"),
+  usesendFrom: () => read("USESEND_FROM_EMAIL"),
   /** Shared with the engine; signs the short-lived stream tokens. */
   streamTokenSecret: () => read("STREAM_TOKEN_SECRET"),
   /** Public WebSocket URL of the engine behind your reverse proxy, e.g. wss://engine.example.com/v1/stream */

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto"
 import { emailOTP } from "better-auth/plugins"
 import { describe, expect, it } from "vitest"
-import { hashIp, UNUSED_OTP_PATHS } from "../src/auth"
+import { createAuth, hashIp, UNUSED_OTP_PATHS } from "../src/auth"
 
 /** The hash each dashboard stored before the auth factory was shared (the login rate-limit keys). */
 const before = (salt: string, value: string) => createHash("sha256").update(`${salt}${value}`).digest("hex").slice(0, 32)
@@ -15,6 +15,26 @@ describe("hashIp", () => {
 
   it("never gives the same key in both bots", () => {
     expect(hashIp("cmb-ip.", "203.0.113.7")).not.toBe(hashIp("smb-ip.", "203.0.113.7"))
+  })
+})
+
+describe("authConfigured", () => {
+  const configured = (ownerEmail: string | null) =>
+    createAuth({
+      appName: "TestBot",
+      ipSalt: "test-ip.",
+      env: { betterAuthSecret: () => "x".repeat(32), mongoUri: () => "mongodb://db.example", mongoDb: () => "test", siteUrl: () => null, ownerEmail: () => ownerEmail },
+      mongoClient: () => {
+        throw new Error("not used")
+      },
+      collections: () => Promise.reject(new Error("not used")),
+      sendMagicLinkEmail: async () => {},
+      sendSignInCodeEmail: async () => {},
+    }).authConfigured()
+
+  it("needs OWNER_EMAIL: there is no default owner", () => {
+    expect(configured("owner@example.com")).toBe(true)
+    expect(configured(null)).toBe(false)
   })
 })
 

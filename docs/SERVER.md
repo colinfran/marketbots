@@ -34,7 +34,7 @@ The free tier has no backups and no high availability, and pauses after 60 days 
 
 **AI**: no outside AI service and no AI key. Both engines use the local model server and its search service (§9).
 
-**useSend** (`USESEND_API_KEY`): sends the owner's sign-in magic links, and the sign-in codes the dashboard asks for when it runs as an installed Home Screen app (that app keeps its own cookies, so a link opened in the browser wouldn't sign it in). Links and codes only ever go to `OWNER_EMAIL`; nobody else can sign in.
+**useSend** (`USESEND_API_KEY`, `USESEND_BASE_URL`, `USESEND_FROM_EMAIL`; no defaults): sends the owner's sign-in magic links, and the sign-in codes the dashboard asks for when it runs as an installed Home Screen app (that app keeps its own cookies, so a link opened in the browser wouldn't sign it in). Links and codes only ever go to `OWNER_EMAIL`; nobody else can sign in.
 
 **Random secrets**: each bot has its own `STREAM_TOKEN_SECRET` and `BETTER_AUTH_SECRET`; never reuse one across bots. Generate each with:
 
@@ -158,11 +158,12 @@ Set for Production and Preview, with the same values as the bot's env file. Verc
 | `MONGODB_DB_NAME` | SHARED | `cryptomarketbot` |
 | `STREAM_TOKEN_SECRET` | SHARED | **identical** to the engine's |
 | `BETTER_AUTH_SECRET` | DASHBOARD | 32+ characters; changing it signs you out everywhere |
-| `USESEND_API_KEY` | DASHBOARD | the useSend key |
+| `OWNER_EMAIL` | DASHBOARD | the only address that can sign in; required, no default |
+| `USESEND_API_KEY`, `USESEND_BASE_URL`, `USESEND_FROM_EMAIL` | DASHBOARD | the useSend key, its instance's URL and the verified sender; required, no defaults |
 | `ENGINE_STREAM_URL` | DASHBOARD | `wss://engine.cryptomarketbot.app/v1/stream` |
 | `NEXT_PUBLIC_DISPLAY_TIMEZONE` | DASHBOARD | `America/Los_Angeles` |
 | `HOST_DB_NAME` | DASHBOARD | optional: the host agent's database (default `serverstats`, §11) |
-| `SITE_URL`, `OWNER_EMAIL`, `USESEND_BASE_URL`, `USESEND_FROM_EMAIL` | DASHBOARD | optional; the defaults are in `.env.crypto.example` |
+| `SITE_URL` | DASHBOARD | optional: defaults to the project's production domain |
 
 **Stock** (the stockmarketbot.app project):
 
@@ -172,11 +173,12 @@ Set for Production and Preview, with the same values as the bot's env file. Verc
 | `MONGODB_DB_NAME` | SHARED | `stockmarketbot` |
 | `STREAM_TOKEN_SECRET` | SHARED | **identical** to the engine's |
 | `BETTER_AUTH_SECRET` | DASHBOARD | 32+ characters; changing it signs you out everywhere |
-| `USESEND_API_KEY` | DASHBOARD | the useSend key |
+| `OWNER_EMAIL` | DASHBOARD | the only address that can sign in; required, no default |
+| `USESEND_API_KEY`, `USESEND_BASE_URL`, `USESEND_FROM_EMAIL` | DASHBOARD | the useSend key, its instance's URL and the verified sender; required, no defaults |
 | `ENGINE_STREAM_URL` | DASHBOARD | `wss://engine.stockmarketbot.app/v1/stream` |
 | `DISCORD_WEBHOOK_URL` | DASHBOARD | optional: unhandled dashboard errors go to Discord (the engine reads the same variable for its alerts) |
 | `HOST_DB_NAME` | DASHBOARD | optional: the host agent's database (default `serverstats`, §11) |
-| `SITE_URL`, `OWNER_EMAIL`, `USESEND_BASE_URL`, `USESEND_FROM_EMAIL` | DASHBOARD | optional; the defaults are in `.env.stock.example` |
+| `SITE_URL` | DASHBOARD | optional: defaults to the project's production domain |
 
 Nothing from the ENGINE sections goes to Vercel: the dashboards hold no broker or AI keys. Vercel sets `VERCEL_PROJECT_PRODUCTION_URL` itself (the default for `SITE_URL`); sign in on the production domain, not on preview URLs.
 
@@ -756,8 +758,8 @@ A run takes about a minute, and costs nothing (`ai_calls`: `cost_source: "local"
 | Headless news sources down in Admin | The scraper isn't running or is unhealthy: `docker compose ps scraper`, `docker compose logs scraper`, the health check in §5.3. |
 | Header says "No stream" | `ENGINE_STREAM_URL` isn't set on Vercel (redeploy after adding it). |
 | Stream stuck on "reconnecting" | Caddy isn't running or lacks the site, `STREAM_ALLOWED_ORIGINS` doesn't include the exact dashboard origin (handshake refused), or `STREAM_TOKEN_SECRET` differs between Vercel and the engine (connection closed with 4003). |
-| "Owner sign-in is not configured" | `BETTER_AUTH_SECRET` (32+ characters) or `MONGODB_URI` is missing on Vercel. |
-| No sign-in email arrives | `USESEND_API_KEY` is missing or wrong, or the sender domain isn't verified in useSend (Vercel function logs show the error). Only `OWNER_EMAIL` is ever emailed. |
+| "Owner sign-in is not configured" | `BETTER_AUTH_SECRET` (32+ characters), `MONGODB_URI` or `OWNER_EMAIL` is missing on Vercel. |
+| No sign-in email arrives | `USESEND_API_KEY`, `USESEND_BASE_URL` or `USESEND_FROM_EMAIL` is missing or wrong, or the sender domain isn't verified in useSend (Vercel function logs show the error). Only `OWNER_EMAIL` is ever emailed. |
 | Vercel skips a build that changed a dashboard | The change was outside the app and its workspace dependencies, e.g. a package the app imports without listing it in `package.json` (§8.2). List it, or redeploy by hand. |
 | A deploy is blocked for storage, or *Functions Storage* is near 10 GB | Too many kept deployments (§8.4). |
 | Vercel build can't resolve `@mb/...` | *Include files outside the root directory* is off (§8.1). |

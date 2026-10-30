@@ -10,10 +10,14 @@ export const email = ({ appName, env }: { appName: string; env: DashboardEnv }) 
   const send = async (message: { to: string; subject: string; html: string; text: string }) => {
     const apiKey = env.usesendApiKey()
     if (!apiKey) throw new Error("USESEND_API_KEY is not set")
-    const res = await fetch(`${env.usesendBaseUrl().replace(/\/+$/, "")}/api/v1/emails`, {
+    const baseUrl = env.usesendBaseUrl()
+    if (!baseUrl) throw new Error("USESEND_BASE_URL is not set")
+    const from = env.usesendFrom()
+    if (!from) throw new Error("USESEND_FROM_EMAIL is not set")
+    const res = await fetch(`${baseUrl.replace(/\/+$/, "")}/api/v1/emails`, {
       method: "POST",
       headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
-      body: JSON.stringify({ from: env.usesendFrom(), ...message }),
+      body: JSON.stringify({ from, ...message }),
       signal: AbortSignal.timeout(15_000),
     })
     if (!res.ok) throw new Error(`useSend email delivery failed (HTTP ${res.status}): ${(await res.text()).slice(0, 500)}`)

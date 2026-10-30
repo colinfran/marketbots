@@ -67,8 +67,8 @@ export const createAuth = ({
   sendMagicLinkEmail: (message: { to: string; url: string; minutes: number }) => Promise<void>
   sendSignInCodeEmail: (message: { to: string; code: string; minutes: number }) => Promise<void>
 }) => {
-  /** Sign-in needs BETTER_AUTH_SECRET (32+ chars) and MongoDB; without them everyone is public. */
-  const authConfigured = () => (env.betterAuthSecret()?.length ?? 0) >= 32 && !!env.mongoUri()
+  /** Sign-in needs BETTER_AUTH_SECRET (32+ chars), MongoDB and OWNER_EMAIL; without them everyone is public. */
+  const authConfigured = () => (env.betterAuthSecret()?.length ?? 0) >= 32 && !!env.mongoUri() && !!env.ownerEmail()
 
   const hash = (value: string) => hashIp(ipSalt, value)
 
@@ -162,7 +162,7 @@ export const createAuth = ({
 /** app/api/auth/[...all]: magic-link and code sign-in, link verification, sign-out (503 until sign-in is configured). */
 export const authRoute = ({ auth, authConfigured }: Pick<ReturnType<typeof createAuth>, "auth" | "authConfigured">) =>
   toNextJsHandler(async (request) =>
-    authConfigured() ? auth().handler(request) : NextResponse.json({ message: "Owner sign-in is not configured (BETTER_AUTH_SECRET / MONGODB_URI)." }, { status: 503 }),
+    authConfigured() ? auth().handler(request) : NextResponse.json({ message: "Owner sign-in is not configured (BETTER_AUTH_SECRET / MONGODB_URI / OWNER_EMAIL)." }, { status: 503 }),
   )
 
 /**
