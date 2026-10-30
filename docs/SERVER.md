@@ -175,6 +175,7 @@ Set for Production and Preview, under the Vercel name, with the value of the `.e
 | `USESEND_API_KEY`, `USESEND_BASE_URL` | the same names | the useSend key and its instance's URL; required, no defaults |
 | `USESEND_FROM_EMAIL` | `CRYPTO_USESEND_FROM_EMAIL` | the verified sender; required, no default |
 | `ENGINE_STREAM_URL` | `CRYPTO_ENGINE_STREAM_URL` | `wss://engine.cryptomarketbot.app/v1/stream` |
+| `DISCORD_WEBHOOK_URL` | `CRYPTO_DISCORD_WEBHOOK_URL` | optional: unhandled dashboard errors go to the engine's Discord channel |
 | `NEXT_PUBLIC_DISPLAY_TIMEZONE` | `NEXT_PUBLIC_DISPLAY_TIMEZONE` | `America/Los_Angeles` |
 | `HOST_DB_NAME` | `HOST_DB_NAME` | optional: the host agent's database (default `serverstats`, §11) |
 | `SITE_URL` | `CRYPTO_SITE_URL` | optional: defaults to the project's production domain |
