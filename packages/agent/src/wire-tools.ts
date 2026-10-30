@@ -1,6 +1,7 @@
 import type { WireItemDoc } from "@mb/core/wire"
 import { cleanLine, fenceUntrusted } from "@mb/engine-kit/util/text"
 import { upcomingMacro } from "@mb/wire/calendar"
+import type { LocalResearch } from "@mb/wire/research/local"
 import { buildDossier, renderLine, summaryLine } from "@mb/wire/dossier"
 import type { Collection } from "mongodb"
 import { z } from "zod"
@@ -155,3 +156,37 @@ export const historyTools = <C extends string>(d: Pick<WireToolsDeps<C>, "histor
     },
   }),
 ]
+
+/** The least time web research is worth starting with, and the most it is given. */
+const RESEARCH_MIN_MS = 45_000
+const RESEARCH_MAX_MS = 180_000
+
+/**
+ * research: web research on one question, for what our feeds don't cover. The model plans the
+ * searches, the search service runs them on its free engines only (never the metered providers or
+ * the paid proxy), the scraper reads the best articles, and the model writes a short memo citing
+ * them; every step streams to the live model feed. Slow, so only reviews and background episodes
+ * are offered it, and it fits itself into the episode's tool time.
+ */
+export const researchTool = (research: LocalResearch | null, model: () => string, now: () => number = Date.now): AgentTool =>
+  defineTool({
+    name: "research",
+    description:
+      "web research on one question our feeds don't answer: it searches the web, reads the best articles and returns a short memo citing them. Slow (1-3 min), so ask one focused question. Args: {question}.",
+    args: z.object({ question: z.string().describe("One focused question, e.g. why SOL/USD fell 8% today.") }),
+    minPriority: 2,
+    resultChars: 6_000,
+    run: async ({ question }, tc) => {
+      if (!research) return "web research is unavailable here (no search service)"
+      const q = cleanLine(question, 300)
+      if (q.length < 8) return "ask a full question"
+      const left = (tc.deadline ?? now() + RESEARCH_MAX_MS) - now() - 5_000
+      if (left < RESEARCH_MIN_MS) return "not enough time left in this episode for web research: answer from what you have"
+      const fromDate = new Date(now() - 7 * 86_400_000).toISOString().slice(0, 10)
+      const r = await research({ model: model(), prompt: q, fromDate, timeoutMs: Math.min(left, RESEARCH_MAX_MS), signal: tc.signal, label: cleanLine(q, 80), freeOnly: true })
+      if (r.error) return `the research failed: ${r.error}`
+      for (const s of r.sources) tc.urls.add(s.url)
+      const sources = r.sources.slice(0, 10).map((s) => `- ${cleanLine(s.title, 120)} (${s.domain}) ${s.url}`)
+      return [fenceUntrusted("research memo", r.memo), sources.length ? `SOURCES\n${sources.join("\n")}` : "No sources could be read."].join("\n\n")
+    },
+  })

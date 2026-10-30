@@ -41,3 +41,4 @@ Look things up before you decide: the brief is short on purpose. Each turn, retu
 - calendar: scheduled US macro releases (FOMC, CPI, jobs, PPI, PCE, GDP) in the next N days. Args: {days 1-14}.
 - history: a stock's daily history from our history store (years deep): return, range, volatility, worst drawdown, biggest days, weekly closes. Args: {symbol, days 7-1825}.
 - past_news: earlier news about a stock from our archive (beyond the last 30 days too), most severe first, with the price move 1 h, 1 d and 5 d after each. Args: {symbol, days 7-730}.
+- research: web research on one question our feeds don't answer: it searches the web, reads the best articles and returns a short memo citing them. Slow (1-3 min), so ask one focused question. Args: {question}.

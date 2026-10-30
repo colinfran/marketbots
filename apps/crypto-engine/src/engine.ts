@@ -6,6 +6,7 @@ import type { SettingsPatch } from "@mb/crypto-core/settings"
 import type { WireCategory, WireItemDoc } from "@mb/crypto-core/wire"
 import type { AiCallLog } from "@mb/engine-kit/ai/call-log"
 import type { ModelCalls } from "@mb/engine-kit/ai/monitor"
+import type { LocalResearch } from "@mb/wire/research/local"
 import { ControlPlane, type ControlWording } from "@mb/engine-kit/control/plane"
 import { StatusReporter } from "@mb/engine-kit/control/status"
 import { errorMessage, type Logger } from "@mb/engine-kit/log"
@@ -64,6 +65,8 @@ export type EngineDeps = {
   calls: AiCallLog
   /** The live model feed. */
   models?: ModelCalls
+  /** The agent's web research; null without the search service. */
+  research?: LocalResearch | null
   alerts: Alerts
   stream: StreamServer
   wire: Wire
@@ -137,6 +140,7 @@ export class Engine {
       history: d.history ?? null,
       calls: d.calls,
       models: d.models,
+      research: d.research ?? null,
       llmUrl: d.env.LLM_URL ?? null,
       pause: {
         get: () => d.state.state.agent_pause ?? null,

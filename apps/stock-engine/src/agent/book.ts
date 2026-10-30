@@ -1,5 +1,6 @@
 import { checkEntry, entryRoomUsd, type EnvelopeHistory } from "@mb/agent/envelope"
 import type { HistoryStore } from "@mb/history/store"
+import type { LocalResearch } from "@mb/wire/research/local"
 import type { AlpacaAccount, AlpacaPosition } from "@mb/stock-core/alpaca"
 import type { ChainContract, RiskState } from "@mb/stock-core/context"
 import { formatTime, marketDay, marketTime, minutesBetween } from "@mb/stock-core/time"
@@ -16,6 +17,8 @@ import { isSessionOpen, type Session } from "../bot/session"
 export type StockAgentDeps = {
   ctx: EngineContext
   history: HistoryStore<WireCategory> | null
+  /** Web research (the research tool); null without the search service. */
+  research?: LocalResearch | null
   session: () => Session | null
   /** The latest price no older than five minutes: the broker's stream, else the price layers. */
   price: (symbol: string) => number | null

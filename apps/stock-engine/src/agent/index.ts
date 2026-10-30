@@ -4,6 +4,7 @@ import { newsObservations } from "@mb/agent/observations"
 import { Agent, type AgentBot, type Pause, type Promotion } from "@mb/agent/runtime"
 import type { AiCallLog } from "@mb/engine-kit/ai/call-log"
 import type { ModelCalls } from "@mb/engine-kit/ai/monitor"
+import type { LocalResearch } from "@mb/wire/research/local"
 import type { HistoryStore } from "@mb/history/store"
 import { stockAgentAnswerSchema, type StockAgentAnswer } from "@mb/stock-core/agent"
 import type { EventDataMap } from "@mb/stock-core/events"
@@ -46,6 +47,7 @@ export const createStockAgent = ({
   history,
   calls,
   models,
+  research,
   llmUrl,
   session,
   layerPrice,
@@ -58,6 +60,8 @@ export const createStockAgent = ({
   calls: Pick<AiCallLog, "record">
   /** The live model feed: each step streams there. */
   models?: ModelCalls
+  /** Web research for the research tool; null without the search service. */
+  research?: LocalResearch | null
   llmUrl: string | null
   session: () => Session | null
   /** The news engine's price layers (a price no older than `maxAgeMs`, or null). */
@@ -70,7 +74,7 @@ export const createStockAgent = ({
   promotion?: { get: () => Promotion | null; set: (p: Promotion) => Promise<void> }
 }): StockAgent => {
   const price = (symbol: string) => ctx.prices.fresh(symbol, MAX_PRICE_AGE_MS) ?? layerPrice(symbol, MAX_PRICE_AGE_MS)
-  const deps: StockAgentDeps = { ctx, history, session, price, snapshot, offered: new Map(), reviews: new Map() }
+  const deps: StockAgentDeps = { ctx, history, research: research ?? null, session, price, snapshot, offered: new Map(), reviews: new Map() }
   let observer: StockObserver | null = null
   const known = (symbol: string) => TICKER_PATTERN.test(symbol) && price(symbol) !== null
   const bot: AgentBot<StockAgentAnswer> = {

@@ -2,6 +2,7 @@ import { checkEntry, entryRoomUsd, type EnvelopeHistory } from "@mb/agent/envelo
 import { roundTo } from "@mb/crypto-core/math"
 import type { Settings } from "@mb/crypto-core/settings"
 import type { HistoryStore } from "@mb/history/store"
+import type { LocalResearch } from "@mb/wire/research/local"
 import type { WireCategory } from "@mb/crypto-core/wire"
 import type { EngineContext } from "../orchestrator/context"
 import { formatPrice } from "../venues/kraken/pairs"
@@ -11,6 +12,8 @@ import { formatPrice } from "../venues/kraken/pairs"
 export type CryptoAgentDeps = {
   ctx: EngineContext
   history: HistoryStore<WireCategory> | null
+  /** Web research (the research tool); null without the search service. */
+  research?: LocalResearch | null
 }
 
 export const mid = (ctx: EngineContext) => (symbol: string) => ctx.hub.quote(symbol)?.mid ?? null

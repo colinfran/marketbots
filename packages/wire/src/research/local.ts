@@ -1,6 +1,5 @@
 import type { TokenUsage } from "@mb/core/db"
 import { NO_MODEL_CALLS, type ModelCalls } from "@mb/engine-kit/ai/monitor"
-import type { LocalResearch, ResearchSource } from "@mb/engine-kit/ai/runner"
 import { streamChat } from "@mb/engine-kit/ai/stream-chat"
 import { errorMessage, type Logger } from "@mb/engine-kit/log"
 import type { SearchMeter } from "@mb/engine-kit/state/search-usage"
@@ -111,6 +110,32 @@ const PICK_SCHEMA = {
   required: ["read"],
   additionalProperties: false,
 }
+
+/** A web source research read or cited. */
+export type ResearchSource = { title: string; url: string; domain: string }
+
+export type ResearchProgress = {
+  onQuery?: (query: string, tool: string) => void
+  onSource?: (source: ResearchSource) => void
+  onText?: (chars: number, excerpt: string) => void
+}
+
+/**
+ * Research on the local model server. The model can't browse, so the searching and reading are
+ * done for it. Never throws: failures come back as `error`.
+ */
+export type LocalResearch = (job: {
+  model: string
+  prompt: string
+  fromDate: string
+  timeoutMs: number
+  signal?: AbortSignal
+  progress?: ResearchProgress
+  /** What the live model feed calls this research (its subject). */
+  label?: string
+  /** Only the search service's free engines: no metered providers, no paid searches. */
+  freeOnly?: boolean
+}) => Promise<{ memo: string; sources: ResearchSource[]; queries: string[]; usage: TokenUsage; error: string | null }>
 
 export type LocalResearchDeps = {
   request: RequestText

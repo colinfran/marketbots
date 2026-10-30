@@ -2,6 +2,8 @@ import { utcDay } from "@mb/crypto-core/db"
 import { AiCallLog } from "@mb/engine-kit/ai/call-log"
 import { startModelFeed } from "@mb/engine-kit/ai/feed"
 import { bootstrap } from "@mb/engine-kit/bootstrap"
+import { httpClient } from "@mb/engine-kit/util/http"
+import { localResearcher } from "@mb/wire/research/local"
 import { newsMovesJob } from "@mb/history/moves"
 import { HistoryStore } from "@mb/history/store"
 import { krakenDailyJob, krakenFilesJob, krakenGapJob } from "./history/backfill"
@@ -57,6 +59,17 @@ void bootstrap({
     // The live model feed: every model call streams its text to the dashboards (owner-only unless agent.public_thinking).
     const feed = startModelFeed({ bus, stream, llmUrl: env.LLM_URL, visibility: () => (settings.current.agent.public_thinking ? "public" : "owner") })
     const models = feed.models
+    // The agent's web research (its research tool): our search service's free engines and the scraper, read by the local model.
+    const research =
+      env.LLM_URL && env.SEARCH_URL
+        ? localResearcher({
+            request: httpClient(env.SEC_USER_AGENT ?? DEFAULT_USER_AGENT).requestText,
+            env: { LLM_URL: env.LLM_URL, SEARCH_URL: env.SEARCH_URL, SCRAPER_URL: env.SCRAPER_URL },
+            client: "crypto",
+            log: log.child({ component: "research" }),
+            models,
+          })
+        : null
 
     // Our own market data as a news source: price/volume anomalies and stablecoin depegs.
     const marketSignals = new KrakenMarketSignals(hub, () => settings.current, log.child({ component: "anomaly" }), (symbol, kind) => wire.recordAnomaly(symbol, kind))
@@ -95,7 +108,7 @@ void bootstrap({
       history.start()
     }
 
-    engine = new Engine({ env, log, db, bus, settings, state, hub, rest, candles, cli, ledger, executor, calls, alerts, stream, wire, history, models })
+    engine = new Engine({ env, log, db, bus, settings, state, hub, rest, candles, cli, ledger, executor, calls, alerts, stream, wire, history, models, research })
     return {
       engine,
       stop: () => {

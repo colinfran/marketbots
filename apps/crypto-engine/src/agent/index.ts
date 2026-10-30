@@ -8,6 +8,7 @@ import type { EventDataMap } from "@mb/crypto-core/events"
 import type { WireCategory, WireItemDoc } from "@mb/crypto-core/wire"
 import type { AiCallLog } from "@mb/engine-kit/ai/call-log"
 import type { ModelCalls } from "@mb/engine-kit/ai/monitor"
+import type { LocalResearch } from "@mb/wire/research/local"
 import type { HistoryStore } from "@mb/history/store"
 import type { Candidate } from "@mb/wire/trigger"
 import type { EngineContext } from "../orchestrator/context"
@@ -37,6 +38,7 @@ export const createCryptoAgent = ({
   history,
   calls,
   models,
+  research,
   llmUrl,
   pause,
   promotion,
@@ -46,13 +48,15 @@ export const createCryptoAgent = ({
   calls: Pick<AiCallLog, "record">
   /** The live model feed: each step streams there. */
   models?: ModelCalls
+  /** Web research for the research tool; null without the search service. */
+  research?: LocalResearch | null
   llmUrl: string | null
   /** A breaker's pause on new entries, kept in the engine's state. */
   pause?: { get: () => Pause | null; set: (p: Pause | null, by: string) => Promise<void> }
   /** When the agent was last turned on or its entries resumed, kept in the engine's state. */
   promotion?: { get: () => Promotion | null; set: (p: Promotion) => Promise<void> }
 }): CryptoAgent => {
-  const deps: CryptoAgentDeps = { ctx, history }
+  const deps: CryptoAgentDeps = { ctx, history, research: research ?? null }
   const market = new CryptoMarketView(deps)
   let observer: CryptoObserver | null = null
   const known = (symbol: string) => symbol === MARKET_SUBJECT || symbol === BOOK_SUBJECT || ctx.hub.universe.includes(symbol)

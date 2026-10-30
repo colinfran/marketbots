@@ -1,5 +1,5 @@
 import { defineTool, type AgentTool } from "@mb/agent/tools"
-import { calendarTool, historyTools, wireTools, type WireToolsDeps } from "@mb/agent/wire-tools"
+import { calendarTool, historyTools, researchTool, wireTools, type WireToolsDeps } from "@mb/agent/wire-tools"
 import { roundTo } from "@mb/crypto-core/math"
 import type { WireCategory } from "@mb/crypto-core/wire"
 import { cleanLine } from "@mb/engine-kit/util/text"
@@ -110,5 +110,6 @@ export const cryptoAgentTools = (d: CryptoAgentDeps): AgentTool[] => {
     }),
     calendarTool(utcTime),
     ...historyTools(wire, 7),
+    researchTool(d.research ?? null, () => d.ctx.settings.current.agent.model),
   ]
 }

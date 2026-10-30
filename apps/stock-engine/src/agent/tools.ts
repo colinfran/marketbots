@@ -1,5 +1,5 @@
 import { defineTool, type AgentTool } from "@mb/agent/tools"
-import { calendarTool, historyTools, wireTools, type WireToolsDeps } from "@mb/agent/wire-tools"
+import { calendarTool, historyTools, researchTool, wireTools, type WireToolsDeps } from "@mb/agent/wire-tools"
 import { cleanLine } from "@mb/engine-kit/util/text"
 import type { Bar } from "@mb/stock-core/alpaca"
 import { TICKER_PATTERN } from "@mb/stock-core/settings"
@@ -150,5 +150,6 @@ export const stockAgentTools = (d: StockAgentDeps): AgentTool[] => {
     }),
     calendarTool((t) => formatDateTime(t)),
     ...historyTools(wire, 5),
+    researchTool(d.research ?? null, () => d.ctx.settings.current.agent.model),
   ]
 }

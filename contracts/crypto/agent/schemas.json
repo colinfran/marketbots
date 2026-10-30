@@ -204,6 +204,23 @@
         ],
         "additionalProperties": false
       }
+    },
+    {
+      "name": "research",
+      "description": "web research on one question our feeds don't answer: it searches the web, reads the best articles and returns a short memo citing them. Slow (1-3 min), so ask one focused question. Args: {question}.",
+      "args": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "string",
+            "description": "One focused question, e.g. why SOL/USD fell 8% today."
+          }
+        },
+        "required": [
+          "question"
+        ],
+        "additionalProperties": false
+      }
     }
   ],
   "answer": {

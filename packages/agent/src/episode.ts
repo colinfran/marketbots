@@ -160,7 +160,7 @@ export const runEpisode = async <A>(input: EpisodeInput<A>): Promise<EpisodeResu
 
     if (parsed?.kind === "tool" && !mustAnswer) {
       const name = typeof parsed.tool === "string" ? parsed.tool : ""
-      const call = await callTool(tools, name, parsed.args, ctx)
+      const call = await callTool(tools, name, parsed.args, { ...ctx, deadline: toolStop })
       record({ kind: "tool", tool: name, purpose: words(parsed.purpose, 25), args: cap(JSON.stringify(parsed.args ?? {}), STEP_CAPS.args), result: cap(call.result, STEP_CAPS.result), error: call.error })
       const left = limits.steps - n
       const nextMustAnswer = left <= 1 || now() >= toolStop

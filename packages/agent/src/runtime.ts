@@ -31,7 +31,7 @@ import type { ChatFn } from "./client"
 import { runEpisode } from "./episode"
 import { compactEpisode, episodeExpiry, type EpisodeArchive } from "./journal"
 import { AttentionQueue, type Wake } from "./queue"
-import type { AgentTool } from "./tools"
+import { toolsFor, type AgentTool } from "./tools"
 import { describeWatch, newsWatchFires, normalizeNote, normalizeWatch, watchFires, watchObservation } from "./watches"
 
 /**
@@ -425,7 +425,7 @@ export class Agent<A extends AgentAnswerBase> {
         model: s.model,
         system: this.d.bot.system(),
         brief: doc.brief,
-        tools: this.d.bot.tools,
+        tools: toolsFor(this.d.bot.tools, wake.priority),
         answer: this.d.bot.answer,
         limits,
         ctx: { episodeId: id, urls, signal },
