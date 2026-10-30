@@ -32,17 +32,30 @@ const localMidnight = (t: number) => {
 
 async function main() {
   const env = loadEnv()
-  logToFile(join(env.HOST_DATA_DIR, "logs"))
+  const logDir = join(env.HOST_DATA_DIR, "logs")
+  logToFile(logDir)
   const settings = new SettingsFile(join(env.HOST_DATA_DIR, "settings.json"))
   await settings.load()
   const client = new MongoClient(env.MONGODB_URI, { appName: "marketbots-host-agent", maxPoolSize: 5 })
   const store = new HostStore(client, env.HOST_DATABASES)
   await store.init()
 
+  // Everything shutdown() uses, declared before the watchdog that may call it.
+  const minutes = new MinuteSamples()
+  let stopping = false
+  let readTimer: NodeJS.Timeout | null = null
+  let commandTimer: NodeJS.Timeout | null = null
+
   const board = new Lhm(env.LHM_CONNECTION_FILE)
   const control = env.FAN_CONTROL === "on"
-  // The bundle's sibling: fan control runs from the built agent (dist/), not from tsx.
-  const watchdog = control ? startWatchdog(new URL("./fan-watchdog.js", import.meta.url), env.LHM_CONNECTION_FILE, log, (m) => fans.fault(m)) : null
+  // The bundle's sibling: fan control runs from the built agent (dist/), not from tsx. Without its
+  // watchdog the agent can't set the fans, so it exits with an error and its task restarts it.
+  const watchdog = control
+    ? startWatchdog(new URL("./fan-watchdog.js", import.meta.url), env.LHM_CONNECTION_FILE, logDir, log, {
+        error: (m) => fans.fault(m),
+        exit: () => void shutdown("watchdog stopped", 1),
+      })
+    : null
   const fans = new FanController({ board, file: join(env.HOST_DATA_DIR, "fan-settings.json"), control, guard: watchdog?.guard, log })
   await fans.start()
 
@@ -51,7 +64,6 @@ async function main() {
     () => settings.value.outlet_id,
   )
   const collector = new Collector(board)
-  const minutes = new MinuteSamples()
   const startedAt = new Date()
   let energy: HostStatusDoc["energy"] = null
   let energyAt = 0
@@ -105,8 +117,6 @@ async function main() {
     await store.write(status, samples)
   }
 
-  let stopping = false
-  let readTimer: NodeJS.Timeout | null = null
   const loop = async () => {
     const started = Date.now()
     await read().catch((e) => log.warn("reading failed", { error: errorMessage(e) }))
@@ -114,7 +124,7 @@ async function main() {
   }
 
   let draining = false
-  const commandTimer = setInterval(() => {
+  commandTimer = setInterval(() => {
     if (draining) return
     draining = true
     drainCommands(
@@ -134,17 +144,17 @@ async function main() {
       .finally(() => (draining = false))
   }, 1_000)
 
-  const shutdown = async (signal: string) => {
+  async function shutdown(signal: string, code = 0) {
     if (stopping) return
     stopping = true
-    log.info("stopping", { signal })
+    log.info("stopping", { signal, code })
     if (readTimer) clearTimeout(readTimer)
-    clearInterval(commandTimer)
+    if (commandTimer) clearInterval(commandTimer)
     await store.writeSamples(minutes.flush()).catch((e) => log.warn("last minute not written", { error: errorMessage(e) }))
     await fans.stop().catch((e) => log.error("fan release failed; the watchdog retries", { error: errorMessage(e) }))
     watchdog?.close()
     await client.close().catch(() => undefined)
-    process.exit(0)
+    process.exit(code)
   }
   for (const signal of ["SIGINT", "SIGTERM", "SIGBREAK", "SIGHUP"] as const) process.once(signal, () => void shutdown(signal))
 

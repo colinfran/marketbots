@@ -235,23 +235,31 @@ export class FanController {
  * Starts the watchdog as its own detached process (so it outlives the agent). `guard` heartbeats
  * it: each heartbeat names the headers the agent owns and must be acknowledged within 1.5 s, or the
  * write it precedes doesn't happen. `close` disconnects it on shutdown; it then releases what it
- * was last told about and exits.
+ * was last told about and exits. It gets no stdio (the scheduled task runs the agent without a
+ * console, and writing to an inherited stderr there killed it); it logs to `logDir` itself.
  */
-export const startWatchdog = (script: URL, connectionFile: string, log: Log, onError: (message: string) => void): { guard: Guard; close(): void } => {
-  const worker = fork(script, [connectionFile], { detached: true, execArgv: [], stdio: ["ignore", "ignore", "inherit", "ipc"] })
+export const startWatchdog = (
+  script: URL,
+  connectionFile: string,
+  logDir: string,
+  log: Log,
+  on: { error(message: string): void; /** It stopped while the agent still needed it. */ exit(): void },
+): { guard: Guard; close(): void } => {
+  const worker = fork(script, [connectionFile, logDir], { detached: true, execArgv: [], stdio: ["ignore", "ignore", "ignore", "ipc"] })
   const pending = new Map<number, () => void>()
   let sequence = 0
   let closing = false
   worker.on("message", (m: { ack?: number; error?: string }) => {
-    if (m.error) {
-      log.error("fan watchdog", { error: m.error })
-      onError(m.error)
-    }
+    // The watchdog logs its own errors to the file; this shows them on the page.
+    if (m.error) on.error(m.error)
     if (m.ack !== undefined) pending.get(m.ack)?.()
   })
-  worker.on("error", (e) => onError(`Fan watchdog failed: ${e.message}`))
-  worker.on("exit", () => {
-    if (!closing) onError("The fan watchdog stopped: fan control is off until the agent restarts.")
+  worker.on("error", (e) => on.error(`Fan watchdog failed: ${e.message}`))
+  worker.on("exit", (code) => {
+    if (closing) return
+    log.error("the fan watchdog stopped", { code })
+    on.error("The fan watchdog stopped: fan control is off until the agent restarts.")
+    on.exit()
   })
   worker.unref()
   const close = () => {
