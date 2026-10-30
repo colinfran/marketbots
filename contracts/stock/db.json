@@ -8,18 +8,14 @@
     "commands": "commands",
     "audit": "audit_log",
     "notifications": "notifications",
-    "seedRuns": "seed_runs",
     "wireItems": "wire_items",
     "wireTriggers": "wire_triggers",
     "aiCalls": "ai_calls",
     "searchUsage": "search_usage",
-    "cycles": "cycles",
-    "reports": "reports",
     "decisions": "decisions",
     "orders": "orders",
     "plans": "position_plans",
     "optionPositions": "option_positions",
-    "coreReviews": "core_reviews",
     "dailyStats": "daily_stats",
     "cache": "cache",
     "loginAttempts": "login_attempts",
@@ -97,37 +93,6 @@
         }
       }
     ],
-    "cycles": [
-      {
-        "key": {
-          "started_at": -1
-        }
-      },
-      {
-        "key": {
-          "trading_day": 1,
-          "phase": 1
-        }
-      }
-    ],
-    "reports": [
-      {
-        "key": {
-          "created_at": -1
-        }
-      },
-      {
-        "key": {
-          "trading_day": 1,
-          "phase": 1
-        }
-      },
-      {
-        "key": {
-          "cycle_id": 1
-        }
-      }
-    ],
     "decisions": [
       {
         "key": {
@@ -202,44 +167,12 @@
         }
       }
     ],
-    "core_reviews": [
-      {
-        "key": {
-          "created_at": -1
-        }
-      },
-      {
-        "key": {
-          "kind": 1,
-          "dry_run": 1,
-          "created_at": -1
-        }
-      },
-      {
-        "key": {
-          "cycle_id": 1
-        }
-      }
-    ],
     "cache": [
       {
         "key": {
           "expires_at": 1
         },
         "expireAfterSeconds": 0
-      }
-    ],
-    "seed_runs": [
-      {
-        "key": {
-          "status": 1,
-          "at": 1
-        }
-      },
-      {
-        "key": {
-          "created_at": -1
-        }
       }
     ],
     "wire_items": [

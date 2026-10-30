@@ -47,12 +47,8 @@ const usdText = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDi
 
 /** Stock's words in the shared control results and seed alerts (@mb/engine-kit/control/plane). */
 const WORDING: ControlWording = {
-  paused: "paused: no new cycles or entries; stops, targets and options exits stay active",
+  paused: "paused: no new entries; stops, targets and options exits stay active",
   halted: "halted: no new orders; stops, targets and options exits stay active",
-  usd: usdText,
-  seedScheduled: "; it runs in the regular session, after the opening buffer",
-  seedInterrupted: "check the positions in Alpaca",
-  seedFailedPath: () => "/admin",
 }
 
 export type EngineDeps = {
@@ -82,8 +78,6 @@ export type EngineDeps = {
 
 const MIN = 60_000
 
-/** The heartbeat's schedule: there are no timed cycles to plan. */
-const SCHEDULE: EngineStatusDoc["schedule"] = { phase: null, reason: "The agent decides: no timed cycles." }
 
 /**
  * The always-on engine. Owns the run state and every periodic job:
@@ -222,7 +216,6 @@ export class Engine {
         const now = Date.now()
         return {
           ...p.run,
-          current_phase: null,
           ...p.live,
           broker: {
             rest: this.rest.state,
@@ -233,13 +226,11 @@ export class Engine {
             data_stream: { ...marketStream.health, symbols: marketStream.symbols },
           },
           market: this.marketInfo(),
-          schedule: SCHEDULE,
           quotes: prices
             .all()
             .map((q) => ({ symbol: q.symbol, price: q.price, change_pct: q.change_pct, age_s: Math.round((now - q.at) / 1000) }))
             .sort((a, b) => a.symbol.localeCompare(b.symbol)),
           ...p.usage,
-          last_cycle: null,
           ...p.health,
           ...(d.history ? { history: d.history.status() } : {}),
           agent: this.agent.agent.status(),
@@ -572,11 +563,6 @@ export class Engine {
     const { state, alpaca, db } = this.d
     const by = doc.created_by
     switch (command.type) {
-      case "cycle.run_now": {
-        // The agent reviews what was asked, and may act on it.
-        if (state.state.status !== "running" || state.state.kill_switch.engaged) throw new Error(`engine is ${this.status}`)
-        return this.agent.agent.review(command.symbols ?? [], by)
-      }
       case "position.close": {
         const position = (await alpaca.getPositions()).find((p) => p.symbol === command.symbol && (p.asset_class ?? "us_equity") === "us_equity")
         if (!position) throw new Error(`no ${command.symbol} position`)
@@ -606,8 +592,6 @@ export class Engine {
         await this.refreshSiteData(true).catch((e) => notes.push(`website data refresh failed: ${errorMessage(e)}`))
         return `synced: ${fills} fills on record, ${snapshot.positions.length} positions${notes.length ? `; ${notes.join("; ")}` : ""}`
       }
-      case "core.review":
-        throw new Error("the core book is gone: the agent decides")
       default:
         return this.control.handle(command, by)
     }

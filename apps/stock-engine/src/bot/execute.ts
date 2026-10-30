@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto"
 import { errorMessage } from "@mb/engine-kit/log"
 import type { AlpacaAsset, AlpacaOrder, AlpacaPosition, Snapshot } from "@mb/stock-core/alpaca"
 import type { ChainContract } from "@mb/stock-core/context"
-import type { CycleKind, DecisionDoc, ExecutionSummary, PositionPlanDoc } from "@mb/stock-core/db"
+import type { CycleKind, DecisionDoc, PositionPlanDoc } from "@mb/stock-core/db"
 import type { RiskCheck } from "@mb/stock-core/events"
 import { describeContract, STRATEGY_LABEL } from "@mb/stock-core/options"
 import { isOptionAction, type BotReport, type Decision } from "@mb/stock-core/report"
@@ -217,6 +217,9 @@ export type ExecuteInput = {
   /** The agent episode that made the decisions (level auto), recorded on them. */
   agentEpisodeId?: string
 }
+
+/** How the decisions went: counts by outcome, and notes for the summary. */
+export type ExecutionSummary = { executed: number; rejected: number; failed: number; noop: number; notes: string[] }
 
 export const executeDecisions = async (
   ctx: TradingContext,

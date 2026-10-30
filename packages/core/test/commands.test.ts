@@ -1,16 +1,15 @@
 import { describe, expect, it } from "vitest"
-import { seedCancelCommand, seedScheduleCommand } from "../src/commands"
+import { agentResumeEntriesCommand, agentReviewCommand } from "../src/commands"
 
-describe("seed commands", () => {
-  it("accepts a seed schedule within bounds, with or without force", () => {
-    expect(seedScheduleCommand.safeParse({ type: "seed.schedule", amount_usd: 2_000, at: "2026-10-27T13:45:00.000Z" }).success).toBe(true)
-    expect(seedScheduleCommand.safeParse({ type: "seed.schedule", amount_usd: 2_000, at: "2026-10-27T09:45:00-04:00", force: true }).success).toBe(true)
-    expect(seedCancelCommand.safeParse({ type: "seed.cancel" }).success).toBe(true)
+describe("the agent's commands", () => {
+  it("wakes the agent for its book and the market, or for up to 5 symbols", () => {
+    expect(agentReviewCommand.safeParse({ type: "agent.review" }).success).toBe(true)
+    expect(agentReviewCommand.safeParse({ type: "agent.review", symbols: ["SOL/USD", "NVDA", "BRK.B"] }).success).toBe(true)
+    expect(agentReviewCommand.safeParse({ type: "agent.review", symbols: ["A", "B", "C", "D", "E", "F"] }).success).toBe(false)
+    expect(agentReviewCommand.safeParse({ type: "agent.review", symbols: ["sol usd"] }).success).toBe(false)
   })
 
-  it("rejects amounts out of range and malformed times", () => {
-    expect(seedScheduleCommand.safeParse({ type: "seed.schedule", amount_usd: 50, at: "2026-10-27T13:45:00Z" }).success).toBe(false)
-    expect(seedScheduleCommand.safeParse({ type: "seed.schedule", amount_usd: 20_000, at: "2026-10-27T13:45:00Z" }).success).toBe(false)
-    expect(seedScheduleCommand.safeParse({ type: "seed.schedule", amount_usd: 2_000, at: "tomorrow at 9:45" }).success).toBe(false)
+  it("resumes the agent's entries", () => {
+    expect(agentResumeEntriesCommand.safeParse({ type: "agent.resume_entries" }).success).toBe(true)
   })
 })

@@ -1,4 +1,3 @@
-import type { SeedRunDoc } from "@mb/core/db"
 import type { EngineEvent } from "@mb/core/events"
 import { describe, expect, it } from "vitest"
 import { ControlPlane, type ControlWording } from "../../src/control/plane"
@@ -11,30 +10,10 @@ const db = useTestDb()
 const WORDING: ControlWording = {
   paused: "paused: no new test cycles",
   halted: "halted: no new test orders",
-  usd: (amount) => `$${amount.toFixed(2)}`,
-  seedScheduled: "; it runs at the test open",
-  seedInterrupted: "check the test books",
-  seedFailedPath: (cycleId) => (cycleId ? `/cycles/${cycleId}` : "/admin"),
 }
 
 type Item = { _id: string; title: string; severity: number }
 type SettingsResult = { ok: true; changes: number } | { ok: false; error: string }
-
-const seedRun = (overrides: Partial<SeedRunDoc>): SeedRunDoc => ({
-  _id: "seed-1",
-  status: "scheduled",
-  amount_usd: 1_000,
-  at: new Date(Date.now() - 3 * 3_600_000),
-  created_at: new Date(),
-  created_by: "owner",
-  force: false,
-  started_at: null,
-  cycle_id: null,
-  result: null,
-  error: null,
-  done_at: null,
-  ...overrides,
-})
 
 const setup = async ({ liquidate = async () => ["sold A", "sold B"], settingsResult = { ok: true, changes: 2 } as SettingsResult } = {}) => {
   const bus = await makeTestBus<TestEvents>(db.col, EPHEMERAL)
@@ -46,7 +25,7 @@ const setup = async ({ liquidate = async () => ["sold A", "sold B"], settingsRes
   const items = new Map<string, Item>([["item-1", { _id: "item-1", title: "x".repeat(130), severity: 72 }]])
   const replayed: Item[] = []
   const control = new ControlPlane<TestRunStatus, Item>({
-    col: { seedRuns: db.col.seedRuns, wireItems: { findOne: async ({ _id }) => items.get(_id) ?? null } },
+    col: { wireItems: { findOne: async ({ _id }) => items.get(_id) ?? null } },
     bus,
     state,
     settings: {
@@ -69,6 +48,11 @@ const setup = async ({ liquidate = async () => ["sold A", "sold B"], settingsRes
     },
     liquidate,
     wording: WORDING,
+    agent: {
+      ask: (question) => `asked: ${question}`,
+      review: (symbols) => `reviewing ${symbols.join(", ") || "the book and the market"}`,
+      resumeEntries: async () => "resumed",
+    },
   })
   return { bus, events, state, alerts, patches, replayed, control }
 }
@@ -147,15 +131,15 @@ describe("ControlPlane", () => {
     for (const s of [two, one, none, bad]) await s.bus.stop()
   })
 
-  it("schedules and cancels the one-time seed in the bot's words", async () => {
+  it("hands the agent its commands, and wakes it only while trading runs", async () => {
     const { bus, control } = await setup()
-    const at = new Date(Date.now() + 3_600_000).toISOString()
-    expect(await control.handle({ type: "seed.schedule", amount_usd: 1_500, at }, "owner")).toBe(`one-time seed of $1500.00 scheduled for ${at}; it runs at the test open`)
-    await expect(control.handle({ type: "seed.schedule", amount_usd: 1_500, at }, "owner")).rejects.toThrow(/already scheduled/)
-    expect(await control.handle({ type: "seed.cancel" }, "owner")).toBe(`seed scheduled for ${at} canceled`)
-    await expect(control.handle({ type: "seed.cancel" }, "owner")).rejects.toThrow("no scheduled seed to cancel")
-    expect(await control.handle({ type: "seed.schedule", amount_usd: 250.5, at, force: true }, "owner")).toBe(`one-time seed of $250.50 scheduled for ${at} (forced); it runs at the test open`)
-    expect(await db.col.seedRuns.findOne({ status: "scheduled" })).toMatchObject({ amount_usd: 250.5, created_by: "owner", force: true })
+    control.emitStatus("startup complete")
+    expect(await control.handle({ type: "agent.ask", question: "What do you hold?" }, "owner")).toBe("asked: What do you hold?")
+    expect(await control.handle({ type: "agent.review", symbols: ["AAA"] }, "owner")).toBe("reviewing AAA")
+    expect(await control.handle({ type: "agent.review" }, "owner")).toBe("reviewing the book and the market")
+    expect(await control.handle({ type: "agent.resume_entries" }, "owner")).toBe("resumed")
+    await control.handle({ type: "pause" }, "owner")
+    await expect(control.handle({ type: "agent.review" }, "owner")).rejects.toThrow("engine is paused")
     await bus.stop()
   })
 
@@ -164,46 +148,6 @@ describe("ControlPlane", () => {
     await expect(control.handle({ type: "wire.replay", item_id: "missing-1" }, "owner")).rejects.toThrow("no wire item with that id")
     expect(await control.handle({ type: "wire.replay", item_id: "item-1" }, "owner")).toBe(`${"x".repeat(120)} (severity 72): would review`)
     expect(replayed.map((i) => i._id)).toEqual(["item-1"])
-    await bus.stop()
-  })
-
-  it("fails interrupted, missed and unsuccessful seed runs, alerting and announcing each", async () => {
-    const { bus, events, alerts, control } = await setup()
-    await control.failInterruptedSeed()
-    expect(alerts).toEqual([])
-    await db.col.seedRuns.insertOne(seedRun({ _id: "running", status: "running" }))
-    await control.failInterruptedSeed()
-    expect(alerts.at(-1)).toEqual({
-      level: "error",
-      title: "Seed buy interrupted",
-      message: "The engine restarted while the one-time seed was running. It is not retried; check the test books, then schedule it again from Admin if needed.",
-      path: "/admin",
-    })
-    expect(await db.col.seedRuns.findOne({ _id: "running" })).toMatchObject({ status: "failed", error: "the engine restarted during the seed run" })
-
-    await db.col.seedRuns.insertOne(seedRun({ _id: "missed" }))
-    await control.failMissedSeeds((run) => new Date(run.at.getTime() + 3_600_000))
-    const missed = (await db.col.seedRuns.findOne({ _id: "missed" }))!
-    expect(missed.status).toBe("failed")
-    expect(alerts.at(-1)).toEqual({ level: "error", title: "Seed buy missed", message: `${missed.error}. Nothing was bought; schedule it again from Admin if you still want it.`, path: "/admin" })
-    expect(events.filter((e) => e.type === "seed.completed").map((e) => [e.summary, e.level, e.data])).toEqual([
-      ["One-time seed missed", "warn", { seed_id: "missed", cycle_id: null, status: "failed", allocations: [], executed: 0, error: missed.error }],
-    ])
-
-    const run = seedRun({ _id: "unlucky", status: "running" })
-    await db.col.seedRuns.insertOne(run)
-    const result = { allocations: [{ symbol: "AAA", weight_pct: 60, notional_usd: 600, thesis: "core" }], orders: [], notes: ["no fills"], rationale: null }
-    await control.failSeed(run, "no buy went through (nothing allocated)", "cycle-9", result)
-    expect(await db.col.seedRuns.findOne({ _id: "unlucky" })).toMatchObject({ status: "failed", cycle_id: "cycle-9", result, error: "no buy went through (nothing allocated)" })
-    expect(events.at(-1)).toMatchObject({
-      type: "seed.completed",
-      summary: "One-time seed failed: no buy went through (nothing allocated)",
-      level: "warn",
-      data: { seed_id: "unlucky", cycle_id: "cycle-9", status: "failed", allocations: [{ symbol: "AAA", weight_pct: 60, notional_usd: 600 }], executed: 0, error: "no buy went through (nothing allocated)" },
-    })
-    expect(alerts.at(-1)).toEqual({ level: "error", title: "Seed buy failed", message: "no buy went through (nothing allocated). It is not retried; schedule it again from Admin if you still want it.", path: "/cycles/cycle-9" })
-    await control.failSeed(run, "crashed: boom", null)
-    expect(alerts.at(-1)).toMatchObject({ title: "Seed buy failed", path: "/admin" })
     await bus.stop()
   })
 })

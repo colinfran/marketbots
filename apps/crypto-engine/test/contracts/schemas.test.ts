@@ -1,8 +1,8 @@
 import { createRequire } from "node:module"
-import { backtestParamsSchema, BACKTEST_INTERVALS, BACKTEST_STRATEGIES, COMMAND_LABEL, commandSchema } from "@mb/crypto-core/commands"
+import { COMMAND_LABEL, commandSchema } from "@mb/crypto-core/commands"
 import { COLLECTIONS, INDEXES, TERMINAL_ORDER_STATUSES } from "@mb/crypto-core/db"
 import { clientFrameSchema, EPHEMERAL_EVENTS, EVENT_SCHEMA_VERSION, eventEnvelopeSchema, OWNER_ONLY_EVENTS, STREAM_PROTOCOL_VERSION } from "@mb/crypto-core/events"
-import { CRYPTO_ACTIONS, cryptoReportSchema, EVIDENCE_KINDS, MAX_HORIZON_HOURS, PRICED_IN, REGIMES, SEED_MAX_ALLOCATIONS, SEED_MIN_HORIZON_HOURS, seedAllocationSchema, UNCERTAINTY } from "@mb/crypto-core/report"
+import { CRYPTO_ACTIONS, cryptoReportSchema, EVIDENCE_KINDS, MAX_HORIZON_HOURS, PRICED_IN, REGIMES, UNCERTAINTY } from "@mb/crypto-core/report"
 import { DEFAULT_SETTINGS, settingsSchema } from "@mb/crypto-core/settings"
 import { STRATEGIES, STRATEGY_IDS } from "@mb/crypto-core/strategies"
 import { CATEGORY_BASE, NOTABLE_REASONS, TIER_FACTOR, WIRE_KINDS } from "@mb/crypto-core/wire"
@@ -70,14 +70,8 @@ describe("contracts: settings", () => {
 })
 
 describe("contracts: commands", () => {
-  it("command JSON Schema, labels and backtest options", () => {
-    matchJson("commands.schema.json", {
-      command: jsonSchema(commandSchema, "input"),
-      backtest_params: jsonSchema(backtestParamsSchema, "input"),
-      labels: COMMAND_LABEL,
-      backtest_intervals: BACKTEST_INTERVALS,
-      backtest_strategies: BACKTEST_STRATEGIES,
-    })
+  it("command JSON Schema and labels", () => {
+    matchJson("commands.schema.json", { command: jsonSchema(commandSchema, "input"), labels: COMMAND_LABEL })
   })
 })
 
@@ -108,12 +102,11 @@ describe("contracts: domain constants", () => {
 })
 
 describe("contracts: AI output schemas", () => {
-  it("decision report and seed allocation", () => {
+  it("decision report", () => {
     matchJson("ai.schema.json", {
       enums: { evidence_kinds: EVIDENCE_KINDS, uncertainty: UNCERTAINTY, priced_in: PRICED_IN, regimes: REGIMES, actions: CRYPTO_ACTIONS },
-      limits: { max_horizon_hours: MAX_HORIZON_HOURS, seed_max_allocations: SEED_MAX_ALLOCATIONS, seed_min_horizon_hours: SEED_MIN_HORIZON_HOURS },
+      limits: { max_horizon_hours: MAX_HORIZON_HOURS },
       crypto_report: jsonSchema(cryptoReportSchema, "input"),
-      seed_allocation: jsonSchema(seedAllocationSchema, "input"),
     })
   })
 })

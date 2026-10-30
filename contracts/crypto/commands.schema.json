@@ -128,26 +128,6 @@
         "properties": {
           "type": {
             "type": "string",
-            "const": "cycle.run_now"
-          },
-          "symbols": {
-            "maxItems": 5,
-            "type": "array",
-            "items": {
-              "type": "string",
-              "pattern": "^[A-Z0-9]{2,12}\\/(USD|USDC|USDT)$"
-            }
-          }
-        },
-        "required": [
-          "type"
-        ]
-      },
-      {
-        "type": "object",
-        "properties": {
-          "type": {
-            "type": "string",
             "const": "position.close"
           },
           "position_id": {
@@ -176,129 +156,6 @@
         "required": [
           "type",
           "confirm"
-        ]
-      },
-      {
-        "type": "object",
-        "properties": {
-          "type": {
-            "type": "string",
-            "const": "backtest.run"
-          },
-          "params": {
-            "type": "object",
-            "properties": {
-              "symbols": {
-                "minItems": 1,
-                "maxItems": 10,
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "pattern": "^[A-Z0-9]{2,12}\\/(USD|USDC|USDT)$"
-                }
-              },
-              "strategies": {
-                "minItems": 1,
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "enum": [
-                    "trend",
-                    "mean_reversion",
-                    "momentum"
-                  ]
-                }
-              },
-              "interval": {
-                "anyOf": [
-                  {
-                    "type": "number",
-                    "const": 60
-                  },
-                  {
-                    "type": "number",
-                    "const": 240
-                  },
-                  {
-                    "type": "number",
-                    "const": 1440
-                  }
-                ]
-              },
-              "starting_usd": {
-                "type": "number",
-                "minimum": 100,
-                "maximum": 10000000
-              },
-              "slippage_bps": {
-                "type": "number",
-                "minimum": 0,
-                "maximum": 200
-              },
-              "fee_bps": {
-                "type": "number",
-                "minimum": 0,
-                "maximum": 200
-              },
-              "in_sample_fraction": {
-                "type": "number",
-                "minimum": 0.3,
-                "maximum": 0.9
-              }
-            },
-            "required": [
-              "symbols",
-              "strategies",
-              "interval",
-              "starting_usd",
-              "slippage_bps",
-              "fee_bps",
-              "in_sample_fraction"
-            ]
-          }
-        },
-        "required": [
-          "type",
-          "params"
-        ]
-      },
-      {
-        "type": "object",
-        "properties": {
-          "type": {
-            "type": "string",
-            "const": "seed.schedule"
-          },
-          "amount_usd": {
-            "type": "number",
-            "minimum": 100,
-            "maximum": 10000
-          },
-          "at": {
-            "type": "string",
-            "format": "date-time",
-            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
-          },
-          "force": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "type",
-          "amount_usd",
-          "at"
-        ]
-      },
-      {
-        "type": "object",
-        "properties": {
-          "type": {
-            "type": "string",
-            "const": "seed.cancel"
-          }
-        },
-        "required": [
-          "type"
         ]
       },
       {
@@ -342,6 +199,26 @@
         "properties": {
           "type": {
             "type": "string",
+            "const": "agent.review"
+          },
+          "symbols": {
+            "maxItems": 5,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Z0-9./-]{1,20}$"
+            }
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
             "const": "agent.resume_entries"
           }
         },
@@ -351,78 +228,6 @@
       }
     ]
   },
-  "backtest_params": {
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "type": "object",
-    "properties": {
-      "symbols": {
-        "minItems": 1,
-        "maxItems": 10,
-        "type": "array",
-        "items": {
-          "type": "string",
-          "pattern": "^[A-Z0-9]{2,12}\\/(USD|USDC|USDT)$"
-        }
-      },
-      "strategies": {
-        "minItems": 1,
-        "type": "array",
-        "items": {
-          "type": "string",
-          "enum": [
-            "trend",
-            "mean_reversion",
-            "momentum"
-          ]
-        }
-      },
-      "interval": {
-        "anyOf": [
-          {
-            "type": "number",
-            "const": 60
-          },
-          {
-            "type": "number",
-            "const": 240
-          },
-          {
-            "type": "number",
-            "const": 1440
-          }
-        ]
-      },
-      "starting_usd": {
-        "type": "number",
-        "minimum": 100,
-        "maximum": 10000000
-      },
-      "slippage_bps": {
-        "type": "number",
-        "minimum": 0,
-        "maximum": 200
-      },
-      "fee_bps": {
-        "type": "number",
-        "minimum": 0,
-        "maximum": 200
-      },
-      "in_sample_fraction": {
-        "type": "number",
-        "minimum": 0.3,
-        "maximum": 0.9
-      }
-    },
-    "required": [
-      "symbols",
-      "strategies",
-      "interval",
-      "starting_usd",
-      "slippage_bps",
-      "fee_bps",
-      "in_sample_fraction"
-    ]
-  },
   "labels": {
     "pause": "Pause trading",
     "resume": "Resume trading",
@@ -430,24 +235,11 @@
     "kill_switch.release": "Release kill switch",
     "strategy.set_enabled": "Toggle strategy",
     "settings.update": "Update settings",
-    "cycle.run_now": "Run cycle now",
     "position.close": "Close position",
     "paper.reset": "Reset paper wallet",
-    "backtest.run": "Run backtest",
-    "seed.schedule": "Schedule seed buy",
-    "seed.cancel": "Cancel seed buy",
     "wire.replay": "Replay news item",
     "agent.ask": "Ask the agent",
+    "agent.review": "Wake the agent",
     "agent.resume_entries": "Resume the agent's entries"
-  },
-  "backtest_intervals": [
-    60,
-    240,
-    1440
-  ],
-  "backtest_strategies": [
-    "trend",
-    "mean_reversion",
-    "momentum"
-  ]
+  }
 }

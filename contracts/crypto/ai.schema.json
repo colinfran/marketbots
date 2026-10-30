@@ -33,9 +33,7 @@
     ]
   },
   "limits": {
-    "max_horizon_hours": 2160,
-    "seed_max_allocations": 4,
-    "seed_min_horizon_hours": 168
+    "max_horizon_hours": 2160
   },
   "crypto_report": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -290,77 +288,6 @@
       "decisions",
       "data_gaps",
       "notification"
-    ]
-  },
-  "seed_allocation": {
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "type": "object",
-    "properties": {
-      "allocations": {
-        "type": "array",
-        "items": {
-          "type": "object",
-          "properties": {
-            "symbol": {
-              "type": "string",
-              "description": "Pair exactly as listed in SEED CANDIDATES, e.g. BTC/USD."
-            },
-            "weight_pct": {
-              "type": "number",
-              "description": "% of the seed amount for this pair (1-100). Weights across allocations sum to at most 100; anything left stays in cash."
-            },
-            "conviction": {
-              "type": "number",
-              "description": "0-100: how strongly the evidence supports this pair as a long-term core holding. It is NOT a probability."
-            },
-            "thesis": {
-              "type": "string",
-              "description": "2-3 sentences: why this is a good long-term core holding now. Cite numbers from CONTEXT or RESEARCH."
-            },
-            "invalidation": {
-              "type": "string",
-              "description": "The specific price level or event that would prove the long-term thesis wrong."
-            },
-            "stop_loss": {
-              "description": "Stop price below the current price at a daily level (the hint is 2.5 daily ATR), or null to use the hint.",
-              "type": [
-                "number",
-                "null"
-              ]
-            },
-            "take_profit": {
-              "description": "Target price above the current price, or null to use the hint (3R).",
-              "type": [
-                "number",
-                "null"
-              ]
-            },
-            "horizon_hours": {
-              "type": "number",
-              "description": "Expected holding period in hours (168-2160). When it elapses the position is reviewed, not sold."
-            }
-          },
-          "required": [
-            "symbol",
-            "weight_pct",
-            "conviction",
-            "thesis",
-            "invalidation",
-            "stop_loss",
-            "take_profit",
-            "horizon_hours"
-          ]
-        },
-        "description": "1-4 long-term core holdings."
-      },
-      "rationale": {
-        "type": "string",
-        "description": "3-5 sentences on the allocation as a whole: why these pairs, why these weights, and the macro backdrop."
-      }
-    },
-    "required": [
-      "allocations",
-      "rationale"
     ]
   }
 }

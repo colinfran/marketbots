@@ -31,24 +31,14 @@ export const settingsUpdateCommand = z.object({
   expected_version: z.number().int().nonnegative(),
 })
 
-/**
- * One-time seed buy: at `at`, research and an AI allocation put about `amount_usd` into long-term
- * core holdings. The engine refuses it once a seed has completed, unless `force` is set.
- */
-export const seedScheduleCommand = z.object({
-  type: z.literal("seed.schedule"),
-  amount_usd: z.number().min(100).max(10_000),
-  at: z.iso.datetime({ offset: true }),
-  force: z.boolean().optional(),
-})
-
-export const seedCancelCommand = z.object({ type: z.literal("seed.cancel") })
-
 /** Runs a stored news item through the trigger policy and reports what it would do. Never starts a cycle. */
 export const wireReplayCommand = z.object({ type: z.literal("wire.replay"), item_id: z.string().min(8).max(64) })
 
 /** A question for the agent (docs/plans/LOCAL-AI.md §11): a read-only episode whose reply shows on the Agent page. Nothing it decides is acted on. */
 export const agentAskCommand = z.object({ type: z.literal("agent.ask"), question: z.string().trim().min(3).max(500) })
+
+/** Wakes the agent for a review it may act on: of the symbols named (at most 5), or of its book and the market. */
+export const agentReviewCommand = z.object({ type: z.literal("agent.review"), symbols: z.array(z.string().regex(/^[A-Z0-9./-]{1,20}$/)).max(5).optional() })
 
 /** Lifts a circuit breaker's pause on the agent's new entries. Its total-loss breaker counts afresh from now. */
 export const agentResumeEntriesCommand = z.object({ type: z.literal("agent.resume_entries") })
@@ -59,10 +49,9 @@ export type BaseCommand = z.infer<
   | typeof killSwitchEngageCommand
   | typeof killSwitchReleaseCommand
   | typeof settingsUpdateCommand
-  | typeof seedScheduleCommand
-  | typeof seedCancelCommand
   | typeof wireReplayCommand
   | typeof agentAskCommand
+  | typeof agentReviewCommand
   | typeof agentResumeEntriesCommand
 >
 export type BaseCommandType = BaseCommand["type"]
@@ -73,9 +62,8 @@ export const BASE_COMMAND_LABEL: Record<BaseCommandType, string> = {
   "kill_switch.engage": "Engage kill switch",
   "kill_switch.release": "Release kill switch",
   "settings.update": "Update settings",
-  "seed.schedule": "Schedule seed buy",
-  "seed.cancel": "Cancel seed buy",
   "wire.replay": "Replay news item",
   "agent.ask": "Ask the agent",
+  "agent.review": "Wake the agent",
   "agent.resume_entries": "Resume the agent's entries",
 }

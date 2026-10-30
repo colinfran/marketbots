@@ -10,7 +10,7 @@ import type { Collections } from "../db/mongo"
  * after 10 minutes.
  */
 
-const EXPIRING = new Set<Command["type"]>(["resume", "cycle.run_now", "kill_switch.release", "seed.schedule"])
+const EXPIRING = new Set<Command["type"]>(["resume", "agent.review", "kill_switch.release"])
 
 export type CommandHandler = CommandHandlerOf<Command>
 

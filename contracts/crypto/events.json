@@ -84,127 +84,6 @@
       ]
     },
     {
-      "type": "cycle.started",
-      "data_keys": [
-        "cycle_id",
-        "trigger"
-      ]
-    },
-    {
-      "type": "cycle.state",
-      "data_keys": [
-        "cycle_id",
-        "state",
-        "detail?"
-      ]
-    },
-    {
-      "type": "cycle.completed",
-      "data_keys": [
-        "cycle_id",
-        "duration_ms",
-        "decisions",
-        "approved",
-        "executed",
-        "ai_cost_usd",
-        "summary"
-      ]
-    },
-    {
-      "type": "cycle.skipped",
-      "data_keys": [
-        "reason"
-      ]
-    },
-    {
-      "type": "cycle.failed",
-      "data_keys": [
-        "cycle_id",
-        "error"
-      ]
-    },
-    {
-      "type": "screen.candidates",
-      "data_keys": [
-        "cycle_id",
-        "candidates",
-        "reviews",
-        "regime?",
-        "symbols?"
-      ]
-    },
-    {
-      "type": "research.started",
-      "data_keys": [
-        "cycle_id",
-        "research_id",
-        "subjects",
-        "model"
-      ]
-    },
-    {
-      "type": "research.query",
-      "data_keys": [
-        "research_id",
-        "query",
-        "tool"
-      ]
-    },
-    {
-      "type": "research.source",
-      "data_keys": [
-        "research_id",
-        "title",
-        "url",
-        "domain"
-      ]
-    },
-    {
-      "type": "research.progress",
-      "data_keys": [
-        "research_id",
-        "chars",
-        "excerpt"
-      ]
-    },
-    {
-      "type": "research.completed",
-      "data_keys": [
-        "research_id",
-        "sources",
-        "queries",
-        "duration_ms",
-        "cost_usd",
-        "error"
-      ]
-    },
-    {
-      "type": "ai.reasoning",
-      "data_keys": [
-        "cycle_id",
-        "task",
-        "chars",
-        "excerpt"
-      ]
-    },
-    {
-      "type": "ai.decision.started",
-      "data_keys": [
-        "cycle_id",
-        "model",
-        "items"
-      ]
-    },
-    {
-      "type": "ai.decision.progress",
-      "data_keys": [
-        "cycle_id",
-        "chars",
-        "headline",
-        "decisions"
-      ]
-    },
-    {
       "type": "ai.decision.proposed",
       "data_keys": [
         "decision_id",
@@ -214,23 +93,6 @@
         "thesis",
         "edge_bps",
         "execution?"
-      ]
-    },
-    {
-      "type": "ai.decision.completed",
-      "data_keys": [
-        "cycle_id",
-        "decisions",
-        "attempts",
-        "repaired",
-        "cost_usd"
-      ]
-    },
-    {
-      "type": "ai.decision.failed",
-      "data_keys": [
-        "cycle_id",
-        "error"
       ]
     },
     {
@@ -366,15 +228,6 @@
       ]
     },
     {
-      "type": "backtest.completed",
-      "data_keys": [
-        "backtest_id",
-        "total_return_pct",
-        "sharpe",
-        "max_drawdown_pct"
-      ]
-    },
-    {
       "type": "wire.item",
       "data_keys": [
         "id",
@@ -403,14 +256,6 @@
       ]
     },
     {
-      "type": "wire.dossier",
-      "data_keys": [
-        "cycle_id",
-        "rows",
-        "total"
-      ]
-    },
-    {
       "type": "wire.trigger",
       "data_keys": [
         "trigger_id",
@@ -428,25 +273,6 @@
       "data_keys": [
         "id",
         "state",
-        "error"
-      ]
-    },
-    {
-      "type": "seed.started",
-      "data_keys": [
-        "seed_id",
-        "cycle_id",
-        "amount_usd"
-      ]
-    },
-    {
-      "type": "seed.completed",
-      "data_keys": [
-        "seed_id",
-        "cycle_id",
-        "status",
-        "allocations",
-        "executed",
         "error"
       ]
     },
@@ -572,9 +398,6 @@
   "ephemeral": [
     "market.ticker",
     "engine.heartbeat",
-    "research.progress",
-    "ai.decision.progress",
-    "ai.reasoning",
     "llm.call",
     "llm.delta",
     "llm.done",

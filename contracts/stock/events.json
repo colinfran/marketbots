@@ -65,192 +65,6 @@
       ]
     },
     {
-      "type": "broker.error",
-      "data_keys": [
-        "scope",
-        "message"
-      ]
-    },
-    {
-      "type": "cycle.started",
-      "data_keys": [
-        "cycle_id",
-        "phase",
-        "trigger"
-      ]
-    },
-    {
-      "type": "cycle.state",
-      "data_keys": [
-        "cycle_id",
-        "state",
-        "detail?"
-      ]
-    },
-    {
-      "type": "cycle.step",
-      "data_keys": [
-        "cycle_id",
-        "name",
-        "ok",
-        "detail"
-      ]
-    },
-    {
-      "type": "cycle.completed",
-      "data_keys": [
-        "cycle_id",
-        "phase",
-        "report_id",
-        "duration_ms",
-        "decisions",
-        "executed",
-        "rejected",
-        "failed",
-        "ai_cost_usd",
-        "headline"
-      ]
-    },
-    {
-      "type": "cycle.failed",
-      "data_keys": [
-        "cycle_id",
-        "phase",
-        "error"
-      ]
-    },
-    {
-      "type": "cycle.skipped",
-      "data_keys": [
-        "phase",
-        "reason"
-      ]
-    },
-    {
-      "type": "context.built",
-      "data_keys": [
-        "cycle_id",
-        "positions",
-        "option_positions",
-        "instruments",
-        "headlines",
-        "equity",
-        "day_pnl_pct",
-        "new_buys_allowed",
-        "flags"
-      ]
-    },
-    {
-      "type": "options.chains",
-      "data_keys": [
-        "cycle_id",
-        "underlyings"
-      ]
-    },
-    {
-      "type": "research.started",
-      "data_keys": [
-        "cycle_id",
-        "research_id",
-        "phase",
-        "model",
-        "focus"
-      ]
-    },
-    {
-      "type": "research.query",
-      "data_keys": [
-        "research_id",
-        "query",
-        "tool"
-      ]
-    },
-    {
-      "type": "research.source",
-      "data_keys": [
-        "research_id",
-        "title",
-        "url",
-        "domain"
-      ]
-    },
-    {
-      "type": "research.progress",
-      "data_keys": [
-        "research_id",
-        "chars",
-        "excerpt"
-      ]
-    },
-    {
-      "type": "research.completed",
-      "data_keys": [
-        "research_id",
-        "sources",
-        "queries",
-        "duration_ms",
-        "cost_usd",
-        "error"
-      ]
-    },
-    {
-      "type": "ai.reasoning",
-      "data_keys": [
-        "cycle_id",
-        "task",
-        "chars",
-        "excerpt"
-      ]
-    },
-    {
-      "type": "ai.decision.started",
-      "data_keys": [
-        "cycle_id",
-        "model"
-      ]
-    },
-    {
-      "type": "ai.decision.progress",
-      "data_keys": [
-        "cycle_id",
-        "chars",
-        "headline",
-        "decisions"
-      ]
-    },
-    {
-      "type": "ai.decision.completed",
-      "data_keys": [
-        "cycle_id",
-        "decisions",
-        "attempts",
-        "repaired",
-        "cost_usd"
-      ]
-    },
-    {
-      "type": "ai.decision.failed",
-      "data_keys": [
-        "cycle_id",
-        "error"
-      ]
-    },
-    {
-      "type": "ai.report",
-      "data_keys": [
-        "cycle_id",
-        "phase",
-        "headline",
-        "summary",
-        "sentiment",
-        "regime",
-        "stance",
-        "confidence",
-        "key_drivers",
-        "watchlist"
-      ]
-    },
-    {
       "type": "ai.decision.proposed",
       "data_keys": [
         "cycle_id",
@@ -445,14 +259,6 @@
       ]
     },
     {
-      "type": "wire.dossier",
-      "data_keys": [
-        "cycle_id",
-        "rows",
-        "total"
-      ]
-    },
-    {
       "type": "wire.trigger",
       "data_keys": [
         "trigger_id",
@@ -470,25 +276,6 @@
       "data_keys": [
         "id",
         "state",
-        "error"
-      ]
-    },
-    {
-      "type": "seed.started",
-      "data_keys": [
-        "seed_id",
-        "cycle_id",
-        "amount_usd"
-      ]
-    },
-    {
-      "type": "seed.completed",
-      "data_keys": [
-        "seed_id",
-        "cycle_id",
-        "status",
-        "allocations",
-        "executed",
         "error"
       ]
     },
@@ -589,32 +376,6 @@
       ]
     },
     {
-      "type": "core.review.started",
-      "data_keys": [
-        "review_id",
-        "cycle_id",
-        "kind",
-        "trigger",
-        "symbol",
-        "dry_run"
-      ]
-    },
-    {
-      "type": "core.review.completed",
-      "data_keys": [
-        "review_id",
-        "cycle_id",
-        "status",
-        "dry_run",
-        "summary",
-        "decisions",
-        "executed",
-        "rejected",
-        "cost_usd",
-        "error"
-      ]
-    },
-    {
       "type": "error",
       "data_keys": [
         "scope",
@@ -634,15 +395,11 @@
     "command.received",
     "command.completed",
     "command.failed",
-    "error",
-    "broker.error"
+    "error"
   ],
   "ephemeral": [
     "market.ticker",
     "engine.heartbeat",
-    "research.progress",
-    "ai.decision.progress",
-    "ai.reasoning",
     "llm.call",
     "llm.delta",
     "llm.done",

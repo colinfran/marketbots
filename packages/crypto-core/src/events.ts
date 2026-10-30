@@ -22,15 +22,8 @@ export type { ClientFrame, EventLevel, EventVisibility } from "@mb/core/events"
 
 export type EngineRunStatus = "starting" | "reconciling" | "running" | "paused" | "halted" | "stopping"
 
-export type CycleState =
-  | "idle"
-  | "waiting_for_data"
-  | "screening"
-  | "researching"
-  | "evaluating"
-  | "risk_check"
-  | "placing_order"
-  | "position_monitoring"
+/** What the engine's execution path is doing while the agent's decisions go through it (the dashboard's status pill). */
+export type CycleState = "idle" | "position_monitoring" | "risk_check" | "placing_order"
 
 export type EvidenceKind = "fact" | "sourced_claim" | "estimate" | "speculation"
 
@@ -49,37 +42,6 @@ export type EventDataMap = {
   "venue.connected": { channel: string }
   "venue.disconnected": { channel: string; reason: string }
   "venue.error": { message: string }
-  "cycle.started": { cycle_id: string; trigger: string }
-  "cycle.state": { cycle_id: string; state: CycleState; detail?: string }
-  "cycle.completed": {
-    cycle_id: string
-    duration_ms: number
-    decisions: number
-    approved: number
-    executed: number
-    ai_cost_usd: number
-    summary: string
-  }
-  "cycle.skipped": { reason: string }
-  "cycle.failed": { cycle_id: string; error: string }
-  "screen.candidates": {
-    cycle_id: string
-    candidates: { instrument: string; strategy: StrategyId; score: number; signal: string }[]
-    reviews: string[]
-    /** Market regime label and how many symbols had usable data (absent on older events). */
-    regime?: string
-    symbols?: number
-  }
-  "research.started": { cycle_id: string; research_id: string; subjects: string[]; model: string }
-  "research.query": Shared["research.query"]
-  "research.source": Shared["research.source"]
-  "research.progress": Shared["research.progress"]
-  "research.completed": Shared["research.completed"]
-  /** The latest ~240 characters of the model's reasoning, at most every 1.5 s while it streams. */
-  "ai.reasoning": { cycle_id: string; task: "research" | "decision"; chars: number; excerpt: string }
-  "ai.decision.started": { cycle_id: string; model: string; items: string[] }
-  /** The decision as it's written: the market read so far (the seed: null) and how many decisions it holds. */
-  "ai.decision.progress": { cycle_id: string; chars: number; headline: string | null; decisions: number }
   "ai.decision.proposed": {
     decision_id: string
     instrument: string
@@ -90,8 +52,6 @@ export type EventDataMap = {
     /** What happened to it: filled, rejected, not_applicable… (absent on older events). */
     execution?: string
   }
-  "ai.decision.completed": Shared["ai.decision.completed"]
-  "ai.decision.failed": Shared["ai.decision.failed"]
   "risk.checked": {
     decision_id: string
     instrument: string
@@ -146,14 +106,10 @@ export type EventDataMap = {
   "command.completed": Shared["command.completed"]
   "command.failed": Shared["command.failed"]
   "summary.periodic": { equity_usd: number; day_pnl_pct: number | null; total_return_pct: number | null; positions: number }
-  "backtest.completed": { backtest_id: string; total_return_pct: number | null; sharpe: number | null; max_drawdown_pct: number | null }
   "wire.item": Shared["wire.item"]
   "wire.notable": Shared["wire.notable"]
-  "wire.dossier": Shared["wire.dossier"]
   "wire.trigger": Shared["wire.trigger"]
   "wire.source": Shared["wire.source"]
-  "seed.started": Shared["seed.started"]
-  "seed.completed": Shared["seed.completed"]
   "agent.woke": Shared["agent.woke"]
   "agent.step": Shared["agent.step"]
   "agent.answered": Shared["agent.answered"]
@@ -181,7 +137,7 @@ export const OWNER_ONLY_EVENTS: ReadonlySet<EventType> = new Set<EventType>([
 ])
 
 /** High-frequency events that are streamed but not stored. */
-export const EPHEMERAL_EVENTS: ReadonlySet<EventType> = new Set<EventType>(["market.ticker", "engine.heartbeat", "research.progress", "ai.decision.progress", "ai.reasoning", ...MODEL_EVENT_TYPES])
+export const EPHEMERAL_EVENTS: ReadonlySet<EventType> = new Set<EventType>(["market.ticker", "engine.heartbeat", ...MODEL_EVENT_TYPES])
 
 /**
  * Whether a viewer may see an event. Everything is paper money, so public viewers see amounts

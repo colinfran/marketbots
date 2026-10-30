@@ -31,19 +31,6 @@ export type BaseEventDataMap<Category extends string, RunStatus extends string, 
     uptime_s: number
     ai_calls_today: number
   }
-  "research.query": { research_id: string; query: string; tool: string }
-  "research.source": { research_id: string; title: string; url: string; domain: string }
-  "research.progress": { research_id: string; chars: number; excerpt: string }
-  "research.completed": {
-    research_id: string
-    sources: number
-    queries: number
-    duration_ms: number
-    cost_usd: number
-    error: string | null
-  }
-  "ai.decision.completed": { cycle_id: string; decisions: number; attempts: number; repaired: boolean; cost_usd: number }
-  "ai.decision.failed": { cycle_id: string; error: string }
   "command.received": { command_id: string; type: string }
   "command.completed": { command_id: string; type: string; result: string }
   "command.failed": { command_id: string; type: string; error: string }
@@ -64,19 +51,8 @@ export type BaseEventDataMap<Category extends string, RunStatus extends string, 
   }
   /** An earlier item just became notable (it triggered something, or the AI cited it). */
   "wire.notable": { id: string; reason: NotableReason; notable_reasons: NotableReason[]; title: string; symbols: string[]; severity: number }
-  /** The wire items a cycle's AI was given. */
-  "wire.dossier": { cycle_id: string; rows: DossierRow<Category>[]; total: number }
   "wire.trigger": { trigger_id: string; rule: string; action: WireTriggerAction; status: WireTriggerStatus; reason: string; symbols: string[]; severity: number; item_ids: string[] }
   "wire.source": { id: string; state: WireSourceState; error: string | null }
-  "seed.started": { seed_id: string; cycle_id: string; amount_usd: number }
-  "seed.completed": {
-    seed_id: string
-    cycle_id: string | null
-    status: "done" | "failed"
-    allocations: { symbol: string; weight_pct: number; notional_usd: number }[]
-    executed: number
-    error: string | null
-  }
   /** The agent woke on a subject (docs/plans/LOCAL-AI.md §8). */
   "agent.woke": { episode_id: string; priority: Priority; subject: string; kinds: ObservationKind[]; observations: number; reasons: string[] }
   /** One step of an episode: a tool call (its purpose and result, capped) or the answer. */

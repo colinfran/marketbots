@@ -2,7 +2,6 @@ import {
   BASE_INDEXES,
   type CollectionMap,
   type CommandDoc as CommandDocOf,
-  type CycleDocBase,
   type CycleKind,
   type EngineStatusBase,
   type EventDoc as EventDocOf,
@@ -10,7 +9,7 @@ import {
   type SettingsDoc as SettingsDocOf,
   type TokenUsage,
 } from "@mb/core/db"
-import type { BacktestParams, Command } from "./commands"
+import type { Command } from "./commands"
 import type { CycleState, EngineEvent, EngineRunStatus, EvidenceKind } from "./events"
 import type { PerformanceMetrics, TradeStats } from "./metrics"
 import type { Settings } from "./settings"
@@ -31,11 +30,6 @@ export type {
   LeaseDoc,
   LoginAttemptDoc,
   NotificationDoc,
-  ResearchPlan,
-  SeedAllocation,
-  SeedOrder,
-  SeedRunDoc,
-  SeedRunStatus,
   TokenUsage,
 } from "@mb/core/db"
 
@@ -61,16 +55,12 @@ export const COLLECTIONS = {
   positions: "positions",
   orders: "orders",
   fills: "fills",
-  cycles: "cycles",
-  research: "research",
   decisions: "decisions",
   snapshots: "portfolio_snapshots",
   dailyStats: "daily_stats",
   aiCalls: "ai_calls",
   searchUsage: "search_usage",
-  backtests: "backtests",
   notifications: "notifications",
-  seedRuns: "seed_runs",
   wireItems: "wire_items",
   wireTriggers: "wire_triggers",
   loginAttempts: "login_attempts",
@@ -137,8 +127,6 @@ export type EngineStatusDoc = EngineStatusBase<EngineRunStatus, CycleState> & {
   kraken: VenueHealth
   paper_wallet: PaperWalletHealth
   symbols: SymbolHealth[]
-  last_cycle: { id: string; at: Date; status: string; summary: string | null } | null
-  next_cycle_at: Date | null
   reconciliation: { ok: boolean; at: Date; issues: string[] } | null
 }
 
@@ -260,54 +248,12 @@ export type FillDoc = {
   purpose: OrderPurpose
 }
 
-export type CandidateRecord = {
-  instrument: string
-  strategy: StrategyId
-  score: number
-  signal: string
-  features: Record<string, number | string | null>
-}
-
 export type RegimeSnapshot = {
   label: "risk_on_trend" | "risk_off_trend" | "range" | "high_volatility" | "unknown"
   btc_trend: "up" | "down" | "flat" | null
   btc_vol_pct: number | null
   breadth_pct: number | null
   notes: string[]
-}
-
-export type CycleDoc = CycleDocBase<"running" | "completed" | "skipped" | "failed"> & {
-  state: CycleState
-  regime: RegimeSnapshot | null
-  candidates: CandidateRecord[]
-  reviews: string[]
-  research_id: string | null
-  decision_ids: string[]
-  summary: string | null
-  prompt_version: string
-}
-
-export type ResearchSource = { title: string; url: string; domain: string }
-
-export type ResearchDoc = {
-  _id: string
-  cycle_id: string
-  subjects: string[]
-  memo: string
-  sources: ResearchSource[]
-  queries: string[]
-  model: string
-  prompt_version: string
-  x_search: boolean
-  started_at: Date
-  duration_ms: number
-  usage: TokenUsage
-  cost_usd: number
-  error: string | null
-  /** full = the usual research; gap_fill = only what the wire dossier lacks; skipped = the wire covered it (absent on older docs). */
-  mode?: "full" | "gap_fill" | "skipped"
-  /** The wire items the AI was given alongside the research (top rows). */
-  dossier?: DossierRow[]
 }
 
 export type EvidenceItem = {
@@ -450,39 +396,6 @@ export type DailyStatsDoc = {
   updated_at: Date
 }
 
-export type BacktestTrade = {
-  symbol: string
-  strategy: StrategyId
-  entry_at: Date
-  exit_at: Date
-  entry_price: number
-  exit_price: number
-  qty: number
-  pnl_usd: number
-  return_pct: number
-  exit_reason: string
-  regime: string
-}
-
-export type BacktestDoc = {
-  _id: string
-  created_at: Date
-  finished_at: Date | null
-  status: "running" | "completed" | "failed"
-  params: BacktestParams
-  metrics: PerformanceMetrics | null
-  in_sample: PerformanceMetrics | null
-  out_of_sample: PerformanceMetrics | null
-  by_strategy: Record<string, TradeStats>
-  by_symbol: Record<string, TradeStats>
-  by_regime: Record<string, TradeStats>
-  benchmarks: { buy_hold_btc_pct: number | null; equal_weight_pct: number | null }
-  equity_curve: { t: number; equity: number }[]
-  trades: BacktestTrade[]
-  notes: string[]
-  error: string | null
-}
-
 /** The shared indexes (@mb/core/db) and crypto's own, in this order. */
 export const INDEXES: Partial<Record<(typeof COLLECTIONS)[keyof typeof COLLECTIONS], IndexSpec[]>> = {
   events: BASE_INDEXES.events,
@@ -506,8 +419,6 @@ export const INDEXES: Partial<Record<(typeof COLLECTIONS)[keyof typeof COLLECTIO
     { key: { decision_id: 1 } },
     { key: { venue_trade_id: 1 }, sparse: true },
   ],
-  cycles: [{ key: { started_at: -1 } }],
-  research: [{ key: { started_at: -1 } }, { key: { cycle_id: 1 } }],
   decisions: [
     { key: { created_at: -1 } },
     { key: { cycle_id: 1 } },
@@ -517,9 +428,7 @@ export const INDEXES: Partial<Record<(typeof COLLECTIONS)[keyof typeof COLLECTIO
   portfolio_snapshots: [{ key: { account_id: 1, at: -1 } }, { key: { expires_at: 1 }, expireAfterSeconds: 0 }],
   daily_stats: [{ key: { account_id: 1, day: -1 } }],
   ai_calls: BASE_INDEXES.ai_calls,
-  backtests: [{ key: { created_at: -1 } }],
   notifications: BASE_INDEXES.notifications,
-  seed_runs: BASE_INDEXES.seed_runs,
   wire_items: BASE_INDEXES.wire_items,
   wire_triggers: BASE_INDEXES.wire_triggers,
   login_attempts: BASE_INDEXES.login_attempts,

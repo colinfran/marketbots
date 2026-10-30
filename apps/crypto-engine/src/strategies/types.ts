@@ -1,4 +1,4 @@
-import type { CandidateRecord, RegimeSnapshot } from "@mb/crypto-core/db"
+import type { RegimeSnapshot } from "@mb/crypto-core/db"
 import type { Settings } from "@mb/crypto-core/settings"
 import type { StrategyId } from "@mb/crypto-core/strategies"
 import type { Features } from "../market/features"
@@ -16,6 +16,15 @@ export type StrategyContext = {
   settings: Settings
 }
 
+/** What a strategy proposes: an instrument, its score and signal, and the features behind them. */
+export type CandidateRecord = {
+  instrument: string
+  strategy: StrategyId
+  score: number
+  signal: string
+  features: Record<string, number | string | null>
+}
+
 export type CryptoCandidate = CandidateRecord & {
   symbol: string
   stop_hint: number
@@ -27,7 +36,7 @@ export type CryptoStrategy = {
   screen: (ctx: StrategyContext) => CryptoCandidate[]
 }
 
-/** Summarizes features into the record stored with the cycle (no raw series). */
+/** Summarizes features into a candidate's record (no raw series). */
 export const candidateFeatures = (f: Features): CandidateRecord["features"] => ({
   price: f.price,
   ret_24h_pct: f.ret_24h_pct,

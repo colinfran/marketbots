@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest"
-import { commandSchema } from "../src/commands"
 import { coreReviewSchema, normalizeCoreReview, type CoreHoldingDecision, type CoreReviewOutput } from "../src/core-book"
 
 const holding = (o: Partial<CoreHoldingDecision>): CoreHoldingDecision => ({
@@ -47,13 +46,5 @@ describe("normalizeCoreReview", () => {
 
   it("passes the strict schema", () => {
     expect(coreReviewSchema.safeParse(normalizeCoreReview(output({ holdings: [holding({})] }))).success).toBe(true)
-  })
-})
-
-describe("core.review command", () => {
-  it("takes an optional dry run flag", () => {
-    expect(commandSchema.safeParse({ type: "core.review" }).success).toBe(true)
-    expect(commandSchema.safeParse({ type: "core.review", dry_run: true }).success).toBe(true)
-    expect(commandSchema.safeParse({ type: "core.review", dry_run: "yes" }).success).toBe(false)
   })
 })

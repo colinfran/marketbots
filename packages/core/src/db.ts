@@ -18,11 +18,9 @@ export const BASE_COLLECTIONS = {
   events: "events",
   commands: "commands",
   audit: "audit_log",
-  cycles: "cycles",
   aiCalls: "ai_calls",
   searchUsage: "search_usage",
   notifications: "notifications",
-  seedRuns: "seed_runs",
   wireItems: "wire_items",
   wireTriggers: "wire_triggers",
   loginAttempts: "login_attempts",
@@ -62,7 +60,6 @@ export const BASE_INDEXES = indexes({
   audit_log: [{ key: { at: -1 } }],
   ai_calls: [{ key: { day: 1 } }, { key: { at: -1 } }],
   notifications: [{ key: { at: -1 } }, { key: { expires_at: 1 }, expireAfterSeconds: 0 }],
-  seed_runs: [{ key: { status: 1, at: 1 } }, { key: { created_at: -1 } }],
   wire_items: [
     { key: { first_seen_at: -1 } },
     { key: { symbols: 1, first_seen_at: -1 } },
@@ -228,61 +225,6 @@ export type AiCallDoc = {
 
 /** What started a cycle (absent on cycles from before it was recorded). core = a review of the long-term core book; agent = an agent episode (its decisions' cycle_id is the episode's id). */
 export type CycleKind = "scheduled" | "price_move" | "manual" | "event" | "seed" | "core" | "agent"
-
-export type CycleStep = { name: string; at: Date; ok: boolean; detail: string | null }
-
-/** Which web research a cycle runs (each bot decides that; see its researchPlan) and why. */
-export type ResearchPlan = { kind: "full" | "gap" | "none"; reason: string }
-
-/** The `cycles` fields both bots record. Each bot adds its own (phase, regime, candidates…). */
-export type CycleDocBase<Status extends string> = {
-  _id: string
-  /** "schedule", "manual", a price move, a wire trigger… */
-  trigger: string
-  kind?: CycleKind
-  status: Status
-  started_at: Date
-  finished_at: Date | null
-  duration_ms: number | null
-  steps: CycleStep[]
-  error: string | null
-  ai_cost_usd: number
-  settings_version: number
-  /** Event cycles: the trigger and the wire items that started it. */
-  wire_trigger_id?: string | null
-  wire_item_ids?: string[]
-  /** Why web research was skipped (research_mode auto), when it was. */
-  research_skip_reason?: string | null
-  /** Which web research the cycle ran (full, gap-fill or none) and why (absent on older cycles and on cycles that stopped before research). */
-  research_plan?: ResearchPlan
-}
-
-export type SeedRunStatus = "scheduled" | "running" | "done" | "failed" | "canceled"
-
-export type SeedAllocation = { symbol: string; weight_pct: number; notional_usd: number; thesis: string }
-
-export type SeedOrder = { symbol: string; decision_id: string | null; status: string; qty: number | null; notional_usd: number | null; reason: string | null }
-
-/**
- * A one-time seed buy, scheduled by the owner. The engine refuses a new one while any run is
- * `done` unless the command sets `force`, so it happens once unless explicitly asked again. A run
- * is a single attempt: a failure is recorded and alerted, never retried automatically.
- */
-export type SeedRunDoc = {
-  _id: string
-  status: SeedRunStatus
-  amount_usd: number
-  /** When it should run. */
-  at: Date
-  created_at: Date
-  created_by: string
-  force: boolean
-  started_at: Date | null
-  cycle_id: string | null
-  result: { allocations: SeedAllocation[]; orders: SeedOrder[]; notes: string[]; rationale: string | null } | null
-  error: string | null
-  done_at: Date | null
-}
 
 /** Rate-limit counter for the dashboard's sign-in endpoints, keyed by a hash of client IP + path. */
 export type LoginAttemptDoc = { _id: string; count: number; first_at: Date; expires_at: Date }

@@ -10,7 +10,6 @@ import {
   type EventDoc,
   type LeaseDoc,
   type NotificationDoc,
-  type SeedRunDoc,
 } from "@mb/core/db"
 import type { BaseEventDataMap, EngineEvent } from "@mb/core/events"
 import type { WireTriggerDoc } from "@mb/core/wire"
@@ -46,7 +45,6 @@ const collectionsFor = (db: Db) => ({
   commands: db.collection<CommandDoc<TestCommand>>(BASE_COLLECTIONS.commands),
   audit: db.collection<AuditDoc>(BASE_COLLECTIONS.audit),
   notifications: db.collection<NotificationDoc>(BASE_COLLECTIONS.notifications),
-  seedRuns: db.collection<SeedRunDoc>(BASE_COLLECTIONS.seedRuns),
   engineState: db.collection<EngineStateDoc>(BASE_COLLECTIONS.engineState),
   engineStatus: db.collection<TestStatusDoc>(BASE_COLLECTIONS.engineStatus),
   aiCalls: db.collection<AiCallDoc>(BASE_COLLECTIONS.aiCalls),

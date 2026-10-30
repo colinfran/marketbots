@@ -439,7 +439,7 @@ export function AskAgentForm({ disabled }: { disabled: boolean }) {
 /** The owner's Wake the agent: a review of the named symbols, or of its book and the market, that it may act on. */
 export function WakeAgentForm({ disabled, placeholder }: { disabled: boolean; placeholder: string }) {
   const [symbols, setSymbols] = useState("")
-  const { busy, result, error, send } = useCommand<{ type: "cycle.run_now"; symbols?: string[] }>()
+  const { busy, result, error, send } = useCommand<{ type: "agent.review"; symbols?: string[] }>()
   const list = symbols
     .split(/[\s,]+/)
     .map((s) => s.trim().toUpperCase())
@@ -450,7 +450,7 @@ export function WakeAgentForm({ disabled, placeholder }: { disabled: boolean; pl
       className="space-y-2"
       onSubmit={(ev) => {
         ev.preventDefault()
-        void send(list.length ? { type: "cycle.run_now", symbols: list } : { type: "cycle.run_now" }).then((ok) => ok && setSymbols(""))
+        void send(list.length ? { type: "agent.review", symbols: list } : { type: "agent.review" }).then((ok) => ok && setSymbols(""))
       }}
     >
       <div className="flex gap-2">

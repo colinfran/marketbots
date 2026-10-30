@@ -2,7 +2,6 @@ import {
   BASE_INDEXES,
   type CollectionMap,
   type CommandDoc as CommandDocOf,
-  type CycleDocBase,
   type CycleKind,
   type EngineStatusBase,
   type EventDoc as EventDocOf,
@@ -28,17 +27,11 @@ export type {
   AuditDoc,
   CommandStatus,
   CycleKind,
-  CycleStep,
   EngineStateDoc,
   IndexSpec,
   LeaseDoc,
   LoginAttemptDoc,
   NotificationDoc,
-  ResearchPlan,
-  SeedAllocation,
-  SeedOrder,
-  SeedRunDoc,
-  SeedRunStatus,
   TokenUsage,
 } from "@mb/core/db"
 
@@ -63,18 +56,14 @@ export const COLLECTIONS = {
   commands: "commands",
   audit: "audit_log",
   notifications: "notifications",
-  seedRuns: "seed_runs",
   wireItems: "wire_items",
   wireTriggers: "wire_triggers",
   aiCalls: "ai_calls",
   searchUsage: "search_usage",
-  cycles: "cycles",
-  reports: "reports",
   decisions: "decisions",
   orders: "orders",
   plans: "position_plans",
   optionPositions: "option_positions",
-  coreReviews: "core_reviews",
   dailyStats: "daily_stats",
   cache: "cache",
   loginAttempts: "login_attempts",
@@ -105,7 +94,6 @@ export type MarketSessionInfo = {
 
 /** Observed state: the engine's heartbeat, written every few seconds. AI calls today count the New York trading day. */
 export type EngineStatusDoc = EngineStatusBase<EngineRunStatus, CycleState> & {
-  current_phase: Phase | null
   broker: {
     rest: "ok" | "degraded" | "down" | "unknown"
     last_ok_at: Date | null
@@ -115,67 +103,12 @@ export type EngineStatusDoc = EngineStatusBase<EngineRunStatus, CycleState> & {
     data_stream: StreamHealth & { symbols: string[] }
   }
   market: MarketSessionInfo | null
-  /** What the scheduler would run now, and why. */
-  schedule: { phase: Phase | null; reason: string }
   quotes: { symbol: string; price: number; change_pct: number | null; age_s: number }[]
-  last_cycle: { id: string; phase: Phase; at: Date; status: CycleStatus; headline: string | null } | null
 }
 
 export type EventDoc = EventDocOf<EngineEvent>
 
 export type CommandDoc = CommandDocOf<Command>
-
-export type CycleStatus = "running" | "succeeded" | "failed" | "skipped" | "timed_out"
-
-/** One run of a phase of the trading day. `trigger` is "schedule", "manual", "price move on NVDA", … */
-export type CycleDoc = CycleDocBase<CycleStatus> & {
-  phase: Phase
-  trading_day: string
-  report_id: string | null
-  /** A failed cycle's research (no report holds it), and when it was done: the scheduler's retry of the phase reuses it while it's fresh. */
-  research?: ResearchResult & { at: Date }
-}
-
-export type ResearchSource = { title: string | null; url: string; domain?: string }
-
-export type ResearchResult = {
-  memo: string
-  sources: ResearchSource[]
-  queries: string[]
-  model: string
-  x_search: boolean
-  duration_ms: number
-  error: string | null
-  usage: TokenUsage
-  cost_usd?: number
-  /** full = the usual research; gap_fill = only what the wire dossier lacks; skipped = the wire covered it (absent on older docs). */
-  mode?: "full" | "gap_fill" | "skipped"
-  /** The failed attempt (cycle id) whose research this retry reused; it was paid for there. */
-  reused_from?: string
-  /** The wire items the AI was given alongside the research (top rows). */
-  dossier?: DossierRow[]
-}
-
-export type ExecutionSummary = { executed: number; rejected: number; failed: number; noop: number; notes: string[] }
-
-export type ReportDoc = {
-  _id: string
-  cycle_id: string
-  phase: Phase
-  trading_day: string
-  created_at: Date
-  model: string
-  attempts: number
-  /** True when the AI's output failed the schema and was salvaged in code. */
-  repaired: boolean
-  research: ResearchResult
-  report: BotReport
-  context: MarketContext
-  execution: ExecutionSummary
-  usage: TokenUsage
-  cost_usd: number
-  settings_version: number
-}
 
 export type DecisionStatus = "executed" | "rejected" | "failed" | "noop"
 
@@ -345,76 +278,6 @@ export type OptionPositionDoc = {
   mark: OptionMark | null
 }
 
-/** weekly: the scheduled review (or the owner's "Run core review now"). holding: one holding, after serious news about it. */
-export type CoreReviewKind = "weekly" | "holding"
-
-export type CoreReviewStatus = "running" | "done" | "failed" | "skipped"
-
-/** planned: what a dry run would have done. */
-export type CoreDecisionStatus = "executed" | "rejected" | "failed" | "noop" | "planned"
-
-/** What code did with one of the review's decisions (or with a holding the review left out, kept by default). */
-export type CoreDecisionRecord = {
-  symbol: string
-  action: CoreAction
-  /** The AI's request as normalized; null for a holding it left out. */
-  request: CoreHoldingDecision | null
-  status: CoreDecisionStatus
-  reason: string | null
-  /** Every rule evaluated, in order. */
-  checks: RiskCheck[]
-  /** % of equity before and after (planned or done). */
-  weight_before_pct: number | null
-  weight_after_pct: number | null
-  price: number | null
-  /** Shares bought or sold. */
-  qty: number | null
-  notional: number | null
-  /** The holding's stop after the review. */
-  stop: number | null
-  /** The `decisions` document of a trade, which its orders link to. */
-  decision_id: string | null
-  order_ids: string[]
-}
-
-/** The core book at a moment. Percentages are of equity. */
-export type CoreBookState = { equity: number; cash: number; target_pct: number; core_value: number; core_pct: number; holdings: string[] }
-
-/** One run of the core review: what the AI saw and said, and what code did about it. */
-export type CoreReviewDoc = {
-  _id: string
-  cycle_id: string
-  kind: CoreReviewKind
-  /** "schedule", "manual", "news: …". */
-  trigger: string
-  /** Single-holding reviews: the holding. */
-  symbol: string | null
-  dry_run: boolean
-  status: CoreReviewStatus
-  trading_day: string
-  created_at: Date
-  finished_at: Date | null
-  book_before: CoreBookState | null
-  book_after: CoreBookState | null
-  /** Seed holdings taken into the core book at the start of this review. */
-  adopted: string[]
-  /** The ranking the review was shown (its rows are in `context.candidates`). */
-  ranking: { day: string; as_of: string | null } | null
-  /** Everything the review was given, as the AI saw it. */
-  context: CoreReviewContext | null
-  research: ResearchResult | null
-  /** The AI's answer, normalized. */
-  output: CoreReviewOutput | null
-  decisions: CoreDecisionRecord[]
-  summary: string | null
-  /** Names the AI likes but isn't buying; the next weekly review sees them. */
-  watch: CoreWatchItem[]
-  model: string | null
-  cost_usd: number
-  error: string | null
-  settings_version: number
-}
-
 export type DailyStatsDoc = {
   _id: string // trading day
   trading_day: string
@@ -463,14 +326,10 @@ export const INDEXES: Partial<Record<(typeof COLLECTIONS)[keyof typeof COLLECTIO
   audit_log: BASE_INDEXES.audit_log,
   notifications: BASE_INDEXES.notifications,
   ai_calls: BASE_INDEXES.ai_calls,
-  cycles: [{ key: { started_at: -1 } }, { key: { trading_day: 1, phase: 1 } }],
-  reports: [{ key: { created_at: -1 } }, { key: { trading_day: 1, phase: 1 } }, { key: { cycle_id: 1 } }],
   decisions: [{ key: { created_at: -1 } }, { key: { trading_day: 1 } }, { key: { report_id: 1 } }, { key: { symbol: 1, created_at: -1 } }],
   orders: [{ key: { trading_day: 1 } }, { key: { filled_at: -1 } }, { key: { status: 1 } }, { key: { symbol: 1 } }, { key: { underlying: 1 } }, { key: { structure_id: 1 }, sparse: true }],
   option_positions: [{ key: { status: 1 } }, { key: { underlying: 1, opened_at: -1 } }, { key: { closed_at: -1 } }],
-  core_reviews: [{ key: { created_at: -1 } }, { key: { kind: 1, dry_run: 1, created_at: -1 } }, { key: { cycle_id: 1 } }],
   cache: [{ key: { expires_at: 1 }, expireAfterSeconds: 0 }],
-  seed_runs: BASE_INDEXES.seed_runs,
   wire_items: BASE_INDEXES.wire_items,
   wire_triggers: BASE_INDEXES.wire_triggers,
   login_attempts: BASE_INDEXES.login_attempts,

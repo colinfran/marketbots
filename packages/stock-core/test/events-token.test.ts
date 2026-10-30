@@ -27,7 +27,7 @@ describe("eventForViewer", () => {
   it("never sends owner-only events to the public", () => {
     const command = { ...fill, type: "command.completed", data: { command_id: "c", type: "pause", result: "ok" } } as EngineEvent
     expect(eventForViewer(command, "public")).toBeNull()
-    expect(eventForViewer({ ...fill, type: "broker.error", data: { scope: "x", message: "y" } } as EngineEvent, "public")).toBeNull()
+    expect(eventForViewer({ ...fill, type: "error", data: { scope: "x", message: "y" } } as EngineEvent, "public")).toBeNull()
     expect(eventForViewer({ ...fill, visibility: "owner" }, "public")).toBeNull()
   })
 })

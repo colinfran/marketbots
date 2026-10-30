@@ -126,17 +126,11 @@ describe("Engine", () => {
     expect(internals.streamSymbols()).toEqual(["AAPL", "SPY", "QQQ", "NVDA"])
   })
 
-  it("refuses core reviews: the core book is gone", async () => {
-    expect(await command({ type: "core.review" })).toMatchObject({ status: "failed", error: "the core book is gone: the agent decides" })
-    expect(await command({ type: "core.review", dry_run: true })).toMatchObject({ status: "failed", error: "the core book is gone: the agent decides" })
-    expect(await db.col.coreReviews.countDocuments()).toBe(0)
-  })
-
   it("runs no timed cycles: Wake the agent goes to the agent", async () => {
     await until(async () => (await db.col.engineStatus.findOne({ _id: "engine" })) !== null)
-    expect(await db.col.engineStatus.findOne({ _id: "engine" })).toMatchObject({ current_phase: null, schedule: { phase: null, reason: "The agent decides: no timed cycles." }, last_cycle: null })
-    expect(await command({ type: "cycle.run_now", phase: "postmarket" })).toMatchObject({ status: "failed", error: "the agent needs the model server (LLM_URL)" })
-    expect(await db.col.cycles.countDocuments()).toBe(0)
+    const status = await db.col.engineStatus.findOne({ _id: "engine" })
+    for (const gone of ["current_phase", "schedule", "last_cycle"]) expect(status).not.toHaveProperty(gone)
+    expect(await command({ type: "agent.review", symbols: ["AAPL"] })).toMatchObject({ status: "failed", error: "the agent needs the model server (LLM_URL)" })
   })
 
   it("turns an earlier breaker's drop to shadow into a pause on entries, which the owner lifts", async () => {
@@ -160,7 +154,7 @@ describe("Engine", () => {
     expect(broker.holdings.has("AAPL")).toBe(false)
     expect(engine.status).toBe("halted")
     expect(await command({ type: "resume" })).toMatchObject({ status: "failed", error: "the kill switch is engaged; release it first" })
-    expect(await command({ type: "cycle.run_now", phase: "premarket" })).toMatchObject({ status: "failed", error: "engine is halted" })
+    expect(await command({ type: "agent.review" })).toMatchObject({ status: "failed", error: "engine is halted" })
     expect(await command({ type: "kill_switch.release", confirm: "RELEASE" })).toMatchObject({ status: "done" })
     expect(engine.status).toBe("paused")
   })
@@ -187,17 +181,14 @@ describe("Engine", () => {
       "status",
       "cycle_state",
       "current_task",
-      "current_phase",
       "kill_switch",
       "ws_clients",
       "event_seq",
       "broker",
       "market",
-      "schedule",
       "quotes",
       "ai",
       "system",
-      "last_cycle",
       "errors_last_hour",
       "wire",
       "agent",
@@ -224,7 +215,7 @@ describe("Engine", () => {
   })
 
   it("words its control results for stocks and options", async () => {
-    expect(await command({ type: "pause" })).toMatchObject({ status: "done", result: "paused: no new cycles or entries; stops, targets and options exits stay active" })
+    expect(await command({ type: "pause" })).toMatchObject({ status: "done", result: "paused: no new entries; stops, targets and options exits stay active" })
     expect(await command({ type: "kill_switch.engage", reason: "test", liquidate: false })).toMatchObject({ status: "done", result: "halted: no new orders; stops, targets and options exits stay active" })
     expect(await command({ type: "kill_switch.release", confirm: "RELEASE" })).toMatchObject({ status: "done", result: "kill switch released; engine paused until you resume" })
     expect(events.filter((e) => e.type === "engine.status").map((e) => e.summary)).toEqual([
@@ -240,12 +231,7 @@ describe("Engine", () => {
     ])
   })
 
-  it("schedules and cancels the one-time seed, and replays news items only if they exist", async () => {
-    const at = new Date(Date.now() + 3_600_000).toISOString()
-    expect(await command({ type: "seed.schedule", amount_usd: 1_234.5678, at })).toMatchObject({ status: "done", result: `one-time seed of $1,234.57 scheduled for ${at}; it runs in the regular session, after the opening buffer` })
-    expect(await command({ type: "seed.schedule", amount_usd: 500, at })).toMatchObject({ status: "failed", error: expect.stringContaining("already scheduled") })
-    expect(await command({ type: "seed.cancel" })).toMatchObject({ status: "done", result: `seed scheduled for ${at} canceled` })
-    expect(await command({ type: "seed.cancel" })).toMatchObject({ status: "failed", error: "no scheduled seed to cancel" })
+  it("replays news items only if they exist", async () => {
     expect(await command({ type: "wire.replay", item_id: "missing-item" })).toMatchObject({ status: "failed", error: "no wire item with that id" })
   })
 })

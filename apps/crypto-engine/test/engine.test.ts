@@ -129,8 +129,6 @@ describe("Engine", () => {
       "symbols",
       "ai",
       "system",
-      "last_cycle",
-      "next_cycle_at",
       "reconciliation",
       "errors_last_hour",
       "wire",
@@ -147,9 +145,9 @@ describe("Engine", () => {
   })
 
   it("runs no timed cycles: Wake the agent goes to the agent", async () => {
-    expect(await command({ type: "cycle.run_now", symbols: ["BTC/USD"] })).toMatchObject({ status: "failed", error: "the agent needs the model server (LLM_URL)" })
+    expect(await command({ type: "agent.review", symbols: ["BTC/USD"] })).toMatchObject({ status: "failed", error: "the agent needs the model server (LLM_URL)" })
     await until(async () => (await db.col.engineStatus.findOne({ _id: "engine" }))?.agent?.level === "on")
-    expect((await db.col.engineStatus.findOne({ _id: "engine" }))!.next_cycle_at).toBeNull()
+    expect(await db.col.engineStatus.findOne({ _id: "engine" })).not.toHaveProperty("next_cycle_at")
   })
 
   it("turns an earlier breaker's drop to shadow into a pause on entries, which the owner lifts", async () => {
@@ -187,19 +185,14 @@ describe("Engine", () => {
     expect(await command({ type: "kill_switch.engage", reason: "test", liquidate: false })).toMatchObject({ status: "done", result: "halted: no new orders; stops and targets stay active" })
     expect(engine.status).toBe("halted")
     expect(await command({ type: "resume" })).toMatchObject({ status: "failed", error: "the kill switch is engaged; release it first" })
-    expect(await command({ type: "cycle.run_now" })).toMatchObject({ status: "failed", error: "engine is halted" })
+    expect(await command({ type: "agent.review" })).toMatchObject({ status: "failed", error: "engine is halted" })
     expect(await command({ type: "kill_switch.release", confirm: "RELEASE" })).toMatchObject({ status: "done", result: "kill switch released; engine paused until you resume" })
     expect(engine.status).toBe("paused")
     expect(await command({ type: "kill_switch.engage", reason: "again", liquidate: true })).toMatchObject({ status: "done", result: "halted and liquidated: no positions" })
     expect(await db.col.notifications.countDocuments({ title: "Kill switch engaged" })).toBe(2)
   })
 
-  it("schedules and cancels the one-time seed, and replays news items only if they exist", async () => {
-    const at = new Date(Date.now() + 3_600_000).toISOString()
-    expect(await command({ type: "seed.schedule", amount_usd: 1_234.5678, at })).toMatchObject({ status: "done", result: `one-time seed of $1,234.568 scheduled for ${at}` })
-    expect(await command({ type: "seed.schedule", amount_usd: 500, at })).toMatchObject({ status: "failed", error: expect.stringContaining("already scheduled") })
-    expect(await command({ type: "seed.cancel" })).toMatchObject({ status: "done", result: `seed scheduled for ${at} canceled` })
-    expect(await command({ type: "seed.cancel" })).toMatchObject({ status: "failed", error: "no scheduled seed to cancel" })
+  it("replays news items only if they exist", async () => {
     expect(await command({ type: "wire.replay", item_id: "missing-item" })).toMatchObject({ status: "failed", error: "no wire item with that id" })
   })
 })

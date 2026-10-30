@@ -114,9 +114,10 @@ describe("settings", () => {
 
 describe("commands", () => {
   it("validates every command shape", () => {
-    expect(commandSchema.safeParse({ type: "cycle.run_now", phase: "intraday", symbols: ["NVDA", "BRK.B"] }).success).toBe(true)
-    expect(commandSchema.safeParse({ type: "cycle.run_now", symbols: ["nvda"] }).success).toBe(false)
-    expect(commandSchema.safeParse({ type: "cycle.run_now", phase: "lunch" }).success).toBe(false)
+    expect(commandSchema.safeParse({ type: "agent.review", symbols: ["NVDA", "BRK.B"] }).success).toBe(true)
+    expect(commandSchema.safeParse({ type: "agent.review", symbols: ["nvda"] }).success).toBe(false)
+    expect(commandSchema.safeParse({ type: "cycle.run_now", phase: "intraday" }).success).toBe(false)
+    expect(commandSchema.safeParse({ type: "core.review" }).success).toBe(false)
     expect(commandSchema.safeParse({ type: "kill_switch.release", confirm: "yes" }).success).toBe(false)
     expect(commandSchema.safeParse({ type: "option.close", structure_id: "opt-1" }).success).toBe(true)
     expect(commandSchema.safeParse({ type: "position.close", symbol: "NVDA261120C00140000" }).success).toBe(false)

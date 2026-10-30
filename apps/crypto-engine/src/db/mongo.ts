@@ -3,9 +3,7 @@ import type {
   AccountDoc,
   AiCallDoc,
   AuditDoc,
-  BacktestDoc,
   CommandDoc,
-  CycleDoc,
   DailyStatsDoc,
   DecisionDoc,
   EngineStateDoc,
@@ -16,8 +14,6 @@ import type {
   NotificationDoc,
   OrderDoc,
   PositionDoc,
-  ResearchDoc,
-  SeedRunDoc,
   SettingsDoc,
   SnapshotDoc,
 } from "@mb/crypto-core/db"
@@ -46,16 +42,12 @@ export type Collections = {
   positions: Collection<PositionDoc>
   orders: Collection<OrderDoc>
   fills: Collection<FillDoc>
-  cycles: Collection<CycleDoc>
-  research: Collection<ResearchDoc>
   decisions: Collection<DecisionDoc>
   snapshots: Collection<SnapshotDoc>
   dailyStats: Collection<DailyStatsDoc>
   aiCalls: Collection<AiCallDoc>
   searchUsage: Collection<SearchUsageDoc>
-  backtests: Collection<BacktestDoc>
   notifications: Collection<NotificationDoc>
-  seedRuns: Collection<SeedRunDoc>
   wireItems: Collection<WireItemDoc>
   wireTriggers: Collection<WireTriggerDoc>
   agentEpisodes: Collection<AgentEpisodeDoc>
@@ -77,16 +69,12 @@ export const collectionsFor = (db: Db): Collections => ({
   positions: db.collection<PositionDoc>(COLLECTIONS.positions),
   orders: db.collection<OrderDoc>(COLLECTIONS.orders),
   fills: db.collection<FillDoc>(COLLECTIONS.fills),
-  cycles: db.collection<CycleDoc>(COLLECTIONS.cycles),
-  research: db.collection<ResearchDoc>(COLLECTIONS.research),
   decisions: db.collection<DecisionDoc>(COLLECTIONS.decisions),
   snapshots: db.collection<SnapshotDoc>(COLLECTIONS.snapshots),
   dailyStats: db.collection<DailyStatsDoc>(COLLECTIONS.dailyStats),
   aiCalls: db.collection<AiCallDoc>(COLLECTIONS.aiCalls),
   searchUsage: db.collection<SearchUsageDoc>(COLLECTIONS.searchUsage),
-  backtests: db.collection<BacktestDoc>(COLLECTIONS.backtests),
   notifications: db.collection<NotificationDoc>(COLLECTIONS.notifications),
-  seedRuns: db.collection<SeedRunDoc>(COLLECTIONS.seedRuns),
   wireItems: db.collection<WireItemDoc>(COLLECTIONS.wireItems),
   wireTriggers: db.collection<WireTriggerDoc>(COLLECTIONS.wireTriggers),
   agentEpisodes: db.collection<AgentEpisodeDoc>(COLLECTIONS.agentEpisodes),

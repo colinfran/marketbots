@@ -6,7 +6,6 @@ import type {
   AuditDoc,
   CacheDoc,
   CommandDoc,
-  CycleDoc,
   DailyStatsDoc,
   DecisionDoc,
   EngineStateDoc,
@@ -14,12 +13,9 @@ import type {
   EventDoc,
   LeaseDoc,
   NotificationDoc,
-  SeedRunDoc,
   OptionPositionDoc,
-  CoreReviewDoc,
   OrderDoc,
   PositionPlanDoc,
-  ReportDoc,
   SettingsDoc,
 } from "@mb/stock-core/db"
 import type { AgentEpisodeDoc, AgentNoteDoc, AgentWatchDoc } from "@mb/core/agent"
@@ -29,7 +25,7 @@ import type { Collection, Db } from "mongodb"
 
 /**
  * The engine's long-lived MongoDB connection. The engine is the only writer of trading state
- * (cycles, reports, decisions, orders, plans, options positions), which together with the
+ * (decisions, orders, plans, options positions), which together with the
  * single-instance lease means those documents never see concurrent writers.
  */
 
@@ -42,7 +38,6 @@ export type Collections = {
   commands: Collection<CommandDoc>
   audit: Collection<AuditDoc>
   notifications: Collection<NotificationDoc>
-  seedRuns: Collection<SeedRunDoc>
   wireItems: Collection<WireItemDoc>
   wireTriggers: Collection<WireTriggerDoc>
   agentEpisodes: Collection<AgentEpisodeDoc>
@@ -50,13 +45,10 @@ export type Collections = {
   agentNotes: Collection<AgentNoteDoc>
   aiCalls: Collection<AiCallDoc>
   searchUsage: Collection<SearchUsageDoc>
-  cycles: Collection<CycleDoc>
-  reports: Collection<ReportDoc>
   decisions: Collection<DecisionDoc>
   orders: Collection<OrderDoc>
   plans: Collection<PositionPlanDoc>
   optionPositions: Collection<OptionPositionDoc>
-  coreReviews: Collection<CoreReviewDoc>
   dailyStats: Collection<DailyStatsDoc>
   cache: Collection<CacheDoc>
 }
@@ -72,7 +64,6 @@ export const collectionsFor = (db: Db): Collections => ({
   commands: db.collection<CommandDoc>(COLLECTIONS.commands),
   audit: db.collection<AuditDoc>(COLLECTIONS.audit),
   notifications: db.collection<NotificationDoc>(COLLECTIONS.notifications),
-  seedRuns: db.collection<SeedRunDoc>(COLLECTIONS.seedRuns),
   wireItems: db.collection<WireItemDoc>(COLLECTIONS.wireItems),
   wireTriggers: db.collection<WireTriggerDoc>(COLLECTIONS.wireTriggers),
   agentEpisodes: db.collection<AgentEpisodeDoc>(COLLECTIONS.agentEpisodes),
@@ -80,13 +71,10 @@ export const collectionsFor = (db: Db): Collections => ({
   agentNotes: db.collection<AgentNoteDoc>(COLLECTIONS.agentNotes),
   aiCalls: db.collection<AiCallDoc>(COLLECTIONS.aiCalls),
   searchUsage: db.collection<SearchUsageDoc>(COLLECTIONS.searchUsage),
-  cycles: db.collection<CycleDoc>(COLLECTIONS.cycles),
-  reports: db.collection<ReportDoc>(COLLECTIONS.reports),
   decisions: db.collection<DecisionDoc>(COLLECTIONS.decisions),
   orders: db.collection<OrderDoc>(COLLECTIONS.orders),
   plans: db.collection<PositionPlanDoc>(COLLECTIONS.plans),
   optionPositions: db.collection<OptionPositionDoc>(COLLECTIONS.optionPositions),
-  coreReviews: db.collection<CoreReviewDoc>(COLLECTIONS.coreReviews),
   dailyStats: db.collection<DailyStatsDoc>(COLLECTIONS.dailyStats),
   cache: db.collection<CacheDoc>(COLLECTIONS.cache),
 })

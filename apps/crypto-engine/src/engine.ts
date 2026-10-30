@@ -39,14 +39,10 @@ import type { Wire } from "./wire/wire"
 
 export const ENGINE_VERSION = "0.1.0"
 
-/** Crypto's words in the shared control results and seed alerts (@mb/engine-kit/control/plane). */
+/** Crypto's words in the shared control results (@mb/engine-kit/control/plane). */
 const WORDING: ControlWording = {
   paused: "paused: no new decisions or entries; stops and targets stay active",
   halted: "halted: no new orders; stops and targets stay active",
-  usd: (amount) => `$${amount.toLocaleString("en-US")}`,
-  seedScheduled: "",
-  seedInterrupted: "check Holdings",
-  seedFailedPath: (cycleId) => (cycleId ? `/research/${cycleId}` : "/admin"),
 }
 
 export type EngineDeps = {
@@ -200,8 +196,6 @@ export class Engine {
         paper_wallet: this.wallet,
         symbols: d.hub.symbolHealth(),
         ...p.usage,
-        last_cycle: null,
-        next_cycle_at: null,
         reconciliation: this.reconciliation ? { ok: this.reconciliation.ok, at: this.reconciliation.at, issues: this.reconciliation.issues.slice(0, 20) } : null,
         ...p.health,
         ...(d.history ? { history: d.history.status() } : {}),
@@ -408,10 +402,6 @@ export class Engine {
         if (!res.ok) throw new Error(res.error)
         return `${command.strategy} ${command.enabled ? "enabled" : "disabled"}`
       }
-      case "cycle.run_now":
-        // The agent reviews what was asked, and may act on it.
-        if (state.state.status !== "running" || state.state.kill_switch.engaged) throw new Error(`engine is ${this.status}`)
-        return this.agent.agent.review(command.symbols ?? [], by)
       case "position.close": {
         const position = await this.d.db.col.positions.findOne({ _id: command.position_id, status: "open" })
         if (!position) throw new Error("no open position with that id")
@@ -429,8 +419,6 @@ export class Engine {
         await this.reconcile()
         return `paper wallet reset to $${s.paper.starting_usd.toLocaleString("en-US")} (fee ${s.kraken.taker_fee_bps} bps, slippage ${s.kraken.paper_slippage_bps} bps)`
       }
-      case "backtest.run":
-        throw new Error("the backtester is gone: the agent decides")
       default:
         return this.control.handle(command, by)
     }

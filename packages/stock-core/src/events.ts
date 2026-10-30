@@ -22,7 +22,8 @@ export type { ClientFrame, EventLevel, EventVisibility } from "@mb/core/events"
 
 export type EngineRunStatus = "starting" | "running" | "paused" | "halted" | "stopping"
 
-export type CycleState = "idle" | "gathering_data" | "loading_options" | "researching" | "deciding" | "executing" | "protecting" | "reviewing"
+/** What the engine's execution path is doing (the dashboard's status pill). */
+export type CycleState = "idle" | "executing" | "protecting"
 
 export type RiskCheck = { name: string; ok: boolean; detail: string }
 
@@ -40,58 +41,6 @@ export type EventDataMap = {
   "market.session": { state: "open" | "closed"; day: string }
   "broker.connected": { channel: "trade_updates" | "market_data" }
   "broker.disconnected": { channel: "trade_updates" | "market_data"; reason: string }
-  "broker.error": { scope: string; message: string }
-  "cycle.started": { cycle_id: string; phase: Phase; trigger: string }
-  "cycle.state": { cycle_id: string; state: CycleState; detail?: string }
-  "cycle.step": { cycle_id: string; name: string; ok: boolean; detail: string | null }
-  "cycle.completed": {
-    cycle_id: string
-    phase: Phase
-    report_id: string
-    duration_ms: number
-    decisions: number
-    executed: number
-    rejected: number
-    failed: number
-    ai_cost_usd: number
-    headline: string
-  }
-  "cycle.failed": { cycle_id: string; phase: Phase; error: string }
-  "cycle.skipped": { phase: Phase | null; reason: string }
-  "context.built": {
-    cycle_id: string
-    positions: number
-    option_positions: number
-    instruments: number
-    headlines: number
-    equity: number
-    day_pnl_pct: number
-    new_buys_allowed: boolean
-    flags: string[]
-  }
-  "options.chains": { cycle_id: string; underlyings: { symbol: string; contracts: number }[] }
-  "research.started": { cycle_id: string; research_id: string; phase: Phase; model: string; focus: string[] }
-  "research.query": Shared["research.query"]
-  "research.source": Shared["research.source"]
-  "research.progress": Shared["research.progress"]
-  "research.completed": Shared["research.completed"]
-  "ai.reasoning": { cycle_id: string; task: "research" | "decision"; chars: number; excerpt: string }
-  "ai.decision.started": { cycle_id: string; model: string }
-  "ai.decision.progress": { cycle_id: string; chars: number; headline: string | null; decisions: number }
-  "ai.decision.completed": Shared["ai.decision.completed"]
-  "ai.decision.failed": Shared["ai.decision.failed"]
-  "ai.report": {
-    cycle_id: string
-    phase: Phase
-    headline: string
-    summary: string
-    sentiment: string
-    regime: string
-    stance: string
-    confidence: number
-    key_drivers: string[]
-    watchlist: string[]
-  }
   "ai.decision.proposed": {
     cycle_id: string
     symbol: string
@@ -144,11 +93,8 @@ export type EventDataMap = {
   "daily.stats": { day: string; pnl: number; pnl_pct: number; spy_pct: number | null }
   "wire.item": Shared["wire.item"]
   "wire.notable": Shared["wire.notable"]
-  "wire.dossier": Shared["wire.dossier"]
   "wire.trigger": Shared["wire.trigger"]
   "wire.source": Shared["wire.source"]
-  "seed.started": Shared["seed.started"]
-  "seed.completed": Shared["seed.completed"]
   "agent.woke": Shared["agent.woke"]
   "agent.step": Shared["agent.step"]
   "agent.answered": Shared["agent.answered"]
@@ -158,19 +104,6 @@ export type EventDataMap = {
   "llm.delta": Shared["llm.delta"]
   "llm.done": Shared["llm.done"]
   "llm.status": Shared["llm.status"]
-  "core.review.started": { review_id: string; cycle_id: string; kind: "weekly" | "holding"; trigger: string; symbol: string | null; dry_run: boolean }
-  "core.review.completed": {
-    review_id: string
-    cycle_id: string
-    status: "done" | "failed" | "skipped"
-    dry_run: boolean
-    summary: string | null
-    decisions: { symbol: string; action: string; status: string; reason: string | null }[]
-    executed: number
-    rejected: number
-    cost_usd: number
-    error: string | null
-  }
   error: Shared["error"]
   alert: Shared["alert"]
 }
@@ -180,10 +113,10 @@ export type EventType = keyof EventDataMap
 export type EngineEvent<T extends EventType = EventType> = EngineEventOf<EventDataMap, T>
 
 /** Events that never reach a public (logged-out) viewer. */
-export const OWNER_ONLY_EVENTS: ReadonlySet<EventType> = new Set<EventType>(["command.received", "command.completed", "command.failed", "error", "broker.error"])
+export const OWNER_ONLY_EVENTS: ReadonlySet<EventType> = new Set<EventType>(["command.received", "command.completed", "command.failed", "error"])
 
 /** High-frequency events that are streamed but not stored. */
-export const EPHEMERAL_EVENTS: ReadonlySet<EventType> = new Set<EventType>(["market.ticker", "engine.heartbeat", "research.progress", "ai.decision.progress", "ai.reasoning", ...MODEL_EVENT_TYPES])
+export const EPHEMERAL_EVENTS: ReadonlySet<EventType> = new Set<EventType>(["market.ticker", "engine.heartbeat", ...MODEL_EVENT_TYPES])
 
 /**
  * Whether a viewer may see an event. Everything is paper money, so public viewers see amounts;

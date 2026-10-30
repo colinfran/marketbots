@@ -1,7 +1,7 @@
 import "server-only"
 import { randomUUID } from "node:crypto"
 import type { BaseCommand } from "@mb/core/commands"
-import type { AuditDoc, CommandDoc, SeedRunDoc, SettingsDoc } from "@mb/core/db"
+import type { AuditDoc, CommandDoc, SettingsDoc } from "@mb/core/db"
 import type { EventVisibility } from "@mb/core/events"
 import type { StreamTokenPayload } from "@mb/core/stream-token"
 import type { Collection, Document } from "mongodb"
@@ -21,7 +21,6 @@ type CommandCollections<C extends { type: string }, S> = {
   commands: Collection<CommandDoc<C>>
   audit: Collection<AuditDoc>
   settings: Collection<SettingsDoc<S>>
-  seedRuns: Collection<SeedRunDoc>
 }
 
 export type SubmitResult = { ok: true; id: string } | { ok: false; error: string }
@@ -44,13 +43,7 @@ export const createCommands = <C extends { type: string }, S>({
     if (!parsed.success) return { ok: false, error: parsed.error.issues.map((i) => `${i.path.join(".") || "command"}: ${i.message}`).join("; ") }
     const command = parsed.data
     const shared = command as unknown as BaseCommand
-    const { commands, audit, settings, seedRuns } = await collections()
-    if (shared.type === "seed.schedule") {
-      // The engine enforces these too; checking here gives the form an immediate answer.
-      const active = await seedRuns.findOne({ status: { $in: ["scheduled", "running"] } })
-      if (active) return { ok: false, error: `a seed is already ${active.status}; cancel it first` }
-      if (!shared.force && (await seedRuns.findOne({ status: "done" }))) return { ok: false, error: 'a seed already ran; tick "force a new seed" to run another' }
-    }
+    const { commands, audit, settings } = await collections()
     if (shared.type === "settings.update") {
       // Same validation the engine applies, so a bad form never reaches the queue.
       const current = await settings.findOne({ _id: "current" })

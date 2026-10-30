@@ -1,5 +1,5 @@
 import "server-only"
-import type { AiCallDoc, AuditDoc, EngineStateDoc, NotificationDoc, SeedRunDoc } from "@mb/core/db"
+import type { AiCallDoc, AuditDoc, EngineStateDoc, NotificationDoc } from "@mb/core/db"
 import type { EventLevel, EventVisibility } from "@mb/core/events"
 import type { NotableReason, WireItemDoc, WireTriggerDoc } from "@mb/core/wire"
 import type { Collection, Document, Filter } from "mongodb"
@@ -87,7 +87,7 @@ export const toRowView = (i: WireItemDoc<string>): WireRowView => ({
 })
 
 /** The collections the shared queries read. Each bot passes its own map; the bot-specific document types are read off it. */
-type QueryCollectionName = "engineStatus" | "engineState" | "events" | "commands" | "audit" | "notifications" | "seedRuns" | "aiCalls" | "wireItems" | "wireTriggers" | "cycles"
+type QueryCollectionName = "engineStatus" | "engineState" | "events" | "commands" | "audit" | "notifications" | "aiCalls" | "wireItems" | "wireTriggers"
 
 type DocOf<X> = X extends Collection<infer T> ? T : never
 
@@ -116,7 +116,6 @@ export const createQueries = <Cols extends Record<QueryCollectionName, unknown>,
       engineState: Collection<EngineStateDoc>
       audit: Collection<AuditDoc>
       notifications: Collection<NotificationDoc>
-      seedRuns: Collection<SeedRunDoc>
       aiCalls: Collection<AiCallDoc>
       wireTriggers: Collection<WireTriggerDoc>
     }

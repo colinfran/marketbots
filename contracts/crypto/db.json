@@ -11,16 +11,12 @@
     "positions": "positions",
     "orders": "orders",
     "fills": "fills",
-    "cycles": "cycles",
-    "research": "research",
     "decisions": "decisions",
     "snapshots": "portfolio_snapshots",
     "dailyStats": "daily_stats",
     "aiCalls": "ai_calls",
     "searchUsage": "search_usage",
-    "backtests": "backtests",
     "notifications": "notifications",
-    "seedRuns": "seed_runs",
     "wireItems": "wire_items",
     "wireTriggers": "wire_triggers",
     "loginAttempts": "login_attempts",
@@ -144,25 +140,6 @@
         "sparse": true
       }
     ],
-    "cycles": [
-      {
-        "key": {
-          "started_at": -1
-        }
-      }
-    ],
-    "research": [
-      {
-        "key": {
-          "started_at": -1
-        }
-      },
-      {
-        "key": {
-          "cycle_id": 1
-        }
-      }
-    ],
     "decisions": [
       {
         "key": {
@@ -224,13 +201,6 @@
         }
       }
     ],
-    "backtests": [
-      {
-        "key": {
-          "created_at": -1
-        }
-      }
-    ],
     "notifications": [
       {
         "key": {
@@ -242,19 +212,6 @@
           "expires_at": 1
         },
         "expireAfterSeconds": 0
-      }
-    ],
-    "seed_runs": [
-      {
-        "key": {
-          "status": 1,
-          "at": 1
-        }
-      },
-      {
-        "key": {
-          "created_at": -1
-        }
       }
     ],
     "wire_items": [
