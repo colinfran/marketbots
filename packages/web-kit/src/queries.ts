@@ -1,5 +1,5 @@
 import "server-only"
-import type { AiCallDoc, AuditDoc, EngineStateDoc, NotificationDoc } from "@mb/core/db"
+import { STATUS_DETAIL_ID, type AiCallDoc, type AuditDoc, type EngineStateDoc, type NotificationDoc } from "@mb/core/db"
 import type { EventLevel, EventVisibility } from "@mb/core/events"
 import type { NotableReason, WireItemDoc, WireTriggerDoc } from "@mb/core/wire"
 import type { Collection, Document, Filter } from "mongodb"
@@ -120,9 +120,13 @@ export const createQueries = <Cols extends Record<QueryCollectionName, unknown>,
       wireTriggers: Collection<WireTriggerDoc>
     }
 
+  /** The heartbeat, with its large sections from their own document (written once a minute); an older engine's own copy of them wins. */
   const getEngine = async (): Promise<EngineSummary<S>> => {
     await connection()
-    const status = (await (await loose()).engineStatus.findOne({ _id: "engine" })) as S | null
+    const { engineStatus } = await loose()
+    const [main, detail] = await Promise.all([engineStatus.findOne({ _id: "engine" }), engineStatus.findOne({ _id: STATUS_DETAIL_ID })])
+    const sections = Object.fromEntries(Object.entries(detail ?? {}).filter(([k]) => k !== "_id" && k !== "at"))
+    const status = (main ? { ...sections, ...main } : null) as S | null
     const age = status ? (Date.now() - (status as unknown as { at: Date }).at.getTime()) / 1000 : null
     return { status, online: age !== null && age * 1000 < HEARTBEAT_STALE_MS, heartbeatAgeS: age === null ? null : Math.round(age) }
   }

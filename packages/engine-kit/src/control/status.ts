@@ -1,4 +1,4 @@
-import type { AiCallDoc, EngineStateDoc, EngineStatusBase } from "@mb/core/db"
+import { STATUS_DETAIL_ID, type AiCallDoc, type EngineStateDoc, type EngineStatusBase } from "@mb/core/db"
 import type { BaseEventDataMap } from "@mb/core/events"
 import type { WireStatus } from "@mb/core/wire"
 import type { Collection } from "mongodb"
@@ -12,7 +12,13 @@ import { ResourceSampler } from "../heartbeat"
  *
  * The reporter gathers the fields both bots write. The bot's `doc` places them, with its own
  * section (venue or broker health, market, schedule, last cycle…), in its document's field order.
+ * The fields the bot names in `detail` (large, and slow to change) go to their own document
+ * instead, once a minute: the database is a small shared one, and rewriting tens of kilobytes every
+ * few seconds was most of the bots' traffic to it.
  */
+
+/** How often the `detail` fields are rewritten. */
+const DETAIL_MS = 60_000
 
 type Base = EngineStatusBase<string, string>
 
@@ -34,7 +40,8 @@ export type StatusReporterDeps<D extends Base> = {
   col: {
     aiCalls: Collection<AiCallDoc>
     events: { countDocuments(filter: { level: "error"; ts: { $gte: string } }): Promise<number> }
-    engineStatus: { replaceOne(filter: { _id: "engine" }, doc: D, options: { upsert: true }): Promise<unknown> }
+    /** Holds both documents: `engine` and `STATUS_DETAIL_ID`. */
+    engineStatus: { replaceOne(filter: { _id?: unknown }, doc: object, options: { upsert: true }): Promise<unknown> }
   }
   bus: { readonly lastSeq: number; emit(type: "engine.heartbeat", data: HeartbeatData<D>, meta: EmitMeta): unknown }
   calls: { today(): Promise<{ calls: number }> }
@@ -50,12 +57,15 @@ export type StatusReporterDeps<D extends Base> = {
   run: () => { status: D["status"]; cycle_state: D["cycle_state"]; current_task: string | null }
   /** The bot's document: the shared parts and its own section, in its field order. */
   doc: (parts: StatusParts<D["status"], D["cycle_state"]>) => D
+  /** The document's fields written apart, once a minute, in the `STATUS_DETAIL_ID` document. */
+  detail: readonly (keyof D & string)[]
 }
 
 export class StatusReporter<D extends Base> {
   private readonly startedAt = new Date()
   private readonly sampler = new ResourceSampler()
   private triggersToday = 0
+  private detailAt = 0
 
   constructor(private readonly d: StatusReporterDeps<D>) {}
 
@@ -80,7 +90,15 @@ export class StatusReporter<D extends Base> {
       },
       health: { errors_last_hour: errors, wire: this.d.wire.health({ triggers_today: this.triggersToday }) },
     }
-    await col.engineStatus.replaceOne({ _id: "engine" }, this.d.doc(parts), { upsert: true })
+    const doc = this.d.doc(parts)
+    const detail = new Set<string>(this.d.detail)
+    // The detail first: a new `engine` document never stands without one.
+    if (Date.now() - this.detailAt >= DETAIL_MS) {
+      const fields = Object.entries(doc).filter(([k, v]) => detail.has(k) && v !== undefined)
+      await col.engineStatus.replaceOne({ _id: STATUS_DETAIL_ID }, { _id: STATUS_DETAIL_ID, at: parts.run.at, ...Object.fromEntries(fields) }, { upsert: true })
+      this.detailAt = Date.now()
+    }
+    await col.engineStatus.replaceOne({ _id: "engine" }, Object.fromEntries(Object.entries(doc).filter(([k]) => !detail.has(k))), { upsert: true })
     if (Math.floor(Date.now() / 5_000) % 3 === 0) {
       const now = this.d.run()
       bus.emit(

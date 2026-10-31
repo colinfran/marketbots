@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto"
+import { STATUS_DETAIL_ID } from "@mb/core/db"
 import type { Command } from "@mb/crypto-core/commands"
 import { utcDay, type CommandDoc } from "@mb/crypto-core/db"
 import type { EngineEvent } from "@mb/crypto-core/events"
@@ -121,14 +122,14 @@ describe("Engine", () => {
       "event_seq",
       "kraken",
       "paper_wallet",
-      "symbols",
       "ai",
       "system",
       "reconciliation",
       "errors_last_hour",
-      "wire",
       "agent",
     ])
+    // The large sections, apart (written once a minute).
+    expect(Object.keys((await db.col.engineStatus.findOne({ _id: STATUS_DETAIL_ID as never }))!)).toEqual(["_id", "at", "symbols", "wire"])
     expect(engine.ready).toBe(true)
     expect(events.map((e) => e.type)).toEqual(expect.arrayContaining(["engine.started", "engine.status", "alert"]))
   })

@@ -2,6 +2,7 @@ import { AiCallLog } from "@mb/engine-kit/ai/call-log"
 import { silentLogger } from "@mb/engine-kit/log"
 import type { Wire } from "../src/wire/wire"
 import { randomUUID } from "node:crypto"
+import { STATUS_DETAIL_ID } from "@mb/core/db"
 import type { Command } from "@mb/stock-core/commands"
 import type { CommandDoc, StreamHealth } from "@mb/stock-core/db"
 import type { EngineEvent } from "@mb/stock-core/events"
@@ -190,9 +191,10 @@ describe("Engine", () => {
       "ai",
       "system",
       "errors_last_hour",
-      "wire",
       "agent",
     ])
+    // The news engine's health, apart (written once a minute).
+    expect(Object.keys((await db.col.engineStatus.findOne({ _id: STATUS_DETAIL_ID as never }))!)).toEqual(["_id", "at", "wire"])
   })
 
   it("runs the agent by default, and says why it can't answer without the model server", async () => {

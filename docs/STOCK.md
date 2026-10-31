@@ -35,7 +35,7 @@ Browser ─https─▶ Vercel (Next.js dashboard) ─▶ Azure DocumentDB ◀─
 | Every | Job |
 | --- | --- |
 | 1 s | dashboard commands |
-| 5 s | heartbeat to `engine_status` (the Admin page) and the stream |
+| 5 s | heartbeat to `engine_status` (the Admin page) and the stream; its large news-source health section once a minute, in its own document |
 | 15 s | account snapshot for the dashboard; live-price subscriptions; periodic summary |
 | `options.monitor_seconds` (15) | options monitor: marks every position, checks its exits, closes what's hit |
 | 30 s | the market calendar: today's session |
@@ -109,7 +109,7 @@ Files headed `// Mirrored in cryptomarketbot and stockmarketbot: keep in sync.` 
 
 **Settings** (the `wire` section, changed live from Admin; defaults): `mode` live, `thresholds` 30/55/70/85, `entry_confirmation` on, `unexplained_move_entries` off, `trigger_max_age_minutes` 15, `symbol_cooldown_minutes` 30, `max_event_cycles_per_hour` / `_per_day` 4 / 24 (the trigger caps), `emergency_action` review, `anomaly` price z 4 / volume ×5 / market z 4, `retention_days` 30, `odds_swing_pts` 15, `scan_max_symbols` 1,500, `scan_min_dollar_volume` $20M.
 
-**Events and commands**: `wire.item`, `wire.notable`, `wire.dossier`, `wire.trigger` and `wire.source` on the live stream; `wire.replay` (Admin) re-runs an item through the policy as a dry run. Source health is in the heartbeat (`engine_status.wire.sources`: state, last error, items and drops in 24 h, lag, and a detail line for the price layers).
+**Events and commands**: `wire.item`, `wire.notable`, `wire.dossier`, `wire.trigger` and `wire.source` on the live stream; `wire.replay` (Admin) re-runs an item through the policy as a dry run. Source health is in the heartbeat (`wire.sources` in `engine_status`'s `detail` document, rewritten once a minute: state, last error, items and drops in 24 h, lag, and a detail line for the price layers).
 
 **Failure behavior**: the wire never throws into the engine. A broken source, a bad payload or a database hiccup costs at most that batch of items, and trading goes on as it would without the wire. On boot the cluster index and seen ids are rebuilt from MongoDB, and nothing from a source's first poll can trigger, so a restart never replays old news as new. A dead scraper sidecar only takes the headless sources down. Settings change live from Admin (`wire.mode: off` turns the whole engine off; `disabled_sources` turns single sources off, price layers included).
 
@@ -156,7 +156,7 @@ Events are typed (`packages/core/src/events.ts`) and carry a strictly increasing
 | Collection | Contents |
 | --- | --- |
 | `settings`, `engine_state` | the versioned settings document; desired state (running/paused/halted, kill switch, when the agent was last turned on or resumed, and any breaker pause on its entries) |
-| `engine_status`, `engine_lease` | heartbeat (health of everything, the agent, live prices, AI calls today); single-instance lease |
+| `engine_status`, `engine_lease` | heartbeat (health of everything, the agent, live prices, AI calls today: `engine`, every 5 s; the news sources' health: `detail`, every minute; the dashboard reads the two as one); single-instance lease |
 | `events` | persisted stream events (replay, episode trails) |
 | `commands`, `audit_log` | owner commands and results; every control and settings change |
 | `decisions` | each requested action (stock or option), every risk check, what happened, the order ids, and the agent episode that made it |

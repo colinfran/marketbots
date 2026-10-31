@@ -1,4 +1,4 @@
-import type { EngineStateDoc } from "@mb/core/db"
+import { STATUS_DETAIL_ID, type EngineStateDoc } from "@mb/core/db"
 import type { EngineEvent } from "@mb/core/events"
 import type { WireStatus } from "@mb/core/wire"
 import { afterEach, describe, expect, it, vi } from "vitest"
@@ -40,6 +40,7 @@ const setup = async (overrides: Partial<StatusReporterDeps<TestStatusDoc>> = {})
     run: () => run,
     // The bot's own fields go between the shared ones, in its order.
     doc: (p) => ({ ...p.run, ...p.live, venue: { ok: true }, ...p.usage, last_cycle: "cycle-1", ...p.health }),
+    detail: ["wire"],
     ...overrides,
   })
   return { bus, events, run, healthCalls, triggers, reporter }
@@ -50,7 +51,7 @@ afterEach(() => {
 })
 
 describe("StatusReporter", () => {
-  it("writes the shared fields with the bot's section, in the bot's field order", async () => {
+  it("writes the shared fields with the bot's section, in the bot's field order, and its detail fields apart", async () => {
     const { bus, healthCalls, reporter } = await setup()
     await db.col.aiCalls.insertOne({ _id: "a1", at: new Date(Date.now() - 60_000), ok: true, error: null } as never)
     await db.col.aiCalls.insertOne({ _id: "a2", at: new Date(), ok: false, error: "gateway timeout" } as never)
@@ -78,7 +79,6 @@ describe("StatusReporter", () => {
       "system",
       "last_cycle",
       "errors_last_hour",
-      "wire",
     ])
     expect(doc).toMatchObject({
       instance: "kit-1",
@@ -93,14 +93,32 @@ describe("StatusReporter", () => {
       ai: { calls_today: 7, last_error: "gateway timeout", enabled: true },
       last_cycle: "cycle-1",
       errors_last_hour: 1,
-      wire: { mode: "live", items_last_hour: 5, triggers_today: 4 },
     })
     expect(Object.keys(doc.ai)).toEqual(["calls_today", "last_call_at", "last_error", "enabled"])
     expect(doc.system).toEqual({ cpu_pct: expect.any(Number), rss_mb: expect.any(Number), heap_mb: expect.any(Number), load_avg: expect.any(Array), uptime_s: expect.any(Number) })
+    const detail = await db.col.engineStatus.findOne({ _id: STATUS_DETAIL_ID as never })
+    expect(Object.keys(detail!)).toEqual(["_id", "at", "wire"])
+    expect(detail).toMatchObject({ at: doc.at, wire: { mode: "live", items_last_hour: 5, triggers_today: 4 } })
     expect(healthCalls).toEqual([{ triggers_today: 4 }])
-    // Replaced in place on every beat.
+    // Both replaced in place.
     await reporter.write()
-    expect(await db.col.engineStatus.countDocuments()).toBe(1)
+    expect(await db.col.engineStatus.countDocuments()).toBe(2)
+    await bus.stop()
+  })
+
+  it("rewrites the detail fields once a minute, not on every beat", async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: BEAT })
+    const { bus, reporter } = await setup()
+    const detailAt = async () => (await db.col.engineStatus.findOne({ _id: STATUS_DETAIL_ID as never }))!.at.getTime()
+    await reporter.write()
+    expect(await detailAt()).toBe(BEAT)
+    vi.setSystemTime(BEAT + 55_000)
+    await reporter.write()
+    expect(await detailAt()).toBe(BEAT)
+    expect((await db.col.engineStatus.findOne({ _id: "engine" }))!.at.getTime()).toBe(BEAT + 55_000)
+    vi.setSystemTime(BEAT + 60_000)
+    await reporter.write()
+    expect(await detailAt()).toBe(BEAT + 60_000)
     await bus.stop()
   })
 
@@ -122,11 +140,12 @@ describe("StatusReporter", () => {
   })
 
   it("keeps the last trigger count when the policy can't be read, and reports no calls when the call log can't be read", async () => {
-    const { bus, triggers, reporter } = await setup({ calls: { today: async () => Promise.reject(new Error("db down")) } })
+    const { bus, healthCalls, triggers, reporter } = await setup({ calls: { today: async () => Promise.reject(new Error("db down")) } })
     await reporter.write()
     triggers.fail = true
     await reporter.write()
-    expect(await db.col.engineStatus.findOne({ _id: "engine" })).toMatchObject({ ai: { calls_today: 0, last_call_at: null, last_error: null }, wire: { triggers_today: 4 } })
+    expect(await db.col.engineStatus.findOne({ _id: "engine" })).toMatchObject({ ai: { calls_today: 0, last_call_at: null, last_error: null } })
+    expect(healthCalls).toEqual([{ triggers_today: 4 }, { triggers_today: 4 }])
     await bus.stop()
   })
 })

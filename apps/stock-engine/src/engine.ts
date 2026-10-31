@@ -233,6 +233,7 @@ export class Engine {
           agent: this.agent.agent.status(),
         }
       },
+      detail: ["wire"],
     })
     d.wire.onItem((e) => this.policy.onItem(e))
     // News watches fire on fresh items only: a source's first poll after a restart is old news.
