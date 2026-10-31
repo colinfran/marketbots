@@ -58,7 +58,7 @@ export default async function DecisionPage({ params }: Props) {
           <>
             {dateTime(d.created_at)} ·{" "}
             {d.agent_episode_id ? (
-              <Link prefetch href={`/agent/${d.agent_episode_id}`} className="hover:underline">
+              <Link href={`/agent/${d.agent_episode_id}`} className="hover:underline">
                 view the agent&apos;s episode: what woke it, each lookup and its thinking
               </Link>
             ) : (

@@ -62,7 +62,7 @@ const detail = (e: EngineEvent): React.ReactNode => {
 const summary = (e: EngineEvent): React.ReactNode => (
   <>
     {e.instrument ? (
-      <Link prefetch href={`/markets/${symbolSlug(e.instrument)}`} className="font-mono font-semibold hover:underline">
+      <Link href={`/markets/${symbolSlug(e.instrument)}`} className="font-mono font-semibold hover:underline">
         {e.instrument}
       </Link>
     ) : null}

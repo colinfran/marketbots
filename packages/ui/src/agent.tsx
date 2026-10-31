@@ -226,7 +226,7 @@ export function AgentLive({ initial, textShown }: { initial: EpisodeView | null;
           </div>
         )}
         {ep.answered && (
-          <Link prefetch href={`/agent/${ep.id}`} className="text-muted-foreground text-xs hover:underline">
+          <Link href={`/agent/${ep.id}`} className="text-muted-foreground text-xs hover:underline">
             The whole episode
           </Link>
         )}
@@ -298,7 +298,7 @@ export function EpisodeTable({ rows }: { rows: EpisodeRowView[] }) {
         {rows.map((r) => (
           <TableRow key={r.id}>
             <TableCell className="text-xs whitespace-nowrap">
-              <Link prefetch href={`/agent/${r.id}`} className="hover:underline">
+              <Link href={`/agent/${r.id}`} className="hover:underline">
                 {kit.format.dateTime(r.started_at)}
               </Link>
             </TableCell>

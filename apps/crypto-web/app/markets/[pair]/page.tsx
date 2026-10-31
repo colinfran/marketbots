@@ -126,7 +126,7 @@ export default async function PairPage({ params }: Props) {
             ) : (
               <p className="text-muted-foreground text-sm">Our feeds saw nothing about {symbol} in the last 72 hours.</p>
             )}
-            <Link prefetch href={`/news?symbol=${encodeURIComponent(symbol)}`} className="text-muted-foreground mt-3 inline-block text-xs hover:underline">
+            <Link href={`/news?symbol=${encodeURIComponent(symbol)}`} className="text-muted-foreground mt-3 inline-block text-xs hover:underline">
               All the news on {symbol}
             </Link>
           </CardContent>

@@ -234,7 +234,7 @@ export function DecisionsTable({ decisions, showDay = false }: { decisions: Deci
               <TableRow key={d._id} className="align-top">
                 <TableCell className="text-muted-foreground whitespace-nowrap">
                   {decisionHref(d) ? (
-                    <Link prefetch href={decisionHref(d)!} className="hover:underline">
+                    <Link href={decisionHref(d)!} className="hover:underline">
                       {showDay ? formatDateTime(d.created_at) : formatTime(d.created_at)}
                     </Link>
                   ) : showDay ? (
@@ -343,7 +343,7 @@ export function TradesTable({ trades, showDay = true }: { trades: TradeRow[]; sh
                 </TableCell>
                 <TableCell className="text-muted-foreground text-xs whitespace-normal">
                   {decisionHref(t) ? (
-                    <Link prefetch href={decisionHref(t)!} className="hover:text-foreground hover:underline">
+                    <Link href={decisionHref(t)!} className="hover:text-foreground hover:underline">
                       {t.rationale}
                     </Link>
                   ) : (
@@ -387,7 +387,7 @@ export function DayRows({
           {days.map(({ day, stats, decisions }) => (
             <TableRow key={day}>
               <TableCell>
-                <Link prefetch href={`/journal/${day}`} className="font-medium hover:underline">
+                <Link href={`/journal/${day}`} className="font-medium hover:underline">
                   {new Date(`${day}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}
                 </Link>
               </TableCell>

@@ -33,7 +33,7 @@ export const agentDetail = (e: AnyEvent): React.ReactNode => {
 export const agentLinks = (e: AnyEvent): React.ReactNode => {
   const id = (e.data as { episode_id?: unknown }).episode_id
   return (e.type === "agent.answered" || e.type === "agent.woke") && typeof id === "string" ? (
-    <Link prefetch href={`/agent/${id}`} className="text-muted-foreground hover:text-foreground text-xs underline underline-offset-2">
+    <Link href={`/agent/${id}`} className="text-muted-foreground hover:text-foreground text-xs underline underline-offset-2">
       View episode
     </Link>
   ) : null

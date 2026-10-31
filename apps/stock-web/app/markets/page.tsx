@@ -90,7 +90,7 @@ export default async function MarketsPage() {
                     <TableCell className="text-sm">
                       {d ? (
                         href ? (
-                          <Link prefetch href={href} className="inline-flex items-center gap-1.5 hover:underline">
+                          <Link href={href} className="inline-flex items-center gap-1.5 hover:underline">
                             <ActionBadge action={d.action} /> <span className="text-muted-foreground text-xs">{ago(d.at)}</span>
                           </Link>
                         ) : (

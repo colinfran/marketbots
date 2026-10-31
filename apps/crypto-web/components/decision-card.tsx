@@ -24,7 +24,7 @@ export function DecisionCard({ d, link = true }: { d: DecisionDoc; link?: boolea
             conviction {d.ai.conviction}/100 · {d.ai.uncertainty} uncertainty · {d.held ? "held position" : "candidate"}
           </span>
           {link && (
-            <Link prefetch href={`/decisions/${d._id}`} className="text-muted-foreground ml-auto text-xs font-normal hover:underline">
+            <Link href={`/decisions/${d._id}`} className="text-muted-foreground ml-auto text-xs font-normal hover:underline">
               {dateTime(d.created_at)}
             </Link>
           )}

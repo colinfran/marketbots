@@ -75,7 +75,7 @@ const links = (e: EngineEvent): React.ReactNode => {
   if (!e.instrument) return null
   return (
     <p className="mt-0.5 flex gap-3 text-xs">
-      <Link prefetch href={`/markets/${encodeURIComponent(e.instrument)}`} className="text-muted-foreground hover:text-foreground font-mono underline underline-offset-2">
+      <Link href={`/markets/${encodeURIComponent(e.instrument)}`} className="text-muted-foreground hover:text-foreground font-mono underline underline-offset-2">
         {e.instrument}
       </Link>
     </p>

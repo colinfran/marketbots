@@ -92,7 +92,7 @@ export default async function AboutPage() {
         <p className="text-muted-foreground mb-3 text-sm leading-relaxed">
           The agent runs on an open-weight model ({s.agent.model}) on two graphics cards in the server that runs the bot: no AI service and no per-call cost. One
           episode runs at a time, and bad news on a holding interrupts anything else. Each one streams to the{" "}
-          <Link prefetch href="/agent" className="text-foreground underline underline-offset-2">
+          <Link href="/agent" className="text-foreground underline underline-offset-2">
             Agent
           </Link>{" "}
           page as it happens.
@@ -133,7 +133,7 @@ export default async function AboutPage() {
           </li>
           <li>
             So the AI is judged going forward: every decision, including the trades it passed on, is scored against what the price actually did.{" "}
-            <Link prefetch href="/analytics" className="text-foreground underline underline-offset-2">
+            <Link href="/analytics" className="text-foreground underline underline-offset-2">
               Analytics
             </Link>{" "}
             compares what it bought with what it skipped, with the screens alone and with a random-walk baseline, and checks how well calibrated its odds are.

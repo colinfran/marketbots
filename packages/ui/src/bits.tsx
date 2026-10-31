@@ -38,7 +38,7 @@ export function Stat({ label, value, sub, className }: { label: string; value: R
 /** A ticker or pair that links to its page; each app passes its own URL for a symbol. */
 export function SymbolLink({ symbol, href, className }: { symbol: string; href: string; className?: string }) {
   return (
-    <Link prefetch href={href} className={cn("font-mono font-semibold hover:underline", className)}>
+    <Link href={href} className={cn("font-mono font-semibold hover:underline", className)}>
       {symbol}
     </Link>
   )

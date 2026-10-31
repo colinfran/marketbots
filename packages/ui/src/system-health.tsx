@@ -241,7 +241,7 @@ export function WireSourcesSummary({ wire }: { wire: NonNullable<Status["wire"]>
       <p className="text-muted-foreground text-sm">
         Mode {wire.mode} · {ok} of {running.length} sources ok · {wire.items_last_hour} items in the last hour · {wire.triggers_today} triggers today. Every source with its
         errors is on{" "}
-        <Link prefetch href="/news" className="text-foreground underline underline-offset-2">
+        <Link href="/news" className="text-foreground underline underline-offset-2">
           News
         </Link>
         .

@@ -79,7 +79,7 @@ export default async function HoldingsPage() {
                         <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3 text-xs">
                           <Delta value={pnl} percent={p.cost_basis_usd > 0 ? (pnl / p.cost_basis_usd) * 100 : null} />
                           {p.decision_id && (
-                            <Link prefetch href={`/decisions/${p.decision_id}`} className="text-muted-foreground hover:underline">
+                            <Link href={`/decisions/${p.decision_id}`} className="text-muted-foreground hover:underline">
                               Opening decision
                             </Link>
                           )}
