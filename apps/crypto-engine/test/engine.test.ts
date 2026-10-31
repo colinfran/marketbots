@@ -169,6 +169,8 @@ describe("Engine", () => {
     await internals().upgradeDemotion()
     expect((await db.col.settings.findOne({ _id: "current" }))!.settings.agent.level).toBe("on")
     expect(await db.col.engineState.findOne({ _id: "engine" })).toMatchObject({ agent_pause: { reason }, agent_demotion: null })
+    // Audited just after the change.
+    await until(async () => (await db.col.audit.findOne({ action: "agent.entries_paused" })) !== null)
     expect(await db.col.audit.findOne({ action: "agent.entries_paused" })).toMatchObject({ actor: "engine:migration" })
     expect(engine.agent.agent.entriesPaused()).toBe(`entries paused by a breaker until the owner resumes them: ${reason}`)
 

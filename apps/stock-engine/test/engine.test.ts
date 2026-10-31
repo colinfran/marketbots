@@ -158,6 +158,8 @@ describe("Engine", () => {
     await internals.upgradeDemotion()
     expect((await db.col.settings.findOne({ _id: "current" }))!.settings.agent.level).toBe("on")
     expect(await db.col.engineState.findOne({ _id: "engine" })).toMatchObject({ agent_pause: { reason }, agent_demotion: null })
+    // Audited just after the change.
+    await until(async () => (await db.col.audit.findOne({ action: "agent.entries_paused" })) !== null)
     expect(await db.col.audit.findOne({ action: "agent.entries_paused" })).toMatchObject({ actor: "engine:migration" })
     expect(engine.agent.agent.entriesPaused()).toBe(`entries paused by a breaker until the owner resumes them: ${reason}`)
     expect(await command({ type: "agent.resume_entries" })).toMatchObject({ status: "done", result: expect.stringMatching(/^the agent's entries resumed/) })
@@ -242,7 +244,10 @@ describe("Engine", () => {
       "Engine halted: test",
       "Engine paused: kill switch released; paused until resumed",
     ])
-    expect(await db.col.audit.find({ action: { $in: ["pause", "kill_switch.engage", "kill_switch.release"] } }).sort({ at: 1 }).toArray()).toMatchObject([
+    // Audited just after each change.
+    const controls = { action: { $in: ["pause", "kill_switch.engage", "kill_switch.release"] } }
+    await until(async () => (await db.col.audit.countDocuments(controls)) === 3)
+    expect(await db.col.audit.find(controls).sort({ at: 1 }).toArray()).toMatchObject([
       { actor: "owner", action: "pause", target: "engine", details: { status: "paused", pause_reason: null } },
       { actor: "owner", action: "kill_switch.engage", target: "engine", details: { reason: "test", status: "halted" } },
       { actor: "owner", action: "kill_switch.release", target: "engine", details: { status: "paused" } },
