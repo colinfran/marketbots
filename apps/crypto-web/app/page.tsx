@@ -57,7 +57,7 @@ export default async function LivePage() {
               label="Holdings"
               value={usd(data.marketValue)}
               sub={
-                <Link href="/holdings" className="text-muted-foreground hover:underline">
+                <Link prefetch href="/holdings" className="text-muted-foreground hover:underline">
                   {data.positions.length} position{data.positions.length === 1 ? "" : "s"}
                 </Link>
               }

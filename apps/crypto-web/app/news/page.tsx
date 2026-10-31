@@ -76,7 +76,7 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
               Filter
             </Button>
             {filtered && (
-              <Link href="/news" className="text-muted-foreground text-xs underline underline-offset-2">
+              <Link prefetch href="/news" className="text-muted-foreground text-xs underline underline-offset-2">
                 Clear
               </Link>
             )}

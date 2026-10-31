@@ -85,7 +85,7 @@ export function SiteHeader({
   return (
     <header className="bg-background/85 sticky top-0 z-40 border-b backdrop-blur">
       <div className="mx-auto flex h-14 w-full max-w-7xl items-center gap-3 px-4">
-        <Link href="/" className="flex shrink-0 items-center gap-2 font-semibold">
+        <Link prefetch href="/" className="flex shrink-0 items-center gap-2 font-semibold">
           <Mark className="size-5" />
           <span className="hidden sm:inline">{name}</span>
         </Link>
@@ -119,7 +119,7 @@ export function SiteHeader({
                   {s.pages.length > 1 && <DropdownMenuLabel className="text-muted-foreground text-xs">{s.label}</DropdownMenuLabel>}
                   {s.pages.map((p) => (
                     <DropdownMenuItem key={p.href} asChild>
-                      <Link href={p.href}>{p.label}</Link>
+                      <Link prefetch href={p.href}>{p.label}</Link>
                     </DropdownMenuItem>
                   ))}
                 </Fragment>
@@ -136,7 +136,7 @@ export function SiteHeader({
             </Button>
           ) : (
             <Button variant="ghost" size="icon" aria-label="Owner sign in" title="Owner sign in" asChild>
-              <Link href="/login">
+              <Link prefetch href="/login">
                 <LogInIcon />
               </Link>
             </Button>

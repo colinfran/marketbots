@@ -39,7 +39,7 @@ export async function OptionsTab() {
       <section>
         <SectionTitle
           action={
-            <Link href="/holdings" className="text-muted-foreground text-sm hover:underline">
+            <Link prefetch href="/holdings" className="text-muted-foreground text-sm hover:underline">
               Open positions
             </Link>
           }

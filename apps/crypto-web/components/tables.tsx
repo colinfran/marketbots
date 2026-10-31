@@ -48,7 +48,7 @@ export function PositionsTable({ positions, owner }: { positions: PositionDoc[];
               <TableCell className="text-sm">{p.strategy_id ? titleCase(p.strategy_id) : "—"}</TableCell>
               <TableCell className="text-muted-foreground text-sm">
                 {p.decision_id ? (
-                  <Link href={`/decisions/${p.decision_id}`} className="hover:underline">
+                  <Link prefetch href={`/decisions/${p.decision_id}`} className="hover:underline">
                     {ago(p.opened_at)}
                   </Link>
                 ) : (
@@ -101,7 +101,7 @@ export function ClosedPositionsTable({ positions }: { positions: PositionDoc[] }
             <TableCell className="text-muted-foreground text-sm">{p.closed_at ? duration(p.closed_at.getTime() - p.opened_at.getTime()) : "—"}</TableCell>
             <TableCell className="text-muted-foreground text-sm">
               {p.decision_id ? (
-                <Link href={`/decisions/${p.decision_id}`} className="hover:underline">
+                <Link prefetch href={`/decisions/${p.decision_id}`} className="hover:underline">
                   {dateTime(p.closed_at)}
                 </Link>
               ) : (
@@ -151,7 +151,7 @@ export function OrdersTable({ orders }: { orders: OrderDoc[] }) {
             </TableCell>
             <TableCell className="text-muted-foreground max-w-64 truncate text-xs" title={o.reason ?? undefined}>
               {o.decision_id ? (
-                <Link href={`/decisions/${o.decision_id}`} className="hover:underline">
+                <Link prefetch href={`/decisions/${o.decision_id}`} className="hover:underline">
                   {o.reason ?? "decision"}
                 </Link>
               ) : (
@@ -224,7 +224,7 @@ export function DecisionsTable({ decisions }: { decisions: DecisionDoc[] }) {
         {decisions.map((d) => (
           <TableRow key={d._id}>
             <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
-              <Link href={`/decisions/${d._id}`} className="hover:underline">
+              <Link prefetch href={`/decisions/${d._id}`} className="hover:underline">
                 {dateTime(d.created_at)}
               </Link>
             </TableCell>
@@ -276,7 +276,7 @@ export function DayRows({ days }: { days: { day: string; stats: DailyStatsDoc | 
         {days.map(({ day, stats, decisions }) => (
           <TableRow key={day}>
             <TableCell>
-              <Link href={`/journal/${day}`} className="font-medium hover:underline">
+              <Link prefetch href={`/journal/${day}`} className="font-medium hover:underline">
                 {formatDay(day)}
               </Link>
             </TableCell>

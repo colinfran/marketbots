@@ -25,7 +25,7 @@ export default async function TradesPage({ searchParams }: { searchParams: Promi
           <>
             Every order executes as a market order in the Kraken CLI paper wallet, behind the engine&apos;s pre-trade price guard. Realized P&L is after the fees on
             both legs. What the bot holds now is on{" "}
-            <Link href="/holdings" className="text-foreground underline underline-offset-2">
+            <Link prefetch href="/holdings" className="text-foreground underline underline-offset-2">
               Holdings
             </Link>
             .
