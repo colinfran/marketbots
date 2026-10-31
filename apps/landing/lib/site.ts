@@ -5,9 +5,9 @@ export const site = {
   name: "Marketbots",
   url: "https://marketbots.vercel.app",
   title: "Marketbots: two AI trading bots, trading in public",
-  tagline: "Two autonomous AI paper-trading bots, one for crypto and one for US stocks and options. Every decision and trade is published live.",
+  tagline: "Two autonomous AI paper-trading bots, one for US stocks and options and one for crypto. Every decision and trade is published live.",
   description:
-    "Marketbots is an autonomous AI trading experiment by Colin Franceschini. CryptoMarketBot trades crypto 24/7 in a Kraken paper wallet; StockMarketBot trades US stocks and defined-risk options on market days in an Alpaca paper account. An AI researches and decides, a risk engine checks every order, and every trade is published live.",
+    "Marketbots is an autonomous AI trading experiment by Colin Franceschini. StockMarketBot trades US stocks and defined-risk options on market days in an Alpaca paper account; CryptoMarketBot trades crypto 24/7 in a Kraken paper wallet. An AI researches and decides, a risk engine checks every order, and every trade is published live.",
   keywords: [
     "AI trading bot",
     "AI crypto trading bot",

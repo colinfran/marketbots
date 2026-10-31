@@ -69,8 +69,8 @@ const NODES: Record<Exclude<NodeId, Bot | "services">, { Icon: LucideIcon; rows:
   browser: { Icon: AppWindowIcon, rows: [title("Browser")] },
   dashboards: {
     Icon: LayoutDashboardIcon,
-    rows: [title("Vercel dashboards"), detail(hot("cryptomarketbot.app", "dashboards:crypto"), " · ", hot("stockmarketbot.app", "dashboards:stock"))],
-    tall: [title("Vercel dashboards"), detail(hot("cryptomarketbot.app", "dashboards:crypto")), detail(hot("stockmarketbot.app", "dashboards:stock"))],
+    rows: [title("Vercel dashboards"), detail(hot("stockmarketbot.app", "dashboards:stock"), " · ", hot("cryptomarketbot.app", "dashboards:crypto"))],
+    tall: [title("Vercel dashboards"), detail(hot("stockmarketbot.app", "dashboards:stock")), detail(hot("cryptomarketbot.app", "dashboards:crypto"))],
   },
   db: { Icon: DatabaseIcon, rows: [title("Azure DocumentDB"), detail("separate database per bot")] },
   llm: {
@@ -84,15 +84,15 @@ const NODES: Record<Exclude<NodeId, Bot | "services">, { Icon: LucideIcon; rows:
   news: { Icon: NewspaperIcon, rows: [title(hot("News sources", "news:sources"))] },
 }
 
-/** The paper accounts, one segment each: crypto's on its side, stock's on the other. */
+/** The paper accounts, one segment each: stock's on its side, crypto's on the other. */
 const SERVICES: { key: HotKey; Icon: LucideIcon; wide: string; tall: [string, string] }[] = [
-  { key: "services:kraken", Icon: WalletIcon, wide: "Kraken paper wallet", tall: ["Kraken", "paper wallet"] },
   { key: "services:alpaca", Icon: LandmarkIcon, wide: "Alpaca paper account", tall: ["Alpaca", "paper account"] },
+  { key: "services:kraken", Icon: WalletIcon, wide: "Kraken paper wallet", tall: ["Kraken", "paper wallet"] },
 ]
 
 const ENGINES: Record<Bot, { name: string; Mark: typeof CryptoMark; tone: string }> = {
-  crypto: { name: "Crypto engine", Mark: CryptoMark, tone: "text-bot-crypto" },
   stock: { name: "Stock engine", Mark: StockMark, tone: "text-bot-stock" },
+  crypto: { name: "Crypto engine", Mark: CryptoMark, tone: "text-bot-crypto" },
 }
 
 /** An episode of either bot's agent, one line each. */
@@ -107,11 +107,11 @@ const NAMES: Record<NodeId, string> = {
   browser: "Browser",
   dashboards: "Vercel dashboards",
   db: "Azure DocumentDB (MongoDB), a separate database per bot",
-  services: "the Kraken paper wallet and the Alpaca paper account",
+  services: "the Alpaca paper account and the Kraken paper wallet",
   news: "news sources",
   internet: "search engines and article pages",
-  crypto: "Crypto engine",
   stock: "Stock engine",
+  crypto: "Crypto engine",
   llm: "Local LLM, Qwen 3.6 on two GPUs, for the agents, news summaries and research",
   search: "Web search, SearXNG",
   scraper: "Shared scraper",
@@ -422,7 +422,7 @@ export function Topology() {
       <Steps />
       <div className="sr-only">
         <p>
-          The marketbots Docker stack, on the owner&apos;s server, runs the crypto engine, the stock engine, the local LLM, web search, the shared scraper and the
+          The marketbots Docker stack, on the owner&apos;s server, runs the stock engine, the crypto engine, the local LLM, web search, the shared scraper and the
           history store. Its connections:
         </p>
         <ul>
@@ -462,8 +462,8 @@ const easeOut = (u: number) => 1 - (1 - clamp01(u)) ** 3
 /** a < t <= b on the loop, wrapping. */
 const crossed = (t: number, a: number, b: number) => (a <= b ? t > a && t <= b : t > a || t <= b)
 /**
- * Whether a bot's first episode has begun by `T` seconds into the loops. Stock's starts half a loop
- * in, so the first loop opens with crypto alone instead of stock caught mid-episode.
+ * Whether a bot's first episode has begun by `T` seconds into the loops. Crypto's starts half a loop
+ * in, so the first loop opens with stock alone instead of crypto caught mid-episode.
  */
 const started = (bot: Bot, T: number) => T >= OFFSET[bot] - 1e-3
 

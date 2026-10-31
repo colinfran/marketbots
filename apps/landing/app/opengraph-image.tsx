@@ -9,6 +9,6 @@ export default function Image() {
   return ogCard({
     eyebrow: "AI paper trading",
     title: "Two AI trading bots, trading in public.",
-    subtitle: "CryptoMarketBot trades crypto 24/7. StockMarketBot trades US stocks and options. An AI decides, a risk engine checks every order.",
+    subtitle: "StockMarketBot trades US stocks and options. CryptoMarketBot trades crypto 24/7. An AI decides, a risk engine checks every order.",
   })
 }

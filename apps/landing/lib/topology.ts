@@ -4,10 +4,10 @@
  * of its agent, woken by code when something matters, that looks things up, decides and trades the
  * paper account. Pure geometry and timing, no React or DOM: components/topology.tsx draws it.
  *
- * Both layouts mirror the bots around what they share: crypto on the left, stock on the right, the
+ * Both layouts mirror the bots around what they share: stock on the left, crypto on the right, the
  * stack's shared services down the middle, Browser, Vercel and the database above, the outside world
  * below. Laid out that way no two engine edges cross; the one crossing left (search to the
- * internet, over the stock engine's scraper edge) is drawn as a hop.
+ * internet, over the crypto engine's scraper edge) is drawn as a hop.
  *
  * One departure from the chart: news sources, which it lists with the two paper accounts, get a
  * node of their own under the search engines and article pages. They are where the bots read, not
@@ -16,7 +16,7 @@
  */
 
 export type Bot = "crypto" | "stock"
-export const BOTS = ["crypto", "stock"] as const satisfies readonly Bot[]
+export const BOTS = ["stock", "crypto"] as const satisfies readonly Bot[]
 
 export type NodeId = "browser" | "dashboards" | "db" | "services" | "news" | "internet" | Bot | "llm" | "search" | "scraper" | "history"
 
@@ -29,22 +29,22 @@ export type EdgeId = "browser-dashboards" | "dashboards-db" | `browser-${Bot}` |
 export const EDGES: Record<EdgeId, { from: NodeId; to: NodeId; label?: string }> = {
   "browser-dashboards": { from: "browser", to: "dashboards", label: "HTTPS" },
   "dashboards-db": { from: "dashboards", to: "db", label: "Read data and write commands" },
-  "browser-crypto": { from: "browser", to: "crypto", label: "Engine WebSocket stream" },
   "browser-stock": { from: "browser", to: "stock", label: "Engine WebSocket stream" },
-  "crypto-db": { from: "crypto", to: "db", label: "Own trading state" },
+  "browser-crypto": { from: "browser", to: "crypto", label: "Engine WebSocket stream" },
   "stock-db": { from: "stock", to: "db", label: "Own trading state" },
-  "crypto-llm": { from: "crypto", to: "llm" },
+  "crypto-db": { from: "crypto", to: "db", label: "Own trading state" },
   "stock-llm": { from: "stock", to: "llm" },
-  "crypto-history": { from: "crypto", to: "history" },
+  "crypto-llm": { from: "crypto", to: "llm" },
   "stock-history": { from: "stock", to: "history" },
-  "crypto-search": { from: "crypto", to: "search" },
+  "crypto-history": { from: "crypto", to: "history" },
   "stock-search": { from: "stock", to: "search" },
-  "crypto-scraper": { from: "crypto", to: "scraper" },
+  "crypto-search": { from: "crypto", to: "search" },
   "stock-scraper": { from: "stock", to: "scraper" },
-  "crypto-services": { from: "crypto", to: "services" },
+  "crypto-scraper": { from: "crypto", to: "scraper" },
   "stock-services": { from: "stock", to: "services" },
-  "crypto-news": { from: "crypto", to: "news" },
+  "crypto-services": { from: "crypto", to: "services" },
   "stock-news": { from: "stock", to: "news" },
+  "crypto-news": { from: "crypto", to: "news" },
   "search-internet": { from: "search", to: "internet" },
   "scraper-internet": { from: "scraper", to: "internet" },
 }
@@ -163,31 +163,31 @@ export type Layout = {
 type Spec = { pts: Pt[]; hops?: (Pt & { side?: 1 | -1 })[] }
 
 /**
- * A layout from its crypto half: the stock engine, its edges and their labels mirror crypto's
+ * A layout from its stock half: the crypto engine, its edges and their labels mirror stock's
  * across the vertical axis.
  */
 function mirrored(
   base: Omit<Layout, "nodes" | "routes" | "labels"> & {
-    nodes: Omit<Record<NodeId, Box>, "stock">
-    crypto: Record<"browser" | Shared, Spec>
+    nodes: Omit<Record<NodeId, Box>, "crypto">
+    stock: Record<"browser" | Shared, Spec>
     middle: Record<"browser-dashboards" | "dashboards-db" | "search-internet" | "scraper-internet", Spec>
     labels: Label[]
   },
 ): Layout {
-  const { crypto, middle, labels, nodes, ...rest } = base
+  const { stock, middle, labels, nodes, ...rest } = base
   const flip = <P extends Pt>(p: P): P => ({ ...p, x: base.w - p.x })
   const routes = {} as Record<EdgeId, Route>
-  for (const [to, { pts, hops }] of Object.entries(crypto) as [keyof typeof crypto, Spec][]) {
+  for (const [to, { pts, hops }] of Object.entries(stock) as [keyof typeof stock, Spec][]) {
     const id = (bot: Bot) => (to === "browser" ? `browser-${bot}` : `${bot}-${to}`) as EdgeId
-    routes[id("crypto")] = route(pts, { hops })
-    routes[id("stock")] = route(pts.map(flip), { hops: hops?.map(flip) })
+    routes[id("stock")] = route(pts, { hops })
+    routes[id("crypto")] = route(pts.map(flip), { hops: hops?.map(flip) })
   }
   for (const [id, { pts, hops }] of Object.entries(middle) as [EdgeId, Spec][]) routes[id] = route(pts, { hops })
-  const stockLabels = labels
-    .filter((l) => l.edge.startsWith("crypto-") || l.edge === "browser-crypto")
-    .map((l): Label => ({ ...flip(l), edge: l.edge.replace("crypto", "stock") as EdgeId, anchor: l.anchor === "start" ? "end" : l.anchor === "end" ? "start" : "middle" }))
-  const stock = { ...nodes.crypto, x: base.w - nodes.crypto.x - nodes.crypto.w }
-  return { ...rest, nodes: { ...nodes, stock }, routes, labels: [...labels, ...stockLabels] }
+  const cryptoLabels = labels
+    .filter((l) => l.edge.startsWith("stock-") || l.edge === "browser-stock")
+    .map((l): Label => ({ ...flip(l), edge: l.edge.replace("stock", "crypto") as EdgeId, anchor: l.anchor === "start" ? "end" : l.anchor === "end" ? "start" : "middle" }))
+  const crypto = { ...nodes.stock, x: base.w - nodes.stock.x - nodes.stock.w }
+  return { ...rest, nodes: { ...nodes, crypto }, routes, labels: [...labels, ...cryptoLabels] }
 }
 
 /** Desktop: the engines flank the shared column, each fanning out to it along its own spine. */
@@ -202,7 +202,7 @@ const WIDE = mirrored({
     browser: { x: 420, y: 8, w: 120, h: 30 },
     dashboards: { x: 335, y: 56, w: 290, h: 42 },
     db: { x: 335, y: 116, w: 290, h: 42 },
-    crypto: { x: 52, y: 259, w: 180, h: 48 },
+    stock: { x: 52, y: 259, w: 180, h: 48 },
     llm: { x: 326, y: 198, w: 308, h: 56 },
     history: { x: 326, y: 262, w: 308, h: 42 },
     search: { x: 326, y: 312, w: 308, h: 42 },
@@ -211,7 +211,7 @@ const WIDE = mirrored({
     news: { x: 300, y: 470, w: 360, h: 30 },
     services: { x: 300, y: 514, w: 360, h: 38 },
   },
-  crypto: {
+  stock: {
     browser: { pts: [{ x: 420, y: 23 }, { x: 142, y: 23 }, { x: 142, y: 259 }] },
     db: { pts: [{ x: 196, y: 259 }, { x: 196, y: 137 }, { x: 335, y: 137 }] },
     llm: { pts: [{ x: 232, y: 283 }, { x: 296, y: 283 }, { x: 296, y: 226 }, { x: 326, y: 226 }] },
@@ -230,8 +230,8 @@ const WIDE = mirrored({
   labels: [
     { edge: "browser-dashboards", x: 488, y: 50.5, anchor: "start", lines: ["HTTPS"] },
     { edge: "dashboards-db", x: 488, y: 110.5, anchor: "start", lines: ["Read data and write commands"] },
-    { edge: "browser-crypto", x: 281, y: 16.5, anchor: "middle", lines: ["Engine WebSocket stream"] },
-    { edge: "crypto-db", x: 265, y: 130.5, anchor: "middle", lines: ["Own trading state"] },
+    { edge: "browser-stock", x: 281, y: 16.5, anchor: "middle", lines: ["Engine WebSocket stream"] },
+    { edge: "stock-db", x: 265, y: 130.5, anchor: "middle", lines: ["Own trading state"] },
   ],
 })
 
@@ -250,7 +250,7 @@ const TALL = mirrored({
     browser: { x: 134, y: 8, w: 112, h: 30 },
     dashboards: { x: 100, y: 58, w: 180, h: 52 },
     db: { x: 92, y: 134, w: 196, h: 42 },
-    crypto: { x: 24, y: 232, w: 152, h: 50 },
+    stock: { x: 24, y: 232, w: 152, h: 50 },
     llm: { x: 66, y: 304, w: 248, h: 70 },
     history: { x: 66, y: 382, w: 248, h: 42 },
     search: { x: 66, y: 432, w: 248, h: 42 },
@@ -259,7 +259,7 @@ const TALL = mirrored({
     news: { x: 50, y: 596, w: 280, h: 30 },
     services: { x: 50, y: 640, w: 280, h: 50 },
   },
-  crypto: {
+  stock: {
     browser: { pts: [{ x: 134, y: 23 }, { x: 6, y: 23 }, { x: 6, y: 257 }, { x: 24, y: 257 }] },
     db: { pts: [{ x: 44, y: 232 }, { x: 44, y: 155 }, { x: 92, y: 155 }] },
     llm: { pts: [{ x: 48, y: 282 }, { x: 48, y: 339 }, { x: 66, y: 339 }] },
@@ -278,8 +278,8 @@ const TALL = mirrored({
   labels: [
     { edge: "browser-dashboards", x: 197, y: 51, anchor: "start", lines: ["HTTPS"] },
     { edge: "dashboards-db", x: 197, y: 120, anchor: "start", lines: ["Read data and", "write commands"] },
-    { edge: "browser-crypto", x: 70, y: 16.5, anchor: "middle", lines: ["Engine WebSocket stream"] },
-    { edge: "crypto-db", x: 50, y: 190, anchor: "start", lines: ["Own trading state"] },
+    { edge: "browser-stock", x: 70, y: 16.5, anchor: "middle", lines: ["Engine WebSocket stream"] },
+    { edge: "stock-db", x: 50, y: 190, anchor: "start", lines: ["Own trading state"] },
   ],
 })
 
@@ -314,9 +314,9 @@ export type Cue =
   | { t: number; bot: Bot; kind: "think"; dur: number }
   | { t: number; bot: Bot; kind: "check" }
 
-/** Seconds per loop. Each bot's agent runs one episode per loop, stock half a loop after crypto. */
+/** Seconds per loop. Each bot's agent runs one episode per loop, crypto half a loop after stock. */
 export const LOOP = 16
-export const OFFSET: Record<Bot, number> = { crypto: 0, stock: LOOP / 2 }
+export const OFFSET: Record<Bot, number> = { stock: 0, crypto: LOOP / 2 }
 
 /** The script below is written at a calm pace and played a little faster. */
 const PACE = 0.75
