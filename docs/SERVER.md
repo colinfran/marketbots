@@ -799,7 +799,7 @@ The containers can't read any of this (they see the Docker VM), so it runs on Wi
 Every reading (2 s by default) the agent reads Windows, `nvidia-smi` and LibreHardwareMonitor; the VeSync outlet once a minute. It writes into its own database on the bots' cluster, `serverstats` (`HOST_DATABASES`), which both dashboards read (`HOST_DB_NAME`): it is one machine, so one copy.
 
 - `host_status`: the latest reading. The page polls it every 2 seconds and shows a reading older than 15 seconds as offline, never as current.
-- `host_samples`: every reading, kept a little over an hour, and minute averages with the energy measured in each minute, kept 30 days (TTL). About 20 MB.
+- `host_samples`: every reading, kept a little over an hour, and minute averages with the energy measured in each minute, kept 30 days (TTL). About 20 MB. The recorded energy totals (today, 24 hours, 7 and 30 days) come from the outlet's minute samples, which the agent keeps in memory and reads again once a day: minutes another process writes (the history import, §11.6) count from the next read or a restart.
 - `host_commands`: the owner's fan setting, agent settings and outlet discovery, from either dashboard. Audited like the engines' commands (the request in the sending bot's audit log, the outcome in `serverstats.audit_log`); one not picked up within 2 minutes is rejected unapplied.
 
 Nothing in it touches the bots' databases or trading state, and the engines don't know it exists.
