@@ -54,7 +54,8 @@ const indexes = <K extends BaseCollectionName>(lists: Record<K, IndexSpec[]>) =>
 
 /** Indexes that are the same in both bots. A bot's `INDEXES` lists these and its own, in its own order. */
 export const BASE_INDEXES = indexes({
-  events: [{ key: { expires_at: 1 }, expireAfterSeconds: 0 }, { key: { type: 1, _id: -1 } }, { key: { cycle_id: 1 }, sparse: true }],
+  // `level` + `ts`: the heartbeat's count of the last hour's errors, every few seconds.
+  events: [{ key: { expires_at: 1 }, expireAfterSeconds: 0 }, { key: { type: 1, _id: -1 } }, { key: { cycle_id: 1 }, sparse: true }, { key: { level: 1, ts: -1 } }],
   commands: [{ key: { status: 1, created_at: 1 } }, { key: { created_at: -1 } }],
   audit_log: [{ key: { at: -1 } }],
   ai_calls: [{ key: { day: 1 } }, { key: { at: -1 } }],

@@ -47,6 +47,12 @@
           "cycle_id": 1
         },
         "sparse": true
+      },
+      {
+        "key": {
+          "level": 1,
+          "ts": -1
+        }
       }
     ],
     "commands": [
