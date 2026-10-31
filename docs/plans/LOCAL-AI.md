@@ -214,7 +214,7 @@ Prompt caching works as §5 assumed: each step reads only its ~100 new tokens; t
 
 **Recommendation** (owner's call): **Qwen 3.6 35B-A3B UD-Q2_K_XL** (SHA-256 `96b9c0af…70dad7`) split across both cards with the setup above. Thinking off for P0 decisions and episode steps; thinking on, with a budget, for reviews. The GPU guard's floor sits around 35 tok/s (normal is 40–47; the same model partly in RAM ran 28–29). gpt-oss-20b stays downloaded as the alternative: switching is a file and a setting, and step 4's dual decision shows whether the stronger model at 2-bit actually decides better. Fallback: Qwen 3.5 9B alone on the 2080 SUPER, 32k context, thinking off. Not Gemma 4. A GPU with more memory would let Qwen 3.6 run at 4-bit or better.
 
-Still open from step 0: the 48-hour soak (it runs as step 3's production setup) and the PSU's rating. The 2080 SUPER has run capped at 180 W since 2026-10-28. The startup task that keeps the cap across reboots is still for the owner to register ([SERVER.md §2](../SERVER.md#2-server-prerequisites-once)).
+Still open from step 0: the 48-hour soak (it runs as step 3's production setup) and the PSU's rating. The 2080 SUPER ran capped at 180 W from 2026-10-28 until a reboot on 2026-10-30 dropped the cap. Since then it is capped at 220 W, and a startup task keeps the cap across reboots ([SERVER.md §2](../SERVER.md#2-server-prerequisites-once)).
 
 ## 6. The history store (`history`)
 
