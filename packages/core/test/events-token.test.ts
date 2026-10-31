@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { eventForViewer, type BaseEventDataMap, type EngineEvent } from "../src/events"
-import { streamTokens } from "../src/stream-token"
+import { REQUEST_HEADERS, requestSignatures, streamTokens } from "../src/stream-token"
 
 const SECRET = "x".repeat(40)
 
@@ -47,5 +47,33 @@ describe("stream tokens", () => {
     const { token } = stock.sign("owner", SECRET, { now: 1_000_000 })
     expect(crypto.verify(token, SECRET, 1_000_000)).toEqual({ ok: false, reason: "bad_signature" })
     expect(stock.verify(token, SECRET, 1_000_000).ok).toBe(true)
+  })
+})
+
+describe("signed requests", () => {
+  const cmb = requestSignatures("cmb-request.")
+  const smb = requestSignatures("smb-request.")
+  const KEY = "k".repeat(40)
+  const request = { method: "POST", path: "/v1/commands", body: '{"id":"c1","actor":"owner","command":{"type":"pause"}}' }
+  const NOW = 1_800_000_000_000
+  const headersOf = (h: Record<string, string>) => ({ timestamp: h[REQUEST_HEADERS.timestamp], signature: h[REQUEST_HEADERS.signature] })
+
+  it("verifies the request it signed, within a minute either way", () => {
+    const h = headersOf(cmb.sign(KEY, request, NOW))
+    expect(cmb.verify(KEY, request, h, NOW)).toBe(true)
+    expect(cmb.verify(KEY, request, h, NOW + 59_000)).toBe(true)
+    expect(cmb.verify(KEY, request, h, NOW - 59_000)).toBe(true)
+    expect(cmb.verify(KEY, request, h, NOW + 61_000)).toBe(false)
+  })
+
+  it("refuses another body, path, method, secret or bot, and missing headers", () => {
+    const h = headersOf(cmb.sign(KEY, request, NOW))
+    expect(cmb.verify(KEY, { ...request, body: request.body.replace("pause", "resume") }, h, NOW)).toBe(false)
+    expect(cmb.verify(KEY, { ...request, path: "/v1/commands/c1" }, h, NOW)).toBe(false)
+    expect(cmb.verify(KEY, { ...request, method: "GET" }, h, NOW)).toBe(false)
+    expect(cmb.verify("j".repeat(40), request, h, NOW)).toBe(false)
+    expect(smb.verify(KEY, request, h, NOW)).toBe(false)
+    expect(cmb.verify(KEY, request, { timestamp: h.timestamp, signature: undefined }, NOW)).toBe(false)
+    expect(cmb.verify(KEY, request, { timestamp: "soon", signature: h.signature }, NOW)).toBe(false)
   })
 })

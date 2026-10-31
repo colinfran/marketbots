@@ -140,7 +140,8 @@ export class Engine {
       llmUrl: d.env.LLM_URL ?? null,
       pause: {
         get: () => d.state.state.agent_pause ?? null,
-        set: (p, by) => d.state.update({ agent_pause: p }, by, p ? "agent.entries_paused" : "agent.entries_resumed", {}),
+        // A breaker's pause takes effect before it is saved; resuming is saved first.
+        set: (p, by) => d.state.update({ agent_pause: p }, by, p ? "agent.entries_paused" : "agent.entries_resumed", {}, { first: p ? "memory" : "save" }),
       },
       promotion: {
         get: () => d.state.state.agent_promotion ?? null,
@@ -148,6 +149,7 @@ export class Engine {
       },
     })
     this.commands = new CommandProcessor(d.db.col, d.bus, d.log.child({ component: "commands" }), (c, doc) => this.handleCommand(c, doc))
+    d.stream.setCommands(this.commands)
     d.hub.heldSymbols = () => this.heldSymbols
     this.policy = new WirePolicy({
       col: d.db.col,

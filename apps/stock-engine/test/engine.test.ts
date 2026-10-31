@@ -1,5 +1,7 @@
 import { AiCallLog } from "@mb/engine-kit/ai/call-log"
+import type { CommandView } from "@mb/engine-kit/commands"
 import { silentLogger } from "@mb/engine-kit/log"
+import type { CommandIntake } from "@mb/engine-kit/stream"
 import type { Wire } from "../src/wire/wire"
 import { randomUUID } from "node:crypto"
 import { STATUS_DETAIL_ID } from "@mb/core/db"
@@ -31,7 +33,7 @@ let engine: Engine
 let events: EngineEvent[]
 let symbols: string[][]
 
-// Generous: the engine polls commands every second, and on the busy trading server (backfills,
+// Generous: the engine checks its queue every 3 seconds, and on the busy trading server (backfills,
 // the GPU) a pass can take several. A real failure still times out.
 const until = async (check: () => Promise<boolean> | boolean, ms = 15_000) => {
   const start = Date.now()
@@ -43,11 +45,25 @@ const until = async (check: () => Promise<boolean> | boolean, ms = 15_000) => {
 
 const health = (): StreamHealth => ({ state: "connected", last_message_at: null, last_error: null })
 
-/** Queues a command like the dashboard does and waits for the engine to answer it. */
-const command = async (c: Command): Promise<CommandDoc> => {
+/** Where the engine hands its commands to the stream server's endpoints. */
+let intake: CommandIntake | null = null
+
+const FINAL = ["done", "failed", "rejected"]
+
+/** Sends a command like the dashboard does (straight to the engine) and waits for its answer. */
+const command = async (c: Command): Promise<CommandView> => {
+  const id = randomUUID()
+  const sent = intake!.submit(id, c, "owner")
+  if (!sent.ok) throw new Error(sent.error)
+  await until(() => FINAL.includes(intake!.status(id)?.status ?? ""))
+  return intake!.status(id)!
+}
+
+/** Queues a command in the database (the dashboard couldn't reach the engine) and waits for the engine to answer it. */
+const queued = async (c: Command): Promise<CommandDoc> => {
   const id = randomUUID()
   await db.col.commands.insertOne({ _id: id, type: c.type, command: c, status: "pending", created_at: new Date(), created_by: "owner", processed_at: null, result: null, error: null })
-  await until(async () => ["done", "failed", "rejected"].includes((await db.col.commands.findOne({ _id: id }))!.status))
+  await until(async () => FINAL.includes((await db.col.commands.findOne({ _id: id }))!.status))
   return (await db.col.commands.findOne({ _id: id }))!
 }
 
@@ -75,7 +91,7 @@ beforeEach(async () => {
     marketStream: { start: () => undefined, stop: () => undefined, setSymbols: (s: string[]) => symbols.push(s), health: health(), symbols: [] } as unknown as MarketStream,
     calls,
     alerts: new Alerts(db.col, bus, silentLogger, null, null),
-    stream: { clientCount: 0 } as unknown as StreamServer,
+    stream: { clientCount: 0, setCommands: (i: CommandIntake) => (intake = i) } as unknown as StreamServer,
     // The news engine is covered by its own tests; here it only has to be present and inert.
     wire: {
       start: async () => undefined,
@@ -235,5 +251,10 @@ describe("Engine", () => {
 
   it("replays news items only if they exist", async () => {
     expect(await command({ type: "wire.replay", item_id: "missing-item" })).toMatchObject({ status: "failed", error: "no wire item with that id" })
+  })
+
+  it("runs a command the dashboard queued in the database because it couldn't reach the engine", async () => {
+    expect(await queued({ type: "pause", reason: "queued" })).toMatchObject({ status: "done" })
+    expect(engine.status).toBe("paused")
   })
 })

@@ -63,3 +63,40 @@ export const streamTokens = (context: string) => {
 
   return { sign, verify }
 }
+
+/**
+ * Requests from a dashboard's server to its engine (the owner's commands), signed with the same
+ * shared secret: an HMAC over a per-bot context prefix, the method, the path, a millisecond
+ * timestamp and the body, sent in REQUEST_HEADERS. The engine refuses a signature that doesn't
+ * match or a timestamp more than REQUEST_MAX_SKEW_MS away from its clock. The secret never travels.
+ */
+
+export const REQUEST_HEADERS = { timestamp: "x-mb-timestamp", signature: "x-mb-signature" } as const
+
+export const REQUEST_MAX_SKEW_MS = 60_000
+
+export type SignedRequest = { method: string; path: string; body: string }
+
+/** Sign and verify requests, bound to one bot's HMAC context prefix (e.g. "cmb-request."). */
+export const requestSignatures = (context: string) => {
+  const mac = (secret: string, { method, path, body }: SignedRequest, timestamp: string) =>
+    createHmac("sha256", secret).update(`${context}${method.toUpperCase()}\n${path}\n${timestamp}\n${body}`).digest()
+
+  /** The headers to send with the request. */
+  const sign = (secret: string, request: SignedRequest, now = Date.now()): Record<string, string> => {
+    assertSecret(secret)
+    const timestamp = String(now)
+    return { [REQUEST_HEADERS.timestamp]: timestamp, [REQUEST_HEADERS.signature]: mac(secret, request, timestamp).toString("hex") }
+  }
+
+  const verify = (secret: string, request: SignedRequest, headers: { timestamp: string | undefined; signature: string | undefined }, now = Date.now()): boolean => {
+    assertSecret(secret)
+    const at = Number(headers.timestamp)
+    if (!headers.timestamp || !headers.signature || !Number.isFinite(at) || Math.abs(now - at) > REQUEST_MAX_SKEW_MS) return false
+    const expected = mac(secret, request, headers.timestamp)
+    const given = Buffer.from(headers.signature, "hex")
+    return given.length === expected.length && timingSafeEqual(given, expected)
+  }
+
+  return { sign, verify }
+}

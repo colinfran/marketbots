@@ -1,19 +1,23 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http"
 import type { Socket } from "node:net"
 import { clientFrameSchema, eventForViewer, STREAM_PROTOCOL_VERSION, type EngineEvent, type EventVisibility, type ServerFrame } from "@mb/core/events"
-import type { TokenCheck } from "@mb/core/stream-token"
+import { REQUEST_HEADERS, type SignedRequest, type TokenCheck } from "@mb/core/stream-token"
 import { WebSocketServer, type WebSocket } from "ws"
 import type { EventBus } from "./bus"
+import type { CommandProcessor } from "./commands"
 import { errorMessage, type Logger } from "./log"
 
 /**
  * The engine's only network listener. It serves:
- *   GET /healthz      liveness for Docker (no details)
- *   GET /readyz       200 once the engine is trading-ready, else 503
- *   WS  /v1/stream    the authenticated, read-only live event stream
+ *   GET  /healthz            liveness for Docker (no details)
+ *   GET  /readyz             200 once the engine is trading-ready, else 503
+ *   WS   /v1/stream          the authenticated, read-only live event stream
+ *   POST /v1/commands        an owner command from the dashboard's server: { id, actor, command } → 202
+ *   GET  /v1/commands/<id>   that command's progress or outcome
  *
- * There are no control endpoints: commands go through MongoDB. Put it behind your reverse proxy
- * (TLS) and publish only this port.
+ * The command endpoints answer only requests signed with the stream secret and the bot's request
+ * prefix (@mb/core/stream-token `requestSignatures`); the browser never calls them. Put it behind
+ * your reverse proxy (TLS) and publish only this port.
  *
  * Connection protocol:
  *   1. client connects; within 5s it sends {"type":"auth","token":…,"since":<seq>?}
@@ -29,6 +33,10 @@ const PING_MS = 15_000
 const MAX_BUFFERED_BYTES = 2_000_000
 const MAX_CONNECTIONS_PER_IP = 10
 const MAX_SESSION_MS = 12 * 3_600_000
+/** A command's body (a settings patch is the largest). */
+const MAX_COMMAND_BYTES = 64 * 1024
+
+const COMMAND_PATH = /^\/v1\/commands\/([\w-]{1,64})$/
 
 export type StreamServerOptions = {
   host: string
@@ -40,11 +48,30 @@ export type StreamServerOptions = {
   ready: () => boolean
 }
 
-/** What the server needs from the bot: its stream-token check (bound to its HMAC prefix) and its owner-only events. */
+/** What the server needs from the bot: its stream-token and request checks (bound to its HMAC prefixes) and its owner-only events. */
 export type StreamBinding<M> = {
   verifyToken: (token: string, secret: string) => TokenCheck
+  verifyRequest: (secret: string, request: SignedRequest, headers: { timestamp: string | undefined; signature: string | undefined }) => boolean
   ownerOnly: ReadonlySet<keyof M & string>
 }
+
+/** The commands the server hands on: the engine's processor, once it exists. */
+export type CommandIntake = Pick<CommandProcessor<{ type: string }>, "submit" | "status">
+
+const json = (res: ServerResponse, status: number, body: unknown) => res.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" }).end(JSON.stringify(body))
+
+/** The request's body, or null past `max` bytes (the rest is read and dropped, so the answer still goes out). */
+const readBody = (req: IncomingMessage, max: number) =>
+  new Promise<string | null>((resolve, reject) => {
+    const chunks: Buffer[] = []
+    let size = 0
+    req.on("data", (chunk: Buffer) => {
+      size += chunk.length
+      if (size <= max) chunks.push(chunk)
+    })
+    req.on("end", () => resolve(size > max ? null : Buffer.concat(chunks).toString("utf8")))
+    req.on("error", reject)
+  })
 
 export class StreamServer<M> {
   private http: Server | null = null
@@ -53,6 +80,7 @@ export class StreamServer<M> {
   private pingTimer: NodeJS.Timeout | null = null
   private unsubscribe: (() => void) | null = null
   private snapshot: (() => EngineEvent<M>[]) | null = null
+  private commands: CommandIntake | null = null
 
   constructor(
     private readonly bus: Pick<EventBus<M>, "subscribe" | "replay" | "lastSeq">,
@@ -68,6 +96,11 @@ export class StreamServer<M> {
   /** Live state no replay holds (the model calls running now and their text so far), sent to each viewer after its replay. */
   setSnapshot(fn: () => EngineEvent<M>[]) {
     this.snapshot = fn
+  }
+
+  /** Where the command endpoints hand commands (the engine's processor); until set, they answer 503. */
+  setCommands(intake: CommandIntake) {
+    this.commands = intake
   }
 
   get address() {
@@ -106,9 +139,43 @@ export class StreamServer<M> {
     } else if (req.method === "GET" && path === "/readyz") {
       const ready = this.opts.ready()
       res.writeHead(ready ? 200 : 503, { "content-type": "application/json", "cache-control": "no-store" }).end(JSON.stringify({ ready }))
+    } else if ((req.method === "POST" && path === "/v1/commands") || (req.method === "GET" && COMMAND_PATH.test(path))) {
+      void this.onCommand(req, res, path).catch((error) => {
+        this.log.warn("command request failed", { error: errorMessage(error) })
+        if (!res.headersSent) json(res, 500, { error: "internal error" })
+      })
     } else {
       res.writeHead(404, { "content-type": "text/plain" }).end("not found")
     }
+  }
+
+  /** The command endpoints: signed requests from the dashboard's server only. */
+  private async onCommand(req: IncomingMessage, res: ServerResponse, path: string) {
+    const body = req.method === "POST" ? await readBody(req, MAX_COMMAND_BYTES) : ""
+    if (body === null) return json(res, 413, { error: "request too large" })
+    const header = (name: string) => {
+      const v = req.headers[name]
+      return Array.isArray(v) ? v[0] : v
+    }
+    const signed = this.bot.verifyRequest(this.opts.secret, { method: req.method ?? "", path, body }, { timestamp: header(REQUEST_HEADERS.timestamp), signature: header(REQUEST_HEADERS.signature) })
+    if (!signed) return json(res, 401, { error: "unauthorized" })
+    if (!this.commands) return json(res, 503, { error: "engine starting" })
+    if (req.method === "GET") {
+      const view = this.commands.status(COMMAND_PATH.exec(path)![1])
+      return view ? json(res, 200, view) : json(res, 404, { error: "not found" })
+    }
+    type Submission = { id?: unknown; actor?: unknown; command?: unknown } | null
+    let input: Submission
+    try {
+      input = JSON.parse(body) as Submission
+    } catch {
+      return json(res, 400, { error: "not JSON" })
+    }
+    const id = input?.id
+    const actor = input?.actor
+    if (typeof id !== "string" || !/^[\w-]{1,64}$/.test(id) || typeof actor !== "string" || !actor || actor.length > 64) return json(res, 400, { error: "id and actor required" })
+    const outcome = this.commands.submit(id, input?.command, actor)
+    return outcome.ok ? json(res, 202, { id }) : json(res, outcome.status, { error: outcome.error })
   }
 
   private reject(socket: Socket, status: number, message: string) {

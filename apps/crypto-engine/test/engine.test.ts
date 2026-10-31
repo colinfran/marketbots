@@ -4,7 +4,9 @@ import type { Command } from "@mb/crypto-core/commands"
 import { utcDay, type CommandDoc } from "@mb/crypto-core/db"
 import type { EngineEvent } from "@mb/crypto-core/events"
 import { AiCallLog } from "@mb/engine-kit/ai/call-log"
+import type { CommandView } from "@mb/engine-kit/commands"
 import { createLogger, silentLogger } from "@mb/engine-kit/log"
+import type { CommandIntake } from "@mb/engine-kit/stream"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { Alerts } from "../src/alerts"
 import type { EventBus } from "../src/bus/event-bus"
@@ -29,7 +31,7 @@ let engine: Engine
 let events: EngineEvent[]
 let lines: Record<string, unknown>[]
 
-// Generous: the engine polls commands every second, and on the busy trading server (backfills,
+// Generous: the engine checks its queue every 3 seconds, and on the busy trading server (backfills,
 // the GPU) a pass can take several. A real failure still times out.
 const until = async (check: () => Promise<boolean> | boolean, ms = 15_000) => {
   const start = Date.now()
@@ -39,11 +41,25 @@ const until = async (check: () => Promise<boolean> | boolean, ms = 15_000) => {
   }
 }
 
-/** Queues a command like the dashboard does and waits for the engine to answer it. */
-const command = async (c: Command): Promise<CommandDoc> => {
+/** Where the engine hands its commands to the stream server's endpoints. */
+let intake: CommandIntake | null = null
+
+const FINAL = ["done", "failed", "rejected"]
+
+/** Sends a command like the dashboard does (straight to the engine) and waits for its answer. */
+const command = async (c: Command): Promise<CommandView> => {
+  const id = randomUUID()
+  const sent = intake!.submit(id, c, "owner")
+  if (!sent.ok) throw new Error(sent.error)
+  await until(() => FINAL.includes(intake!.status(id)?.status ?? ""))
+  return intake!.status(id)!
+}
+
+/** Queues a command in the database (the dashboard couldn't reach the engine) and waits for the engine to answer it. */
+const queued = async (c: Command): Promise<CommandDoc> => {
   const id = randomUUID()
   await db.col.commands.insertOne({ _id: id, type: c.type, command: c, status: "pending", created_at: new Date(), created_by: "owner", processed_at: null, result: null, error: null })
-  await until(async () => ["done", "failed", "rejected"].includes((await db.col.commands.findOne({ _id: id }))!.status))
+  await until(async () => FINAL.includes((await db.col.commands.findOne({ _id: id }))!.status))
   return (await db.col.commands.findOne({ _id: id }))!
 }
 
@@ -81,7 +97,7 @@ beforeEach(async () => {
     executor: new Executor(db.col, ledger, new PaperWalletExecution(cli, hub), bus, silentLogger),
     calls,
     alerts: new Alerts(db.col, bus, silentLogger, null, null),
-    stream: { clientCount: 0 } as unknown as StreamServer,
+    stream: { clientCount: 0, setCommands: (i: CommandIntake) => (intake = i) } as unknown as StreamServer,
     // The news engine is covered by its own tests; here it only has to be present and inert.
     wire: {
       start: async () => undefined,
@@ -165,6 +181,8 @@ describe("Engine", () => {
   it("pauses, resumes and applies settings from audited commands", async () => {
     expect(await command({ type: "pause", reason: "lunch" })).toMatchObject({ status: "done", result: "paused: no new decisions or entries; stops and targets stay active" })
     expect(engine.status).toBe("paused")
+    // In effect at once, saved just after.
+    await until(async () => (await db.col.engineState.findOne({ _id: "engine" }))?.status === "paused")
     expect(await db.col.engineState.findOne({ _id: "engine" })).toMatchObject({ status: "paused", pause_reason: "lunch" })
     expect(await command({ type: "resume" })).toMatchObject({ status: "done", result: "running" })
     expect(engine.status).toBe("running")
@@ -190,5 +208,10 @@ describe("Engine", () => {
 
   it("replays news items only if they exist", async () => {
     expect(await command({ type: "wire.replay", item_id: "missing-item" })).toMatchObject({ status: "failed", error: "no wire item with that id" })
+  })
+
+  it("runs a command the dashboard queued in the database because it couldn't reach the engine", async () => {
+    expect(await queued({ type: "pause", reason: "queued" })).toMatchObject({ status: "done", result: "paused: no new decisions or entries; stops and targets stay active" })
+    expect(engine.status).toBe("paused")
   })
 })

@@ -91,6 +91,8 @@ describe("ControlPlane", () => {
       ["Engine halted: too fast", { status: "halted", kill_switch: true, reason: "too fast" }],
       ["Engine paused: kill switch released; paused until resumed", { status: "paused", kill_switch: false, reason: "kill switch released; paused until resumed" }],
     ])
+    // The audit entries are saved just after each change, in order.
+    expect(await state.settle(5_000)).toBe(true)
     expect((await db.col.audit.find().toArray()).map((a) => [a.actor, a.action, a.details.reason])).toEqual([
       ["owner", "pause", undefined],
       ["owner", "pause", undefined],

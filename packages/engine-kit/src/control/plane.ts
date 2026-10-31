@@ -3,6 +3,7 @@ import type { EngineStateDoc } from "@mb/core/db"
 import type { BaseEventDataMap } from "@mb/core/events"
 import type { AlertLevel, AlertOptions } from "../alerts"
 import type { EmitMeta } from "../bus"
+import type { StateChangeOrder } from "../state/stores"
 
 /**
  * The owner's controls, the same in both bots: pause and resume, the kill switch, settings
@@ -34,7 +35,7 @@ export type ControlWording = {
 export type ControlPlaneDeps<S extends string, Item extends { title: string; severity: number }> = {
   col: { wireItems: { findOne(filter: { _id: string }): Promise<Item | null> } }
   bus: ControlEventSink<S | BaseRunStatus>
-  state: { readonly state: EngineStateDoc; update(fields: Partial<Omit<EngineStateDoc, "_id">>, by: string, action: string, details?: Record<string, unknown>): Promise<void> }
+  state: { readonly state: EngineStateDoc; update(fields: Partial<Omit<EngineStateDoc, "_id">>, by: string, action: string, details?: Record<string, unknown>, order?: StateChangeOrder): Promise<void> }
   settings: { readonly version: number; apply(patch: Record<string, unknown>, by: string, expectedVersion: number | null): Promise<{ ok: true; changes: number } | { ok: false; error: string }> }
   alerts: { send(level: AlertLevel, title: string, message: string, opts?: AlertOptions): Promise<void> }
   /** The news engine's trigger policy, for `wire.replay`. */
@@ -65,7 +66,8 @@ export class ControlPlane<S extends string, Item extends { title: string; severi
 
   /** Halts new orders (the owner, or the engine's own drawdown halt), closing every position if asked. Returns the liquidation notes. */
   async engageKillSwitch(reason: string, by: string, liquidate: boolean) {
-    await this.d.state.update({ status: "halted", kill_switch: { engaged: true, reason, at: new Date(), by, liquidate } }, by, "kill_switch.engage", { reason })
+    // In effect before it is saved: a database problem never keeps the engine trading.
+    await this.d.state.update({ status: "halted", kill_switch: { engaged: true, reason, at: new Date(), by, liquidate } }, by, "kill_switch.engage", { reason }, { first: "memory" })
     this.emitStatus(reason)
     const notes = liquidate ? await this.d.liquidate() : []
     await this.d.alerts.send("critical", "Kill switch engaged", `${reason}${notes.length ? `\nLiquidation: ${notes.join("; ")}` : ""}`)
@@ -77,7 +79,7 @@ export class ControlPlane<S extends string, Item extends { title: string; severi
     const { state, settings, col, wording } = this.d
     switch (command.type) {
       case "pause":
-        await state.update({ status: "paused", pause_reason: command.reason ?? null }, by, "pause")
+        await state.update({ status: "paused", pause_reason: command.reason ?? null }, by, "pause", {}, { first: "memory" })
         this.emitStatus(command.reason ?? "paused from the dashboard")
         return wording.paused
       case "resume":

@@ -27,14 +27,15 @@ Browser ─https─▶ Vercel (Next.js dashboard) ─▶ Azure DocumentDB ◀─
 
 - **The engine owns trading.** It is the only process that talks to Alpaca or the model server. A MongoDB lease guarantees a single running instance.
 - **The dashboard never trades and holds no broker keys.** It reads MongoDB (including the account, equity history and chart bars the engine copies into the `cache` collection) and writes only commands, audit entries and owner sign-in records.
-- **Control goes through MongoDB.** Commands are inserted by the dashboard, polled by the engine every second, validated twice, audited, and answered with a result. The engine accepts no inbound control traffic; its only listener is the read-only stream.
+- **Control goes straight to the engine, signed.** The dashboard's server sends each command to the engine's `POST /v1/commands`, signed with the stream secret (an HMAC with stock's `smb-request.` prefix over the method, path, a millisecond timestamp and the body; a minute of clock tolerance). The engine validates it again, runs it at once, one at a time, and answers with a result the page polls (`GET /v1/commands/<id>`); every command is audited. When the engine can't be reached, the dashboard queues the command in MongoDB under the same id instead, and the engine runs it within 3 seconds of being back (never twice). So the secret now authorizes commands as well as the owner stream: it stays in `.env` and on Vercel only. (Until 2026-10-31 every command went through MongoDB, polled every second.)
+- **Pause and the kill switch never wait on the database.** They take effect in the engine first and are saved after, retried until MongoDB takes them (and once more at shutdown); so do the agent's breakers. Resume and releasing the kill switch are saved first: if MongoDB fails, the engine stays paused.
 - **Stocks don't depend on the engine to be protected.** Every buy is a bracket order and every held position gets an OCO pair, all resting at Alpaca. Options exits do need the engine (Alpaca has no bracket orders for options), which is why options are limited to defined risk.
 
 ## The engine's loops
 
 | Every | Job |
 | --- | --- |
-| 1 s | dashboard commands |
+| 3 s | the command queue in MongoDB (commands sent while the engine couldn't be reached; the others arrive directly) |
 | 5 s | heartbeat to `engine_status` (the Admin page) and the stream; its large news-source health section once a minute, in its own document |
 | 15 s | account snapshot for the dashboard; live-price subscriptions; periodic summary |
 | `options.monitor_seconds` (15) | options monitor: marks every position, checks its exits, closes what's hit |

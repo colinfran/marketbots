@@ -4,6 +4,7 @@ import { diffSettings, type SettingsValidation } from "@mb/core/settings"
 import type { Collection } from "mongodb"
 import type { z } from "zod"
 import type { Logger } from "../log"
+import { withTimeout } from "../util/async"
 
 /**
  * Settings and desired engine state, both persisted in MongoDB so they survive restarts and can
@@ -97,7 +98,22 @@ export class SettingsStore<S, P> implements SettingsView<S> {
   }
 }
 
+/** The longest wait between retries of a save the database refused. */
+const SAVE_RETRY_MAX_MS = 30_000
+
+/** Which comes first for a change of the desired state: saving it, or its taking effect (see `update`). */
+export type StateChangeOrder = { first?: "save" | "memory" }
+
 export class EngineStateStore {
+  /** The state took effect before the database had it: a save of the current state is owed. */
+  private owed = false
+  /** Audit entries not saved yet, oldest first. */
+  private readonly audits: AuditDoc[] = []
+  /** Every write, one at a time in order. */
+  private chain: Promise<unknown> = Promise.resolve()
+  private failures = 0
+  private retryTimer: NodeJS.Timeout | null = null
+
   private constructor(
     private readonly col: { engineState: Collection<EngineStateDoc>; audit: Collection<AuditDoc> },
     public state: EngineStateDoc,
@@ -115,10 +131,70 @@ export class EngineStateStore {
     return new EngineStateStore(col, (await col.engineState.findOne({ _id: "engine" }))!)
   }
 
-  async update(fields: Partial<Omit<EngineStateDoc, "_id">>, by: string, action: string, details: Record<string, unknown> = {}) {
+  /**
+   * Changes the desired state. One that lowers risk (pause, the kill switch, a pause of the agent's
+   * entries: `first: "memory"`) takes effect at once and is saved after, retried until the database
+   * takes it: it never waits on the database, or fails with it. Any other (resume, releasing the
+   * kill switch) is saved first and takes effect only once saved: if the database fails, the engine
+   * stays as it was, the safe side. Its audit entry is saved after either way, retried the same way.
+   */
+  async update(fields: Partial<Omit<EngineStateDoc, "_id">>, by: string, action: string, details: Record<string, unknown> = {}, { first = "save" }: StateChangeOrder = {}) {
     const next = { ...this.state, ...fields, updated_at: new Date() }
-    await this.col.engineState.replaceOne({ _id: "engine" }, next)
-    await this.col.audit.insertOne({ _id: randomUUID(), at: new Date(), actor: by, action, target: "engine", details: { ...details, ...fields } })
-    this.state = next
+    const audit: AuditDoc = { _id: randomUUID(), at: new Date(), actor: by, action, target: "engine", details: { ...details, ...fields } }
+    if (first === "memory") {
+      this.state = next
+      this.owed = true
+    } else {
+      await this.serially(() => this.col.engineState.replaceOne({ _id: "engine" }, next))
+      this.state = next
+    }
+    this.audits.push(audit)
+    void this.save()
+  }
+
+  /** A change (or its audit entry) hasn't reached the database yet. */
+  get unsaved() {
+    return this.owed || this.audits.length > 0
+  }
+
+  /** Saves what is owed now, waiting at most `timeoutMs` (shutdown); true once nothing is owed. */
+  async settle(timeoutMs: number) {
+    if (this.unsaved) await withTimeout(this.save(), timeoutMs, "saving the engine state").catch(() => undefined)
+    return !this.unsaved
+  }
+
+  private serially<T>(work: () => Promise<T>): Promise<T> {
+    const run = this.chain.then(work)
+    this.chain = run.catch(() => undefined)
+    return run
+  }
+
+  /** Writes the state as it is when its turn comes (a later change wins), then the audit entries; on failure, tries again later. */
+  private save(): Promise<void> {
+    return this.serially(async () => {
+      if (this.retryTimer) clearTimeout(this.retryTimer)
+      this.retryTimer = null
+      try {
+        if (this.owed) {
+          this.owed = false
+          await this.col.engineState.replaceOne({ _id: "engine" }, this.state).catch((error: unknown) => {
+            this.owed = true
+            throw error
+          })
+        }
+        while (this.audits.length) {
+          // Duplicate key: an earlier attempt saved it before failing to answer.
+          await this.col.audit.insertOne(this.audits[0]).catch((error: { code?: number }) => {
+            if (error.code !== 11000) throw error
+          })
+          this.audits.shift()
+        }
+        this.failures = 0
+      } catch {
+        this.failures++
+        this.retryTimer = setTimeout(() => void this.save(), Math.min(SAVE_RETRY_MAX_MS, 1_000 * 2 ** (this.failures - 1)))
+        this.retryTimer.unref?.()
+      }
+    })
   }
 }

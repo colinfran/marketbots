@@ -1,14 +1,16 @@
-import { streamTokens } from "@mb/core/stream-token"
-import { afterEach, describe, expect, it } from "vitest"
+import http from "node:http"
+import { requestSignatures, streamTokens } from "@mb/core/stream-token"
+import { afterEach, describe, expect, it, vi } from "vitest"
 import WebSocket from "ws"
 import { silentLogger } from "../src/log"
-import { StreamServer } from "../src/stream"
+import { StreamServer, type CommandIntake } from "../src/stream"
 import { makeTestBus } from "../src/testing/bus"
 import { TEST_STREAM_SECRET as SECRET } from "../src/testing/env"
 import { EPHEMERAL, OWNER_ONLY, useTestDb, type TestEvents } from "./helpers/bot"
 
-// A bot's own tokens: the server only accepts tokens signed with its HMAC prefix.
+// A bot's own tokens and requests: the server only accepts those signed with its HMAC prefixes.
 const { sign: signStreamToken, verify: verifyToken } = streamTokens("test-stream.")
+const { sign: signRequest, verify: verifyRequest } = requestSignatures("test-request.")
 const db = useTestDb()
 let server: StreamServer<TestEvents> | null = null
 
@@ -19,7 +21,7 @@ afterEach(async () => {
 
 const start = async (allowedOrigins: string[] = []) => {
   const bus = await makeTestBus<TestEvents>(db.col, EPHEMERAL)
-  server = new StreamServer(bus, silentLogger, { host: "127.0.0.1", port: 0, secret: SECRET, allowedOrigins, trustProxy: false, maxClients: 10, ready: () => true }, { verifyToken, ownerOnly: OWNER_ONLY })
+  server = new StreamServer(bus, silentLogger, { host: "127.0.0.1", port: 0, secret: SECRET, allowedOrigins, trustProxy: false, maxClients: 10, ready: () => true }, { verifyToken, verifyRequest, ownerOnly: OWNER_ONLY })
   await server.start()
   return { bus, url: `ws://127.0.0.1:${server.address!.port}/v1/stream`, base: `http://127.0.0.1:${server.address!.port}` }
 }
@@ -96,5 +98,66 @@ describe("StreamServer", () => {
     const { url } = await start(["https://dash.example.com"])
     const r = await connect(url, null, () => false, { Origin: "https://evil.example" })
     expect(r.close).toBe(-1)
+  })
+})
+
+/** One HTTP request to the local server (fetch is stubbed out in tests). */
+const call = (base: string, method: string, path: string, body = "", headers: Record<string, string> = {}) =>
+  new Promise<{ status: number; body: unknown }>((resolve, reject) => {
+    const req = http.request(`${base}${path}`, { method, headers: { "content-type": "application/json", ...headers } }, (res) => {
+      let data = ""
+      res.on("data", (chunk: Buffer) => (data += chunk.toString()))
+      res.on("end", () => resolve({ status: res.statusCode ?? 0, body: data ? JSON.parse(data) : null }))
+    })
+    req.on("error", reject)
+    req.end(body)
+  })
+
+/** A signed request, as the dashboard's server sends it. */
+const signed = (base: string, method: string, path: string, body = "", { secret = SECRET, now = Date.now(), sign = signRequest } = {}) =>
+  call(base, method, path, body, sign(secret, { method, path, body }, now))
+
+describe("StreamServer command endpoints", () => {
+  const intake = () => {
+    const submit = vi.fn<CommandIntake["submit"]>(() => ({ ok: true }))
+    const status = vi.fn<CommandIntake["status"]>((id) => (id === "c-1" ? { _id: "c-1", type: "pause", status: "done", result: "paused", error: null } : null))
+    return { submit, status }
+  }
+  const body = JSON.stringify({ id: "c-1", actor: "owner", command: { type: "pause" } })
+
+  it("takes a signed command and hands it to the engine, then answers its status", async () => {
+    const { base } = await start()
+    expect((await signed(base, "POST", "/v1/commands", body)).status).toBe(503)
+    const commands = intake()
+    server!.setCommands(commands)
+    expect(await signed(base, "POST", "/v1/commands", body)).toEqual({ status: 202, body: { id: "c-1" } })
+    expect(commands.submit).toHaveBeenCalledWith("c-1", { type: "pause" }, "owner")
+    expect(await signed(base, "GET", "/v1/commands/c-1")).toEqual({ status: 200, body: { _id: "c-1", type: "pause", status: "done", result: "paused", error: null } })
+    expect((await signed(base, "GET", "/v1/commands/c-2")).status).toBe(404)
+  })
+
+  it("answers nothing unsigned, signed for another bot, stale, or for another body", async () => {
+    const { base } = await start()
+    const commands = intake()
+    server!.setCommands(commands)
+    expect((await call(base, "POST", "/v1/commands", body)).status).toBe(401)
+    expect((await call(base, "GET", "/v1/commands/c-1")).status).toBe(401)
+    expect((await signed(base, "POST", "/v1/commands", body, { sign: requestSignatures("other-request.").sign })).status).toBe(401)
+    expect((await signed(base, "POST", "/v1/commands", body, { now: Date.now() - 2 * 60_000 })).status).toBe(401)
+    expect((await signed(base, "POST", "/v1/commands", body, { secret: "x".repeat(40) })).status).toBe(401)
+    const headers = signRequest(SECRET, { method: "POST", path: "/v1/commands", body })
+    expect((await call(base, "POST", "/v1/commands", body.replace("pause", "resume"), headers)).status).toBe(401)
+    expect(commands.submit).not.toHaveBeenCalled()
+  })
+
+  it("passes on the engine's refusal, and refuses a body that isn't a command", async () => {
+    const { base } = await start()
+    const commands = intake()
+    commands.submit.mockReturnValueOnce({ ok: false, status: 400, error: "type: Invalid input" })
+    server!.setCommands(commands)
+    expect(await signed(base, "POST", "/v1/commands", body)).toEqual({ status: 400, body: { error: "type: Invalid input" } })
+    expect((await signed(base, "POST", "/v1/commands", "{not json")).status).toBe(400)
+    expect((await signed(base, "POST", "/v1/commands", JSON.stringify({ id: "../x", actor: "owner", command: { type: "pause" } }))).status).toBe(400)
+    expect((await signed(base, "POST", "/v1/commands", JSON.stringify({ id: "c-9", actor: "owner", command: { type: "pause" }, pad: "x".repeat(70_000) }))).status).toBe(413)
   })
 })

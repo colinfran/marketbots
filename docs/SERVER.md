@@ -104,7 +104,7 @@ engine.stockmarketbot.app {
 }
 ```
 
-The engines serve only `/v1/stream`, `/healthz` and `/readyz`. `/host/*` goes to the host agent's API (§11), with the `/host` prefix stripped; it answers only requests that carry `HOST_API_SECRET`. After editing the Caddyfile: `C:\Caddy\caddy.exe validate --config C:\Caddy\Caddyfile`, then `C:\Caddy\caddy.exe reload --config C:\Caddy\Caddyfile`.
+The engines serve `/v1/stream`, `/healthz`, `/readyz`, and `/v1/commands`: the dashboards' commands, answered only when signed with the bot's `STREAM_TOKEN_SECRET` (docs/CRYPTO.md, docs/STOCK.md). `/host/*` goes to the host agent's API (§11), with the `/host` prefix stripped; it answers only requests that carry `HOST_API_SECRET`. After editing the Caddyfile: `C:\Caddy\caddy.exe validate --config C:\Caddy\Caddyfile`, then `C:\Caddy\caddy.exe reload --config C:\Caddy\Caddyfile`.
 
 **The repo**:
 

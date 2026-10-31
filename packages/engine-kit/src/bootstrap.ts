@@ -147,6 +147,8 @@ const run = async <Env extends BaseEnv, Col extends CoreCol, Bus extends BootBus
     try {
       await engine?.shutdown(reason)
       bot.stop?.()
+      // A pause or kill switch that took effect before the database had it is saved now if it can be.
+      if (!(await state.settle(5_000))) log.error("the engine state wasn't saved before stopping")
       await bus.stop()
       await stream.stop()
       await lease.release()

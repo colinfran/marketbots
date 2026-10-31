@@ -1,10 +1,10 @@
-import type { AuditDoc, SettingsDoc } from "@mb/core/db"
+import type { AuditDoc, EngineStateDoc, SettingsDoc } from "@mb/core/db"
 import { applySettingsPatch, upgradeStoredSettings } from "@mb/core/settings"
 import type { Db } from "mongodb"
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import { z } from "zod"
 import { silentLogger } from "../../src/log"
-import { SettingsStore } from "../../src/state/stores"
+import { EngineStateStore, SettingsStore } from "../../src/state/stores"
 import { useMongoTestDb } from "../../src/testing/db"
 
 const schema = z.object({ agent: z.object({ level: z.enum(["off", "on"]), model: z.string() }), limit: z.number() })
@@ -15,7 +15,7 @@ const binding = { schema, defaults, applyPatch: (base: S, patch: Partial<S>) => 
 const db = useMongoTestDb({
   prefix: "kit_stores",
   indexes: {},
-  collections: (d: Db) => ({ settings: d.collection<SettingsDoc<S>>("settings"), audit: d.collection<AuditDoc>("audit_log") }),
+  collections: (d: Db) => ({ settings: d.collection<SettingsDoc<S>>("settings"), audit: d.collection<AuditDoc>("audit_log"), engineState: d.collection<EngineStateDoc>("engine_state") }),
 })
 
 describe("settings store", () => {
@@ -50,5 +50,45 @@ describe("settings store", () => {
   it("never turns a stored shadow level on", async () => {
     await db.col.settings.insertOne({ _id: "current", settings: { agent: { level: "shadow", model: "local/x" }, limit: 7 } as unknown as S, version: 2, updated_at: new Date(), updated_by: "owner" })
     expect((await SettingsStore.load(db.col, binding, silentLogger)).current.agent.level).toBe("off")
+  })
+})
+
+describe("engine state store", () => {
+  const stored = async () => (await db.col.engineState.findOne({ _id: "engine" }))!.status
+
+  it("puts a pause in effect while the database fails, and saves it once the database takes it", async () => {
+    const store = await EngineStateStore.load(db.col)
+    const failing = vi.spyOn(db.col.engineState, "replaceOne").mockRejectedValue(new Error("An unexpected internal error has occurred."))
+    await store.update({ status: "paused", pause_reason: "test" }, "owner", "pause", {}, { first: "memory" })
+    expect(store.state.status).toBe("paused")
+    expect(await store.settle(1_000)).toBe(false)
+    expect(await stored()).toBe("running")
+    failing.mockRestore()
+    expect(await store.settle(5_000)).toBe(true)
+    expect(await stored()).toBe("paused")
+    expect(await db.col.audit.findOne({ action: "pause" })).toMatchObject({ actor: "owner", target: "engine" })
+  })
+
+  it("saves a resume first: while the database fails, the engine stays paused", async () => {
+    const store = await EngineStateStore.load(db.col)
+    await store.update({ status: "paused" }, "owner", "pause", {}, { first: "memory" })
+    await store.settle(5_000)
+    const failing = vi.spyOn(db.col.engineState, "replaceOne").mockRejectedValue(new Error("An unexpected internal error has occurred."))
+    await expect(store.update({ status: "running", pause_reason: null }, "owner", "resume")).rejects.toThrow(/unexpected internal error/)
+    expect(store.state.status).toBe("paused")
+    failing.mockRestore()
+    expect(await stored()).toBe("paused")
+  })
+
+  it("never lets a save still owed overwrite a later change", async () => {
+    const store = await EngineStateStore.load(db.col)
+    const failing = vi.spyOn(db.col.engineState, "replaceOne").mockRejectedValueOnce(new Error("An unexpected internal error has occurred."))
+    await store.update({ status: "paused" }, "owner", "pause", {}, { first: "memory" })
+    await vi.waitFor(() => expect(failing).toHaveBeenCalledTimes(1))
+    failing.mockRestore()
+    await store.update({ status: "running", pause_reason: null }, "owner", "resume")
+    expect(await store.settle(5_000)).toBe(true)
+    expect(await stored()).toBe("running")
+    expect((await db.col.audit.find({ target: "engine" }).toArray()).map((a) => a.action)).toEqual(["pause", "resume"])
   })
 })

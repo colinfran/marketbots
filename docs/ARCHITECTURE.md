@@ -40,8 +40,8 @@ External: Kraken (CLI wallet in its volume), Alpaca, ~150 news sources, and the 
 ```
 
 - **Each engine owns its bot's trading state.** It is the only writer of positions, orders and fills, and a MongoDB lease in its own database guarantees one running instance per bot.
-- **The dashboards never trade.** They read MongoDB and write only commands (polled by the engine every second), audit entries and sign-in records.
-- **The engines listen only on loopback**: the read-only live stream plus `/healthz` and `/readyz`. Caddy on the host terminates TLS and forwards each `engine.<domain>` to its port. Ports, Caddy sites and domains are the same as before the merge.
+- **The dashboards never trade.** They read MongoDB, send the owner's commands straight to the engine (signed with the stream secret; queued in MongoDB only when the engine can't be reached, checked every 3 seconds), and write only audit entries and sign-in records.
+- **The engines listen only on loopback**: the read-only live stream, `/healthz` and `/readyz`, and the command endpoints, which answer only requests signed with the stream secret. Caddy on the host terminates TLS and forwards each `engine.<domain>` to its port. Ports, Caddy sites and domains are the same as before the merge.
 - **The host agent reads the machine itself** ([SERVER.md §11](SERVER.md#11-the-host-agent-admin--server)): a Node process on Windows, not in Docker (containers see only the Docker VM). It keeps the hardware readings on the server (a SQLite file) and serves them, with the owner's fan and settings commands, through a small API on loopback that Caddy publishes at `/host` on each engine domain. The dashboards' servers call it with a shared secret only while Admin → Server is open, so nothing about the machine goes to the database. It also runs the motherboard fans.
 
 ### What the bots share at runtime
