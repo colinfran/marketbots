@@ -36,7 +36,7 @@ export default async function SymbolPage({ params }: { params: Promise<{ symbol:
   return (
     <div className="space-y-8">
       <div>
-        <Link href="/markets" className="text-muted-foreground text-sm hover:underline">
+        <Link prefetch href="/markets" className="text-muted-foreground text-sm hover:underline">
           ← Markets
         </Link>
         <h1 className="mt-2 flex flex-wrap items-baseline gap-3 font-mono text-2xl font-semibold tracking-tight">

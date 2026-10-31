@@ -33,7 +33,7 @@ export default async function DayPage({ params }: { params: Promise<{ day: strin
   return (
     <div className="space-y-8">
       <div>
-        <Link href="/journal" className="text-muted-foreground text-sm hover:underline">
+        <Link prefetch href="/journal" className="text-muted-foreground text-sm hover:underline">
           ← Journal
         </Link>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight">{formatDay(day)}</h1>

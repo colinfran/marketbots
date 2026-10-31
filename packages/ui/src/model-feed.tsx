@@ -87,7 +87,7 @@ function CallBody({ call, textShown }: { call: ModelCallView; textShown: boolean
       {call.output && <Streaming text={call.output} label={call.kind === "agent" ? "Its step" : "Output"} icon={FileTextIcon} live={running} />}
       {empty && (running || !textShown) && <p className="text-muted-foreground text-xs">{textShown ? "Reading its prompt…" : "Its text is shown to the owner."}</p>}
       {call.episode_id && (
-        <Link href={`/agent/${call.episode_id}`} className="text-muted-foreground inline-block text-xs hover:underline">
+        <Link prefetch href={`/agent/${call.episode_id}`} className="text-muted-foreground inline-block text-xs hover:underline">
           The episode{call.step ? `, step ${call.step}` : ""}
         </Link>
       )}

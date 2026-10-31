@@ -83,7 +83,7 @@ export default async function AboutPage() {
         <p className="text-muted-foreground mb-3 text-sm leading-relaxed">
           The agent runs on an open-weight model ({a.model}) on two graphics cards in the server that runs the bot: no AI service and no per-call cost. One episode
           runs at a time, and bad news on a holding interrupts anything else. Every step streams to the{" "}
-          <Link href="/agent" className="underline underline-offset-2">
+          <Link prefetch href="/agent" className="underline underline-offset-2">
             Agent
           </Link>{" "}
           page as it happens.
