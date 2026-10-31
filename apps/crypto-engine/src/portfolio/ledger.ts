@@ -17,6 +17,9 @@ import type { AccountState } from "../risk/engine"
  * The math matches the wallet's exactly: a buy costs qty × price + fee, a sale credits
  * qty × price − fee. Cost basis is average cost including entry fees; realized P&L on a sale is
  * proceeds after fees minus the cost basis of the coins sold.
+ *
+ * The open positions are kept in memory between reads (protection reads them every few seconds):
+ * the engine is their only writer, and every write here updates or drops the kept copy.
  */
 
 export type FillInput = {
@@ -50,6 +53,11 @@ export type FillOutcome = {
 const EPS = 1e-9
 
 export class Ledger {
+  /** The account's open positions as last read and written here; null: read them again. */
+  private open: PositionDoc[] | null = null
+  /** Bumped by every write, so a read that overlapped one isn't kept. */
+  private generation = 0
+
   constructor(
     private readonly col: Pick<Collections, "accounts" | "positions" | "fills" | "dailyStats" | "snapshots" | "orders">,
     private readonly bus: EventBus,
@@ -88,8 +96,42 @@ export class Ledger {
     return this.col.accounts.findOne({ _id: id })
   }
 
-  openPositions(id: AccountId = ACCOUNT_ID) {
+  async openPositions(id: AccountId = ACCOUNT_ID): Promise<PositionDoc[]> {
+    if (id !== ACCOUNT_ID) return this.readOpen(id)
+    if (!this.open) {
+      const generation = this.generation
+      const docs = await this.readOpen(id)
+      if (generation !== this.generation) return docs
+      this.open = docs
+    }
+    return structuredClone(this.open)
+  }
+
+  /** Drops the kept open positions: for a write made outside the ledger. */
+  forgetOpenPositions() {
+    this.generation++
+    this.open = null
+  }
+
+  private readOpen(id: AccountId) {
     return this.col.positions.find({ account_id: id, status: "open" }).toArray()
+  }
+
+  /**
+   * A write to positions, then the kept copy brought in line: `fields` set on position `id` there
+   * too (the same `$set` the write made), or, without them, dropped. A failed write drops it.
+   */
+  private async writePositions<T>(write: () => Promise<T>, change?: { id: string; fields: Partial<PositionDoc> }): Promise<T> {
+    try {
+      const result = await write()
+      this.generation++
+      if (change && this.open) Object.assign(this.open.find((p) => p._id === change.id) ?? {}, change.fields)
+      else if (!change) this.open = null
+      return result
+    } catch (error) {
+      this.forgetOpenPositions()
+      throw error
+    }
   }
 
   /**
@@ -198,7 +240,7 @@ export class Ledger {
       purpose: order.purpose,
     }
     await this.col.fills.insertOne(fill)
-    await this.col.positions.replaceOne({ _id: position._id }, position, { upsert: true })
+    await this.writePositions(() => this.col.positions.replaceOne({ _id: position._id }, position, { upsert: true }))
     const cashDelta = isBuy ? -(qty * price + feeUsd) : qty * price - feeUsd
     await this.col.accounts.updateOne(
       { _id: order.account_id },
@@ -219,7 +261,8 @@ export class Ledger {
 
   /** Updates position metadata (stops, review times) without touching quantities. */
   updatePosition(id: string, fields: Partial<Pick<PositionDoc, "stop_price" | "take_profit_price" | "last_reviewed_at" | "last_review_price" | "thesis" | "invalidation" | "horizon_hours">>) {
-    return this.col.positions.updateOne({ _id: id }, { $set: { ...fields, updated_at: new Date() } })
+    const set = { ...fields, updated_at: new Date() }
+    return this.writePositions(() => this.col.positions.updateOne({ _id: id }, { $set: set }), { id, fields: set })
   }
 
   /**
@@ -236,7 +279,10 @@ export class Ledger {
     for (const p of positions) {
       const mark = priceOf(p) ?? p.mark_price ?? p.avg_price
       exposure += p.qty * mark
-      if (mark !== p.mark_price) await this.col.positions.updateOne({ _id: p._id }, { $set: { mark_price: mark, marked_at: now } })
+      if (mark !== p.mark_price) {
+        const fields = { mark_price: mark, marked_at: now }
+        await this.writePositions(() => this.col.positions.updateOne({ _id: p._id }, { $set: fields }), { id: p._id, fields })
+      }
     }
     const equity = account.cash_usd + exposure
     const today = utcDay(now)
@@ -360,15 +406,16 @@ export class Ledger {
       issues.push(`cash ${account.cash_usd.toFixed(2)} → ${cash.toFixed(2)} (rebuilt from fills)`)
       await this.col.accounts.updateOne({ _id: id }, { $set: { cash_usd: cash } })
     }
-    const open = await this.openPositions(id)
+    // From the database, not the kept copy: this is the repair.
+    const open = await this.readOpen(id)
     for (const p of open) {
       const lot = lots.get(p.instrument)
       if (!lot || lot.qty <= EPS) {
         issues.push(`${p.instrument}: open position has no remaining fills; closed`)
-        await this.col.positions.updateOne({ _id: p._id }, { $set: { status: "closed", qty: 0, closed_at: new Date(), exit_reason: "reconciliation" } })
+        await this.writePositions(() => this.col.positions.updateOne({ _id: p._id }, { $set: { status: "closed", qty: 0, closed_at: new Date(), exit_reason: "reconciliation" } }))
       } else if (Math.abs(lot.qty - p.qty) > Math.max(EPS, p.qty * 1e-9)) {
         issues.push(`${p.instrument}: qty ${p.qty} → ${lot.qty}`)
-        await this.col.positions.updateOne({ _id: p._id }, { $set: { qty: lot.qty, cost_basis_usd: lot.basis } })
+        await this.writePositions(() => this.col.positions.updateOne({ _id: p._id }, { $set: { qty: lot.qty, cost_basis_usd: lot.basis } }))
       }
     }
     for (const [instrument, lot] of lots) {
@@ -381,7 +428,7 @@ export class Ledger {
   async resetPaper(startingUsd: number) {
     const id = ACCOUNT_ID
     const now = new Date()
-    await this.col.positions.updateMany({ account_id: id, status: "open" }, { $set: { status: "closed", qty: 0, closed_at: now, exit_reason: "paper_reset" } })
+    await this.writePositions(() => this.col.positions.updateMany({ account_id: id, status: "open" }, { $set: { status: "closed", qty: 0, closed_at: now, exit_reason: "paper_reset" } }))
     await this.col.orders.updateMany({ account_id: id, status: { $in: ["pending_submit", "submitted", "unknown"] } }, { $set: { status: "canceled", reason: "paper reset", updated_at: now } })
     await this.col.accounts.updateOne(
       { _id: id },

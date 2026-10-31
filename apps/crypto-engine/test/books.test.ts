@@ -1,7 +1,7 @@
 import { utcDay } from "@mb/crypto-core/db"
 import { AiCallLog } from "@mb/engine-kit/ai/call-log"
 import { silentLogger } from "@mb/engine-kit/log"
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import { Executor } from "../src/execution/executor"
 import { PaperWalletExecution } from "../src/execution/paper-wallet"
 import type { MarketHub } from "../src/market/hub"
@@ -85,6 +85,26 @@ describe("ledger + paper wallet", () => {
     const account = await ledger.markToMarket(() => 70_000)
     expect(account!.equity_usd).toBeCloseTo(10_000 - 0.01 * 65_010 * 1.004 + 700, 6)
     expect(account!.peak_equity_usd).toBeGreaterThan(10_000)
+  })
+
+  it("keeps its open positions between reads, in line with every write it makes", async () => {
+    const { ledger, buy, sell } = await setup()
+    await buy(0.02)
+    const reads = vi.spyOn(db.col.positions, "find")
+    const [p] = await ledger.openPositions()
+    // A copy: changing it changes nothing kept.
+    p.stop_price = 1
+    expect((await ledger.openPositions())[0].stop_price).toBe(63_000)
+    await ledger.updatePosition(p._id, { stop_price: 64_000 })
+    await ledger.markToMarket(() => 66_000)
+    const kept = await ledger.openPositions()
+    expect(kept).toEqual([expect.objectContaining({ stop_price: 64_000, mark_price: 66_000 })])
+    expect(reads).toHaveBeenCalledTimes(1)
+    expect(kept).toEqual(await db.col.positions.find({ status: "open" }).toArray())
+    reads.mockRestore()
+    // A fill that closes it drops the copy: the next read goes to the database.
+    await sell(0.02)
+    expect(await ledger.openPositions()).toEqual([])
   })
 })
 

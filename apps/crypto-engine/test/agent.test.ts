@@ -141,6 +141,7 @@ describe("crypto agent decisions", () => {
     const [early] = await actOnCryptoAnswer(d, answer([decision({ action: "close" })]), ep("e2"))
     expect(early).toMatchObject({ outcome: "rejected", detail: expect.stringContaining("min") })
     await ctx.col.positions.updateMany({}, { $set: { opened_at: new Date(Date.now() - 2 * 3_600_000) } })
+    ctx.ledger.forgetOpenPositions()
     const [sold] = await actOnCryptoAnswer(d, answer([decision({ action: "close" })]), ep("e3"))
     expect(sold).toMatchObject({ outcome: "filled", detail: expect.stringMatching(/^sold /) })
     expect(await ctx.ledger.openPositions()).toEqual([])
@@ -153,6 +154,7 @@ describe("crypto agent decisions", () => {
     expect(paused).toMatchObject({ outcome: "blocked", detail: "entries paused by a breaker until the owner resumes them: daily loss" })
     await actOnCryptoAnswer(d, answer([decision()]), ep("e2"))
     await ctx.col.positions.updateMany({}, { $set: { opened_at: new Date(Date.now() - 2 * 3_600_000) } })
+    ctx.ledger.forgetOpenPositions()
     await actOnCryptoAnswer(d, answer([decision({ action: "close" })]), ep("e3"))
     // Re-entering right after the exit is a flip.
     const [flip] = await actOnCryptoAnswer(d, answer([decision()]), ep("e4"))
