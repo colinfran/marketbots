@@ -922,4 +922,4 @@ Until 2026-10-31 the agent wrote every reading into a database on the bots' clus
 
 1. `HOST_API_SECRET` in `.env` (SHARED) and on both Vercel projects, with each project's `HOST_API_URL`; the `/host` route in the Caddyfile (§3).
 2. With the agent stopped, the samples copied from `serverstats` into `data\host.sqlite` (`pnpm --filter @mb/host-agent migrate-serverstats`, a one-off that reads `MONGODB_URI`; a sample already in the file stays), then the agent started on the new build.
-3. Once Admin → Server showed the history, `serverstats` was exported to `backups\serverstats-2026-10-31\` and dropped from the cluster.
+3. Once the file held every minute sample (19,915, from 2026-10-17) and the recorded energy totals matched the cloud's, `serverstats` was exported to `backups\serverstats-2026-10-31\` (`mongodump`, 21,555 samples) and dropped from the cluster. `mongorestore` from that folder brings it back.
