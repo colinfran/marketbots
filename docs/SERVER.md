@@ -9,10 +9,10 @@ What runs where:
 | Where | What | Config |
 | --- | --- | --- |
 | Windows server, Docker stack `marketbots` | `crypto-engine` on 127.0.0.1:8787 (with the Kraken CLI paper wallet), `stock-engine` on 127.0.0.1:8788, `scraper` (no host port), `llm` (llama.cpp with the local model on both GPUs, no host port), `search` (SearXNG for local research, no host port), `history` (Postgres with TimescaleDB and pgvector, no host port) and `history-backup` | `compose.yml`, `.env` at the repo root |
-| Caddy on the Windows host | `engine.cryptomarketbot.app` → 127.0.0.1:8787, `engine.stockmarketbot.app` → 127.0.0.1:8788 (WebSocket) | `C:\Caddy\Caddyfile` |
+| Caddy on the Windows host | `engine.cryptomarketbot.app` → 127.0.0.1:8787, `engine.stockmarketbot.app` → 127.0.0.1:8788 (WebSocket); `/host/*` on both → the host agent's API on 127.0.0.1:8789 | `C:\Caddy\Caddyfile` |
 | The Windows host, outside Docker | The host agent and its LibreHardwareMonitor (Admin → Server, the motherboard fans; §11) | `.env` at the repo root (its HOST section) |
 | Vercel | two projects: `apps/crypto-web` at cryptomarketbot.app, `apps/stock-web` at stockmarketbot.app | each project's environment variables |
-| Azure DocumentDB (MongoDB-compatible, free tier) | one cluster, databases `cryptomarketbot`, `stockmarketbot` and `serverstats` | `MONGODB_URI` |
+| Azure DocumentDB (MongoDB-compatible, free tier) | one cluster, databases `cryptomarketbot` and `stockmarketbot` | `MONGODB_URI` |
 | Alpaca | the stock bot's paper account | `.env` (`STOCK_ALPACA_*`, engine only) |
 
 The two engines are independent: separate images, containers, ports, variables, databases, leases and stream secrets. Deploying, restarting or crashing one never touches the other. At runtime they share only the scraper, the LLM, the history service (each with its own database and role on it) and the server's IP address.
@@ -21,7 +21,7 @@ The two engines are independent: separate images, containers, ports, variables, 
 
 ## 1. Accounts and secrets (once)
 
-**Azure DocumentDB** (MongoDB-compatible; the free tier: 32 GB): one cluster serves both bots, each in its own database, and the host agent's `serverstats` (§11).
+**Azure DocumentDB** (MongoDB-compatible; the free tier: 32 GB): one cluster serves both bots, each in its own database. (The host agent keeps its readings on the server, §11.)
 1. The cluster's admin user, with a long random password (no `$`, §3.3). Users can't be limited to one database: every user sees the whole cluster.
 2. *Networking*: the firewall rule `0.0.0.0 – 255.255.255.255`. Vercel connects from changing IPs (and isn't on Azure, so *Allow Azure services* doesn't cover it); the strong password is the protection. With no rule, nothing connects.
 3. *Connection strings*: copy the `mongodb+srv://…` string and put the password in.
@@ -86,15 +86,25 @@ nvidia-smi --query-gpu=name,power.limit,power.default_limit --format=csv   # 200
 
 ```caddy
 engine.cryptomarketbot.app {
-	reverse_proxy 127.0.0.1:8787
+	handle_path /host/* {
+		reverse_proxy 127.0.0.1:8789
+	}
+	handle {
+		reverse_proxy 127.0.0.1:8787
+	}
 }
 
 engine.stockmarketbot.app {
-	reverse_proxy 127.0.0.1:8788
+	handle_path /host/* {
+		reverse_proxy 127.0.0.1:8789
+	}
+	handle {
+		reverse_proxy 127.0.0.1:8788
+	}
 }
 ```
 
-The ports are the same as before the merge, so Caddy needs no change. After editing the Caddyfile for some other reason: `C:\Caddy\caddy.exe reload --config C:\Caddy\Caddyfile`. The engines serve only `/v1/stream`, `/healthz` and `/readyz`.
+The engines serve only `/v1/stream`, `/healthz` and `/readyz`. `/host/*` goes to the host agent's API (§11), with the `/host` prefix stripped; it answers only requests that carry `HOST_API_SECRET`. After editing the Caddyfile: `C:\Caddy\caddy.exe validate --config C:\Caddy\Caddyfile`, then `C:\Caddy\caddy.exe reload --config C:\Caddy\Caddyfile`.
 
 **The repo**:
 
@@ -177,7 +187,8 @@ Set for Production and Preview, under the Vercel name, with the value of the `.e
 | `ENGINE_STREAM_URL` | `CRYPTO_ENGINE_STREAM_URL` | `wss://engine.cryptomarketbot.app/v1/stream` |
 | `DISCORD_WEBHOOK_URL` | `CRYPTO_DISCORD_WEBHOOK_URL` | optional: unhandled dashboard errors go to the engine's Discord channel |
 | `NEXT_PUBLIC_DISPLAY_TIMEZONE` | `NEXT_PUBLIC_DISPLAY_TIMEZONE` | `America/Los_Angeles` |
-| `HOST_DB_NAME` | `HOST_DB_NAME` | optional: the host agent's database (default `serverstats`, §11) |
+| `HOST_API_URL` | (none: `.env` holds the local address) | `https://engine.cryptomarketbot.app/host`: the host agent's API for Admin → Server (§11) |
+| `HOST_API_SECRET` | `HOST_API_SECRET` | **identical** to the agent's; without both, Admin → Server shows the agent offline |
 | `SITE_URL` | `CRYPTO_SITE_URL` | optional: defaults to the project's production domain |
 | `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_DOCUMENTDB_RESOURCE_ID` | the same names | optional, all four or none: Azure Monitor's count of the database's storage on Admin → System (§1) |
 
@@ -194,7 +205,8 @@ Set for Production and Preview, under the Vercel name, with the value of the `.e
 | `USESEND_FROM_EMAIL` | `STOCK_USESEND_FROM_EMAIL` | the verified sender; required, no default |
 | `ENGINE_STREAM_URL` | `STOCK_ENGINE_STREAM_URL` | `wss://engine.stockmarketbot.app/v1/stream` |
 | `DISCORD_WEBHOOK_URL` | `STOCK_DISCORD_WEBHOOK_URL` | optional: unhandled dashboard errors go to the engine's Discord channel |
-| `HOST_DB_NAME` | `HOST_DB_NAME` | optional: the host agent's database (default `serverstats`, §11) |
+| `HOST_API_URL` | (none: `.env` holds the local address) | `https://engine.stockmarketbot.app/host`: the host agent's API for Admin → Server (§11) |
+| `HOST_API_SECRET` | `HOST_API_SECRET` | **identical** to the agent's; without both, Admin → Server shows the agent offline |
 | `SITE_URL` | `STOCK_SITE_URL` | optional: defaults to the project's production domain |
 | `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_DOCUMENTDB_RESOURCE_ID` | the same names | optional, all four or none: Azure Monitor's count of the database's storage on Admin → System (§1) |
 
@@ -796,26 +808,26 @@ The containers can't read any of this (they see the Docker VM), so it runs on Wi
 | The host agent | `apps\host-agent\dist\main.js` on the server's own Node, with `.env` | `\marketbots\Host agent` at startup, no window; restarted if it exits |
 | The fan watchdog | `dist\fan-watchdog.js`, a detached process the agent starts | the agent, when `FAN_CONTROL=on` |
 
-Every reading (2 s by default) the agent reads Windows, `nvidia-smi` and LibreHardwareMonitor; the VeSync outlet once a minute. It writes into its own database on the bots' cluster, `serverstats` (`HOST_DATABASES`), which both dashboards read (`HOST_DB_NAME`): it is one machine, so one copy.
+Every reading (2 s by default) the agent reads Windows, `nvidia-smi` and LibreHardwareMonitor; the VeSync outlet once a minute. It keeps everything on the server, one copy for both dashboards:
 
-- `host_status`: the latest reading. The page polls it every 2 seconds and shows a reading older than 15 seconds as offline, never as current.
-- `host_samples`: every reading, kept a little over an hour, and minute averages with the energy measured in each minute, kept 30 days (TTL). About 20 MB. The recorded energy totals (today, 24 hours, 7 and 30 days) come from the outlet's minute samples, which the agent keeps in memory and reads again once a day: minutes another process writes (the history import, §11.6) count from the next read or a restart.
-- `host_commands`: the owner's fan setting, agent settings and outlet discovery, from either dashboard. Audited like the engines' commands (the request in the sending bot's audit log, the outcome in `serverstats.audit_log`); one not picked up within 2 minutes is rejected unapplied.
+- The latest reading, in memory. The page polls it every 2 seconds and shows a reading older than 15 seconds as offline, never as current.
+- The chart samples, in `data\host.sqlite`: every reading, kept a little over an hour, and minute averages with the energy measured in each minute, kept 30 days. Expired rows are deleted once a minute. The recorded energy totals (today, 24 hours, 7 and 30 days) are summed from the outlet's minute samples.
+- The owner's commands (fan setting, agent settings, outlet discovery, from either dashboard), in the same file with their outcomes, kept 30 days. The request is audited in the sending bot's audit log.
 
-Nothing in it touches the bots' databases or trading state, and the engines don't know it exists.
+Its API serves them: 127.0.0.1:`HOST_API_PORT` (8789), published by Caddy at `/host` on both engine domains (§3). Only the dashboards' servers call it, with `HOST_API_SECRET`, and only while Admin → Server is open: `GET /status`, `GET /history?range=`, `POST /commands`, `GET /commands/<id>`. Nothing about the machine goes to the bots' database, and the engines don't know the agent exists.
 
 ### 11.1 Its variables
 
-The agent reads the repo's `.env` (§3), started with `node --env-file`: the SHARED section's `MONGODB_URI` and the HOST section, under their own names. It ignores the bots' variables in the file. Nothing in the HOST section goes to Vercel.
+The agent reads the repo's `.env` (§3), started with `node --env-file`: the SHARED section's `HOST_API_SECRET` and the HOST section, under their own names. It ignores the bots' variables in the file. Nothing in the HOST section goes to Vercel.
 
 | Variable | What |
 | --- | --- |
-| `MONGODB_URI` | The bots' cluster (SHARED) |
-| `HOST_DATABASES` | Optional: its database (default `serverstats`; the dashboards' `HOST_DB_NAME` must match) |
+| `HOST_API_SECRET` | SHARED, 32+ characters: the dashboards send it with every call (each Vercel project has the same value, §3.4). Empty: the API is off; the agent still reads and runs the fans |
+| `HOST_API_PORT` | Optional: the API's port on 127.0.0.1 (default 8789; Caddy forwards `/host/*` to it) |
 | `FAN_CONTROL` | `on`: the agent sets the motherboard fans. `off` (default): it only reads them (§11.4) |
 | `VESYNC_USERNAME`, `VESYNC_PASSWORD` | A VeSync account that sees the outlet: a separate one the home or outlet is shared with (accept the share in the VeSync app, signed in as it). Without them, no power or energy readings (the recorded history still shows) |
 | `VESYNC_TIMEZONE`, `VESYNC_COUNTRY_CODE`, `VESYNC_REFRESH_MS` | Optional: the account's time zone (default the server's) and country (`US`), and how often the outlet is read (60000 ms) |
-| `HOST_DATA_DIR`, `LHM_CONNECTION_FILE` | Optional: where the agent keeps its files (`apps\host-agent\data`) and LibreHardwareMonitor's login (`<data>\lhm.json`) |
+| `HOST_DATA_DIR`, `LHM_CONNECTION_FILE` | Optional: where the agent keeps its files (`apps\host-agent\data`: settings, `host.sqlite`, logs) and LibreHardwareMonitor's login (`<data>\lhm.json`) |
 
 The agent's own settings (the reading interval, the electricity price and currency, the outlet) aren't in the file: they change in Admin → Server → Settings and are kept in `data\settings.json`. After editing its variables in `.env`, restart the agent (§11.3).
 
@@ -881,7 +893,7 @@ Then check Admin → Server: the fans at 100% under *Motherboard fans*, and *Man
 
 ### 11.6 The imported history
 
-The old monitor's data folder was copied out of its Docker volume (`jellyfin-system-monitor-data`) into `backups\jellyfin-system-monitor\` on 2026-10-30: `history.sqlite` (2-second readings from 2026-10-17) and `settings.json` (the price, currency and outlet, which became the agent's settings). It was imported as minute samples into `serverstats`:
+The old monitor's data folder was copied out of its Docker volume (`jellyfin-system-monitor-data`) into `backups\jellyfin-system-monitor\` on 2026-10-30: `history.sqlite` (2-second readings from 2026-10-17) and `settings.json` (the price, currency and outlet, which became the agent's settings). It was imported as minute samples (then into `serverstats`; the import now writes `data\host.sqlite`, §11.8):
 
 ```powershell
 cd apps\host-agent
@@ -894,8 +906,8 @@ The import matches the old monitor's own energy totals to the watt-hour. Running
 
 | Symptom | Likely cause / fix |
 | --- | --- |
-| *The host agent has never reported* | The `Host agent` task isn't running or can't reach the database: `Get-ScheduledTask -TaskPath '\marketbots\' \| Get-ScheduledTaskInfo`, then the log (§11.3). A bad `.env` stops it at start: the task's last result is 1. |
-| *Offline* with a time | The agent stopped or lost the database after that reading. The history stays. |
+| *The host agent has never reported* | The `Host agent` task isn't running (`Get-ScheduledTask -TaskPath '\marketbots\' \| Get-ScheduledTaskInfo`, then the log, §11.3; a bad `.env` stops it at start: the task's last result is 1), or the dashboard can't reach its API: the log says *API off* (`HOST_API_SECRET` empty) or *API not started*; Vercel's `HOST_API_URL` / `HOST_API_SECRET` don't match (§3.4); Caddy lacks the `/host` route (§3). From the server, `curl.exe -s -o NUL -w "%{http_code}" https://engine.cryptomarketbot.app/host/status` answers 401 when the route and the agent are up (no secret sent). |
+| *Offline* with a time | The agent stopped, or stopped being reachable, after that reading. The history stays. |
 | *Motherboard sensors: LibreHardwareMonitor is not responding* | The `Host sensors` task isn't running, or the PawnIO prompt wasn't approved: run `start-sensors.ps1` by hand. |
 | No CPU temperature, every fan at 100% | *Cooling protection*: LibreHardwareMonitor has no `CPU Package` temperature (sensors still loading, or the driver isn't approved). |
 | *Fan control is off on the server* | `FAN_CONTROL=off` in `.env` (§11.4). |
@@ -903,3 +915,11 @@ The import matches the old monitor's own energy totals to the watt-hour. Running
 | *VeSync login failed*, *Several outlets found* | Check the account and region in `.env`; pick the outlet in Settings after *Discover*. |
 | *VeSync lists no devices on this account* | The account logs in but sees no outlet: accept the home (or outlet) share in the VeSync app, signed in as that account. |
 | VeSync: `login temporary auth code expired` | Since 2026-10-26 VeSync completes logins only for its own app's ID, which the agent sends (`VESYNC_APP_ID` in `vesync.ts`); if VeSync changes it again, update it there. |
+
+### 11.8 Off the database (2026-10-31)
+
+Until 2026-10-31 the agent wrote every reading into a database on the bots' cluster, `serverstats`: its status every 2 seconds, the samples, and a command queue it checked every second, whether or not anyone looked. That was a steady share of the load that capped the free tier's CPU (§1), so the readings moved to the server and the dashboards fetch them on demand. The move:
+
+1. `HOST_API_SECRET` in `.env` (SHARED) and on both Vercel projects, with each project's `HOST_API_URL`; the `/host` route in the Caddyfile (§3).
+2. With the agent stopped, the samples copied from `serverstats` into `data\host.sqlite` (`pnpm --filter @mb/host-agent migrate-serverstats`, a one-off that reads `MONGODB_URI`; a sample already in the file stays), then the agent started on the new build.
+3. Once Admin → Server showed the history, `serverstats` was exported to `backups\serverstats-2026-10-31\` and dropped from the cluster.

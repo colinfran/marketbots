@@ -1,116 +1,83 @@
 import "server-only"
 import { randomUUID } from "node:crypto"
 import type { AuditDoc } from "@mb/core/db"
-import {
-  HOST_COLLECTIONS,
-  HOST_RANGES,
-  hostCommandSchema,
-  isHostRange,
-  type HostChartPoint,
-  type HostCommandDoc,
-  type HostHistoryView,
-  type HostRange,
-  type HostSampleDoc,
-  type HostStatusDoc,
-  type HostStatusView,
-} from "@mb/core/host"
-import type { Collection, Db } from "mongodb"
+import { hostCommandSchema, isHostRange, type HostCommandView, type HostHistoryView, type HostRange, type HostStatusView } from "@mb/core/host"
+import type { Collection } from "mongodb"
 import { connection, NextResponse } from "next/server"
+import { errorMessage } from "./alerts"
 import type { Viewer } from "./auth"
 import type { SubmitResult } from "./commands"
+import type { DashboardEnv } from "./env"
 
 /**
  * Admin → Server (docs/SERVER.md §11), the same in both dashboards: the host agent's latest
- * reading, its chart samples, and the owner's commands for it, all in the agent's own database
- * (HOST_DB_NAME); a command's audit entry goes to the bot's audit log. Owner only: the page lists
- * the machine's volumes and devices.
+ * reading, its charts and the owner's commands, from the agent's own API on the server
+ * (HOST_API_URL, behind Caddy). Only the dashboard's server calls it, with the shared secret
+ * (HOST_API_SECRET), and only while the page is open: nothing about the machine is in the bots'
+ * database. A command's request is audited in the bot's audit log. Owner only: the page lists the
+ * machine's volumes and devices.
  */
 
-export type HostCollections = {
-  hostStatus: Collection<HostStatusDoc>
-  hostSamples: Collection<HostSampleDoc>
-  hostCommands: Collection<HostCommandDoc>
-  audit: Collection<AuditDoc>
-}
+/** How long a call to the agent may take (the page polls every 2 seconds). */
+const TIMEOUT_MS = 5_000
 
-/** The host agent's collections, in its own database `name` on the bot database's cluster, for a dashboard's collection map (lib/db.ts). */
-export const hostCollections = (d: Db, name: string) => {
-  const host = d.client.db(name)
-  return {
-    hostStatus: host.collection<HostStatusDoc>(HOST_COLLECTIONS.status),
-    hostSamples: host.collection<HostSampleDoc>(HOST_COLLECTIONS.samples),
-    hostCommands: host.collection<HostCommandDoc>(HOST_COLLECTIONS.commands),
+export const createHost = ({ env, audit, fetchFn = fetch }: { env: Pick<DashboardEnv, "hostApiUrl" | "hostApiSecret">; audit: () => Promise<Collection<AuditDoc>>; fetchFn?: typeof fetch }) => {
+  /** A call to the agent's API; throws when it isn't configured or doesn't answer in time. */
+  const call = async (path: string, init: RequestInit = {}) => {
+    const url = env.hostApiUrl()
+    const secret = env.hostApiSecret()
+    if (!url || !secret) throw new Error("HOST_API_URL and HOST_API_SECRET aren't set")
+    return fetchFn(`${url.replace(/\/+$/, "")}${path}`, {
+      ...init,
+      cache: "no-store",
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+      headers: { authorization: `Bearer ${secret}`, "content-type": "application/json" },
+    })
   }
-}
 
-/** Dates become ISO strings, as the page receives them. */
-const toView = (doc: HostStatusDoc): HostStatusView => JSON.parse(JSON.stringify(doc)) as HostStatusView
-
-type Bucket = { _id: Date; cpu: number | null; cpu_temp: number | null; memory: number | null; watts: number | null }
-type CardBucket = { _id: { b: Date; id: string }; model: string; util: number | null; temp: number | null }
-
-export const createHost = <Cols extends HostCollections>({ collections }: { collections: () => Promise<Cols> }) => {
+  /** The latest reading; null when the agent can't be reached (the page then shows it offline). */
   const getHostStatus = async (): Promise<HostStatusView | null> => {
     await connection()
-    const { hostStatus } = await collections()
-    const doc = await hostStatus.findOne({ _id: "current" })
-    return doc ? toView(doc) : null
+    const res = await call("/status").catch(() => null)
+    return res?.ok ? ((await res.json()) as HostStatusView | null) : null
   }
 
-  /** A range's chart points: the samples as recorded, or averaged into the range's bins. */
-  const getHostHistory = async (range: HostRange): Promise<HostHistoryView> => {
+  /** A range's chart points; null when the agent can't be reached. */
+  const getHostHistory = async (range: HostRange): Promise<HostHistoryView | null> => {
     await connection()
-    const { hostSamples } = await collections()
-    const r = HOST_RANGES[range]
-    const filter = { res: r.res, t: { $gte: new Date(Date.now() - r.ms) } }
-    const models = new Map<string, string>()
-    let points: HostChartPoint[]
-    if (r.bin_s === 0) {
-      const docs = await hostSamples.find(filter, { projection: { t: 1, cpu: 1, cpu_temp: 1, memory: 1, watts: 1, gpus: 1 } }).sort({ t: 1 }).limit(5_000).toArray()
-      points = docs.map((d) => {
-        for (const g of d.gpus) models.set(g.id, g.model)
-        return { t: d.t.getTime(), cpu: d.cpu, cpu_temp: d.cpu_temp, memory: d.memory, watts: d.watts, gpus: Object.fromEntries(d.gpus.map((g) => [g.id, { util: g.util, temp: g.temp }])) }
-      })
-    } else {
-      const bin = { $dateTrunc: { date: "$t", unit: "second", binSize: r.bin_s } }
-      const [buckets, cards] = await Promise.all([
-        hostSamples
-          .aggregate<Bucket>([{ $match: filter }, { $group: { _id: bin, cpu: { $avg: "$cpu" }, cpu_temp: { $avg: "$cpu_temp" }, memory: { $avg: "$memory" }, watts: { $avg: "$watts" } } }, { $sort: { _id: 1 } }])
-          .toArray(),
-        hostSamples
-          .aggregate<CardBucket>([{ $match: filter }, { $unwind: "$gpus" }, { $group: { _id: { b: bin, id: "$gpus.id" }, model: { $last: "$gpus.model" }, util: { $avg: "$gpus.util" }, temp: { $avg: "$gpus.temp" } } }])
-          .toArray(),
-      ])
-      const byBin = new Map<number, HostChartPoint["gpus"]>()
-      for (const c of cards) {
-        models.set(c._id.id, c.model)
-        const t = c._id.b.getTime()
-        byBin.set(t, { ...byBin.get(t), [c._id.id]: { util: c.util, temp: c.temp } })
-      }
-      points = buckets.map((b) => ({ t: b._id.getTime(), cpu: b.cpu, cpu_temp: b.cpu_temp, memory: b.memory, watts: b.watts, gpus: byBin.get(b._id.getTime()) ?? {} }))
-    }
-    return { range, points, gpus: [...models].map(([id, model]) => ({ id, model })) }
+    const res = await call(`/history?range=${range}`).catch(() => null)
+    return res?.ok ? ((await res.json()) as HostHistoryView) : null
   }
 
-  /** Queues a command for the host agent, with an audit entry; validated again by the agent. */
+  /** Sends a command to the agent (which validates it again and runs it at once), then audits the request. */
   const submitHostCommand = async (input: unknown, actor: string): Promise<SubmitResult> => {
     const parsed = hostCommandSchema.safeParse(input)
     if (!parsed.success) return { ok: false, error: parsed.error.issues.map((i) => `${i.path.join(".") || "command"}: ${i.message}`).join("; ") }
     const command = parsed.data
-    const { hostCommands, audit } = await collections()
     const id = randomUUID()
-    const now = new Date()
-    await hostCommands.insertOne({ _id: id, type: command.type, command, status: "pending", created_at: now, created_by: actor, processed_at: null, result: null, error: null })
-    await audit.insertOne({ _id: randomUUID(), at: now, actor, action: "host_command.requested", target: id, details: { type: command.type, command } })
+    const res = await call("/commands", { method: "POST", body: JSON.stringify({ id, actor, command }) }).catch((e: unknown) => errorMessage(e))
+    if (typeof res === "string" || !res.ok) {
+      const reason = typeof res === "string" ? res : (((await res.json().catch(() => null)) as { error?: string } | null)?.error ?? `HTTP ${res.status}`)
+      return { ok: false, error: `The server's host agent didn't take it: ${reason}` }
+    }
+    await (await audit()).insertOne({ _id: randomUUID(), at: new Date(), actor, action: "host_command.requested", target: id, details: { type: command.type, command } })
     return { ok: true, id }
   }
 
-  return { getHostStatus, getHostHistory, submitHostCommand }
+  /** What the page polls of a command; null if the agent doesn't know it or can't be reached. */
+  const getHostCommand = async (id: string): Promise<HostCommandView | null> => {
+    const res = await call(`/commands/${encodeURIComponent(id)}`).catch(() => null)
+    return res?.ok ? ((await res.json()) as HostCommandView) : null
+  }
+
+  return { getHostStatus, getHostHistory, submitHostCommand, getHostCommand }
 }
 
 type Gate = { getViewer: () => Promise<Viewer> }
 
 const NO_STORE = { headers: { "cache-control": "no-store" } }
+
+const UNREACHABLE = "The server's host agent can't be reached."
 
 /** GET /api/host/status (owner only): the latest reading, polled by the page every 2 seconds. */
 export const hostStatusRoute =
@@ -122,15 +89,16 @@ export const hostStatusRoute =
 
 /** GET /api/host/history?range=1h (owner only): a range's chart points. */
 export const hostHistoryRoute =
-  ({ getViewer, getHostHistory }: Gate & { getHostHistory: (range: HostRange) => Promise<HostHistoryView> }) =>
+  ({ getViewer, getHostHistory }: Gate & { getHostHistory: (range: HostRange) => Promise<HostHistoryView | null> }) =>
   async (request: Request) => {
     if (!(await getViewer()).owner) return NextResponse.json({ error: "Owner login required." }, { status: 401 })
     const range = new URL(request.url).searchParams.get("range")
     if (!isHostRange(range)) return NextResponse.json({ error: "unknown range" }, { status: 400 })
-    return NextResponse.json(await getHostHistory(range), NO_STORE)
+    const history = await getHostHistory(range)
+    return history ? NextResponse.json(history, NO_STORE) : NextResponse.json({ error: UNREACHABLE }, { status: 502 })
   }
 
-/** POST /api/host/commands (owner only): queue a fan, settings or outlet command for the host agent. */
+/** POST /api/host/commands (owner only): send a fan, settings or outlet command to the host agent. */
 export const hostCommandsRoute =
   ({ getViewer, sameOrigin, submitHostCommand }: Gate & { sameOrigin: () => Promise<boolean>; submitHostCommand: (input: unknown, actor: string) => Promise<SubmitResult> }) =>
   async (request: Request) => {
@@ -139,4 +107,13 @@ export const hostCommandsRoute =
     const result = await submitHostCommand(await request.json().catch(() => null), "owner")
     if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 })
     return NextResponse.json({ id: result.id }, { status: 202 })
+  }
+
+/** GET /api/host/commands/<id> (owner only): a command's status, polled by the page until the agent has answered it. */
+export const hostCommandRoute =
+  ({ getViewer, getHostCommand }: Gate & { getHostCommand: (id: string) => Promise<HostCommandView | null> }) =>
+  async (_request: Request, { params }: { params: Promise<{ id: string }> }) => {
+    if (!(await getViewer()).owner) return NextResponse.json({ error: "Owner login required." }, { status: 401 })
+    const doc = await getHostCommand((await params).id)
+    return doc ? NextResponse.json(doc, NO_STORE) : NextResponse.json({ error: "not found" }, { status: 404 })
   }

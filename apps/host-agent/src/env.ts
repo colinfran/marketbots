@@ -1,31 +1,25 @@
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
-import { HOST_DB } from "@mb/core/host"
 import { z } from "zod"
 
 /**
  * The agent's configuration: the repo's `.env` (template `.env.example`), loaded by Node's
- * `--env-file` (docs/SERVER.md §11.1). It reads the SHARED section's MONGODB_URI and the HOST
- * section; the bots' variables in the file are ignored. Secrets: the MongoDB URI and the VeSync login.
+ * `--env-file` (docs/SERVER.md §11.1). It reads the SHARED section's HOST_API_SECRET and the HOST
+ * section; the bots' variables in the file are ignored. Secrets: the API secret and the VeSync login.
  */
 
 /** apps/host-agent: the bundle runs from dist/, the sources from src/. */
 export const AGENT_DIR = fileURLToPath(new URL("..", import.meta.url))
 
 const schema = z.object({
-  MONGODB_URI: z.string().min(1, "MONGODB_URI is required"),
-  /** The databases the agent writes into and takes commands from, comma-separated: its own (HOST_DB), which both dashboards read. */
-  HOST_DATABASES: z
+  /** The API's port on 127.0.0.1; Caddy publishes it at /host on each engine domain. */
+  HOST_API_PORT: z.coerce.number().int().min(1).max(65_535).default(8789),
+  /** Sent by the dashboards' servers with every request (SHARED). Empty: the API is off and Admin → Server can't reach the agent. */
+  HOST_API_SECRET: z
     .string()
-    .default(HOST_DB)
-    .transform((v) =>
-      v
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean),
-    )
-    .pipe(z.array(z.string().regex(/^[\w-]+$/)).min(1)),
-  /** Settings, fan settings and logs. */
+    .default("")
+    .refine((v) => v === "" || v.length >= 32, "HOST_API_SECRET: 32+ characters"),
+  /** Settings, fan settings, the readings' SQLite file and logs. */
   HOST_DATA_DIR: z.string().default(join(AGENT_DIR, "data")),
   /** LibreHardwareMonitor's connection file (port and login), written by scripts/install-sensors.ps1. */
   LHM_CONNECTION_FILE: z.string().default(""),

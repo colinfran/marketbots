@@ -54,7 +54,6 @@ describe("MinuteSamples", () => {
     const [done] = m.add(reading(T0 + M, 100, 90))
     expect(done).toMatchObject({ _id: `1m:${T0}`, res: "1m", cpu: 15, cpu_temp: 40, memory: 50, watts: 100, outlet_id: "o", gpus: [{ id: "GPU-a", model: "RTX 3070", util: 15, temp: 45 }] })
     expect(done.t).toEqual(new Date(T0))
-    expect(done.expires_at.getTime()).toBe(T0 + 30 * 86_400_000)
     // A minute at a steady 100 W: 100/60 Wh, fully covered.
     expect(done.wh).toBeCloseTo(100 / 60)
     expect(done.covered_ms).toBe(M)
@@ -77,9 +76,8 @@ describe("MinuteSamples", () => {
     expect(done).toMatchObject({ cpu: 15, cpu_temp: 40, watts: null, wh: null })
   })
 
-  it("writes a raw sample per reading, kept a little over an hour", () => {
+  it("writes a raw sample per reading (the store keeps it a little over an hour)", () => {
     const raw = rawSample(reading(T0, 100))
-    expect(raw).toMatchObject({ _id: `raw:${T0}`, res: "raw", watts: 100, wh: null, covered_ms: 0 })
-    expect(raw.expires_at.getTime()).toBe(T0 + 65 * M)
+    expect(raw).toEqual({ _id: `raw:${T0}`, res: "raw", t: new Date(T0), cpu: 10, cpu_temp: 40, memory: 50, watts: 100, gpus: [{ id: "GPU-a", model: "RTX 3070", util: 10, temp: 45 }], wh: null, covered_ms: 0, outlet_id: "o" })
   })
 })

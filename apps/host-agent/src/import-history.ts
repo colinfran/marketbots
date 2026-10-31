@@ -2,7 +2,6 @@ import { access, readFile } from "node:fs/promises"
 import { join } from "node:path"
 import { DatabaseSync } from "node:sqlite"
 import { HOST_MINUTE_KEEP_MS, hostSettingsSchema, type HostSampleDoc } from "@mb/core/host"
-import { MongoClient } from "mongodb"
 import { loadEnv } from "./env"
 import { errorMessage, log } from "./log"
 import { MinuteSamples } from "./samples"
@@ -10,8 +9,8 @@ import { SettingsFile } from "./settings"
 import { HostStore } from "./store"
 
 /**
- * One-off (docs/SERVER.md §11): imports the Jellyfin System Monitor's history into the minute
- * samples of the agent's database, so the 30-day charts and energy totals start full. It reads the
+ * One-off (docs/SERVER.md §11): imports the Jellyfin System Monitor's history into the agent's minute
+ * samples (store.ts), so the 30-day charts and energy totals start full. It reads the
  * old monitor's SQLite file (2-second readings) and its settings.json, both copied out of its Docker
  * volume:
  *
@@ -69,9 +68,7 @@ async function main() {
     }
   }
 
-  const client = new MongoClient(env.MONGODB_URI, { appName: "marketbots-host-import", maxPoolSize: 5 })
-  const store = new HostStore(client, env.HOST_DATABASES)
-  await store.init()
+  const store = new HostStore(join(env.HOST_DATA_DIR, "host.sqlite"))
   const sqlite = new DatabaseSync(join(dir, "history.sqlite"), { readOnly: true })
   // Each card's UUID by model, from the newest reading that lists every card.
   const newest = sqlite.prepare("SELECT json_extract(snapshot, '$.gpus') AS gpus FROM samples WHERE json_extract(snapshot, '$.gpus') IS NOT NULL ORDER BY timestamp DESC LIMIT 1").get() as
@@ -91,8 +88,8 @@ async function main() {
   let segment: string | null = null
   let readings = 0
   let written = 0
-  const flush = async () => {
-    await store.writeSamples(batch, { keep: !replace })
+  const flush = () => {
+    store.writeSamples(batch, { keep: !replace })
     written += batch.length
     batch = []
   }
@@ -102,13 +99,13 @@ async function main() {
     batch.push(...minutes.add({ t: r.timestamp, cpu: r.cpu, cpu_temp: r.cpuTemperature, memory: r.memory, watts: r.watts, outlet_id: r.outletDeviceId, gpus }, { gap: r.segment !== segment }))
     segment = r.segment
     if (++readings % 50_000 === 0) log.info("importing", { readings, minutes: written + batch.length })
-    if (batch.length >= 1_000) await flush()
+    if (batch.length >= 1_000) flush()
   }
   batch.push(...minutes.flush())
-  await flush()
+  flush()
   sqlite.close()
-  await client.close()
-  log.info("history imported", { readings, minutes: written, databases: env.HOST_DATABASES })
+  store.close()
+  log.info("history imported", { readings, minutes: written })
 }
 
 main().catch((e) => {

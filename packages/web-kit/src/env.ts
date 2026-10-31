@@ -1,5 +1,4 @@
 import "server-only"
-import { HOST_DB } from "@mb/core/host"
 
 /**
  * Server-side environment for a dashboard (Vercel), under the variable names both bots use.
@@ -16,8 +15,10 @@ const read = (name: string) => {
 export const dashboardEnv = ({ dbName }: { dbName: string }) => ({
   mongoUri: () => read("MONGODB_URI"),
   mongoDb: () => read("MONGODB_DB_NAME") ?? dbName,
-  /** The host agent's database on the same cluster (Admin → Server), shared by both dashboards. */
-  hostDb: () => read("HOST_DB_NAME") ?? HOST_DB,
+  /** The host agent's API (Admin → Server), the same machine for both dashboards: e.g. https://engine.cryptomarketbot.app/host. */
+  hostApiUrl: () => read("HOST_API_URL"),
+  /** Sent with every call to the host agent's API; never to the browser. */
+  hostApiSecret: () => read("HOST_API_SECRET"),
   /** Signs owner session cookies (32+ chars). Better Auth reads it itself; this only checks it's set. */
   betterAuthSecret: () => read("BETTER_AUTH_SECRET"),
   /** The only address that can sign in. Nobody else gets a sign-in link or an account. Without it, nobody can sign in. */

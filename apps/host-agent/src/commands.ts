@@ -1,4 +1,4 @@
-import { HOST_COMMAND_TTL_MS, hostCommandSchema, type FanSettings, type HostCommand, type HostFans, type HostOutlet, type HostSettings } from "@mb/core/host"
+import type { FanSettings, HostCommand, HostFans, HostOutlet, HostSettings } from "@mb/core/host"
 import { errorMessage, type Log } from "./log"
 import type { HostStore } from "./store"
 
@@ -37,29 +37,41 @@ export const runHostCommand = async (command: HostCommand, t: CommandTargets): P
   }
 }
 
-/** Takes and answers the pending commands, oldest first. One that waited past HOST_COMMAND_TTL_MS is rejected unapplied. */
-export const drainCommands = async (store: Pick<HostStore, "nextCommand" | "finish">, targets: CommandTargets, log: Log, now = Date.now) => {
-  for (let i = 0; i < 10; i++) {
-    const next = await store.nextCommand()
-    if (!next) return
-    const { db, doc } = next
-    const parsed = hostCommandSchema.safeParse(doc.command)
-    if (!parsed.success) {
-      await store.finish(db, doc, "rejected", null, parsed.error.issues.map((x) => `${x.path.join(".")}: ${x.message}`).join("; "))
-      continue
-    }
-    if (now() - doc.created_at.getTime() > HOST_COMMAND_TTL_MS) {
-      await store.finish(db, doc, "rejected", null, "Expired: the server didn't pick it up within 2 minutes. Send it again.")
-      continue
-    }
+/**
+ * The owner's commands, as the API takes them (already validated): each is recorded as pending, run
+ * after the ones before it, and its outcome kept in the store for the page to poll.
+ */
+export class HostCommands {
+  private queue: Promise<void> = Promise.resolve()
+
+  constructor(
+    private readonly store: Pick<HostStore, "addCommand" | "setCommand">,
+    private readonly targets: CommandTargets,
+    private readonly log: Log,
+  ) {}
+
+  /** Queues a command; false if its id is taken. */
+  submit(id: string, command: HostCommand, actor: string, now = new Date()): boolean {
+    if (!this.store.addCommand({ _id: id, type: command.type, command, status: "pending", created_at: now, created_by: actor, processed_at: null, result: null, error: null })) return false
+    this.queue = this.queue.then(() => this.run(id, command)).catch((e) => this.log.error("host command not recorded", { type: command.type, error: errorMessage(e) }))
+    return true
+  }
+
+  /** Settles once every command queued so far has run. */
+  idle(): Promise<void> {
+    return this.queue
+  }
+
+  private async run(id: string, command: HostCommand) {
+    this.store.setCommand(id, "processing", null, null)
     try {
-      const result = await runHostCommand(parsed.data, targets)
-      log.info("host command done", { type: doc.type, result })
-      await store.finish(db, doc, "done", result, null)
+      const result = await runHostCommand(command, this.targets)
+      this.log.info("host command done", { type: command.type, result })
+      this.store.setCommand(id, "done", result, null)
     } catch (e) {
       const error = errorMessage(e).slice(0, 500)
-      log.warn("host command failed", { type: doc.type, error })
-      await store.finish(db, doc, "failed", null, error)
+      this.log.warn("host command failed", { type: command.type, error })
+      this.store.setCommand(id, "failed", null, error)
     }
   }
 }

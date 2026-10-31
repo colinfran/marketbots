@@ -1,4 +1,4 @@
-import { HOST_MINUTE_KEEP_MS, HOST_RAW_KEEP_MS, sampleId, type HostSampleDoc, type HostSampleGpu } from "@mb/core/host"
+import { HOST_RANGES, sampleId, type HostChartPoint, type HostHistoryView, type HostRange, type HostSampleDoc, type HostSampleGpu } from "@mb/core/host"
 import { MINUTE_MS, splitByMinute, type PowerReading } from "./energy"
 
 /** What one reading contributes to the charts. */
@@ -17,7 +17,6 @@ export const rawSample = (s: SampleInput): HostSampleDoc => ({
   wh: null,
   covered_ms: 0,
   outlet_id: s.outlet_id,
-  expires_at: new Date(s.t + HOST_RAW_KEEP_MS),
 })
 
 type Mean = { sum: number; n: number }
@@ -111,9 +110,47 @@ export class MinuteSamples {
         wh: m.covered_ms ? m.wh : null,
         covered_ms: m.covered_ms,
         outlet_id: m.outlet_id,
-        expires_at: new Date(t + HOST_MINUTE_KEEP_MS),
       })
     }
     return out
   }
+}
+
+/** A stored sample as the charts read it. */
+export type ChartSample = { t: number; cpu: number | null; cpu_temp: number | null; memory: number | null; watts: number | null; gpus: HostSampleGpu[] }
+
+/**
+ * A range's chart points from its samples, oldest first: as recorded, or averaged into the range's
+ * bins (aligned to the epoch; an average skips missing values), with every card seen in them.
+ */
+export const chartPoints = (range: HostRange, samples: ChartSample[]): HostHistoryView => {
+  const models = new Map<string, string>()
+  for (const s of samples) for (const g of s.gpus) models.set(g.id, g.model)
+  const gpus = [...models].map(([id, model]) => ({ id, model }))
+  const binMs = HOST_RANGES[range].bin_s * 1000
+  if (!binMs) {
+    const points = samples.map((s) => ({ t: s.t, cpu: s.cpu, cpu_temp: s.cpu_temp, memory: s.memory, watts: s.watts, gpus: Object.fromEntries(s.gpus.map((g) => [g.id, { util: g.util, temp: g.temp }])) }))
+    return { range, points, gpus }
+  }
+  type Bin = { cpu: Mean; cpu_temp: Mean; memory: Mean; watts: Mean; gpus: Map<string, { util: Mean; temp: Mean }> }
+  const bins = new Map<number, Bin>()
+  for (const s of samples) {
+    const t = Math.floor(s.t / binMs) * binMs
+    let b = bins.get(t)
+    if (!b) bins.set(t, (b = { cpu: mean(), cpu_temp: mean(), memory: mean(), watts: mean(), gpus: new Map() }))
+    push(b.cpu, s.cpu)
+    push(b.cpu_temp, s.cpu_temp)
+    push(b.memory, s.memory)
+    push(b.watts, s.watts)
+    for (const g of s.gpus) {
+      const slot = b.gpus.get(g.id) ?? { util: mean(), temp: mean() }
+      push(slot.util, g.util)
+      push(slot.temp, g.temp)
+      b.gpus.set(g.id, slot)
+    }
+  }
+  const points: HostChartPoint[] = [...bins]
+    .sort(([a], [b]) => a - b)
+    .map(([t, b]) => ({ t, cpu: avg(b.cpu), cpu_temp: avg(b.cpu_temp), memory: avg(b.memory), watts: avg(b.watts), gpus: Object.fromEntries([...b.gpus].map(([id, g]) => [id, { util: avg(g.util), temp: avg(g.temp) }])) }))
+  return { range, points, gpus }
 }

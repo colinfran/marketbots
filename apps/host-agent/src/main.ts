@@ -1,8 +1,9 @@
+import type { Server } from "node:http"
 import { join } from "node:path"
 import type { HostStatusDoc } from "@mb/core/host"
-import { MongoClient } from "mongodb"
+import { startApi } from "./api"
 import { Collector } from "./collector"
-import { drainCommands } from "./commands"
+import { HostCommands } from "./commands"
 import { loadEnv } from "./env"
 import { FanController, startWatchdog } from "./fans"
 import { Lhm } from "./lhm"
@@ -14,9 +15,9 @@ import { PowerMonitor } from "./vesync"
 
 /**
  * The host agent (docs/SERVER.md §11): reads the Windows server's hardware every `interval_ms`,
- * writes it into its database (`serverstats`) for Admin → Server, runs the motherboard fans, and answers the
- * owner's commands. Started at sign-in by its scheduled task; the fan watchdog it starts hands the
- * fans back to the BIOS if it dies.
+ * keeps it on the server (store.ts) and serves it to Admin → Server through its API (api.ts), runs
+ * the motherboard fans, and answers the owner's commands. Started at sign-in by its scheduled task;
+ * the fan watchdog it starts hands the fans back to the BIOS if it dies.
  */
 
 /** The commit it was built from (build.mjs). */
@@ -36,15 +37,13 @@ async function main() {
   logToFile(logDir)
   const settings = new SettingsFile(join(env.HOST_DATA_DIR, "settings.json"))
   await settings.load()
-  const client = new MongoClient(env.MONGODB_URI, { appName: "marketbots-host-agent", maxPoolSize: 5 })
-  const store = new HostStore(client, env.HOST_DATABASES)
-  await store.init()
+  const store = new HostStore(join(env.HOST_DATA_DIR, "host.sqlite"))
 
   // Everything shutdown() uses, declared before the watchdog that may call it.
   const minutes = new MinuteSamples()
   let stopping = false
   let readTimer: NodeJS.Timeout | null = null
-  let commandTimer: NodeJS.Timeout | null = null
+  let api: Server | null = null
 
   const board = new Lhm(env.LHM_CONNECTION_FILE)
   const control = env.FAN_CONTROL === "on"
@@ -91,7 +90,7 @@ async function main() {
     else if (t - energyAt >= ENERGY_REFRESH_MS) {
       energyAt = t
       try {
-        const totals = await store.energy(energyOutlet, t, localMidnight(t))
+        const totals = store.energy(energyOutlet, t, localMidnight(t))
         energy = { as_of: new Date(t), today_kwh: outlet.energy_today_kwh ?? totals.today_recorded_kwh, last_24h: totals.last_24h, last_7d: totals.last_7d, last_30d: totals.last_30d }
       } catch (e) {
         errors.push(`Recorded energy: ${errorMessage(e)}`)
@@ -114,7 +113,7 @@ async function main() {
       settings: settings.value,
       errors,
     }
-    await store.write(status, samples)
+    store.write(status, samples)
   }
 
   const loop = async () => {
@@ -123,42 +122,46 @@ async function main() {
     if (!stopping) readTimer = setTimeout(() => void loop(), Math.max(0, started + settings.value.interval_ms - Date.now()))
   }
 
-  let draining = false
-  commandTimer = setInterval(() => {
-    if (draining) return
-    draining = true
-    drainCommands(
-      store,
-      {
-        fans,
-        settings,
-        power,
-        onSettings: () => {
-          refreshPower = true
-          energyAt = 0
-        },
+  const commands = new HostCommands(
+    store,
+    {
+      fans,
+      settings,
+      power,
+      onSettings: () => {
+        refreshPower = true
+        energyAt = 0
       },
-      log,
-    )
-      .catch((e) => log.warn("command poll failed", { error: errorMessage(e) }))
-      .finally(() => (draining = false))
-  }, 1_000)
+    },
+    log,
+  )
+  // Without its API the agent still reads and runs the fans; only Admin → Server can't reach it.
+  if (env.HOST_API_SECRET) {
+    api = await startApi({ secret: env.HOST_API_SECRET, store, commands, log }, env.HOST_API_PORT).catch((e) => {
+      log.error("API not started", { port: env.HOST_API_PORT, error: errorMessage(e) })
+      return null
+    })
+  } else log.warn("API off: HOST_API_SECRET is empty, so Admin → Server can't reach the agent")
 
   async function shutdown(signal: string, code = 0) {
     if (stopping) return
     stopping = true
     log.info("stopping", { signal, code })
     if (readTimer) clearTimeout(readTimer)
-    if (commandTimer) clearInterval(commandTimer)
-    await store.writeSamples(minutes.flush()).catch((e) => log.warn("last minute not written", { error: errorMessage(e) }))
+    api?.close()
+    try {
+      store.writeSamples(minutes.flush())
+    } catch (e) {
+      log.warn("last minute not written", { error: errorMessage(e) })
+    }
     await fans.stop().catch((e) => log.error("fan release failed; the watchdog retries", { error: errorMessage(e) }))
     watchdog?.close()
-    await client.close().catch(() => undefined)
+    store.close()
     process.exit(code)
   }
   for (const signal of ["SIGINT", "SIGTERM", "SIGBREAK", "SIGHUP"] as const) process.once(signal, () => void shutdown(signal))
 
-  log.info("host agent started", { version: VERSION, databases: env.HOST_DATABASES, fan_control: env.FAN_CONTROL, interval_ms: settings.value.interval_ms })
+  log.info("host agent started", { version: VERSION, api_port: api ? env.HOST_API_PORT : null, fan_control: env.FAN_CONTROL, interval_ms: settings.value.interval_ms })
   void loop()
 }
 

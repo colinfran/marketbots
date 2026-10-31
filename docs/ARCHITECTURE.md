@@ -28,20 +28,21 @@ Browser ──https──▶ Vercel: cryptomarketbot.app, stockmarketbot.app ─
    │                                                                              ▲
    └── wss://engine.<domain>/v1/stream ──▶ Caddy (Windows host)                   │
                                              ├─▶ 127.0.0.1:8787  crypto-engine ───┤
-                                             └─▶ 127.0.0.1:8788  stock-engine  ───┘
+                                             ├─▶ 127.0.0.1:8788  stock-engine  ───┘
+Vercel (Admin → Server) ── https://engine.<domain>/host ──┴─▶ 127.0.0.1:8789  host agent (its readings in a local SQLite file)
                      marketbots stack:  crypto-engine, stock-engine ──▶ scraper (Playwright), no host port
                                                                     ──▶ search (SearXNG, local research), no host port
                                                                     ──▶ llm (llama.cpp, Qwen 3.6, both GPUs),
                                                                     ──▶ history (Postgres + TimescaleDB + pgvector),
                                                                         both on network `ai`: no host port, no internet
-Windows host, outside Docker: host agent (+ LibreHardwareMonitor, nvidia-smi, the VeSync outlet) ──▶ Azure DocumentDB (`serverstats`)
+Windows host, outside Docker: host agent (+ LibreHardwareMonitor, nvidia-smi, the VeSync outlet)
 External: Kraken (CLI wallet in its volume), Alpaca, ~150 news sources, and the search engines behind `search`
 ```
 
 - **Each engine owns its bot's trading state.** It is the only writer of positions, orders and fills, and a MongoDB lease in its own database guarantees one running instance per bot.
 - **The dashboards never trade.** They read MongoDB and write only commands (polled by the engine every second), audit entries and sign-in records.
 - **The engines listen only on loopback**: the read-only live stream plus `/healthz` and `/readyz`. Caddy on the host terminates TLS and forwards each `engine.<domain>` to its port. Ports, Caddy sites and domains are the same as before the merge.
-- **The host agent reads the machine itself** ([SERVER.md §11](SERVER.md#11-the-host-agent-admin--server)): a Node process on Windows, not in Docker (containers see only the Docker VM). It writes the hardware readings into its own database on the cluster, `serverstats`, which both dashboards read for Admin → Server; runs the motherboard fans; and takes the owner's fan and settings commands from `host_commands` there. Like the engines, it accepts no inbound connections.
+- **The host agent reads the machine itself** ([SERVER.md §11](SERVER.md#11-the-host-agent-admin--server)): a Node process on Windows, not in Docker (containers see only the Docker VM). It keeps the hardware readings on the server (a SQLite file) and serves them, with the owner's fan and settings commands, through a small API on loopback that Caddy publishes at `/host` on each engine domain. The dashboards' servers call it with a shared secret only while Admin → Server is open, so nothing about the machine goes to the database. It also runs the motherboard fans.
 
 ### What the bots share at runtime
 
@@ -51,10 +52,10 @@ External: Kraken (CLI wallet in its volume), Alpaca, ~150 news sources, and the 
 | Local model | One llama.cpp server on both GPUs (`llm`, Qwen 3.6 35B-A3B at 2-bit) on the internal `ai` network, `http://llm:8080` (OpenAI-compatible), with a slot per bot and one for news. It runs every AI call of both engines: the agents' episodes, their research and the article summaries. If it is down, the engines still protect positions but make no new decisions ([SERVER.md §9](SERVER.md#9-the-local-model-server-llm)). |
 | Search service | One SearXNG container, `http://search:8080` on the compose network, that runs the web searches of the agents' research tool (`@mb/wire/research`) for both engines, on free search engines only. If it is down, research fails and the agent decides without it. |
 | History store | One Postgres container (TimescaleDB, pgvector) on the internal `ai` network, with a database and a role per bot (`crypto_history`, `stock_history`): each engine's `HISTORY_URL` holds only its own password. Each engine writes its closed 1-minute bars and archives its news there (`@mb/history`, [plans/LOCAL-AI.md §6](plans/LOCAL-AI.md#6-the-history-store-history)). If it is down, only history stops. |
-| Database cluster (Azure DocumentDB) | One cluster, a separate database per bot, and `serverstats` for the host agent. |
-| Host agent | One process on Windows ([SERVER.md §11](SERVER.md#11-the-host-agent-admin--server)) writes the machine's readings into `serverstats`, which both dashboards read, and either dashboard can send it commands. If it is down, only Admin → Server goes stale (and the BIOS runs the fans). |
+| Database cluster (Azure DocumentDB) | One cluster, a separate database per bot. |
+| Host agent | One process on Windows ([SERVER.md §11](SERVER.md#11-the-host-agent-admin--server)) keeps one copy of the machine's readings, which both dashboards fetch from its API, and either dashboard can send it commands. If it is down, only Admin → Server goes offline (and the BIOS runs the fans). |
 | The server's IP | Outbound rate limits (SEC, GDELT, ForexFactory…) apply to both bots together. |
-| Caddy | One host process, one site per engine. |
+| Caddy | One host process, one site per engine; each site also forwards `/host` to the host agent. |
 
 Not shared: databases (MongoDB and history), leases, the bots' own variables (`CRYPTO_*`, `STOCK_*`), auth secrets, stream token secrets (whose HMAC context prefixes, `cmb-stream.` and `smb-stream.`, also keep tokens from crossing bots), and the Kraken wallet volume (crypto only).
 

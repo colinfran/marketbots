@@ -21,7 +21,6 @@ import type {
 import type { AgentEpisodeDoc, AgentNoteDoc, AgentWatchDoc } from "@mb/crypto-core/db"
 import type { WireItemDoc, WireTriggerDoc } from "@mb/crypto-core/wire"
 import { createDb } from "@mb/web-kit/db"
-import { hostCollections } from "@mb/web-kit/host"
 import { env } from "./env"
 
 /**
@@ -55,6 +54,5 @@ export const { mongoClient, db, collections } = createDb({
     agentEpisodes: d.collection<AgentEpisodeDoc>(COLLECTIONS.agentEpisodes),
     agentWatches: d.collection<AgentWatchDoc>(COLLECTIONS.agentWatches),
     agentNotes: d.collection<AgentNoteDoc>(COLLECTIONS.agentNotes),
-    ...hostCollections(d, env.hostDb()),
   }),
 })

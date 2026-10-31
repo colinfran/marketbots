@@ -12,13 +12,14 @@ const version = (() => {
 
 /**
  * Bundles the host agent into plain JavaScript for the Windows server's own Node (docs/SERVER.md
- * §11): the agent, the fan watchdog it starts as a separate process, and the one-off history import.
+ * §11): the agent, the fan watchdog it starts as a separate process, and the one-offs: the history
+ * import and the copy of the old cloud samples (the only part that still uses MongoDB).
  *
  * As in the engines' bundles, the MongoDB driver's optional native add-ons are external and simply
  * aren't installed, which the driver handles.
  */
 await build({
-  entryPoints: ["src/main.ts", "src/fan-watchdog.ts", "src/import-history.ts"],
+  entryPoints: ["src/main.ts", "src/fan-watchdog.ts", "src/import-history.ts", "src/migrate-serverstats.ts"],
   outdir: "dist",
   bundle: true,
   platform: "node",
@@ -33,4 +34,4 @@ await build({
     js: "import { createRequire as __mbCreateRequire } from 'node:module'; const require = __mbCreateRequire(import.meta.url);",
   },
 })
-console.log("built dist/main.js, dist/fan-watchdog.js, dist/import-history.js")
+console.log("built dist/main.js, dist/fan-watchdog.js, dist/import-history.js, dist/migrate-serverstats.js")

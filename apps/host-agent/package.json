@@ -7,6 +7,7 @@
     "dev": "tsx --env-file-if-exists=../../.env src/main.ts",
     "start": "node --enable-source-maps --env-file-if-exists=../../.env dist/main.js",
     "import-history": "node --enable-source-maps --env-file-if-exists=../../.env dist/import-history.js",
+    "migrate-serverstats": "node --enable-source-maps --env-file-if-exists=../../.env dist/migrate-serverstats.js",
     "build": "node build.mjs",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json",

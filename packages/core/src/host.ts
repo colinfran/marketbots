@@ -3,16 +3,12 @@ import type { CommandDoc } from "./db"
 
 /**
  * The trading server's own hardware (docs/SERVER.md §11). The host agent (apps/host-agent), a Node
- * process on the Windows server, reads it every couple of seconds and writes it into its own
- * database on the bots' cluster, HOST_DB: the latest reading (`host_status`), samples for the charts
- * (`host_samples`), and the owner's fan and settings changes it picks up (`host_commands`). Admin →
- * Server shows it, the same in both dashboards: it is one machine, so one copy.
+ * process on the Windows server, reads it every couple of seconds and keeps it on the server: the
+ * latest reading in memory, samples for the charts and the owner's commands in a local SQLite file.
+ * It serves them over a small API behind Caddy, which the dashboards' servers call with a shared
+ * secret only while Admin → Server is open: nothing about the machine goes to the bots' database.
+ * The page is the same in both dashboards: it is one machine, so one copy.
  */
-
-/** The host agent's database (the agent's HOST_DATABASES, the dashboards' HOST_DB_NAME), beside the bots' own. */
-export const HOST_DB = "serverstats"
-
-export const HOST_COLLECTIONS = { status: "host_status", samples: "host_samples", commands: "host_commands" } as const
 
 /** After this long without a reading, the dashboards show the agent as offline instead of its last numbers. */
 export const HOST_STALE_MS = 15_000
@@ -23,7 +19,7 @@ export const HOST_MINUTE_KEEP_MS = 30 * 86_400_000
 
 // ─── Settings ────────────────────────────────────────────────────────────────
 
-/** How often the agent may read the sensors. Every reading is two writes per bot database. */
+/** How often the agent may read the sensors. */
 export const HOST_INTERVALS_MS = [2_000, 5_000, 10_000, 30_000, 60_000] as const
 
 export const HOST_CURRENCIES = ["USD", "CAD", "EUR", "GBP", "AUD", "NZD", "JPY"] as const
@@ -77,9 +73,9 @@ export type FanSettings = z.infer<typeof fanSettingsSchema>
 // ─── Commands ────────────────────────────────────────────────────────────────
 
 /**
- * Dashboard → host agent. Like the engines' commands: validated, written to `host_commands` with an
- * audit entry (in the sending bot's audit log), picked up by the agent within a second, validated
- * again and answered. Either dashboard can send them.
+ * Dashboard → host agent. Like the engines' commands: validated, sent by the dashboard's server to
+ * the agent's API (with an audit entry in the sending bot's audit log), validated again, run at once
+ * one after another, and kept with their outcome for the page to poll. Either dashboard can send them.
  */
 export const hostCommandSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("fans.set"), ...fanSettingsSchema.shape }),
@@ -89,10 +85,10 @@ export const hostCommandSchema = z.discriminatedUnion("type", [
 
 export type HostCommand = z.infer<typeof hostCommandSchema>
 
-/** A command the agent hasn't picked up within this long is rejected unapplied: an old fan change never lands late. */
-export const HOST_COMMAND_TTL_MS = 2 * 60_000
-
 export type HostCommandDoc = CommandDoc<HostCommand>
+
+/** What the page polls of a command it sent. */
+export type HostCommandView = Pick<HostCommandDoc, "_id" | "type" | "status" | "result" | "error">
 
 // ─── Readings ────────────────────────────────────────────────────────────────
 
@@ -134,7 +130,7 @@ export type HostOutlet = { id: string; name: string; model: string }
 
 export type EnergyPeriod = { kwh: number | null; recorded_ms: number; window_ms: number }
 
-/** Dates are `D`: Date in MongoDB, ISO strings once a dashboard serializes them. */
+/** Dates are `D`: Date in the agent, ISO strings once its API sends them. */
 export type HostStatus<D = Date> = {
   _id: "current"
   at: D
@@ -198,7 +194,6 @@ export type HostSampleDoc = {
   wh: number | null
   covered_ms: number
   outlet_id: string | null
-  expires_at: Date
 }
 
 export const sampleId = (res: HostSampleDoc["res"], t: number) => `${res}:${t}`
