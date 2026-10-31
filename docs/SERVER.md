@@ -70,16 +70,16 @@ node --version          # 22.12 or newer (local dev, the secret one-liner)
 
 If it says `windows/amd64`, switch Docker Desktop to Linux containers (tray icon → *Switch to Linux containers*).
 
-**GPU power limit:** under model work the RTX 2080 SUPER reached 91 °C at its default 250 W ([LOCAL-AI.md §5.1](plans/LOCAL-AI.md#51-step-0-results-2026-102728)), so it runs capped at 220 W (180 W until 2026-10-30). Generating text is limited by memory bandwidth, and a 180 W cap cost no measurable speed. The cap mostly trims spikes: uncapped, the card went past 200 W in 0.4% of samples, all at 62–77 °C. Its heat comes from sustained draw (85 °C or more 90% of the time at 120–140 W averaged over a minute), so its airflow matters more than the cap. The driver forgets the cap on restart, so a startup task sets it again. Once, from an administrator PowerShell (`-Force` replaces an existing task, so the same block changes the cap):
+**GPU power limit:** under model work the RTX 2080 SUPER reached 91 °C at its default 250 W ([LOCAL-AI.md §5.1](plans/LOCAL-AI.md#51-step-0-results-2026-102728)), so it runs capped at 200 W (180 W until 2026-10-30). Generating text is limited by memory bandwidth, and a 180 W cap cost no measurable speed. The cap mostly trims spikes: uncapped, the card went past 200 W in 0.4% of samples, all at 62–77 °C. Its heat comes from sustained draw (85 °C or more 90% of the time at 120–140 W averaged over a minute), so its airflow matters more than the cap. The driver forgets the cap on restart, so a startup task sets it again. Once, from an administrator PowerShell (`-Force` replaces an existing task, so the same block changes the cap):
 
 ```powershell
 $uuid = "GPU-c2f63837-86e4-7c90-764a-3de017193048"   # the 2080 SUPER (nvidia-smi -L)
-nvidia-smi -i $uuid -pl 220
+nvidia-smi -i $uuid -pl 200
 $trigger = New-ScheduledTaskTrigger -AtStartup; $trigger.Delay = "PT1M"
 Register-ScheduledTask -TaskName "GPU power limit (2080 SUPER)" -TaskPath "\marketbots\" -Trigger $trigger -Force `
-  -Action (New-ScheduledTaskAction -Execute "C:\Windows\System32\nvidia-smi.exe" -Argument "-i $uuid -pl 220") `
+  -Action (New-ScheduledTaskAction -Execute "C:\Windows\System32\nvidia-smi.exe" -Argument "-i $uuid -pl 200") `
   -Principal (New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest)
-nvidia-smi --query-gpu=name,power.limit,power.default_limit --format=csv   # 220.00 W on the 2080 SUPER
+nvidia-smi --query-gpu=name,power.limit,power.default_limit --format=csv   # 200.00 W on the 2080 SUPER
 ```
 
 **Caddy** runs on the Windows host, not in Docker: `C:\Caddy\caddy.exe run --config C:\Caddy\Caddyfile`, started by a scheduled task (`C:\Caddy\CaddyTray.ps1` is its tray controller). It terminates TLS and passes WebSocket upgrades through on its own. The engine sites:
@@ -696,7 +696,7 @@ nvidia-smi                                                  # ~6.8 GB used on ea
 - **Container:** `mem_limit: 6g` (it holds ~2.5 GB, plus up to 2 GB of prompt cache), `cpus: 6`. llama.cpp's 6 threads spin while they wait, so a 4-CPU cap throttled them: 36–40 tokens/s against 45–46 at 6. Idle, it uses next to no CPU.
 - **Prompt cache:** `--cache-ram 2048`. llama.cpp keeps recent prompts in RAM so a new request can reuse their start, 8 GB by default: more than the container's 6 GB. At the default, the container sat at its cap and swapped 3.6 GB (all of the Docker VM's swap), and the whole VM froze for seconds when a request needed it back: other containers stalled too (the system monitor showed gaps), and a request was cancelled. Keep the cache well under the container's cap.
 - **GPU:** ~6.8 GB on each card.
-- **Power:** the 2080 SUPER is capped at 220 W (§2).
+- **Power:** the 2080 SUPER is capped at 200 W (§2).
 
 **The agent** (`@mb/agent/client`; the agent's *Model* in Admin, `local/<alias>`, the only kind of model id settings accept): each step of an episode is one streamed chat completion, constrained by a JSON schema, on the bot's slot.
 - **Cost:** none. Every call is in `ai_calls` with `cost_usd: 0` and `cost_source: "local"`, with its tokens and time.
