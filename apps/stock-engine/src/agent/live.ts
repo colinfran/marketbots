@@ -36,12 +36,20 @@ const action = (d: StockAgentDecision, outcome: AgentAction["outcome"], detail: 
 
 const isStock = (p: AlpacaPosition) => (p.asset_class ?? "us_equity") === "us_equity"
 
-/** The book: its long stock positions with their plans, and its open options positions. */
-export const liveBook = async (d: Pick<StockAgentDeps, "ctx" | "snapshot">) => {
-  const snap = d.snapshot()
+/** The book's part in the database: the stock positions' plans and the open options positions. */
+export const storedBook = async (d: Pick<StockAgentDeps, "ctx">) => {
   const [plans, options] = await Promise.all([d.ctx.col.plans.find().toArray(), d.ctx.col.optionPositions.find({ status: { $in: [...OPEN_OPTIONS] } }).toArray()])
+  return { plans: new Map<string, PositionPlanDoc>(plans.map((p) => [p._id, p])), options }
+}
+
+export type StoredBook = Awaited<ReturnType<typeof storedBook>>
+
+/** The book: its long stock positions with their plans, and its open options positions. `stored` is a recent read of its database part (the observers'). */
+export const liveBook = async (d: Pick<StockAgentDeps, "ctx" | "snapshot">, stored?: StoredBook) => {
+  const snap = d.snapshot()
+  const { plans, options } = stored ?? (await storedBook(d))
   const stocks = (snap?.positions ?? []).filter((p) => isStock(p) && p.side === "long")
-  return { snap, plans: new Map<string, PositionPlanDoc>(plans.map((p) => [p._id, p])), stocks, options }
+  return { snap, plans, stocks, options }
 }
 
 /** What the envelope needs from the paper account: the agent's own entries and actions (its decisions), every stock sale and every stop-out. */

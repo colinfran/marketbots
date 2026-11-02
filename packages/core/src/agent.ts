@@ -242,7 +242,9 @@ export type AgentStatus = {
   queue: { subject: string; priority: Priority; salience: number; observations: number }[]
   episodes_today: number
   last_episode_at: Date | null
+  /** The error of the last episode that failed or answered invalid JSON, and when it finished; the next answered episode clears both. */
   last_error: string | null
+  last_error_at: Date | null
   watches: number
   /** The latest step's generation speed, tokens/s. */
   tokens_per_s: number | null

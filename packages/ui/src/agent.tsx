@@ -109,7 +109,11 @@ export function AgentStatusCard({ status, online, owner = false }: { status: Age
           </div>
         </dl>
         {status.blocked && <p className="text-amber-700 dark:text-amber-300">Waiting: {status.blocked}.</p>}
-        {status.last_error && <p className="text-loss text-xs">Last error: {status.last_error}</p>}
+        {status.last_error && (
+          <p className="text-loss text-xs">
+            Last error{status.last_error_at ? `, ${ago(status.last_error_at, now)}` : ""}: {status.last_error}
+          </p>
+        )}
         {status.queue.length > 0 && (
           <div>
             <p className="text-muted-foreground mb-1 text-xs">Queued wake-ups</p>

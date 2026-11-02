@@ -1,15 +1,15 @@
 import type { EnvelopeHistory } from "@mb/agent/envelope"
 import type { AgentAccount } from "@mb/agent/runtime"
 import type { StockAgentDeps } from "./book"
-import { liveAccount, liveBook, liveBookText, liveEnvelopeHistory } from "./live"
+import { liveAccount, liveBook, liveBookText, liveEnvelopeHistory, type StoredBook } from "./live"
 
 /** The paper account's trading book the stock agent trades (./live), as the brief, the tools, the observers and the heartbeat read it. */
 
 /** A held stock as the observers need it. */
 export type Held = { id: string; symbol: string; entry: number; stop: number | null; reviewPrice: number | null; reviewedAt: Date | null; horizon: string | null }
 
-export const heldPositions = async (d: StockAgentDeps): Promise<Held[]> => {
-  const book = await liveBook(d)
+export const heldPositions = async (d: StockAgentDeps, stored?: StoredBook): Promise<Held[]> => {
+  const book = await liveBook(d, stored)
   return book.stocks.map((p) => {
     const plan = book.plans.get(p.symbol)
     const review = d.reviews.get(p.symbol)
@@ -18,8 +18,8 @@ export const heldPositions = async (d: StockAgentDeps): Promise<Held[]> => {
 }
 
 /** Symbols the agent holds: stocks, and the underlyings of its options. */
-export const heldSymbols = async (d: StockAgentDeps): Promise<Set<string>> => {
-  const book = await liveBook(d)
+export const heldSymbols = async (d: StockAgentDeps, stored?: StoredBook): Promise<Set<string>> => {
+  const book = await liveBook(d, stored)
   return new Set([...book.stocks.map((p) => p.symbol), ...book.options.map((o) => o.underlying)])
 }
 

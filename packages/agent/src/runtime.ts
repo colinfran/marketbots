@@ -137,7 +137,7 @@ export class Agent<A extends AgentAnswerBase> {
   private timer: NodeJS.Timeout | null = null
   private ticking = false
   private blockedReason: string | null = null
-  private lastError: string | null = null
+  private lastError: { error: string | null; at: Date } | null = null
   private lastFinishedAt: Date | null = null
   /** The level the last tick saw (null before the first): turning on is a promotion. */
   private levelSeen: AgentLevel | null = null
@@ -249,7 +249,8 @@ export class Agent<A extends AgentAnswerBase> {
       queue: this.queue.pending().slice(0, 10),
       episodes_today: this.today.episodes,
       last_episode_at: this.lastFinishedAt,
-      last_error: this.lastError,
+      last_error: this.lastError?.error ?? null,
+      last_error_at: this.lastError?.at ?? null,
       watches: this.watches.length,
       tokens_per_s: this.breakers.speeds.at(-1) ?? null,
       account: this.accountCache.value?.account ?? null,
@@ -517,7 +518,9 @@ export class Agent<A extends AgentAnswerBase> {
     doc.duration_ms = finished.getTime() - doc.started_at.getTime()
     doc.expires_at = episodeExpiry(doc)
     this.lastFinishedAt = finished
-    this.lastError = doc.status === "failed" || doc.status === "invalid" ? doc.error : this.lastError
+    // A failure shows until the next answered episode; one with no answer, or aborted, leaves it as it is.
+    if (doc.status === "failed" || doc.status === "invalid") this.lastError = { error: doc.error, at: finished }
+    else if (doc.status === "answered") this.lastError = null
     this.today.episodes += 1
     const write = async () => {
       const compact = compactEpisode(doc)

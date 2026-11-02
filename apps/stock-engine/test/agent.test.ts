@@ -1,4 +1,4 @@
-import type { Observation } from "@mb/core/agent"
+import { BOOK_SUBJECT, type Observation } from "@mb/core/agent"
 import type { StockAgentAnswer } from "@mb/stock-core/agent"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { StockAgentDeps } from "../src/agent/book"
@@ -10,7 +10,7 @@ import type { Session } from "../src/bot/session"
 import { fakeBroker } from "./helpers/broker"
 import { makeCtx } from "./helpers/ctx"
 import { useTestDb } from "./helpers/db"
-import { afterOpen, NVDA_CALL_150, OPEN, session } from "./helpers/factories"
+import { afterOpen, beforeClose, NVDA_CALL_150, OPEN, session } from "./helpers/factories"
 
 const db = useTestDb()
 
@@ -106,6 +106,24 @@ describe("stock agent", () => {
     const quiet = new StockObserver(d, (o) => seen.push(o))
     for (let m = 0; m < 16; m++) await quiet.onBars(minute(m, m === 15 ? 101.5 : m % 2 ? 101 : 100, m === 15 ? 3_000 : 1_000), now)
     expect(seen).toHaveLength(1)
+  })
+
+  it("reads the book's plans and options at most every 15 s, and stops checking the closing window once it woke", async () => {
+    const { d, ctx, known, broker, refresh } = await setup()
+    broker.setPrice("AAPL", 200)
+    await actOnStockAnswer(d, answer([decision()]), ep("e1"), known)
+    await refresh()
+    const reads = vi.spyOn(ctx.col.plans, "find")
+    const seen: Observation[] = []
+    const observer = new StockObserver(d, (o) => seen.push(o))
+    const start = beforeClose(20).getTime()
+    for (let s = 0; s < 40; s++) {
+      vi.setSystemTime(start + s * 1_000)
+      await observer.tick(new Date())
+    }
+    expect(seen.filter((o) => o.kind === "session")).toEqual([expect.objectContaining({ subject: BOOK_SUBJECT, priority: 1 })])
+    // At 0, 15 and 30 s: the price moves every 5 s and the closing window share one read.
+    expect(reads).toHaveBeenCalledTimes(3)
   })
 
   describe("on the paper account", () => {

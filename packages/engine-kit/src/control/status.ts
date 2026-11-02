@@ -14,11 +14,14 @@ import { ResourceSampler } from "../heartbeat"
  * section (venue or broker health, market, schedule, last cycle…), in its document's field order.
  * The fields the bot names in `detail` (large, and slow to change) go to their own document
  * instead, once a minute: the database is a small shared one, and rewriting tens of kilobytes every
- * few seconds was most of the bots' traffic to it.
+ * few seconds was most of the bots' traffic to it. For the same reason the counts the beat reads
+ * (the latest AI call, errors in the last hour, triggers today) are read once a minute too.
  */
 
 /** How often the `detail` fields are rewritten. */
 const DETAIL_MS = 60_000
+/** How often the beat reads its counts again. */
+const READS_MS = 60_000
 
 type Base = EngineStatusBase<string, string>
 
@@ -66,15 +69,20 @@ export class StatusReporter<D extends Base> {
   private readonly sampler = new ResourceSampler()
   private triggersToday = 0
   private detailAt = 0
+  private reads: { at: number; lastAi: AiCallDoc | null; errors: number } = { at: 0, lastAi: null, errors: 0 }
 
   constructor(private readonly d: StatusReporterDeps<D>) {}
 
   async write() {
     const { col, bus, calls, stream } = this.d
     const today = await calls.today().catch(() => null)
-    const lastAi = await col.aiCalls.findOne({}, { sort: { at: -1 } }).catch(() => null)
-    const errors = await col.events.countDocuments({ level: "error", ts: { $gte: new Date(Date.now() - 3_600_000).toISOString() } }).catch(() => 0)
-    this.triggersToday = await this.d.policy.triggersToday().catch(() => this.triggersToday)
+    if (Date.now() - this.reads.at >= READS_MS) {
+      const lastAi = await col.aiCalls.findOne({}, { sort: { at: -1 } }).catch(() => null)
+      const errors = await col.events.countDocuments({ level: "error", ts: { $gte: new Date(Date.now() - 3_600_000).toISOString() } }).catch(() => 0)
+      this.triggersToday = await this.d.policy.triggersToday().catch(() => this.triggersToday)
+      this.reads = { at: Date.now(), lastAi, errors }
+    }
+    const { lastAi, errors } = this.reads
     const run = this.d.run()
     const parts: StatusParts<D["status"], D["cycle_state"]> = {
       run: { _id: "engine", at: new Date(), instance: this.d.instance, version: this.d.version, started_at: this.startedAt, status: run.status, cycle_state: run.cycle_state, current_task: run.current_task },

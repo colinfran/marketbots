@@ -6,6 +6,7 @@ import { errorMessage } from "@mb/engine-kit/log"
 import { formatTime, marketDay } from "@mb/stock-core/time"
 import { upcomingMacro } from "@mb/wire/calendar"
 import { sessionWindow, sidePrices, type StockAgentDeps } from "./book"
+import { storedBook, type StoredBook } from "./live"
 import { StockScreen } from "./screen"
 import { stockWireDeps } from "./tools"
 import { bookText, envelopeHistory, heldPositions, heldSymbols } from "./view"
@@ -28,9 +29,14 @@ import { bookText, envelopeHistory, heldPositions, heldSymbols } from "./view"
  *
  * News comes from the wire policy's observe hook (engine.ts), around the clock: outside the session
  * the agent can only set watches and notes.
+ *
+ * The observers read the book's plans and options from the database at most every `BOOK_MS`, as the
+ * account itself refreshes: the database is a small shared one, and a read every second was most of
+ * the stock engine's traffic to it in the closing window.
  */
 
 const EXITS_MS = 5_000
+const BOOK_MS = 15_000
 const CALENDAR_LEAD_MS = 15 * 60_000
 const OVERNIGHT_MINUTES = 3
 const MIN = 60_000
@@ -42,6 +48,7 @@ export class StockObserver {
   private readonly done = new Set<string>()
   private readonly moves = new Map<string, string>()
   private readonly screen = new StockScreen()
+  private stored: { at: number; book: StoredBook } | null = null
 
   constructor(
     private readonly d: StockAgentDeps,
@@ -56,7 +63,7 @@ export class StockObserver {
     const setups = this.screen.onBars(bars, { open: s?.is_trading_day ? (s.open ?? null) : null, day: marketDay(now), minPrice: this.d.ctx.settings.current.risk.min_price })
     if (!setups.length || !sessionWindow(this.d, now).entries) return
     if (!checkEntry("", await envelopeHistory(this.d, now.getTime()), this.d.ctx.settings.current.agent.envelope, now.getTime()).approved) return
-    const held = await heldSymbols(this.d)
+    const held = await heldSymbols(this.d, await this.storedBook(now))
     for (const x of setups.filter((x) => !held.has(x.symbol)).slice(0, MAX_SETUPS)) {
       this.observe({ id: `setup:${x.symbol}:${x.kind}:${x.t}`, subject: MARKET_SUBJECT, kind: "setup", priority: 1, salience: x.score, summary: x.summary, refs: { symbol: x.symbol }, at: now })
     }
@@ -65,6 +72,13 @@ export class StockObserver {
   /** onBars for the engine's callback: never throws. */
   bars(bars: readonly { symbol: string; t: number; close: number; volume: number }[]) {
     void this.onBars(bars).catch((e) => this.d.ctx.log.warn("agent setups failed", { error: errorMessage(e) }))
+  }
+
+  /** The book's plans and options, read again once they are `BOOK_MS` old. */
+  private async storedBook(now: Date) {
+    const t = now.getTime()
+    if (!this.stored || t - this.stored.at >= BOOK_MS) this.stored = { at: t, book: await storedBook(this.d) }
+    return this.stored.book
   }
 
   /** Each key once: a session phase per day, a release, the overnight rule per day. */
@@ -121,7 +135,7 @@ export class StockObserver {
     if (t >= open + sch.open_buffer_minutes * MIN && t < close - sch.close_window_minutes * MIN) {
       at({ subject: MARKET_SUBJECT, kind: "session", priority: 2, salience: 50, summary: `The session is open and past its opening buffer: buys are allowed until the close at ${formatTime(s.close)}.` }, "open")
     }
-    if (t >= close - sch.close_window_minutes * MIN && t < close && (await heldSymbols(this.d)).size) {
+    if (t >= close - sch.close_window_minutes * MIN && t < close && !this.done.has(`${s.day}:close`) && (await heldSymbols(this.d, await this.storedBook(now))).size) {
       at({ subject: BOOK_SUBJECT, kind: "session", priority: 1, salience: 60, summary: `Closing window: the session ends at ${formatTime(s.close)}. Decide what you carry overnight; intraday positions are closed by code ${OVERNIGHT_MINUTES} minutes before the bell.` }, "close")
     }
     if (t >= close + sch.postmarket_delay_minutes * MIN && t < close + 3 * 60 * MIN) {
@@ -131,7 +145,7 @@ export class StockObserver {
 
   private async priceMoves(now: Date) {
     const step = this.d.ctx.settings.current.schedule.trigger_move_pct
-    for (const p of await heldPositions(this.d)) {
+    for (const p of await heldPositions(this.d, await this.storedBook(now))) {
       const m = this.d.price(p.symbol)
       const ref = p.reviewPrice ?? p.entry
       if (!m) continue

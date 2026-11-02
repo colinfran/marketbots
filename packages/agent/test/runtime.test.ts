@@ -181,6 +181,21 @@ describe("agent runtime", () => {
     expect(events.filter((e) => e.type === "agent.watch").map((e) => (e.data as { status: string }).status)).toEqual(["set", "fired"])
   })
 
+  it("shows the last failure, with when it happened, until the next answered episode", async () => {
+    const { chat } = scriptedChat([reply(null, { ok: false, error: "model server down", content: "" }), reply({ kind: "answer", answer: answer({ decisions: [] }) })])
+    const { agent, advance, at, run } = setup({ chat })
+    agent.observe(obs({ subject: "SOL/USD", at: at() }))
+    advance(11_000)
+    await run()
+    expect(agent.status()).toMatchObject({ last_error: "model server down", last_error_at: at() })
+    advance(400_000)
+    agent.observe(obs({ subject: "ETH/USD", at: at() }))
+    advance(11_000)
+    await run()
+    expect(await db.col.agentEpisodes.countDocuments({ status: "answered" })).toBe(1)
+    expect(agent.status()).toMatchObject({ last_error: null, last_error_at: null })
+  })
+
   it("drops a wake-up the bot says isn't worth an episode", async () => {
     const { agent, advance, at, run } = setup({ chat: scriptedChat([]).chat, skip: async (wake) => (wake.subject === "SOL/USD" ? "the envelope refuses entries" : null) })
     agent.observe(obs({ subject: "SOL/USD", kind: "setup", priority: 1, at: at() }))

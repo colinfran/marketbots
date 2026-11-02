@@ -43,9 +43,10 @@ export type WatchView = { id: string; kind: string; symbol: string | null; what:
 export type NoteView = { id: string; subject: string; text: string; created_at: string; expires_at: string; episode_id: string }
 
 /** The heartbeat's agent block (AgentStatus) with its dates as ISO strings. */
-export type AgentStatusView = Omit<AgentStatus, "episode" | "last_episode_at" | "pause"> & {
+export type AgentStatusView = Omit<AgentStatus, "episode" | "last_episode_at" | "last_error_at" | "pause"> & {
   episode: (Omit<NonNullable<AgentStatus["episode"]>, "started_at"> & { started_at: string }) | null
   last_episode_at: string | null
+  last_error_at: string | null
   pause: { at: string; reason: string } | null
 }
 
@@ -53,5 +54,6 @@ export const toAgentStatusView = (s: AgentStatus): AgentStatusView => ({
   ...s,
   episode: s.episode ? { ...s.episode, started_at: new Date(s.episode.started_at).toISOString() } : null,
   last_episode_at: s.last_episode_at ? new Date(s.last_episode_at).toISOString() : null,
+  last_error_at: s.last_error_at ? new Date(s.last_error_at).toISOString() : null,
   pause: s.pause ? { at: new Date(s.pause.at).toISOString(), reason: s.pause.reason } : null,
 })

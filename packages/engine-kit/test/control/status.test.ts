@@ -139,10 +139,30 @@ describe("StatusReporter", () => {
     await bus.stop()
   })
 
+  it("reads its counts once a minute, not on every beat", async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: BEAT })
+    const { bus, healthCalls, reporter } = await setup()
+    const beat = async () => {
+      await reporter.write()
+      return (await db.col.engineStatus.findOne({ _id: "engine" }))!
+    }
+    expect(await beat()).toMatchObject({ errors_last_hour: 0, ai: { last_call_at: null } })
+    await db.col.events.insertOne({ _id: 1, ts: new Date().toISOString(), level: "error" } as never)
+    await db.col.aiCalls.insertOne({ _id: "a1", at: new Date(), ok: true, error: null } as never)
+    vi.setSystemTime(BEAT + 55_000)
+    expect(await beat()).toMatchObject({ errors_last_hour: 0, ai: { last_call_at: null } })
+    vi.setSystemTime(BEAT + 60_000)
+    expect(await beat()).toMatchObject({ errors_last_hour: 1, ai: { last_call_at: new Date(BEAT) } })
+    expect(healthCalls).toEqual([{ triggers_today: 4 }, { triggers_today: 4 }, { triggers_today: 4 }])
+    await bus.stop()
+  })
+
   it("keeps the last trigger count when the policy can't be read, and reports no calls when the call log can't be read", async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: BEAT })
     const { bus, healthCalls, triggers, reporter } = await setup({ calls: { today: async () => Promise.reject(new Error("db down")) } })
     await reporter.write()
     triggers.fail = true
+    vi.setSystemTime(BEAT + 60_000)
     await reporter.write()
     expect(await db.col.engineStatus.findOne({ _id: "engine" })).toMatchObject({ ai: { calls_today: 0, last_call_at: null, last_error: null } })
     expect(healthCalls).toEqual([{ triggers_today: 4 }, { triggers_today: 4 }])
