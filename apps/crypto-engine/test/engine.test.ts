@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto"
 import { STATUS_DETAIL_ID } from "@mb/core/db"
 import type { Command } from "@mb/crypto-core/commands"
-import { utcDay, type CommandDoc } from "@mb/crypto-core/db"
+import { utcDay } from "@mb/crypto-core/db"
 import type { EngineEvent } from "@mb/crypto-core/events"
 import { AiCallLog } from "@mb/engine-kit/ai/call-log"
 import type { CommandView } from "@mb/engine-kit/commands"
@@ -31,8 +31,8 @@ let engine: Engine
 let events: EngineEvent[]
 let lines: Record<string, unknown>[]
 
-// Generous: the engine checks its queue every 3 seconds, and on the busy trading server (backfills,
-// the GPU) a pass can take several. A real failure still times out.
+// Generous: on the busy trading server (backfills, the GPU) a command or a beat can take several
+// seconds. A real failure still times out.
 const until = async (check: () => Promise<boolean> | boolean, ms = 15_000) => {
   const start = Date.now()
   while (!(await check())) {
@@ -55,13 +55,6 @@ const command = async (c: Command): Promise<CommandView> => {
   return intake!.status(id)!
 }
 
-/** Queues a command in the database (the dashboard couldn't reach the engine) and waits for the engine to answer it. */
-const queued = async (c: Command): Promise<CommandDoc> => {
-  const id = randomUUID()
-  await db.col.commands.insertOne({ _id: id, type: c.type, command: c, status: "pending", created_at: new Date(), created_by: "owner", processed_at: null, result: null, error: null })
-  await until(async () => FINAL.includes((await db.col.commands.findOne({ _id: id }))!.status))
-  return (await db.col.commands.findOne({ _id: id }))!
-}
 
 
 type Internals = {
@@ -212,8 +205,11 @@ describe("Engine", () => {
     expect(await command({ type: "wire.replay", item_id: "missing-item" })).toMatchObject({ status: "failed", error: "no wire item with that id" })
   })
 
-  it("runs a command the dashboard queued in the database because it couldn't reach the engine", async () => {
-    expect(await queued({ type: "pause", reason: "queued" })).toMatchObject({ status: "done", result: "paused: no new decisions or entries; stops and targets stay active" })
+  it("records each command it ran, with its outcome, in the database and the audit log", async () => {
+    const view = await command({ type: "pause", reason: "recorded" })
+    expect(view).toMatchObject({ status: "done", result: "paused: no new decisions or entries; stops and targets stay active" })
     expect(engine.status).toBe("paused")
+    await until(async () => (await db.col.audit.countDocuments({ target: view._id, action: "command.done" })) === 1)
+    expect(await db.col.commands.findOne({ _id: view._id })).toMatchObject({ type: "pause", status: "done", created_by: "owner", processed_at: expect.any(Date) })
   })
 })

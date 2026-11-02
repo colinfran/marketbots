@@ -41,10 +41,10 @@ export default async function AdminPage() {
     <div className="space-y-8">
       <PageHeader
         title="Admin"
-        description="Owner controls and engine health. Every action is queued for the engine through MongoDB, validated again there, and written to the audit log."
+        description="Owner controls and engine health. Every action goes straight to the engine, signed, is validated again there, and is written to the audit log."
         action={<StreamBadge />}
       />
-      {!engine.online && <p className="text-loss text-sm">The engine is offline: commands will queue and run when it comes back (risk-increasing ones expire after 10 minutes).</p>}
+      {!engine.online && <p className="text-loss text-sm">The engine is offline: commands cannot be sent until it is back.</p>}
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card>

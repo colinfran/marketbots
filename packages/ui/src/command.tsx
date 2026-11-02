@@ -13,9 +13,10 @@ import { Label } from "./components/label"
 type AnyCommand = { type: string }
 
 /**
- * Sends an owner command and waits for the engine to process it (it polls MongoDB every
- * second, so the result usually arrives within a couple of seconds). Shows the outcome inline.
- * `endpoint` and `runner`: another queue and who answers it (the host agent's, on Admin → Server).
+ * Sends an owner command and waits for its outcome, polled every second (the engine runs one at
+ * once, so it usually arrives within a second or two). Shows the outcome, or why it wasn't sent,
+ * inline. `endpoint` and `runner`: another endpoint and who answers it (the host agent's queue, on
+ * Admin → Server).
  */
 export const useCommand = <C extends AnyCommand>({ endpoint = "/api/commands", runner = "the engine" }: { endpoint?: string; runner?: string } = {}) => {
   const router = useRouter()
@@ -28,7 +29,7 @@ export const useCommand = <C extends AnyCommand>({ endpoint = "/api/commands", r
       setState({ busy: false, result: null, error: body.error ?? "Request failed" })
       return false
     }
-    // Wait for the engine (up to ~30s); if it's offline the command stays queued.
+    // Wait for the outcome (up to ~30s).
     for (let i = 0; i < 30; i++) {
       await new Promise((r) => setTimeout(r, 1_000))
       const s = await fetch(`${endpoint}/${body.id}`, { cache: "no-store" })
@@ -41,7 +42,7 @@ export const useCommand = <C extends AnyCommand>({ endpoint = "/api/commands", r
         return ok
       }
     }
-    setState({ busy: false, result: null, error: `Queued, but ${runner} hasn't processed it yet (is it running?).` })
+    setState({ busy: false, result: null, error: `Sent, but ${runner} hasn't finished it after 30 seconds (is it running?).` })
     return false
   }
   return { ...state, send }

@@ -296,7 +296,6 @@ export class Engine {
     this.stops.push(every(5 * 60_000, () => this.reconcile(), onError("reconciliation")))
     this.stops.push(every(30 * 60_000, async () => void (await evaluateOutcomes(this.ctx)), onError("outcomes"), { immediate: true }))
     this.stops.push(every(60_000, () => (this.wallet.ok ? undefined : this.initWallet()), onError("paper wallet init")))
-    this.commands.start()
     this.d.settings.onChange((s) => this.d.hub.setUniverse(s.universe.kraken_symbols))
     this.d.settings.onChange(() => this.d.wire.reconcile())
     // The news engine fails open: if it can't start, trading carries on exactly as before.
@@ -426,7 +425,6 @@ export class Engine {
     this.control.status = "stopping"
     log.info("engine shutting down", { reason })
     bus.emit("engine.stopping", { reason }, { summary: `Engine stopping (${reason})`, level: "warn" })
-    this.commands.shutdown()
     this.d.wire.stop()
     for (const stop of this.stops) stop()
     this.agent.agent.stop()

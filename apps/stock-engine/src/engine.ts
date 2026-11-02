@@ -336,7 +336,6 @@ export class Engine {
     this.stops.push(every(15_000, () => this.periodicMaintenance(), onError("maintenance")))
     this.stops.push(every(5_000, () => this.watchOptions(), onError("options monitor")))
     this.stops.push(every(60_000, () => this.refreshSiteData(false), onError("site data")))
-    this.commands.start()
     this.d.tradeStream.start()
     this.d.marketStream.start()
     this.d.settings.onChange(() => this.d.wire.reconcile())
@@ -603,7 +602,6 @@ export class Engine {
     this.control.status = "stopping"
     log.info("engine shutting down", { reason })
     bus.emit("engine.stopping", { reason }, { summary: `Engine stopping (${reason})`, level: "warn" })
-    this.commands.shutdown()
     for (const stop of this.stops) stop()
     this.d.tradeStream.stop()
     this.d.marketStream.stop()

@@ -8,28 +8,28 @@ const db = useTestDb()
 
 const setup = async (handle: CommandHandler<TestCommand> = async () => "ok") => {
   const bus = await makeTestBus<TestEvents>(db.col, EPHEMERAL)
-  const processor = new CommandProcessor<TestCommand>(db.col, bus, silentLogger, handle, { schema: testCommandSchema, expiring: new Set(["resume"]) })
+  const processor = new CommandProcessor<TestCommand>(db.col, bus, silentLogger, handle, { schema: testCommandSchema })
   return { bus, processor }
 }
 
-const queued = (id: string, command: TestCommand, created_at = new Date()) => ({ _id: id, type: command.type, command, status: "pending" as const, created_at, created_by: "owner", processed_at: null, result: null, error: null })
-
 describe("CommandProcessor", () => {
-  it("runs the queue: re-validates, executes, and expires stale risk-increasing commands", async () => {
-    const handled: string[] = []
+  it("runs commands one at a time, in the order they arrive", async () => {
+    let release = () => undefined as void
+    const held = new Promise<void>((r) => (release = r))
+    const log: string[] = []
     const { bus, processor } = await setup(async (c) => {
-      handled.push(c.type)
+      log.push(`start ${c.type}`)
+      if (c.type === "pause") await held
+      log.push(`end ${c.type}`)
       return "ok"
     })
-    const old = new Date(Date.now() - 60 * 60_000)
-    await db.col.commands.insertMany([queued("1", { type: "pause" }, old), queued("2", { type: "resume" }, old), { ...queued("3", { type: "pause" }), command: { type: "settings.update", patch: {}, expected_version: -1 } as never }])
-    await processor.drain()
-    expect(handled).toEqual(["pause"])
-    const docs = Object.fromEntries((await db.col.commands.find().toArray()).map((d) => [d._id, d]))
-    expect(docs["1"].status).toBe("done")
-    expect(docs["2"]).toMatchObject({ status: "rejected", error: expect.stringMatching(/expired/) })
-    expect(docs["3"].status).toBe("rejected")
-    expect(await db.col.audit.countDocuments()).toBe(3)
+    processor.submit("d1", { type: "pause" }, "owner")
+    processor.submit("d2", { type: "resume" }, "owner")
+    await new Promise((r) => setTimeout(r, 20))
+    expect(processor.status("d2")).toMatchObject({ status: "pending" })
+    release()
+    await processor.idle()
+    expect(log).toEqual(["start pause", "end pause", "start resume", "end resume"])
     await bus.stop()
   })
 
@@ -55,21 +55,18 @@ describe("CommandProcessor", () => {
     await bus.stop()
   })
 
-  it("runs once a command the dashboard also queued (it stopped waiting for the engine's answer)", async () => {
-    let release = () => undefined as void
-    const held = new Promise<void>((r) => (release = r))
-    const handle = vi.fn(async () => {
-      await held
-      return "paused"
+  it("records a command that failed, with its error, and carries on with the next", async () => {
+    const { bus, processor } = await setup(async (c) => {
+      if (c.type === "pause") throw new Error("broker down")
+      return "resumed"
     })
-    const { bus, processor } = await setup(handle)
     processor.submit("d1", { type: "pause" }, "owner")
-    await db.col.commands.insertOne(queued("d1", { type: "pause" }))
-    const draining = processor.drain()
-    release()
-    await draining
-    expect(handle).toHaveBeenCalledTimes(1)
-    expect(await db.col.commands.findOne({ _id: "d1" })).toMatchObject({ status: "done", result: "paused" })
+    processor.submit("d2", { type: "resume" }, "owner")
+    await processor.idle()
+    expect(processor.status("d1")).toMatchObject({ status: "failed", error: "broker down" })
+    expect(await db.col.commands.findOne({ _id: "d1" })).toMatchObject({ status: "failed", error: "broker down", processed_at: expect.any(Date) })
+    expect(await db.col.audit.findOne({ target: "d1" })).toMatchObject({ action: "command.failed", details: { error: "broker down" } })
+    expect(processor.status("d2")).toMatchObject({ status: "done", result: "resumed" })
     await bus.stop()
   })
 
