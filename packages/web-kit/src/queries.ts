@@ -1,5 +1,5 @@
 import "server-only"
-import { STATUS_DETAIL_ID, type AiCallDoc, type AuditDoc, type EngineStateDoc, type NotificationDoc } from "@mb/core/db"
+import type { AiCallDoc, AuditDoc, EngineStateDoc, NotificationDoc } from "@mb/core/db"
 import type { EventLevel, EventVisibility } from "@mb/core/events"
 import type { NotableReason, WireItemDoc, WireTriggerDoc } from "@mb/core/wire"
 import type { Collection, Document, Filter } from "mongodb"
@@ -11,13 +11,9 @@ import type { Viewer } from "./auth"
  * AI costs and the news engine. Each awaits `connection()`, so pages render at request time with
  * live data (never prerendered at build). Only plain, serializable values leave this module.
  * Each app binds them to its collections (lib/data.ts, lib/queries.ts) and keeps its own
- * trading queries next to them.
+ * trading queries next to them. The engine's heartbeat comes from the engine itself
+ * (./engine-status).
  */
-
-/** The engine counts as online if its heartbeat is fresher than this. */
-const HEARTBEAT_STALE_MS = 30_000
-
-export type EngineSummary<S> = { status: S | null; online: boolean; heartbeatAgeS: number | null }
 
 /** A news item for display (same shape as @mb/ui/wire's WireRowView; ui and web-kit can't import each other). */
 export type WireRowView = {
@@ -87,7 +83,7 @@ export const toRowView = (i: WireItemDoc<string>): WireRowView => ({
 })
 
 /** The collections the shared queries read. Each bot passes its own map; the bot-specific document types are read off it. */
-type QueryCollectionName = "engineStatus" | "engineState" | "events" | "commands" | "audit" | "notifications" | "aiCalls" | "wireItems" | "wireTriggers"
+type QueryCollectionName = "engineState" | "events" | "commands" | "audit" | "notifications" | "aiCalls" | "wireItems" | "wireTriggers"
 
 type DocOf<X> = X extends Collection<infer T> ? T : never
 
@@ -105,7 +101,6 @@ export const createQueries = <Cols extends Record<QueryCollectionName, unknown>,
   /** Which events the default recent-events query reads. */
   recentEventsFilter?: Filter<LooseDoc>
 }) => {
-  type S = DocOf<Cols["engineStatus"]>
   /**
    * The shared queries only read fields both bots have, so they work on a plain view of each
    * collection (the driver's generic types don't narrow across bots) and type their results.
@@ -119,17 +114,6 @@ export const createQueries = <Cols extends Record<QueryCollectionName, unknown>,
       aiCalls: Collection<AiCallDoc>
       wireTriggers: Collection<WireTriggerDoc>
     }
-
-  /** The heartbeat, with its large sections from their own document (written once a minute); an older engine's own copy of them wins. */
-  const getEngine = async (): Promise<EngineSummary<S>> => {
-    await connection()
-    const { engineStatus } = await loose()
-    const [main, detail] = await Promise.all([engineStatus.findOne({ _id: "engine" }), engineStatus.findOne({ _id: STATUS_DETAIL_ID })])
-    const sections = Object.fromEntries(Object.entries(detail ?? {}).filter(([k]) => k !== "_id" && k !== "at"))
-    const status = (main ? { ...sections, ...main } : null) as S | null
-    const age = status ? (Date.now() - (status as unknown as { at: Date }).at.getTime()) / 1000 : null
-    return { status, online: age !== null && age * 1000 < HEARTBEAT_STALE_MS, heartbeatAgeS: age === null ? null : Math.round(age) }
-  }
 
   const getEngineState = async () => {
     await connection()
@@ -232,7 +216,6 @@ export const createQueries = <Cols extends Record<QueryCollectionName, unknown>,
   }
 
   return {
-    getEngine,
     getEngineState,
     getAudit,
     getCommands,

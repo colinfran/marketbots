@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { Socket } from "node:net"
 import { clientFrameSchema, eventForViewer, STREAM_PROTOCOL_VERSION, type EngineEvent, type EventVisibility, type ServerFrame } from "@mb/core/events"
 import { REQUEST_HEADERS, type SignedRequest, type TokenCheck } from "@mb/core/stream-token"
+import { BSON } from "mongodb"
 import { WebSocketServer, type WebSocket } from "ws"
 import type { EventBus } from "./bus"
 import type { CommandProcessor } from "./commands"
@@ -14,8 +15,9 @@ import { errorMessage, type Logger } from "./log"
  *   WS   /v1/stream          the authenticated, read-only live event stream
  *   POST /v1/commands        an owner command from the dashboard's server: { id, actor, command } → 202
  *   GET  /v1/commands/<id>   that command's progress or outcome
+ *   GET  /v1/status          the heartbeat's latest status, in relaxed Extended JSON (its dates stay dates)
  *
- * The command endpoints answer only requests signed with the stream secret and the bot's request
+ * The /v1 HTTP endpoints answer only requests signed with the stream secret and the bot's request
  * prefix (@mb/core/stream-token `requestSignatures`); the browser never calls them. Put it behind
  * your reverse proxy (TLS) and publish only this port.
  *
@@ -81,6 +83,7 @@ export class StreamServer<M> {
   private unsubscribe: (() => void) | null = null
   private snapshot: (() => EngineEvent<M>[]) | null = null
   private commands: CommandIntake | null = null
+  private status: (() => object | null) | null = null
 
   constructor(
     private readonly bus: Pick<EventBus<M>, "subscribe" | "replay" | "lastSeq">,
@@ -101,6 +104,11 @@ export class StreamServer<M> {
   /** Where the command endpoints hand commands (the engine's processor); until set, they answer 503. */
   setCommands(intake: CommandIntake) {
     this.commands = intake
+  }
+
+  /** Where GET /v1/status reads the heartbeat's latest status; until set, or before the first beat, it answers 503. */
+  setStatus(latest: () => object | null) {
+    this.status = latest
   }
 
   get address() {
@@ -139,9 +147,9 @@ export class StreamServer<M> {
     } else if (req.method === "GET" && path === "/readyz") {
       const ready = this.opts.ready()
       res.writeHead(ready ? 200 : 503, { "content-type": "application/json", "cache-control": "no-store" }).end(JSON.stringify({ ready }))
-    } else if ((req.method === "POST" && path === "/v1/commands") || (req.method === "GET" && COMMAND_PATH.test(path))) {
-      void this.onCommand(req, res, path).catch((error) => {
-        this.log.warn("command request failed", { error: errorMessage(error) })
+    } else if ((req.method === "POST" && path === "/v1/commands") || (req.method === "GET" && (COMMAND_PATH.test(path) || path === "/v1/status"))) {
+      void this.onSigned(req, res, path).catch((error) => {
+        this.log.warn("engine request failed", { path, error: errorMessage(error) })
         if (!res.headersSent) json(res, 500, { error: "internal error" })
       })
     } else {
@@ -149,8 +157,8 @@ export class StreamServer<M> {
     }
   }
 
-  /** The command endpoints: signed requests from the dashboard's server only. */
-  private async onCommand(req: IncomingMessage, res: ServerResponse, path: string) {
+  /** The /v1 HTTP endpoints: signed requests from the dashboard's server only. */
+  private async onSigned(req: IncomingMessage, res: ServerResponse, path: string) {
     const body = req.method === "POST" ? await readBody(req, MAX_COMMAND_BYTES) : ""
     if (body === null) return json(res, 413, { error: "request too large" })
     const header = (name: string) => {
@@ -159,6 +167,11 @@ export class StreamServer<M> {
     }
     const signed = this.bot.verifyRequest(this.opts.secret, { method: req.method ?? "", path, body }, { timestamp: header(REQUEST_HEADERS.timestamp), signature: header(REQUEST_HEADERS.signature) })
     if (!signed) return json(res, 401, { error: "unauthorized" })
+    if (path === "/v1/status") {
+      const status = this.status?.()
+      if (!status) return json(res, 503, { error: "engine starting" })
+      return res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" }).end(BSON.EJSON.stringify(status, { relaxed: true }))
+    }
     if (!this.commands) return json(res, 503, { error: "engine starting" })
     if (req.method === "GET") {
       const view = this.commands.status(COMMAND_PATH.exec(path)![1])

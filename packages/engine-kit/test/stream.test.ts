@@ -1,5 +1,6 @@
 import http from "node:http"
 import { requestSignatures, streamTokens } from "@mb/core/stream-token"
+import { BSON } from "mongodb"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import WebSocket from "ws"
 import { silentLogger } from "../src/log"
@@ -159,5 +160,22 @@ describe("StreamServer command endpoints", () => {
     expect((await signed(base, "POST", "/v1/commands", "{not json")).status).toBe(400)
     expect((await signed(base, "POST", "/v1/commands", JSON.stringify({ id: "../x", actor: "owner", command: { type: "pause" } }))).status).toBe(400)
     expect((await signed(base, "POST", "/v1/commands", JSON.stringify({ id: "c-9", actor: "owner", command: { type: "pause" }, pad: "x".repeat(70_000) }))).status).toBe(413)
+  })
+})
+
+describe("StreamServer status endpoint", () => {
+  it("serves the latest status signed only, in Extended JSON that keeps its dates, and 503 before the first beat", async () => {
+    const { base } = await start()
+    expect((await signed(base, "GET", "/v1/status")).status).toBe(503)
+    let latest: object | null = null
+    server!.setStatus(() => latest)
+    expect((await signed(base, "GET", "/v1/status")).status).toBe(503)
+    const at = new Date("2026-11-02T22:00:00.000Z")
+    latest = { _id: "engine", at, status: "running", agent: { last_error_at: null } }
+    expect((await call(base, "GET", "/v1/status")).status).toBe(401)
+    expect((await signed(base, "GET", "/v1/status", "", { sign: requestSignatures("other-request.").sign })).status).toBe(401)
+    const res = await signed(base, "GET", "/v1/status")
+    expect(res).toEqual({ status: 200, body: { _id: "engine", at: { $date: "2026-11-02T22:00:00Z" }, status: "running", agent: { last_error_at: null } } })
+    expect(BSON.EJSON.parse(JSON.stringify(res.body), { relaxed: true })).toEqual(latest)
   })
 })

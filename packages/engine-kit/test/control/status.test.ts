@@ -1,4 +1,4 @@
-import { STATUS_DETAIL_ID, type EngineStateDoc } from "@mb/core/db"
+import type { EngineStateDoc } from "@mb/core/db"
 import type { EngineEvent } from "@mb/core/events"
 import type { WireStatus } from "@mb/core/wire"
 import { afterEach, describe, expect, it, vi } from "vitest"
@@ -40,7 +40,6 @@ const setup = async (overrides: Partial<StatusReporterDeps<TestStatusDoc>> = {})
     run: () => run,
     // The bot's own fields go between the shared ones, in its order.
     doc: (p) => ({ ...p.run, ...p.live, venue: { ok: true }, ...p.usage, last_cycle: "cycle-1", ...p.health }),
-    detail: ["wire"],
     ...overrides,
   })
   return { bus, events, run, healthCalls, triggers, reporter }
@@ -51,7 +50,7 @@ afterEach(() => {
 })
 
 describe("StatusReporter", () => {
-  it("writes the shared fields with the bot's section, in the bot's field order, and its detail fields apart", async () => {
+  it("builds the shared fields with the bot's section, in the bot's field order", async () => {
     const { bus, healthCalls, reporter } = await setup()
     await db.col.aiCalls.insertOne({ _id: "a1", at: new Date(Date.now() - 60_000), ok: true, error: null } as never)
     await db.col.aiCalls.insertOne({ _id: "a2", at: new Date(), ok: false, error: "gateway timeout" } as never)
@@ -60,8 +59,8 @@ describe("StatusReporter", () => {
       { _id: 2, ts: new Date(Date.now() - 2 * 3_600_000).toISOString(), level: "error" } as never,
       { _id: 3, ts: new Date().toISOString(), level: "warn" } as never,
     ])
-    await reporter.write()
-    const doc = (await db.col.engineStatus.findOne({ _id: "engine" }))!
+    await reporter.beat()
+    const doc = reporter.latest!
     expect(Object.keys(doc)).toEqual([
       "_id",
       "at",
@@ -79,6 +78,7 @@ describe("StatusReporter", () => {
       "system",
       "last_cycle",
       "errors_last_hour",
+      "wire",
     ])
     expect(doc).toMatchObject({
       instance: "kit-1",
@@ -93,45 +93,37 @@ describe("StatusReporter", () => {
       ai: { calls_today: 7, last_error: "gateway timeout", enabled: true },
       last_cycle: "cycle-1",
       errors_last_hour: 1,
+      wire: { mode: "live", items_last_hour: 5, triggers_today: 4 },
     })
     expect(Object.keys(doc.ai)).toEqual(["calls_today", "last_call_at", "last_error", "enabled"])
     expect(doc.system).toEqual({ cpu_pct: expect.any(Number), rss_mb: expect.any(Number), heap_mb: expect.any(Number), load_avg: expect.any(Array), uptime_s: expect.any(Number) })
-    const detail = await db.col.engineStatus.findOne({ _id: STATUS_DETAIL_ID as never })
-    expect(Object.keys(detail!)).toEqual(["_id", "at", "wire"])
-    expect(detail).toMatchObject({ at: doc.at, wire: { mode: "live", items_last_hour: 5, triggers_today: 4 } })
     expect(healthCalls).toEqual([{ triggers_today: 4 }])
-    // Both replaced in place.
-    await reporter.write()
-    expect(await db.col.engineStatus.countDocuments()).toBe(2)
     await bus.stop()
   })
 
-  it("rewrites the detail fields once a minute, not on every beat", async () => {
+  it("keeps the latest beat's status only, and none before the first", async () => {
     vi.useFakeTimers({ toFake: ["Date"], now: BEAT })
-    const { bus, reporter } = await setup()
-    const detailAt = async () => (await db.col.engineStatus.findOne({ _id: STATUS_DETAIL_ID as never }))!.at.getTime()
-    await reporter.write()
-    expect(await detailAt()).toBe(BEAT)
-    vi.setSystemTime(BEAT + 55_000)
-    await reporter.write()
-    expect(await detailAt()).toBe(BEAT)
-    expect((await db.col.engineStatus.findOne({ _id: "engine" }))!.at.getTime()).toBe(BEAT + 55_000)
-    vi.setSystemTime(BEAT + 60_000)
-    await reporter.write()
-    expect(await detailAt()).toBe(BEAT + 60_000)
+    const { bus, run, reporter } = await setup()
+    expect(reporter.latest).toBeNull()
+    await reporter.beat()
+    expect(reporter.latest).toMatchObject({ at: new Date(BEAT), status: "running" })
+    vi.setSystemTime(BEAT + 10_000)
+    run.status = "paused"
+    await reporter.beat()
+    expect(reporter.latest).toMatchObject({ at: new Date(BEAT + 10_000), status: "paused", started_at: expect.any(Date) })
     await bus.stop()
   })
 
   it("streams a short heartbeat on every beat, with the state at that moment", async () => {
     vi.useFakeTimers({ toFake: ["Date"], now: BEAT })
     const { bus, events, run, reporter } = await setup()
-    await reporter.write()
+    await reporter.beat()
     expect(events.filter((e) => e.type === "engine.heartbeat").map((e) => [e.summary, e.level, e.data])).toEqual([
       ["Engine running, deciding", "debug", { status: "running", cycle_state: "deciding", ws_clients: 2, uptime_s: expect.any(Number), ai_calls_today: 7 }],
     ])
     vi.setSystemTime(BEAT + 10_000)
     run.status = "paused"
-    await reporter.write()
+    await reporter.beat()
     expect(events.filter((e) => e.type === "engine.heartbeat")).toHaveLength(2)
     expect(events.filter((e) => e.type === "engine.heartbeat").at(-1)).toMatchObject({ summary: "Engine paused, deciding", data: { status: "paused" } })
     await bus.stop()
@@ -141,8 +133,8 @@ describe("StatusReporter", () => {
     vi.useFakeTimers({ toFake: ["Date"], now: BEAT })
     const { bus, healthCalls, reporter } = await setup()
     const beat = async () => {
-      await reporter.write()
-      return (await db.col.engineStatus.findOne({ _id: "engine" }))!
+      await reporter.beat()
+      return reporter.latest!
     }
     expect(await beat()).toMatchObject({ errors_last_hour: 0, ai: { last_call_at: null } })
     await db.col.events.insertOne({ _id: 1, ts: new Date().toISOString(), level: "error" } as never)
@@ -158,11 +150,11 @@ describe("StatusReporter", () => {
   it("keeps the last trigger count when the policy can't be read, and reports no calls when the call log can't be read", async () => {
     vi.useFakeTimers({ toFake: ["Date"], now: BEAT })
     const { bus, healthCalls, triggers, reporter } = await setup({ calls: { today: async () => Promise.reject(new Error("db down")) } })
-    await reporter.write()
+    await reporter.beat()
     triggers.fail = true
     vi.setSystemTime(BEAT + 60_000)
-    await reporter.write()
-    expect(await db.col.engineStatus.findOne({ _id: "engine" })).toMatchObject({ ai: { calls_today: 0, last_call_at: null, last_error: null } })
+    await reporter.beat()
+    expect(reporter.latest).toMatchObject({ ai: { calls_today: 0, last_call_at: null, last_error: null } })
     expect(healthCalls).toEqual([{ triggers_today: 4 }, { triggers_today: 4 }])
     await bus.stop()
   })

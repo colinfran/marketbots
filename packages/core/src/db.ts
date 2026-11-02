@@ -12,7 +12,6 @@ import type { WireStatus } from "./wire"
 export const BASE_COLLECTIONS = {
   settings: "settings",
   engineState: "engine_state",
-  engineStatus: "engine_status",
   lease: "engine_lease",
   events: "events",
   commands: "commands",
@@ -106,10 +105,9 @@ export type EngineStateDoc = {
 }
 
 /**
- * Observed state: the `engine_status` fields both bots write in their heartbeat every 10 seconds.
- * Each bot adds its own section (venue or broker health, market, last cycle…). Its large sections
- * that change slowly (the news engine's health, and any the bot names) are written apart, once a
- * minute, in the document `STATUS_DETAIL_ID`; the dashboards read the two as one.
+ * Observed state: the fields both bots report in their heartbeat every 10 seconds, kept in the
+ * engine's memory and read by the dashboards from its GET /v1/status (never stored). Each bot adds
+ * its own section (venue or broker health, market, last cycle…).
  */
 export type EngineStatusBase<RunStatus extends string, CycleState extends string> = {
   _id: "engine"
@@ -138,9 +136,6 @@ export type EngineStatusBase<RunStatus extends string, CycleState extends string
   /** The agent (absent before it shipped). */
   agent?: AgentStatus
 }
-
-/** The `engine_status` document with the heartbeat's large sections: `_id`, `at`, then those fields as in `engine`. */
-export const STATUS_DETAIL_ID = "detail"
 
 /** The history store's health in the heartbeat (docs/plans/LOCAL-AI.md §6). */
 export type HistoryStatus = {

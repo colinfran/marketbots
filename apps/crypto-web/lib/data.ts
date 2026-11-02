@@ -3,7 +3,9 @@ import type { DecisionDoc, EngineStatusDoc } from "@mb/crypto-core/db"
 import { eventForViewer } from "@mb/crypto-core/events"
 import { brierScore, calibrationTable, drawdownSeries, performanceMetrics, tradeStats } from "@mb/crypto-core/metrics"
 import { ACCOUNT_ID } from "@mb/crypto-core/venues"
-import { createQueries, decisionLatency, type EngineSummary as EngineSummaryOf } from "@mb/web-kit/queries"
+import { signEngineRequest } from "@mb/crypto-core/stream-token"
+import { createEngineStatus, type EngineSummary as EngineSummaryOf } from "@mb/web-kit/engine-status"
+import { createQueries, decisionLatency } from "@mb/web-kit/queries"
 import { azureMonitorConfig } from "@mb/web-kit/azure"
 import { databaseStorage } from "@mb/web-kit/storage"
 import { connection } from "next/server"
@@ -19,8 +21,10 @@ import { env } from "./env"
 
 export type EngineSummary = EngineSummaryOf<EngineStatusDoc>
 
+/** The engine's heartbeat, from the engine itself (@mb/web-kit/engine-status). */
+export const getEngine = createEngineStatus<EngineStatusDoc>({ streamUrl: env.engineStreamUrl, secret: env.streamTokenSecret, sign: signEngineRequest })
+
 export const {
-  getEngine,
   getEngineState,
   getAudit,
   getCommands,

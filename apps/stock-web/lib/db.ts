@@ -8,7 +8,6 @@ import type {
   DailyStatsDoc,
   DecisionDoc,
   EngineStateDoc,
-  EngineStatusDoc,
   EventDoc,
   LoginAttemptDoc,
   NotificationDoc,
@@ -34,7 +33,6 @@ export const { mongoClient, db, collections } = createDb({
   collections: (d) => ({
     settings: d.collection<SettingsDoc>(COLLECTIONS.settings),
     engineState: d.collection<EngineStateDoc>(COLLECTIONS.engineState),
-    engineStatus: d.collection<EngineStatusDoc>(COLLECTIONS.engineStatus),
     events: d.collection<EventDoc>(COLLECTIONS.events),
     commands: d.collection<CommandDoc>(COLLECTIONS.commands),
     audit: d.collection<AuditDoc>(COLLECTIONS.audit),

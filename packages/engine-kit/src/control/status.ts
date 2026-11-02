@@ -1,4 +1,4 @@
-import { STATUS_DETAIL_ID, type AiCallDoc, type EngineStateDoc, type EngineStatusBase } from "@mb/core/db"
+import type { AiCallDoc, EngineStateDoc, EngineStatusBase } from "@mb/core/db"
 import type { BaseEventDataMap } from "@mb/core/events"
 import type { WireStatus } from "@mb/core/wire"
 import type { Collection } from "mongodb"
@@ -6,20 +6,19 @@ import type { EmitMeta } from "../bus"
 import { ResourceSampler } from "../heartbeat"
 
 /**
- * The heartbeat: the engine's observed state, written to `engine_status` every 10 seconds (the
- * dashboard's Admin page and status pill read it), with a short `engine.heartbeat` streamed on
- * every beat.
+ * The heartbeat: the engine's observed state, built every 10 seconds and kept in memory (`latest`),
+ * where the stream server's signed GET /v1/status hands it to the dashboard's server (the Admin page
+ * and the status pill), with a short `engine.heartbeat` streamed on every beat.
  *
- * The reporter gathers the fields both bots write. The bot's `doc` places them, with its own
+ * The reporter gathers the fields both bots report. The bot's `doc` places them, with its own
  * section (venue or broker health, market, schedule, last cycle…), in its document's field order.
- * The fields the bot names in `detail` (large, and slow to change) go to their own document
- * instead, once a minute: the database is a small shared one, and rewriting tens of kilobytes every
- * few seconds was most of the bots' traffic to it. For the same reason the counts the beat reads
- * (the latest AI call, errors in the last hour, triggers today) are read once a minute too.
+ *
+ * Nothing of it is written to the database: the cluster is a small shared one, and the status was
+ * most of the bots' traffic to it. (Until 2026-11-02 it was rewritten into `engine_status` at every
+ * beat.) The counts the beat reads from the database (the latest AI call, errors in the last hour,
+ * triggers today) are read once a minute.
  */
 
-/** How often the `detail` fields are rewritten. */
-const DETAIL_MS = 60_000
 /** How often the beat reads its counts again. */
 const READS_MS = 60_000
 
@@ -43,8 +42,6 @@ export type StatusReporterDeps<D extends Base> = {
   col: {
     aiCalls: Collection<AiCallDoc>
     events: { countDocuments(filter: { level: "error"; ts: { $gte: string } }): Promise<number> }
-    /** Holds both documents: `engine` and `STATUS_DETAIL_ID`. */
-    engineStatus: { replaceOne(filter: { _id?: unknown }, doc: object, options: { upsert: true }): Promise<unknown> }
   }
   bus: { readonly lastSeq: number; emit(type: "engine.heartbeat", data: HeartbeatData<D>, meta: EmitMeta): unknown }
   calls: { today(): Promise<{ calls: number }> }
@@ -60,20 +57,24 @@ export type StatusReporterDeps<D extends Base> = {
   run: () => { status: D["status"]; cycle_state: D["cycle_state"]; current_task: string | null }
   /** The bot's document: the shared parts and its own section, in its field order. */
   doc: (parts: StatusParts<D["status"], D["cycle_state"]>) => D
-  /** The document's fields written apart, once a minute, in the `STATUS_DETAIL_ID` document. */
-  detail: readonly (keyof D & string)[]
 }
 
 export class StatusReporter<D extends Base> {
   private readonly startedAt = new Date()
   private readonly sampler = new ResourceSampler()
   private triggersToday = 0
-  private detailAt = 0
   private reads: { at: number; lastAi: AiCallDoc | null; errors: number } = { at: 0, lastAi: null, errors: 0 }
+  private last: D | null = null
 
   constructor(private readonly d: StatusReporterDeps<D>) {}
 
-  async write() {
+  /** The status at the last beat; null before the first. */
+  get latest(): D | null {
+    return this.last
+  }
+
+  /** One beat: the status, built afresh and kept, and its short event on the stream. */
+  async beat() {
     const { col, bus, calls, stream } = this.d
     const today = await calls.today().catch(() => null)
     if (Date.now() - this.reads.at >= READS_MS) {
@@ -98,20 +99,11 @@ export class StatusReporter<D extends Base> {
       },
       health: { errors_last_hour: errors, wire: this.d.wire.health({ triggers_today: this.triggersToday }) },
     }
-    const doc = this.d.doc(parts)
-    const detail = new Set<string>(this.d.detail)
-    // The detail first: a new `engine` document never stands without one.
-    if (Date.now() - this.detailAt >= DETAIL_MS) {
-      const fields = Object.entries(doc).filter(([k, v]) => detail.has(k) && v !== undefined)
-      await col.engineStatus.replaceOne({ _id: STATUS_DETAIL_ID }, { _id: STATUS_DETAIL_ID, at: parts.run.at, ...Object.fromEntries(fields) }, { upsert: true })
-      this.detailAt = Date.now()
-    }
-    await col.engineStatus.replaceOne({ _id: "engine" }, Object.fromEntries(Object.entries(doc).filter(([k]) => !detail.has(k))), { upsert: true })
-    const now = this.d.run()
+    this.last = this.d.doc(parts)
     bus.emit(
       "engine.heartbeat",
-      { status: now.status, cycle_state: now.cycle_state, ws_clients: stream.clientCount, uptime_s: parts.usage.system.uptime_s, ai_calls_today: parts.usage.ai.calls_today },
-      { summary: `Engine ${now.status}, ${now.cycle_state}`, level: "debug" },
+      { status: run.status, cycle_state: run.cycle_state, ws_clients: stream.clientCount, uptime_s: parts.usage.system.uptime_s, ai_calls_today: parts.usage.ai.calls_today },
+      { summary: `Engine ${run.status}, ${run.cycle_state}`, level: "debug" },
     )
   }
 }

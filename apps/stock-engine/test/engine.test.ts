@@ -4,9 +4,8 @@ import { silentLogger } from "@mb/engine-kit/log"
 import type { CommandIntake } from "@mb/engine-kit/stream"
 import type { Wire } from "../src/wire/wire"
 import { randomUUID } from "node:crypto"
-import { STATUS_DETAIL_ID } from "@mb/core/db"
 import type { Command } from "@mb/stock-core/commands"
-import type { StreamHealth } from "@mb/stock-core/db"
+import type { EngineStatusDoc, StreamHealth } from "@mb/stock-core/db"
 import type { EngineEvent } from "@mb/stock-core/events"
 import { DEFAULT_SETTINGS } from "@mb/stock-core/settings"
 import { marketDay } from "@mb/stock-core/time"
@@ -48,6 +47,10 @@ const health = (): StreamHealth => ({ state: "connected", last_message_at: null,
 /** Where the engine hands its commands to the stream server's endpoints. */
 let intake: CommandIntake | null = null
 
+/** Where the engine hands its heartbeat's latest status to the stream server (GET /v1/status). */
+let statusOf: (() => object | null) | null = null
+const latestStatus = () => (statusOf?.() ?? null) as EngineStatusDoc | null
+
 const FINAL = ["done", "failed", "rejected"]
 
 /** Sends a command like the dashboard does (straight to the engine) and waits for its answer. */
@@ -84,7 +87,7 @@ beforeEach(async () => {
     marketStream: { start: () => undefined, stop: () => undefined, setSymbols: (s: string[]) => symbols.push(s), health: health(), symbols: [] } as unknown as MarketStream,
     calls,
     alerts: new Alerts(db.col, bus, silentLogger, null, null),
-    stream: { clientCount: 0, setCommands: (i: CommandIntake) => (intake = i) } as unknown as StreamServer,
+    stream: { clientCount: 0, setCommands: (i: CommandIntake) => (intake = i), setStatus: (fn: () => object | null) => (statusOf = fn) } as unknown as StreamServer,
     // The news engine is covered by its own tests; here it only has to be present and inert.
     wire: {
       start: async () => undefined,
@@ -107,8 +110,8 @@ afterEach(async () => {
 
 describe("Engine", () => {
   it("starts up, reports its health and copies the account for the website", async () => {
-    await until(async () => (await db.col.engineStatus.findOne({ _id: "engine" })) !== null)
-    const status = (await db.col.engineStatus.findOne({ _id: "engine" }))!
+    await until(() => latestStatus() !== null)
+    const status = latestStatus()!
     expect(status).toMatchObject({ status: "running", instance: "test", kill_switch: false, broker: { trade_stream: { state: "connected" } }, ai: { enabled: false } })
     expect(engine.ready).toBe(true)
     expect(await db.col.cache.findOne({ _id: "alpaca:account" })).not.toBeNull()
@@ -137,8 +140,8 @@ describe("Engine", () => {
   })
 
   it("runs no timed cycles: Wake the agent goes to the agent", async () => {
-    await until(async () => (await db.col.engineStatus.findOne({ _id: "engine" })) !== null)
-    const status = await db.col.engineStatus.findOne({ _id: "engine" })
+    await until(() => latestStatus() !== null)
+    const status = latestStatus()
     for (const gone of ["current_phase", "schedule", "last_cycle"]) expect(status).not.toHaveProperty(gone)
     expect(await command({ type: "agent.review", symbols: ["AAPL"] })).toMatchObject({ status: "failed", error: "the agent needs the model server (LLM_URL)" })
   })
@@ -183,8 +186,8 @@ describe("Engine", () => {
   })
 
   it("keeps the field order of its status document", async () => {
-    await until(async () => (await db.col.engineStatus.findOne({ _id: "engine" })) !== null)
-    expect(Object.keys((await db.col.engineStatus.findOne({ _id: "engine" }))!)).toEqual([
+    await until(() => latestStatus() !== null)
+    expect(Object.keys(latestStatus()!)).toEqual([
       "_id",
       "at",
       "instance",
@@ -202,10 +205,9 @@ describe("Engine", () => {
       "ai",
       "system",
       "errors_last_hour",
+      "wire",
       "agent",
     ])
-    // The news engine's health, apart (written once a minute).
-    expect(Object.keys((await db.col.engineStatus.findOne({ _id: STATUS_DETAIL_ID as never }))!)).toEqual(["_id", "at", "wire"])
   })
 
   it("runs the agent by default, and says why it can't answer without the model server", async () => {

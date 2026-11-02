@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto"
-import { STATUS_DETAIL_ID } from "@mb/core/db"
 import type { Command } from "@mb/crypto-core/commands"
-import { utcDay } from "@mb/crypto-core/db"
+import { utcDay, type EngineStatusDoc } from "@mb/crypto-core/db"
 import type { EngineEvent } from "@mb/crypto-core/events"
 import { AiCallLog } from "@mb/engine-kit/ai/call-log"
 import type { CommandView } from "@mb/engine-kit/commands"
@@ -43,6 +42,10 @@ const until = async (check: () => Promise<boolean> | boolean, ms = 15_000) => {
 
 /** Where the engine hands its commands to the stream server's endpoints. */
 let intake: CommandIntake | null = null
+
+/** Where the engine hands its heartbeat's latest status to the stream server (GET /v1/status). */
+let statusOf: (() => object | null) | null = null
+const latestStatus = () => (statusOf?.() ?? null) as EngineStatusDoc | null
 
 const FINAL = ["done", "failed", "rejected"]
 
@@ -90,7 +93,7 @@ beforeEach(async () => {
     executor: new Executor(db.col, ledger, new PaperWalletExecution(cli, hub), bus, silentLogger),
     calls,
     alerts: new Alerts(db.col, bus, silentLogger, null, null),
-    stream: { clientCount: 0, setCommands: (i: CommandIntake) => (intake = i) } as unknown as StreamServer,
+    stream: { clientCount: 0, setCommands: (i: CommandIntake) => (intake = i), setStatus: (fn: () => object | null) => (statusOf = fn) } as unknown as StreamServer,
     // The news engine is covered by its own tests; here it only has to be present and inert.
     wire: {
       start: async () => undefined,
@@ -113,8 +116,8 @@ afterEach(async () => {
 
 describe("Engine", () => {
   it("starts up, reconciles with the paper wallet and reports its health", async () => {
-    await until(async () => (await db.col.engineStatus.findOne({ _id: "engine" })) !== null)
-    const status = (await db.col.engineStatus.findOne({ _id: "engine" }))!
+    await until(() => latestStatus() !== null)
+    const status = latestStatus()!
     expect(status).toMatchObject({ status: "running", instance: "test", kill_switch: false, paper_wallet: { ok: true, workspace: "test" }, reconciliation: { ok: true }, ai: { enabled: false } })
     // The dashboard reads fields by name, but the document keeps its field order.
     expect(Object.keys(status)).toEqual([
@@ -131,14 +134,14 @@ describe("Engine", () => {
       "event_seq",
       "kraken",
       "paper_wallet",
+      "symbols",
       "ai",
       "system",
       "reconciliation",
       "errors_last_hour",
+      "wire",
       "agent",
     ])
-    // The large sections, apart (written once a minute).
-    expect(Object.keys((await db.col.engineStatus.findOne({ _id: STATUS_DETAIL_ID as never }))!)).toEqual(["_id", "at", "symbols", "wire"])
     expect(engine.ready).toBe(true)
     expect(events.map((e) => e.type)).toEqual(expect.arrayContaining(["engine.started", "engine.status", "alert"]))
   })
@@ -151,8 +154,8 @@ describe("Engine", () => {
 
   it("runs no timed cycles: Wake the agent goes to the agent", async () => {
     expect(await command({ type: "agent.review", symbols: ["BTC/USD"] })).toMatchObject({ status: "failed", error: "the agent needs the model server (LLM_URL)" })
-    await until(async () => (await db.col.engineStatus.findOne({ _id: "engine" }))?.agent?.level === "on")
-    expect(await db.col.engineStatus.findOne({ _id: "engine" })).not.toHaveProperty("next_cycle_at")
+    await until(() => latestStatus()?.agent?.level === "on")
+    expect(latestStatus()).not.toHaveProperty("next_cycle_at")
   })
 
   it("turns an earlier breaker's drop to shadow into a pause on entries, which the owner lifts", async () => {

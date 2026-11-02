@@ -202,8 +202,8 @@ export class Engine {
         ...(d.history ? { history: d.history.status() } : {}),
         agent: this.agent.agent.status(),
       }),
-      detail: ["wire", "symbols"],
     })
+    d.stream.setStatus(() => this.reporter.latest)
     d.wire.onItem((e) => this.policy.onItem(e))
     // News watches fire on fresh items only: a source's first poll after a restart is old news.
     d.wire.onItem((e) => (e.backfill ? undefined : this.agent.agent.onItem(e.item)))
@@ -291,7 +291,7 @@ export class Engine {
     const onError = (job: string) => (error: unknown) => log.warn(`${job} failed`, { error: errorMessage(error) })
     this.stops.push(every(3_000, () => checkProtection(this.ctx, this.protectionInFlight), onError("protection")))
     this.stops.push(every(15_000, () => this.markAndMonitor(), onError("mark-to-market"), { immediate: true }))
-    this.stops.push(every(10_000, () => this.reporter.write(), onError("heartbeat"), { immediate: true }))
+    this.stops.push(every(10_000, () => this.reporter.beat(), onError("heartbeat"), { immediate: true }))
     this.stops.push(every(5 * 60_000, () => this.periodic(), onError("snapshot")))
     this.stops.push(every(5 * 60_000, () => this.reconcile(), onError("reconciliation")))
     this.stops.push(every(30 * 60_000, async () => void (await evaluateOutcomes(this.ctx)), onError("outcomes"), { immediate: true }))
@@ -431,6 +431,6 @@ export class Engine {
     // Abort in-flight AI calls; an order already handed to the wallet still completes.
     this.abort.abort()
     if (this.agent.agent.current) await withTimeout(this.agent.agent.current, 20_000, "agent shutdown").catch(() => undefined)
-    await this.reporter.write().catch(() => undefined)
+    await this.reporter.beat().catch(() => undefined)
   }
 }

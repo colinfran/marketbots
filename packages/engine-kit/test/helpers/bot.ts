@@ -46,7 +46,6 @@ const collectionsFor = (db: Db) => ({
   audit: db.collection<AuditDoc>(BASE_COLLECTIONS.audit),
   notifications: db.collection<NotificationDoc>(BASE_COLLECTIONS.notifications),
   engineState: db.collection<EngineStateDoc>(BASE_COLLECTIONS.engineState),
-  engineStatus: db.collection<TestStatusDoc>(BASE_COLLECTIONS.engineStatus),
   aiCalls: db.collection<AiCallDoc>(BASE_COLLECTIONS.aiCalls),
   wireTriggers: db.collection<WireTriggerDoc>(BASE_COLLECTIONS.wireTriggers),
 })

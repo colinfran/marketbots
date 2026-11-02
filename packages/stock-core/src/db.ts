@@ -46,7 +46,6 @@ export type {
 export const COLLECTIONS = {
   settings: "settings",
   engineState: "engine_state",
-  engineStatus: "engine_status",
   lease: "engine_lease",
   events: "events",
   commands: "commands",

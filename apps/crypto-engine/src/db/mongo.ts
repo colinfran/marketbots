@@ -7,7 +7,6 @@ import type {
   DailyStatsDoc,
   DecisionDoc,
   EngineStateDoc,
-  EngineStatusDoc,
   EventDoc,
   FillDoc,
   LeaseDoc,
@@ -33,7 +32,6 @@ import type { Collection, Db } from "mongodb"
 export type Collections = {
   settings: Collection<SettingsDoc>
   engineState: Collection<EngineStateDoc>
-  engineStatus: Collection<EngineStatusDoc>
   lease: Collection<LeaseDoc>
   events: Collection<EventDoc>
   commands: Collection<CommandDoc>
@@ -60,7 +58,6 @@ export type Database = DatabaseOf<Collections>
 export const collectionsFor = (db: Db): Collections => ({
   settings: db.collection<SettingsDoc>(COLLECTIONS.settings),
   engineState: db.collection<EngineStateDoc>(COLLECTIONS.engineState),
-  engineStatus: db.collection<EngineStatusDoc>(COLLECTIONS.engineStatus),
   lease: db.collection<LeaseDoc>(COLLECTIONS.lease),
   events: db.collection<EventDoc>(COLLECTIONS.events),
   commands: db.collection<CommandDoc>(COLLECTIONS.commands),

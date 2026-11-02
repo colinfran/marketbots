@@ -353,7 +353,7 @@ The scraper publishes no port. Its health, from inside its container:
 docker compose exec scraper node -e "fetch('http://127.0.0.1:8790/health').then(r=>r.text()).then(console.log)"
 ```
 
-The detailed view (every dependency, data freshness, AI calls) is each dashboard's **Admin → System**, fed by the engine's heartbeat. Every news source's health, with its errors when you're signed in, is on the dashboard's **News** page; Admin → System has a one-line summary.
+The detailed view (every dependency, data freshness, AI calls) is each dashboard's **Admin → System**, fed by the engine's heartbeat, which the dashboard's server reads from the engine's `GET /v1/status` (signed with `STREAM_TOKEN_SECRET`, so it can't be curled; nothing of it is stored). Every news source's health, with its errors when you're signed in, is on the dashboard's **News** page; Admin → System has a one-line summary.
 
 ### 5.4 After a deploy
 

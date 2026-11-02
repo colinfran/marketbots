@@ -5,7 +5,9 @@ import { eventForViewer } from "@mb/stock-core/events"
 import { FILLED_ORDERS, fillsFromOrders, type OrderFill } from "@mb/stock-core/fills"
 import { DEFAULT_SETTINGS, settingsSchema, type Settings } from "@mb/stock-core/settings"
 import { addDays, marketDay, marketTime } from "@mb/stock-core/time"
-import { createQueries, decisionLatency, type EngineSummary as EngineSummaryOf } from "@mb/web-kit/queries"
+import { signEngineRequest } from "@mb/stock-core/stream-token"
+import { createEngineStatus, type EngineSummary as EngineSummaryOf } from "@mb/web-kit/engine-status"
+import { createQueries, decisionLatency } from "@mb/web-kit/queries"
 import { azureMonitorConfig } from "@mb/web-kit/azure"
 import { databaseStorage } from "@mb/web-kit/storage"
 import { connection } from "next/server"
@@ -14,9 +16,10 @@ import { collections, mongoClient } from "./db"
 import { env } from "./env"
 
 /**
- * Read queries for the dashboard and JSON API. Everything comes from MongoDB: the engine writes
- * the books and copies the Alpaca data the site shows (account, equity history, chart bars) into
- * the `cache` collection. Each query awaits `connection()`, so pages render at request time.
+ * Read queries for the dashboard and JSON API. The engine's heartbeat comes from the engine itself;
+ * everything else from MongoDB: the engine writes the books and copies the Alpaca data the site
+ * shows (account, equity history, chart bars) into the `cache` collection. Each query awaits
+ * `connection()`, so pages render at request time.
  * The queries both dashboards share come from @mb/web-kit/queries; stock's own follow.
  */
 
@@ -24,8 +27,10 @@ import { env } from "./env"
 
 export type EngineSummary = EngineSummaryOf<EngineStatusDoc>
 
+/** The engine's heartbeat, from the engine itself (@mb/web-kit/engine-status). */
+export const getEngine = createEngineStatus<EngineStatusDoc>({ streamUrl: env.engineStreamUrl, secret: env.streamTokenSecret, sign: signEngineRequest })
+
 export const {
-  getEngine,
   getEngineState,
   getAudit,
   getCommands,

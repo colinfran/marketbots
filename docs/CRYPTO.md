@@ -51,8 +51,7 @@ Safety: browser `Origin` allowlist, max clients and max connections per IP, 4KB 
 | --- | --- | --- |
 | `settings` | The single versioned settings document (risk, the agent, strategies, universe, the wire) | permanent |
 | `engine_state` | Desired state: running/paused/halted, kill switch; when the agent was last turned on or resumed, and any breaker pause on its entries | permanent |
-| `engine_status` | Heartbeat: health of every dependency, data freshness, AI calls today, resources (`engine`); the large sections, news-source health and per-pair prices and indicators (`detail`). The dashboard reads the two as one | `engine` overwritten every 10 s (its error, AI-call and trigger counts read once a minute), `detail` every minute |
-| `engine_lease` | Single-instance lease | 30s TTL |
+| `engine_lease` | Single-instance lease (the heartbeat isn't stored: the dashboard reads it from the engine's signed `GET /v1/status`) | 30s TTL |
 | `events` | Persisted stream events (replay + history) | TTL, default 30 days |
 | `commands` / `audit_log` | Owner commands and their results; every control and settings change | permanent |
 | `accounts` / `positions` / `orders` / `fills` | The books. Fills are the source of truth; positions and the account are running totals that can be rebuilt from fills | permanent |
@@ -149,7 +148,7 @@ The timed cycles' research modes and event-cycle timings are gone with the cycle
 
 **Settings** (the `wire` section, changed live from Admin; defaults): `mode` live, `thresholds` 30/55/70/85, `entry_confirmation` on, `unexplained_move_entries` off, `trigger_max_age_minutes` 15, `symbol_cooldown_minutes` 30, `max_event_cycles_per_hour` / `_per_day` 4 / 24 (the trigger caps), `emergency_action` review, `anomaly` price z 4 / volume ×5 / market z 4, `retention_days` 30, and the crypto detectors: `depeg_pct` 1, `tvl_drop_pct` 15, `odds_swing_pts` 15, `funding_extreme_annual_pct` 100, `coinbase_premium_pct` 0.3.
 
-**Events and commands**: `wire.item`, `wire.notable`, `wire.dossier`, `wire.trigger` and `wire.source` on the live stream; `wire.replay` (Admin) re-runs an item through the policy as a dry run. Source health is in the heartbeat (`wire.sources` in `engine_status`'s `detail` document, rewritten once a minute: state, last error, items and drops in 24 h, lag).
+**Events and commands**: `wire.item`, `wire.notable`, `wire.dossier`, `wire.trigger` and `wire.source` on the live stream; `wire.replay` (Admin) re-runs an item through the policy as a dry run. Source health is in the heartbeat (`wire.sources` in the engine's status: state, last error, items and drops in 24 h, lag).
 
 **Failure behavior**: the wire never throws into the engine. A broken source, a bad payload or a database hiccup costs at most that batch of items, and trading goes on as it would without the wire. On boot the cluster index and seen ids are rebuilt from MongoDB, and nothing from a source's first poll can trigger, so a restart never replays old news as new. A dead scraper sidecar only takes the headless sources down. Settings change live from Admin (`wire.mode: off` turns the whole engine off; `disabled_sources` turns single sources off).
 
