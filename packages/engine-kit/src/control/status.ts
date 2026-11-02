@@ -6,9 +6,9 @@ import type { EmitMeta } from "../bus"
 import { ResourceSampler } from "../heartbeat"
 
 /**
- * The heartbeat: the engine's observed state, written to `engine_status` every few seconds (the
+ * The heartbeat: the engine's observed state, written to `engine_status` every 10 seconds (the
  * dashboard's Admin page and status pill read it), with a short `engine.heartbeat` streamed on
- * every third beat.
+ * every beat.
  *
  * The reporter gathers the fields both bots write. The bot's `doc` places them, with its own
  * section (venue or broker health, market, schedule, last cycle…), in its document's field order.
@@ -107,13 +107,11 @@ export class StatusReporter<D extends Base> {
       this.detailAt = Date.now()
     }
     await col.engineStatus.replaceOne({ _id: "engine" }, Object.fromEntries(Object.entries(doc).filter(([k]) => !detail.has(k))), { upsert: true })
-    if (Math.floor(Date.now() / 5_000) % 3 === 0) {
-      const now = this.d.run()
-      bus.emit(
-        "engine.heartbeat",
-        { status: now.status, cycle_state: now.cycle_state, ws_clients: stream.clientCount, uptime_s: parts.usage.system.uptime_s, ai_calls_today: parts.usage.ai.calls_today },
-        { summary: `Engine ${now.status}, ${now.cycle_state}`, level: "debug" },
-      )
-    }
+    const now = this.d.run()
+    bus.emit(
+      "engine.heartbeat",
+      { status: now.status, cycle_state: now.cycle_state, ws_clients: stream.clientCount, uptime_s: parts.usage.system.uptime_s, ai_calls_today: parts.usage.ai.calls_today },
+      { summary: `Engine ${now.status}, ${now.cycle_state}`, level: "debug" },
+    )
   }
 }

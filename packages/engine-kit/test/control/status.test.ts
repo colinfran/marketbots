@@ -8,7 +8,7 @@ import { EPHEMERAL, useTestDb, type TestCycleState, type TestEvents, type TestRu
 
 const db = useTestDb()
 
-/** A moment on a heartbeat-event beat (every third 5-second slot). */
+/** A round moment to start the fake clock at. */
 const BEAT = 1_800_000_000_000 - (1_800_000_000_000 % 15_000)
 
 const setup = async (overrides: Partial<StatusReporterDeps<TestStatusDoc>> = {}) => {
@@ -122,19 +122,17 @@ describe("StatusReporter", () => {
     await bus.stop()
   })
 
-  it("streams a short heartbeat on every third beat, with the state at that moment", async () => {
+  it("streams a short heartbeat on every beat, with the state at that moment", async () => {
     vi.useFakeTimers({ toFake: ["Date"], now: BEAT })
     const { bus, events, run, reporter } = await setup()
     await reporter.write()
     expect(events.filter((e) => e.type === "engine.heartbeat").map((e) => [e.summary, e.level, e.data])).toEqual([
       ["Engine running, deciding", "debug", { status: "running", cycle_state: "deciding", ws_clients: 2, uptime_s: expect.any(Number), ai_calls_today: 7 }],
     ])
-    vi.setSystemTime(BEAT + 5_000)
+    vi.setSystemTime(BEAT + 10_000)
     run.status = "paused"
     await reporter.write()
-    expect(events.filter((e) => e.type === "engine.heartbeat")).toHaveLength(1)
-    vi.setSystemTime(BEAT + 15_000)
-    await reporter.write()
+    expect(events.filter((e) => e.type === "engine.heartbeat")).toHaveLength(2)
     expect(events.filter((e) => e.type === "engine.heartbeat").at(-1)).toMatchObject({ summary: "Engine paused, deciding", data: { status: "paused" } })
     await bus.stop()
   })

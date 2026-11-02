@@ -291,7 +291,7 @@ export class Engine {
     const onError = (job: string) => (error: unknown) => log.warn(`${job} failed`, { error: errorMessage(error) })
     this.stops.push(every(3_000, () => checkProtection(this.ctx, this.protectionInFlight), onError("protection")))
     this.stops.push(every(15_000, () => this.markAndMonitor(), onError("mark-to-market"), { immediate: true }))
-    this.stops.push(every(5_000, () => this.reporter.write(), onError("heartbeat"), { immediate: true }))
+    this.stops.push(every(10_000, () => this.reporter.write(), onError("heartbeat"), { immediate: true }))
     this.stops.push(every(5 * 60_000, () => this.periodic(), onError("snapshot")))
     this.stops.push(every(5 * 60_000, () => this.reconcile(), onError("reconciliation")))
     this.stops.push(every(30 * 60_000, async () => void (await evaluateOutcomes(this.ctx)), onError("outcomes"), { immediate: true }))

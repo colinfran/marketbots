@@ -54,7 +54,7 @@ const indexes = <K extends BaseCollectionName>(lists: Record<K, IndexSpec[]>) =>
 
 /** Indexes that are the same in both bots. A bot's `INDEXES` lists these and its own, in its own order. */
 export const BASE_INDEXES = indexes({
-  // `level` + `ts`: the heartbeat's count of the last hour's errors, every few seconds.
+  // `level` + `ts`: the heartbeat's count of the last hour's errors, once a minute.
   events: [{ key: { expires_at: 1 }, expireAfterSeconds: 0 }, { key: { type: 1, _id: -1 } }, { key: { cycle_id: 1 }, sparse: true }, { key: { level: 1, ts: -1 } }],
   commands: [{ key: { status: 1, created_at: 1 } }, { key: { created_at: -1 } }],
   audit_log: [{ key: { at: -1 } }],
@@ -106,7 +106,7 @@ export type EngineStateDoc = {
 }
 
 /**
- * Observed state: the `engine_status` fields both bots write in their heartbeat every few seconds.
+ * Observed state: the `engine_status` fields both bots write in their heartbeat every 10 seconds.
  * Each bot adds its own section (venue or broker health, market, last cycle…). Its large sections
  * that change slowly (the news engine's health, and any the bot names) are written apart, once a
  * minute, in the document `STATUS_DETAIL_ID`; the dashboards read the two as one.

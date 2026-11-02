@@ -36,7 +36,7 @@ Browser ─https─▶ Vercel (Next.js dashboard) ─▶ Azure DocumentDB ◀─
 | Every | Job |
 | --- | --- |
 | 3 s | the command queue in MongoDB (commands sent while the engine couldn't be reached; the others arrive directly) |
-| 5 s | heartbeat to `engine_status` (the Admin page) and the stream; its large news-source health section once a minute, in its own document |
+| 10 s | heartbeat to `engine_status` (the Admin page) and the stream; its large news-source health section once a minute, in its own document |
 | 15 s | account snapshot for the dashboard; live-price subscriptions; periodic summary |
 | `options.monitor_seconds` (15) | options monitor: marks every position, checks its exits, closes what's hit |
 | 30 s | the market calendar: today's session |
@@ -157,7 +157,7 @@ Events are typed (`packages/core/src/events.ts`) and carry a strictly increasing
 | Collection | Contents |
 | --- | --- |
 | `settings`, `engine_state` | the versioned settings document; desired state (running/paused/halted, kill switch, when the agent was last turned on or resumed, and any breaker pause on its entries) |
-| `engine_status`, `engine_lease` | heartbeat (health of everything, the agent, live prices, AI calls today: `engine`, every 5 s, its error, AI-call and trigger counts read once a minute; the news sources' health: `detail`, every minute; the dashboard reads the two as one); single-instance lease |
+| `engine_status`, `engine_lease` | heartbeat (health of everything, the agent, live prices, AI calls today: `engine`, every 10 s, its error, AI-call and trigger counts read once a minute; the news sources' health: `detail`, every minute; the dashboard reads the two as one); single-instance lease |
 | `events` | persisted stream events (replay, episode trails) |
 | `commands`, `audit_log` | owner commands and results; every control and settings change |
 | `decisions` | each requested action (stock or option), every risk check, what happened, the order ids, and the agent episode that made it |

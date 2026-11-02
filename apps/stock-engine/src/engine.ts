@@ -330,7 +330,7 @@ export class Engine {
     }
 
     const onError = (job: string) => (error: unknown) => log.warn(`${job} failed`, { error: errorMessage(error) })
-    this.stops.push(every(5_000, () => this.reporter.write(), onError("heartbeat"), { immediate: true }))
+    this.stops.push(every(10_000, () => this.reporter.write(), onError("heartbeat"), { immediate: true }))
     this.stops.push(every(15_000, () => this.refreshAccount(), onError("account refresh")))
     this.stops.push(every(30_000, () => this.refreshSession().then(() => undefined), onError("market calendar"), { immediate: true }))
     this.stops.push(every(15_000, () => this.periodicMaintenance(), onError("maintenance")))
