@@ -51,7 +51,7 @@ Safety: browser `Origin` allowlist, max clients and max connections per IP, 4KB 
 | --- | --- | --- |
 | `settings` | The single versioned settings document (risk, the agent, strategies, universe, the wire) | permanent |
 | `engine_state` | Desired state: running/paused/halted, kill switch; when the agent was last turned on or resumed, and any breaker pause on its entries | permanent |
-| `engine_status` | Heartbeat: health of every dependency, data freshness, AI calls today, resources (`engine`); the large sections, news-source health and per-pair prices and indicators (`detail`). The dashboard reads the two as one | `engine` overwritten every 5s, `detail` every minute |
+| `engine_status` | Heartbeat: health of every dependency, data freshness, AI calls today, resources (`engine`); the large sections, news-source health and per-pair prices and indicators (`detail`). The dashboard reads the two as one | `engine` overwritten every 5s (its error, AI-call and trigger counts read once a minute), `detail` every minute |
 | `engine_lease` | Single-instance lease | 30s TTL |
 | `events` | Persisted stream events (replay + history) | TTL, default 30 days |
 | `commands` / `audit_log` | Owner commands and their results; every control and settings change | permanent |

@@ -62,7 +62,7 @@ An agent on the local model is the only thing that decides ([plans/LOCAL-AI.md Â
 | News, around the clock: every trigger candidate that passes the wire's gates on the item itself (fresh, not old news, confirmed for entries). Outside the session it can only set watches and notes | P0 bad news on a holding (or a critical market review while it holds anything), P1 entry ideas, P2 the rest |
 | The setup screen (`src/agent/screen.ts`), on each closed minute of the price board (the scan universe and what the engine tracks): the first close above the opening range (the first 15 minutes) and, an hour in, a new session high, each on at least twice the stock's median minute volume today (IEX volume against its own). While buys are allowed and the envelope would take one, a minute's best five setups on stocks it doesn't hold wake it together, with a SUBJECT section each | P1 |
 | The session: premarket (plan; watches and notes only), the open after its buffer, the closing window while it holds anything, after the close | P2, P2, P1, P3 |
-| A held stock moving `schedule.trigger_move_pct` since its last review (checked every 5 s in session), again at every further step | P0 down, P2 up |
+| A held stock moving `schedule.trigger_move_pct` since its last review (checked every 5 s in session against live prices; the observers read the book's plans and options from the database at most every 15 s), again at every further step | P0 down, P2 up |
 | A stop-loss or take-profit leg the broker fills | P2 |
 | A macro release 15 minutes out | P2 |
 | Its own watches (price above or below, a % move, news at a severity, a time) | the watch's |
@@ -157,7 +157,7 @@ Events are typed (`packages/core/src/events.ts`) and carry a strictly increasing
 | Collection | Contents |
 | --- | --- |
 | `settings`, `engine_state` | the versioned settings document; desired state (running/paused/halted, kill switch, when the agent was last turned on or resumed, and any breaker pause on its entries) |
-| `engine_status`, `engine_lease` | heartbeat (health of everything, the agent, live prices, AI calls today: `engine`, every 5 s; the news sources' health: `detail`, every minute; the dashboard reads the two as one); single-instance lease |
+| `engine_status`, `engine_lease` | heartbeat (health of everything, the agent, live prices, AI calls today: `engine`, every 5 s, its error, AI-call and trigger counts read once a minute; the news sources' health: `detail`, every minute; the dashboard reads the two as one); single-instance lease |
 | `events` | persisted stream events (replay, episode trails) |
 | `commands`, `audit_log` | owner commands and results; every control and settings change |
 | `decisions` | each requested action (stock or option), every risk check, what happened, the order ids, and the agent episode that made it |
