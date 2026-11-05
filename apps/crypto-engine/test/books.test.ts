@@ -7,8 +7,9 @@ import { PaperWalletExecution } from "../src/execution/paper-wallet"
 import type { MarketHub } from "../src/market/hub"
 import { Ledger } from "../src/portfolio/ledger"
 import { reconcileWallet } from "../src/portfolio/reconcile"
+import type { PairInfo } from "../src/venues/kraken/pairs"
 import { useTestDb } from "./helpers/db"
-import { fakeHub, FakeWallet, makeBus } from "./helpers/fakes"
+import { BTC, fakeHub, FakeWallet, makeBus, quote } from "./helpers/fakes"
 
 const db = useTestDb()
 
@@ -106,6 +107,27 @@ describe("ledger + paper wallet", () => {
     await sell(0.02)
     expect(await ledger.openPositions()).toEqual([])
   })
+
+  it("sells all of a large position left by partial sells, leaving no dust in the wallet", async () => {
+    // PUMP/USD on 2026-11-05: the books held 19722.990169999986 after four reduces, and the stop
+    // sold 19722.99016 of the wallet's 19722.99017.
+    const PUMP: PairInfo = { ...BTC, symbol: "PUMP/USD", restPair: "PUMPUSD", altname: "PUMPUSD", base: "PUMP", quote: "ZUSD", priceDecimals: 7, lotDecimals: 5, tickSize: 1e-7, lotStep: 1e-5, orderMin: 0, costMin: 0 }
+    const wallet = new FakeWallet(10_000, 0.004, 0, 0.00409, 0.00408)
+    const bus = await makeBus(db.col)
+    const ledger = new Ledger(db.col, bus)
+    await ledger.ensureAccount(10_000)
+    const hub = fakeHub({ "PUMP/USD": quote({ symbol: "PUMP/USD", bid: 0.00408, ask: 0.00409, mid: 0.004085 }) }, [PUMP]) as unknown as MarketHub
+    const executor = new Executor(db.col, ledger, new PaperWalletExecution(wallet.cli(), hub), bus, silentLogger)
+    const order = (side: "buy" | "sell", qty: number) =>
+      executor.execute({ instrument: "PUMP/USD", side, qty, limitPrice: null, referencePrice: 0.004085, purpose: side === "buy" ? "entry" : "reduce", decisionId: null, positionId: null, meta: {} })
+    await order("buy", 150270.4012)
+    for (const qty of [45081.12036, 26297.32021, 39445.98031, 19722.99015]) await order("sell", qty)
+    expect(wallet.coins.get("PUMP")).toBe(19722.99017)
+    const [position] = await ledger.openPositions()
+    const { outcomes } = await order("sell", position.qty)
+    expect(outcomes[0]).toMatchObject({ closed: true, fill: { qty: 19722.99017 } })
+    expect(wallet.coins.get("PUMP")).toBe(0)
+  })
 })
 
 describe("reconcileWallet", () => {
@@ -157,6 +179,20 @@ describe("reconcileWallet", () => {
     const result = await reconcile()
     expect(result.ok).toBe(false)
     expect(result.issues[0]).toMatch(/^USD: wallet/)
+  })
+
+  it("leaves the dust of a position the books closed out, but not a coin it can't explain", async () => {
+    const wallet = new FakeWallet()
+    const { buy, sell, reconcile } = await setup(wallet)
+    await buy(0.01)
+    await sell(0.01)
+    wallet.coins.set("BTC", 0.0000001) // $0.0065 at the exit's price: what the ledger closes as dust
+    expect(await reconcile()).toMatchObject({ ok: true, issues: [] })
+    wallet.coins.set("BTC", 0.001)
+    expect(await reconcile()).toMatchObject({ ok: false, issues: ["BTC: wallet holds 0.001 but the books have no open position"] })
+    wallet.coins.set("BTC", 0)
+    wallet.coins.set("ETH", 0.0000001) // never held
+    expect(await reconcile()).toMatchObject({ ok: false, issues: ["ETH: wallet holds 1e-7 but the books have no open position"] })
   })
 })
 

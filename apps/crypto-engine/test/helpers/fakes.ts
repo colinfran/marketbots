@@ -132,14 +132,16 @@ export class FakeWallet {
       const cost = volume * price
       const fee = cost * this.feeRate
       const base = pair.split("/")[0]
+      // The real CLI keeps coin balances as exact decimals; 8 places is the finest lot here.
+      const held = (qty: number) => Number(qty.toFixed(8))
       if (side === "buy") {
         if (this.usd < cost + fee) throw fail(`Insufficient USD balance. Available: ${this.usd.toFixed(2)}, Required: ${(cost + fee).toFixed(2)}`)
         this.usd -= cost + fee
-        this.coins.set(base, (this.coins.get(base) ?? 0) + volume)
+        this.coins.set(base, held((this.coins.get(base) ?? 0) + volume))
       } else {
         if ((this.coins.get(base) ?? 0) < volume - 1e-12) throw fail(`Insufficient ${base} balance`)
         this.usd += cost - fee
-        this.coins.set(base, (this.coins.get(base) ?? 0) - volume)
+        this.coins.set(base, held((this.coins.get(base) ?? 0) - volume))
       }
       const trade = { id: `PAPER-${String(this.next++).padStart(5, "0")}`, order_id: `OPAPER-${this.next}`, status: "filled", pair, side, volume: String(volume), price: String(price), fee: String(fee), cost: String(cost), time: new Date().toISOString() }
       this.trades.push(trade)

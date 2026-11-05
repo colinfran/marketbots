@@ -5,7 +5,7 @@ import { errorMessage, type Logger } from "@mb/engine-kit/log"
 import type { Collections } from "../db/mongo"
 import type { Executor } from "../execution/executor"
 import type { CliTrade, KrakenCli } from "../venues/kraken/cli"
-import type { Ledger, PositionMeta } from "./ledger"
+import { DUST_USD, type Ledger, type PositionMeta } from "./ledger"
 
 /**
  * Reconciles the engine's books with the Kraken CLI paper wallet (the venue of record).
@@ -17,7 +17,8 @@ import type { Ledger, PositionMeta } from "./ledger"
  *    fill.
  * 3. USD and every coin balance are compared with the books. Any remaining difference makes the
  *    result not ok, and the risk engine blocks new entries until it's resolved (a paper reset
- *    clears it). Exits keep working.
+ *    clears it). Exits keep working. A coin the books closed out as dust (worth under
+ *    `DUST_USD` at that position's last price, the ledger's own rule) isn't a difference.
  */
 
 const USD_TOLERANCE = 0.02
@@ -128,10 +129,22 @@ export const reconcileWallet = async (deps: {
     issues.push(`USD: wallet ${walletUsd.toFixed(2)} vs books ${booksUsd.toFixed(2)}`)
   }
   const held = new Map(positions.map((p) => [baseAsset(p.symbol), p]))
+  /** Whether `qty` of `asset` is what the books' last closed position in it left as dust. */
+  const isDust = async (asset: string, qty: number) => {
+    const closed = col.positions.find(
+      { account_id: ACCOUNT_ID, status: "closed", closed_at: { $gte: since } },
+      { sort: { closed_at: -1 }, projection: { symbol: 1, mark_price: 1, avg_price: 1 } },
+    )
+    for await (const p of closed) {
+      if (baseAsset(p.symbol) === asset) return qty * (p.mark_price ?? p.avg_price) < DUST_USD
+    }
+    return false
+  }
   for (const [asset, b] of Object.entries(balances)) {
     if (asset === "USD" || b.total <= QTY_TOLERANCE) continue
     const p = held.get(asset)
     if (!p) {
+      if (await isDust(asset, b.total)) continue
       mismatched = true
       issues.push(`${asset}: wallet holds ${b.total} but the books have no open position`)
     } else if (Math.abs(p.qty - b.total) > QTY_TOLERANCE * Math.max(1, p.qty)) {

@@ -32,11 +32,17 @@ export const median = (values: number[]) => {
   return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2
 }
 
-/** Floors `value` to a multiple of `step` (e.g. a lot size), without float drift. */
+/**
+ * Floors `value` to a multiple of `step` (e.g. a lot size), without float drift: a value within
+ * 1e-13 of a multiple (relative, or 1e-9 steps when that's larger) counts as that multiple. Float
+ * error grows with the number of steps (150,000 coins at 5 lot decimals is 1.5e10 steps), so a
+ * fixed tolerance would floor an amount sitting on a lot boundary down a whole step.
+ */
 export const floorToStep = (value: number, step: number): number => {
   if (step <= 0) return value
   const decimals = Math.max(0, Math.ceil(-Math.log10(step)))
-  return Number((Math.floor(value / step + 1e-9) * step).toFixed(decimals))
+  const steps = value / step
+  return Number((Math.floor(steps + Math.max(1e-9, Math.abs(steps) * 1e-13)) * step).toFixed(decimals))
 }
 
 /** Rounds `value` to the nearest multiple of `step` (e.g. a price tick). */

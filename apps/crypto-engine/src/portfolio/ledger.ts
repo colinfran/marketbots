@@ -52,6 +52,12 @@ export type FillOutcome = {
 
 const EPS = 1e-9
 
+/**
+ * A sale that leaves less than this (in USD at the sale's price) closes the position: dust too
+ * small to sell. The wallet keeps it, and reconciliation knows it as dust.
+ */
+export const DUST_USD = 0.01
+
 export class Ledger {
   /** The account's open positions as last read and written here; null: read them again. */
   private open: PositionDoc[] | null = null
@@ -199,7 +205,7 @@ export class Ledger {
       const basis = pos.cost_basis_usd * (sellQty / pos.qty)
       realized = sellQty * price - feeUsd - basis
       const remaining = pos.qty - sellQty
-      const closed = remaining <= EPS || remaining * price < 0.01
+      const closed = remaining <= EPS || remaining * price < DUST_USD
       position = {
         ...pos,
         qty: closed ? 0 : remaining,
