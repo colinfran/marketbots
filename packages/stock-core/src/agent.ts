@@ -37,7 +37,7 @@ export const stockAgentAnswerSchema = z.object({
   decisions: z
     .array(stockAgentDecisionSchema)
     .describe(
-      `Only about what woke you and what you hold: at most ${MAX_NEW_ENTRIES} new entries (buy, buy_option), plus one for each position in YOUR BOOK that needs a decision. An empty list is a normal answer: watch instead of acting early.`,
+      `Only about what woke you and what you hold: at most ${MAX_NEW_ENTRIES} new entries (buy, buy_option), plus one for each position in YOUR BOOK that needs a decision. An empty list is right when nothing has an edge.`,
     ),
   ...agentAnswerFields,
 })

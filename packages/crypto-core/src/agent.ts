@@ -35,7 +35,7 @@ export const cryptoAgentAnswerSchema = z.object({
   decisions: z
     .array(cryptoAgentDecisionSchema)
     .describe(
-      `Only about what woke you and what you hold: at most ${MAX_NEW_PAIRS} about pairs you don't hold, plus one for each position in YOUR BOOK that needs a decision. An empty list is a normal answer: watch instead of acting early.`,
+      `Only about what woke you and what you hold: at most ${MAX_NEW_PAIRS} about pairs you don't hold, plus one for each position in YOUR BOOK that needs a decision. An empty list is right when nothing has an edge.`,
     ),
   ...agentAnswerFields,
 })
