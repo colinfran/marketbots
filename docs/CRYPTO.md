@@ -181,7 +181,7 @@ Deterministic and pure (`apps/engine/src/risk/engine.ts`), every check recorded 
 
 ## Is there an edge? How it's measured
 
-- **Forward evaluation**: every decision (including no-trades) is scored after its horizon. The Analytics page shows the results; the Journal, each day's decisions and what came of them.
+- **Forward evaluation**: every decision (including no-trades) is scored after its horizon. The Analytics page shows the results, led by a scorecard: the return against holding BTC over the same period (Kraken's public daily candles), expectancy per trade, fees paid, and the trend core against the agent; the Journal, each day's decisions and what came of them.
 - **No automatic learning**: nothing changes strategies or prompts based on results. Prompt and settings versions are stored on every decision so changes can be compared deliberately.
 
 ## Testing

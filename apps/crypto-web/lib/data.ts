@@ -69,6 +69,25 @@ export const getAccount = async () => {
   }
 }
 
+/**
+ * Holding BTC instead, from `since` to now, %: Kraken's public daily candles (no key), cached for
+ * an hour; from the close of the day the account started to the latest price. null when Kraken
+ * doesn't answer.
+ */
+export const getBtcBenchmarkPct = async (since: Date): Promise<number | null> => {
+  const day = Math.floor(since.getTime() / 86_400_000) * 86_400
+  const res = await fetch(`https://api.kraken.com/0/public/OHLC?pair=XBTUSD&interval=1440&since=${day - 86_400}`, { next: { revalidate: 3_600 }, signal: AbortSignal.timeout(8_000) }).catch(() => null)
+  if (!res?.ok) return null
+  const body = (await res.json().catch(() => null)) as { error?: string[]; result?: Record<string, unknown> } | null
+  const rows = body?.result ? Object.entries(body.result).find(([k]) => k !== "last")?.[1] : null
+  if (!Array.isArray(rows)) return null
+  const candles = rows as [number, string, string, string, string][]
+  const start = candles.find((c) => c[0] === day)
+  const end = candles.at(-1)
+  if (!start || !end || !(Number(start[4]) > 0)) return null
+  return (Number(end[4]) / Number(start[4]) - 1) * 100
+}
+
 export const getEquitySeries = async (days = 30) => {
   await connection()
   const { snapshots } = await collections()
@@ -234,6 +253,11 @@ export const getAnalytics = async () => {
 
   return {
     trades: tradeStats(trades),
+    // The rules against the agent's judgment (and the positions from before either).
+    byBook: [
+      { key: "Trend core (rules)", ...tradeStats(trades.filter((t) => t.strategy === "core")) },
+      { key: "Agent and earlier", ...tradeStats(trades.filter((t) => t.strategy !== "core")) },
+    ],
     byStrategy: byKey((t) => t.strategy),
     bySymbol: byKey((t) => t.symbol),
     risk: performanceMetrics(points, [], { exposure_pct: exposure }),

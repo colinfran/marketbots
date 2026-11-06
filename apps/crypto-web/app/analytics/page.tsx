@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@mb/u
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mb/ui/components/table"
 import { Delta, Empty, PageHeader, SectionTitle, Stat } from "@/components/bits"
 import { DailyPnlChart, DrawdownChart, EquityChart } from "@/components/charts"
-import { getAccount, getAnalytics, getDailyStats, getEquitySeries, getWireAnalytics } from "@/lib/data"
+import { getAccount, getAnalytics, getBtcBenchmarkPct, getDailyStats, getEquitySeries, getWireAnalytics } from "@/lib/data"
 import { num, pct, titleCase, usd } from "@/lib/format"
 import { pageMetadata } from "@/lib/site"
 
@@ -18,6 +18,9 @@ const rate = (correct: number, judged: number) => (judged ? `${Math.round((corre
 
 export default async function AnalyticsPage() {
   const [a, account, curve, daily, w] = await Promise.all([getAnalytics(), getAccount(), getEquitySeries(365), getDailyStats(120), getWireAnalytics()])
+  const since = account ? (account.account.last_reset_at ?? account.account.created_at) : null
+  const btc = since ? await getBtcBenchmarkPct(since) : null
+  const vsBtc = account?.totalReturnPct != null && btc !== null ? account.totalReturnPct - btc : null
   const t = a.trades
   const r = a.risk
   const base = a.decisions.baseline
@@ -46,6 +49,54 @@ export default async function AnalyticsPage() {
           }
         />
       </div>
+
+      <section className="space-y-3">
+        <SectionTitle>Scorecard</SectionTitle>
+        <p className="text-muted-foreground max-w-3xl text-sm">
+          The trend core trades by rules, the agent by judgment. Either earns its place only by beating plain BTC over the same period, after fees: a positive expectancy per
+          trade, and winners bigger than losers.
+        </p>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <Stat label="Holding BTC instead" value={<Delta percent={btc} className="text-2xl" />} sub={<span className="text-muted-foreground">{since ? `since ${since.toISOString().slice(0, 10)}` : "no account yet"}</span>} />
+          <Stat label="Bot vs BTC" value={<Delta percent={vsBtc} className="text-2xl" />} sub={<span className="text-muted-foreground">total return minus BTC&apos;s</span>} />
+          <Stat
+            label="Expectancy per trade"
+            value={<Delta value={t.expectancy_usd} className="text-2xl" />}
+            sub={<span className="text-muted-foreground">avg win {pct(t.avg_win_pct)} · avg loss {pct(t.avg_loss_pct)}</span>}
+          />
+          <Stat label="Fees paid" value={usd(account?.account.fees_usd)} sub={<span className="text-muted-foreground">{t.trades} closed trades</span>} />
+        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Book</TableHead>
+              <TableHead className="text-right">Trades</TableHead>
+              <TableHead className="text-right">Win rate</TableHead>
+              <TableHead className="text-right">Avg win</TableHead>
+              <TableHead className="text-right">Avg loss</TableHead>
+              <TableHead className="text-right">Expectancy</TableHead>
+              <TableHead className="text-right">Net P&L</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {a.byBook.map((b) => (
+              <TableRow key={b.key}>
+                <TableCell className="text-sm">{b.key}</TableCell>
+                <TableCell className="text-right font-mono tabular-nums">{b.trades}</TableCell>
+                <TableCell className="text-right font-mono tabular-nums">{pct(b.win_rate_pct, { sign: false, digits: 0 })}</TableCell>
+                <TableCell className="text-right font-mono tabular-nums">{pct(b.avg_win_pct)}</TableCell>
+                <TableCell className="text-right font-mono tabular-nums">{pct(b.avg_loss_pct)}</TableCell>
+                <TableCell className="text-right">
+                  <Delta value={b.expectancy_usd} />
+                </TableCell>
+                <TableCell className="text-right">
+                  <Delta value={b.total_pnl_usd} />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </section>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>

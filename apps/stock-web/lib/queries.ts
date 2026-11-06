@@ -390,7 +390,7 @@ const tally = <D extends Pick<DecisionDoc, "_id" | "action" | "status">>(
 // ─── News engine ("wire") ────────────────────────────────────────────────────
 
 /** What started a decision, for the analytics tables. Decisions from before it was recorded have no kind. */
-const KIND_LABEL: Record<string, string> = { agent: "The agent", scheduled: "Schedule (before the agent)", price_move: "Price move (before the agent)", manual: "Owner (manual)", event: "News event (before the agent)", seed: "Seed buy", core: "Core review", unrecorded: "Not recorded (older)" }
+const KIND_LABEL: Record<string, string> = { agent: "The agent", scheduled: "Schedule (before the agent)", price_move: "Price move (before the agent)", manual: "Owner (manual)", event: "News event (before the agent)", seed: "Seed buy", core: "Trend core (rules)", unrecorded: "Not recorded (older)" }
 
 /** News-engine analytics: does acting on news pay, and how fast is it. */
 export const getWireAnalytics = async () => {
