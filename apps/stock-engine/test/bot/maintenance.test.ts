@@ -212,6 +212,9 @@ describe("trailing stops", () => {
     // Only moves up, by at least 0.5% of the price.
     expect(trailedStop({ stop_loss: 101, trail_usd: 5 }, 100, 106.3)).toBeNull()
     expect(trailedStop({ stop_loss: 101, trail_usd: 5 }, 100, 106.6)).toEqual({ stop: 101.6, trail: 5 })
+    // A long-term leader's stop trails 20% below the price from the start.
+    expect(trailedStop({ stop_loss: 80, trail_pct: 20 }, 100, 110)).toEqual({ stop: 88, trail: 22 })
+    expect(trailedStop({ stop_loss: 88, trail_pct: 20 }, 100, 110.2)).toBeNull()
   })
 
   it("replaces a winner's exits with the higher stop and the same target, and records it on the plan", async () => {

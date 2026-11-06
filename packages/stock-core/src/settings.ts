@@ -127,6 +127,19 @@ export const coreSettingsSchema = z.object({
   news_veto_hours: z.number().min(0).max(168),
 })
 
+/** The long-term book: index ETFs and long-term leaders held for months, beside the trend core and the agent. */
+export const longTermSettingsSchema = z.object({
+  enabled: z.boolean(),
+  /** SPY's and QQQ's shares of equity, %. 0: not held. */
+  spy_pct: pct(0, 50),
+  qqq_pct: pct(0, 50),
+  /** How many leaders it holds, and each one's share of equity. */
+  leaders: int(0, 10),
+  leader_pct: pct(0, 20),
+  /** A leader's stop trails this far below its price. */
+  leader_trail_pct: pct(5, 50),
+})
+
 export const scheduleSettingsSchema = z.object({
   /** How early before the open the agent is woken to plan the day. */
   premarket_lead_minutes: z.number().min(10).max(240),
@@ -173,6 +186,7 @@ export const settingsSchema = z
     risk: riskSettingsSchema,
     options: optionsSettingsSchema,
     core: coreSettingsSchema,
+    long_term: longTermSettingsSchema,
     schedule: scheduleSettingsSchema,
     universe: z.object({
       /** ETFs always included in the market snapshot so the model can read the tape. */
@@ -255,6 +269,14 @@ export const DEFAULT_SETTINGS: Settings = {
     universe_size: 500,
     reentry_hours: 72,
     news_veto_hours: 24,
+  },
+  long_term: {
+    enabled: true,
+    spy_pct: 15,
+    qqq_pct: 10,
+    leaders: 5,
+    leader_pct: 5,
+    leader_trail_pct: 20,
   },
   schedule: {
     premarket_lead_minutes: 90,

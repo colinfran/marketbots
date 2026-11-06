@@ -86,7 +86,9 @@ export const liveRiskState = async (d: Pick<StockAgentDeps, "ctx" | "snapshot">,
   const book = await liveBook(d)
   if (!book.snap) return null
   const tradesToday = await d.ctx.col.decisions.countDocuments({ trading_day: marketDay(now), status: "executed", action: { $in: [...TRADES] } })
-  const risk = computeRiskState(book.snap.account, book.stocks.length, tradesToday, d.ctx.settings.current)
+  // The long-term book's holdings are fixed in number and don't take trading slots.
+  const trading = book.stocks.filter((p) => book.plans.get(p.symbol)?.book !== "long_term").length
+  const risk = computeRiskState(book.snap.account, trading, tradesToday, d.ctx.settings.current)
   return { risk, history: await liveEnvelopeHistory(d, now.getTime()), book }
 }
 
@@ -127,7 +129,7 @@ export const liveBookText = async (d: Pick<StockAgentDeps, "ctx" | "snapshot" | 
   const stocks = book.stocks.map((p) => {
     const plan = book.plans.get(p.symbol)
     const m = d.price(p.symbol) ?? Number(p.current_price)
-    return `- ${p.symbol}: ${p.qty} shares at ${Number(p.avg_entry_price).toFixed(2)}, now ${m} (${(Number(p.unrealized_plpc ?? 0) * 100).toFixed(2)}%), stop ${plan?.stop_loss ?? "none"}, target ${plan?.take_profit ?? "none"}${plan?.book === "core" ? ", TREND CORE (rules-managed: its stop trails and a close below the 50-day average sells it; sell it yourself only on news that breaks the trend)" : ""}, ${plan?.horizon ?? "?"} horizon${plan ? `, opened ${formatTime(plan.opened_at)}` : ""}. Thesis: ${plan?.thesis ?? "none recorded"} Invalidation: ${plan?.invalidation ?? "none recorded"}`
+    return `- ${p.symbol}: ${p.qty} shares at ${Number(p.avg_entry_price).toFixed(2)}, now ${m} (${(Number(p.unrealized_plpc ?? 0) * 100).toFixed(2)}%), stop ${plan?.stop_loss ?? "none"}, target ${plan?.take_profit ?? "none"}${plan?.book === "core" ? ", TREND CORE (rules-managed: its stop trails and a close below the 50-day average sells it; sell it yourself only on news that breaks the trend)" : plan?.book === "long_term" ? ", LONG-TERM BOOK (rules-managed: held for months until a week closes below its 200-day average; sell it yourself only on news that breaks the long-term case)" : ""}, ${plan?.horizon ?? "?"} horizon${plan ? `, opened ${formatTime(plan.opened_at)}` : ""}. Thesis: ${plan?.thesis ?? "none recorded"} Invalidation: ${plan?.invalidation ?? "none recorded"}`
   })
   const options = book.options.map(
     (o) =>
@@ -190,8 +192,10 @@ export const actOnStockAnswer = async (
       // A sale closes the position: trimming a winner cuts it, and code trails its stop instead.
       let decision = dec.action === "sell" ? { ...dec, sell_pct: null } : dec
       // The trend core's positions end by its rules (the trailing stop, a broken trend); the agent overrides them only on news.
-      if (dec.action === "sell" && book.plans.get(dec.symbol)?.book === "core" && !newsWoke(episode.wake.observations, dec.symbol)) {
-        out.push(action(dec, "blocked", "a trend-core position closes by its rules (its trailing stop, a broken trend); you may sell it only when news about it woke you"))
+      const ruled = book.plans.get(dec.symbol)?.book
+      if (dec.action === "sell" && (ruled === "core" || ruled === "long_term") && !newsWoke(episode.wake.observations, dec.symbol)) {
+        const why = ruled === "core" ? "a trend-core position closes by its rules (its trailing stop, a broken trend)" : "a long-term holding is sold by its rules (a week closing below its 200-day average, a leader's trailing stop)"
+        out.push(action(dec, "blocked", `${why}; you may sell it only when news about it woke you`))
         continue
       }
       if (dec.action === "buy" || dec.action === "buy_option") {

@@ -51,6 +51,14 @@
     "reentry_hours": 72,
     "news_veto_hours": 24
   },
+  "long_term": {
+    "enabled": true,
+    "spy_pct": 15,
+    "qqq_pct": 10,
+    "leaders": 5,
+    "leader_pct": 5,
+    "leader_trail_pct": 20
+  },
   "schedule": {
     "premarket_lead_minutes": 90,
     "open_buffer_minutes": 10,

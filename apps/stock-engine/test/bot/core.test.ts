@@ -7,6 +7,7 @@ import type { EngineContext } from "../../src/bot/context"
 import { StockCore } from "../../src/bot/core"
 import { coreCandidates, coreRegime, coreStats, coreTrendBroken, GEARED_NAME } from "../../src/bot/core-rules"
 import type { EventBus } from "../../src/bus/event-bus"
+import { ensureProtection } from "../../src/bot/maintenance"
 import { SCAN_UNIVERSE_KEY } from "../../src/market/scan-universe"
 import { fakeBroker, type FakeBroker } from "../helpers/broker"
 import { makeCtx, type SentAlert } from "../helpers/ctx"
@@ -59,7 +60,7 @@ describe("the trend core's rules", () => {
   })
 
   it("leaves out stocks far from their 52-week high and overbought ones", () => {
-    const base = { symbol: "X", close: 70, sma50: 65, sma200: 60, high252: 100, ret126Pct: 10, atrPct: 2, rsi: 55, strength: 5 }
+    const base = { symbol: "X", close: 70, sma50: 65, sma200: 60, high252: 100, ret126Pct: 10, ret12_1Pct: null, atrPct: 2, rsi: 55, strength: 5 }
     // In an uptrend by its averages, but 30% under its 52-week high.
     expect(coreCandidates([base], DEFAULT_SETTINGS)).toEqual([])
     expect(coreCandidates([{ ...base, high252: 90 }], DEFAULT_SETTINGS).map((p) => p.symbol)).toEqual(["X"])
@@ -89,8 +90,10 @@ describe("the trend core on the paper account", () => {
     useFakeClock(afterOpen(10))
     broker = fakeBroker()
     ;({ ctx, bus, alerts } = await makeCtx(testDb.col, broker))
+    // The trend core's tests run without the long-term book, which buys first; its own tests turn it on.
+    ctx.settings.current.long_term.enabled = false
     paused = null
-    const bars = { SPY: daily(260, 0.001, 400), FAST: daily(260, 0.003), SLOW: daily(260, 0.001), DOWN: daily(260, -0.002), TQQQ: daily(260, 0.005) }
+    const bars = { SPY: daily(260, 0.001, 400), QQQ: daily(260, 0.0012, 300), FAST: daily(260, 0.003), SLOW: daily(260, 0.001), DOWN: daily(260, -0.002), TQQQ: daily(260, 0.005) }
     broker.bars["1Day"] = bars
     broker.assetList = [asset("TQQQ", "ProShares UltraPro QQQ"), asset("FAST", "Fast Corp"), asset("SLOW", "Slow Corp"), asset("DOWN", "Down Corp")]
     for (const [symbol, b] of Object.entries(bars)) broker.setPrice(symbol, last(b))
@@ -171,6 +174,67 @@ describe("the trend core on the paper account", () => {
     await testDb.col.wireItems.insertOne({ _id: "n1", symbols: ["SLOW"], polarity: -1, severity: 60, first_seen_at: afterOpen(-60) } as never)
     await tick(35)
     expect(broker.submitted).toEqual([])
+  })
+
+  it("long-term book: buys SPY and QQQ with no stop and the leaders with a 20% trailing stop, before the trend core", async () => {
+    ctx.settings.current.long_term.enabled = true
+    await tick(10)
+    expect(core.today?.longTerm).toMatchObject({ base: [{ symbol: "SPY", above: true }, { symbol: "QQQ", above: true }], broken: [], refresh: true })
+    expect(core.today!.longTerm!.leaders.map((l) => l.symbol)).toEqual(["FAST", "SLOW"])
+    await tick(35)
+    const plans = await testDb.col.plans.find().sort({ _id: 1 }).toArray()
+    expect(plans.map((p) => [p._id, p.book, p.stop_loss === null, p.trail_pct ?? null])).toEqual([
+      ["FAST", "long_term", false, 20],
+      ["QQQ", "long_term", true, null],
+      ["SLOW", "long_term", false, 20],
+      ["SPY", "long_term", true, null],
+    ])
+    // 15% of $10,000 in SPY, 10% in QQQ, 5% in each leader.
+    const value = async (s: string) => {
+      const p = (await broker.getPositions()).find((x) => x.symbol === s)!
+      return Number(p.qty) * Number(p.current_price)
+    }
+    expect(await value("SPY")).toBeGreaterThan(1_000)
+    expect(await value("SPY")).toBeLessThanOrEqual(1_500)
+    expect(await value("FAST")).toBeLessThanOrEqual(500)
+    const fast = plans[0]
+    expect(fast.stop_loss! / last(broker.bars["1Day"]!.FAST)).toBeCloseTo(0.8, 2)
+    expect(broker.submitted.filter((o) => o.symbol === "SPY").map((o) => [o.side, o.type])).toEqual([["buy", "market"]])
+    expect(broker.submitted.filter((o) => o.symbol === "FAST").map((o) => [o.side, o.type])).toEqual([
+      ["buy", "market"],
+      ["sell", "stop"],
+    ])
+    expect((await testDb.col.decisions.find({ trigger_kind: "long_term" }).toArray()).map((d) => d.symbol).sort()).toEqual(["FAST", "QQQ", "SLOW", "SPY"])
+    // The trend core's picks are held by the long-term book: it buys nothing more.
+    expect(await testDb.col.decisions.countDocuments({ trigger_kind: "core" })).toBe(0)
+    // Maintenance gives the stop-less base no default stop.
+    expect(await settle(ensureProtection(ctx))).toEqual([])
+  })
+
+  it("long-term book: sells a holding after a week closing below its 200-day average", async () => {
+    ctx.settings.current.long_term.enabled = true
+    broker.bars["1Day"]!.QQQ = [...daily(230, 0.001, 300), ...daily(30, -0.006, 300 * 1.001 ** 230)]
+    broker.setPosition("QQQ", 3, last(broker.bars["1Day"]!.QQQ))
+    await testDb.col.plans.insertOne({ _id: "QQQ", decision_id: null, stop_loss: null, take_profit: null, horizon: "multi_day", setup: "momentum", thesis: "t", invalidation: "i", opened_at: new Date(), updated_at: new Date(), book: "long_term" })
+    await tick(10)
+    expect(core.today?.longTerm?.base.find((b) => b.symbol === "QQQ")).toMatchObject({ above: false })
+    await tick(35)
+    expect(broker.holdings.has("QQQ")).toBe(false)
+    expect(await testDb.col.decisions.findOne({ symbol: "QQQ", action: "sell" })).toMatchObject({ trigger_kind: "long_term", status: "executed" })
+    expect(alerts).toContainEqual(expect.objectContaining({ level: "success", title: "Long-term book sold QQQ" }))
+  })
+
+  it("long-term book: replaces a leader that dropped out of the top only at a month's first plan", async () => {
+    ctx.settings.current.long_term.enabled = true
+    broker.bars["1Day"]!.OLD = daily(260, 0.001)
+    broker.setPosition("OLD", 5, last(broker.bars["1Day"]!.OLD))
+    await testDb.col.plans.insertOne({ _id: "OLD", decision_id: null, stop_loss: 50, take_profit: null, trail_pct: 20, horizon: "multi_day", setup: "momentum", thesis: "t", invalidation: "i", opened_at: new Date(), updated_at: new Date(), book: "long_term" })
+    // An earlier plan this month: no refresh.
+    await testDb.col.cache.insertOne({ _id: "core:plan", data: { day: "2026-10-23", built_at: new Date(), regime: { on: true, detail: "" }, picks: [], broken: [] }, fetched_at: new Date(), expires_at: new Date(Date.now() + DAY_MS) })
+    await tick(10)
+    expect(core.today?.longTerm?.refresh).toBe(false)
+    await tick(35)
+    expect(broker.holdings.has("OLD")).toBe(true)
   })
 
   it("sells a core position whose trend broke, and leaves the agent's alone", async () => {

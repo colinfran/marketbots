@@ -260,9 +260,11 @@ export const executeDecisions = async (
     col.plans.find().toArray(),
   ])
   const positions = allPositions.filter((p) => (p.asset_class ?? "us_equity") === "us_equity")
-  const risk = computeRiskState(account, positions.length, tradesToday, settings)
-  const held = new Map<string, AlpacaPosition>(positions.map((p) => [p.symbol, p]))
   const plans = new Map(planDocs.map((p) => [p._id, p]))
+  // The long-term book's holdings are fixed in number and don't take trading slots.
+  const trading = positions.filter((p) => plans.get(p.symbol)?.book !== "long_term")
+  const risk = computeRiskState(account, trading.length, tradesToday, settings)
+  const held = new Map<string, AlpacaPosition>(positions.map((p) => [p.symbol, p]))
   const stockSymbols = report.decisions.filter((d) => !isOptionAction(d.action)).map((d) => d.symbol)
   const snapshots = await alpaca.getSnapshots(stockSymbols).catch((): Record<string, Snapshot> => ({}))
   const priceOf = (symbol: string): number | null => {
@@ -279,7 +281,7 @@ export const executeDecisions = async (
   const recentlySold = new Set([...soldByDecision, ...soldFills].map((d) => d.symbol))
 
   let cash = risk.deployable_cash
-  let openCount = positions.length
+  let openCount = trading.length
   let tradesLeft = risk.trades_remaining
   let newBuys = 0
 

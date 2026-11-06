@@ -113,3 +113,17 @@ export const trendOf = (fast: number | null, slow: number | null, price: number,
   if (Math.abs(gapPct) < deadBandPct) return "flat"
   return gapPct > 0 ? "up" : "down"
 }
+
+/**
+ * The long-term books' rule: the last completed week's close against its 200-day average. `bars`
+ * are completed daily bars, oldest first, `t` their start in ms; the week's close is the last bar
+ * that starts before `weekStart` (Monday 00:00 in the market's time). null without 200 bars by then.
+ */
+export const weeklyCloseVs200 = (bars: readonly { t: number; close: number }[], weekStart: number): { close: number; sma200: number; above: boolean } | null => {
+  let i = bars.length - 1
+  while (i >= 0 && bars[i].t >= weekStart) i -= 1
+  if (i < 199) return null
+  const close = bars[i].close
+  const sma200 = mean(bars.slice(i - 199, i + 1).map((b) => b.close))
+  return { close, sma200, above: close > sma200 }
+}

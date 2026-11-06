@@ -98,6 +98,8 @@ export type CryptoEntry = {
   takeProfitPrice: number
   /** The trend core's entry: no AI call to check (conviction, edge, reward:risk, a target). */
   rules?: boolean
+  /** The long-term book's entry (with `rules`): no stop; exempt from the per-position cap and the position count. */
+  longTerm?: boolean
   conviction: number
   netEdgeBps: number
   rewardRisk: number
@@ -118,11 +120,9 @@ export const evaluateCryptoEntry = (p: CryptoEntry, account: AccountState, gate:
   c.check("spread", p.spreadBps <= k.max_spread_bps, `spread ${p.spreadBps.toFixed(1)} bps (max ${k.max_spread_bps})`)
   c.check("strategy_enabled", settings.strategies[p.strategyId].enabled, `${p.strategyId} ${settings.strategies[p.strategyId].enabled ? "enabled" : "disabled"}`)
   c.check("not_held", !account.positions.some((h) => h.symbol === p.symbol), "no existing position (adding is disabled)")
-  c.check(
-    "max_positions",
-    account.positions.length < k.max_concurrent_positions,
-    `${account.positions.length}/${k.max_concurrent_positions} positions open`,
-  )
+  // The long-term book's holdings are fixed in number and don't take the trading positions' slots.
+  const trading = account.positions.filter((h) => h.strategyId !== "long_term").length
+  if (!p.longTerm) c.check("max_positions", trading < k.max_concurrent_positions, `${trading}/${k.max_concurrent_positions} trading positions open`)
   c.check("trades_per_day", account.tradesToday < k.max_trades_per_day, `${account.tradesToday}/${k.max_trades_per_day} trades today`)
   const lastExit = account.lastExitAt.get(p.symbol)
   const cooldownLeft = lastExit ? k.reentry_cooldown_minutes - (now - lastExit) / 60_000 : 0
@@ -134,11 +134,13 @@ export const evaluateCryptoEntry = (p: CryptoEntry, account: AccountState, gate:
     c.check("reward_risk", p.rewardRisk >= k.min_reward_risk, `reward:risk ${p.rewardRisk.toFixed(2)} (min ${k.min_reward_risk})`)
   }
   const stopPct = ((p.mid - p.stopPrice) / p.mid) * 100
-  c.check(
-    "stop_distance",
-    p.stopPrice < p.mid && stopPct >= k.min_stop_pct && stopPct <= k.max_stop_pct,
-    `stop ${p.stopPrice} is ${pct(stopPct)} below (allowed ${k.min_stop_pct}-${k.max_stop_pct}%)`,
-  )
+  if (!p.longTerm) {
+    c.check(
+      "stop_distance",
+      p.stopPrice < p.mid && stopPct >= k.min_stop_pct && stopPct <= k.max_stop_pct,
+      `stop ${p.stopPrice} is ${pct(stopPct)} below (allowed ${k.min_stop_pct}-${k.max_stop_pct}%)`,
+    )
+  }
   if (!p.rules) c.check("target_above", p.takeProfitPrice > p.mid, `target ${p.takeProfitPrice} vs price ${p.mid}`)
   const limitDevBps = ((p.limitPrice - p.mid) / p.mid) * 10_000
   c.check("limit_price_sane", limitDevBps >= 0 && limitDevBps <= k.max_slippage_bps + p.spreadBps / 2 + 1, `limit ${limitDevBps.toFixed(1)} bps above mid`)
@@ -153,7 +155,7 @@ export const evaluateCryptoEntry = (p: CryptoEntry, account: AccountState, gate:
   const strategyExposure = account.positions.filter((h) => h.strategyId === p.strategyId).reduce((s, h) => s + h.valueUsd, 0)
   const feeFactor = 1 + p.takerFeeBps / 10_000
   let allowed = requested
-  allowed = cap(c, "max_position", allowed, (eq * k.max_position_pct) / 100, `max position ${k.max_position_pct}% of equity`)
+  if (!p.longTerm) allowed = cap(c, "max_position", allowed, (eq * k.max_position_pct) / 100, `max position ${k.max_position_pct}% of equity`)
   allowed = cap(c, "asset_exposure", allowed, (eq * k.max_asset_exposure_pct) / 100, `max ${k.max_asset_exposure_pct}% per asset`)
   allowed = cap(c, "total_exposure", allowed, (eq * k.max_total_exposure_pct) / 100 - exposure, `total exposure ${pct((exposure / eq) * 100)} (max ${k.max_total_exposure_pct}%)`)
   allowed = cap(

@@ -79,6 +79,12 @@ export type DecisionInput = {
    * minimum hold. Every account gate and cap applies as to any entry.
    */
   rules?: boolean
+  /**
+   * The long-term book's entries (with `rules`): sized to this share of equity, with no stop or
+   * target (the weekly 200-day rule sells them); exempt from the per-position cap and the
+   * position count, not from the per-asset, exposure and cash caps.
+   */
+  longTerm?: { targetPct: number }
 }
 
 export const processDecision = async (ctx: EngineContext, i: DecisionInput): Promise<DecisionDoc> => {
@@ -153,7 +159,10 @@ export const processDecision = async (ctx: EngineContext, i: DecisionInput): Pro
     const limit = roundPrice(pair, quote.ask * (1 + settings.kraken.max_slippage_bps / 10_000))
     // Risk per trade, a little more or less by the agent's conviction (the core's is fixed); the risk engine's caps can only cut it.
     const riskPct = i.rules ? settings.core.risk_per_trade_pct : roundTo(settings.kraken.risk_per_trade_pct * convictionScale(d.conviction, settings.kraken.min_conviction, 100), 3)
-    const size = cryptoSize({ equity: riskState?.equityUsd ?? 0, price: quote.ask, stop, riskPct, maxPositionPct: settings.kraken.max_position_pct })
+    const equity = riskState?.equityUsd ?? 0
+    const size = i.longTerm
+      ? { qty: (equity * i.longTerm.targetPct) / 100 / quote.ask, notional: (equity * i.longTerm.targetPct) / 100, riskUsd: 0 }
+      : cryptoSize({ equity, price: quote.ask, stop, riskPct, maxPositionPct: settings.kraken.max_position_pct })
     const qty = roundQty(pair, size.qty)
     const walkIn = walkBook(quote.book.asks, qty, limit, "buy")
     const walkOut = walkBook(quote.book.bids, qty, null, "sell")
@@ -170,9 +179,15 @@ export const processDecision = async (ctx: EngineContext, i: DecisionInput): Pro
       notional_usd: roundTo(qty * limit, 2),
       risk_usd: roundTo(size.riskUsd, 2),
       limit_price: limit,
-      stop_price: roundPrice(pair, stop),
+      stop_price: i.longTerm ? null : roundPrice(pair, stop),
       take_profit_price: i.rules ? null : roundPrice(pair, target),
-      notes: [i.rules ? `risks ${riskPct}% of equity at the stop (the trend core); no target: the stop trails` : `risks ${riskPct}% of equity at the stop (conviction ${d.conviction})`],
+      notes: [
+        i.longTerm
+          ? `${i.longTerm.targetPct}% of equity, held long term: no stop or target; sold after a week closing below its 200-day average`
+          : i.rules
+            ? `risks ${riskPct}% of equity at the stop (the trend core); no target: the stop trails`
+            : `risks ${riskPct}% of equity at the stop (conviction ${d.conviction})`,
+      ],
     }
     risk = riskState
       ? evaluateCryptoEntry(
@@ -187,6 +202,7 @@ export const processDecision = async (ctx: EngineContext, i: DecisionInput): Pro
             stopPrice: stop,
             takeProfitPrice: target,
             rules: i.rules ?? false,
+            longTerm: !!i.longTerm,
             conviction: d.conviction,
             netEdgeBps: edge?.netEdgeBps ?? Number.NEGATIVE_INFINITY,
             rewardRisk: edge?.rewardRisk ?? 0,
@@ -221,7 +237,7 @@ export const processDecision = async (ctx: EngineContext, i: DecisionInput): Pro
           stop_price: doc.sizing.stop_price,
           take_profit_price: doc.sizing.take_profit_price,
           // The trailing stop keeps the entry's stop distance once the position is that far up.
-          trail_usd: quote.ask - stop,
+          trail_usd: i.longTerm ? null : quote.ask - stop,
           horizon_hours: d.horizon_hours,
         },
       })
@@ -242,9 +258,9 @@ export const processDecision = async (ctx: EngineContext, i: DecisionInput): Pro
             Quantity: filled,
             Price: `$${formatPrice(pair, avg)}`,
             Cost: `$${cost.toFixed(2)}${riskState?.equityUsd ? ` (${((cost / riskState.equityUsd) * 100).toFixed(1)}% of equity)` : ""}`,
-            Stop: `$${formatPrice(pair, stop)}`,
+            Stop: i.longTerm ? "none: sold after a week closing below its 200-day average" : `${formatPrice(pair, stop)}`,
             Target: i.rules ? "none: the stop trails" : `$${formatPrice(pair, target)}`,
-            Strategy: i.rules ? "trend core (rules)" : i.candidate.strategy.replace("_", " "),
+            Strategy: i.longTerm ? "long-term book (rules)" : i.rules ? "trend core (rules)" : i.candidate.strategy.replace("_", " "),
             Conviction: i.rules ? "rules" : `${d.conviction}/100`,
           },
         })

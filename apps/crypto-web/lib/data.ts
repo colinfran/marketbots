@@ -255,8 +255,9 @@ export const getAnalytics = async () => {
     trades: tradeStats(trades),
     // The rules against the agent's judgment (and the positions from before either).
     byBook: [
+      { key: "Long-term book (rules)", ...tradeStats(trades.filter((t) => t.strategy === "long_term")) },
       { key: "Trend core (rules)", ...tradeStats(trades.filter((t) => t.strategy === "core")) },
-      { key: "Agent and earlier", ...tradeStats(trades.filter((t) => t.strategy !== "core")) },
+      { key: "Agent and earlier", ...tradeStats(trades.filter((t) => t.strategy !== "core" && t.strategy !== "long_term")) },
     ],
     byStrategy: byKey((t) => t.strategy),
     bySymbol: byKey((t) => t.symbol),

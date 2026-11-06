@@ -189,7 +189,8 @@ export type CorePlanNote = { at: Date; review_id: string; action: string; text: 
 export const CORE_PLAN_NOTES = 12
 
 /** Which book a stock position belongs to. */
-export type Book = "core" | "trading"
+/** core: the trend core's; long_term: the long-term book's; trading: everything else (the agent's). */
+export type Book = "core" | "long_term" | "trading"
 
 /** The live plan for a stock position (options positions carry their own). */
 export type PositionPlanDoc = {
@@ -199,6 +200,8 @@ export type PositionPlanDoc = {
   take_profit: number | null
   /** The trailing stop's distance below the price, in $: the entry's stop distance (absent on plans from before 2026-11-06). */
   trail_usd?: number | null
+  /** A trailing stop this % below the price from the start (the long-term book's leaders), in place of trail_usd. */
+  trail_pct?: number | null
   horizon: Horizon
   setup: string
   thesis: string

@@ -304,6 +304,23 @@
               "enabled",
               "max_exposure_pct"
             ]
+          },
+          "long_term": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "max_exposure_pct": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              }
+            },
+            "required": [
+              "enabled",
+              "max_exposure_pct"
+            ]
           }
         },
         "required": [
@@ -313,7 +330,8 @@
           "momentum",
           "event_driven",
           "discretionary",
-          "core"
+          "core",
+          "long_term"
         ]
       },
       "core": {
@@ -351,6 +369,25 @@
           "stop_atr",
           "reentry_hours",
           "news_veto_hours"
+        ]
+      },
+      "long_term": {
+        "type": "object",
+        "properties": {
+          "btc_pct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 50
+          },
+          "eth_pct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 50
+          }
+        },
+        "required": [
+          "btc_pct",
+          "eth_pct"
         ]
       },
       "universe": {
@@ -786,6 +823,7 @@
       "schedule",
       "strategies",
       "core",
+      "long_term",
       "universe",
       "paper",
       "wire",
@@ -1108,6 +1146,24 @@
               "max_exposure_pct"
             ],
             "additionalProperties": false
+          },
+          "long_term": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "max_exposure_pct": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              }
+            },
+            "required": [
+              "enabled",
+              "max_exposure_pct"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -1117,7 +1173,8 @@
           "momentum",
           "event_driven",
           "discretionary",
-          "core"
+          "core",
+          "long_term"
         ],
         "additionalProperties": false
       },
@@ -1156,6 +1213,26 @@
           "stop_atr",
           "reentry_hours",
           "news_veto_hours"
+        ],
+        "additionalProperties": false
+      },
+      "long_term": {
+        "type": "object",
+        "properties": {
+          "btc_pct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 50
+          },
+          "eth_pct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 50
+          }
+        },
+        "required": [
+          "btc_pct",
+          "eth_pct"
         ],
         "additionalProperties": false
       },
@@ -1605,6 +1682,7 @@
       "schedule",
       "strategies",
       "core",
+      "long_term",
       "universe",
       "paper",
       "wire",

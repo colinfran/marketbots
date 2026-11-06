@@ -20,6 +20,7 @@ import { isSessionOpen, type Session } from "./session"
  */
 
 const isStock = (p: AlpacaPosition) => (p.asset_class ?? "us_equity") === "us_equity"
+const round2 = (n: number) => Math.round(n * 100) / 100
 
 const money = (n: number) => `${n < 0 ? "-" : ""}$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -66,6 +67,8 @@ export const ensureProtection = async (ctx: TradingContext): Promise<string[]> =
     if (qty < 1) continue
     const price = Number(position.current_price)
     const plan = planBySymbol.get(position.symbol)
+    // The long-term book's base holdings have no stop: a weekly close below the 200-day average sells them.
+    if (plan?.book === "long_term" && plan.stop_loss === null) continue
     // A plan with a stop and no target (the trend core's) gets a plain stop: it rides its trend.
     const stopOnly = !!plan && plan.stop_loss !== null && plan.take_profit === null
     const exits = resolveExits(price, plan?.stop_loss ?? null, plan?.take_profit ?? null, r, heldExitBounds(r))
@@ -130,8 +133,13 @@ const TRAIL_STEP = 0.005
  * stop still below it), and it starts once the price is that far above the entry, so a winner keeps
  * running and gives back at most that much of its gain. Stops only move up.
  */
-export const trailedStop = (plan: Pick<PositionPlanDoc, "stop_loss" | "trail_usd">, entry: number, price: number): { stop: number; trail: number } | null => {
+export const trailedStop = (plan: Pick<PositionPlanDoc, "stop_loss" | "trail_usd" | "trail_pct">, entry: number, price: number): { stop: number; trail: number } | null => {
   const current = plan.stop_loss
+  // A long-term leader's stop trails a fixed share of the price from the start.
+  if (plan.trail_pct) {
+    const stop = Math.floor(price * (1 - plan.trail_pct / 100) * 100) / 100
+    return current !== null && stop >= current + Math.max(0.01, price * TRAIL_STEP) ? { stop, trail: round2(price - stop) } : null
+  }
   const trail = plan.trail_usd ?? (current !== null && current < entry ? entry - current : null)
   if (trail === null || !(trail > 0) || price < entry + trail) return null
   const stop = Math.floor((price - trail) * 100) / 100
@@ -154,7 +162,7 @@ export const trailStops = async (ctx: TradingContext, positions: AlpacaPosition[
       // If placing the new exits fails, ensureProtection re-protects the shares at the plan's old levels in this same pass.
       await cancelSymbolOrders(ctx.alpaca, position.symbol)
       await protect(ctx, position.symbol, qty, next.stop, plan.take_profit, plan.decision_id)
-      await ctx.col.plans.updateOne({ _id: position.symbol }, { $set: { stop_loss: next.stop, trail_usd: next.trail, updated_at: new Date() } })
+      await ctx.col.plans.updateOne({ _id: position.symbol }, { $set: { stop_loss: next.stop, ...(plan.trail_pct ? {} : { trail_usd: next.trail }), updated_at: new Date() } })
       notes.push(`trailed ${position.symbol}: stop ${plan.stop_loss} → ${next.stop}`)
     } catch (error) {
       notes.push(`could not trail ${position.symbol}: ${errorMessage(error)}`)

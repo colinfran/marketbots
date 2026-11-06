@@ -18,6 +18,17 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     ],
   },
   {
+    title: "Long-term book (index ETFs and leaders held for months)",
+    fields: [
+      { path: "long_term.enabled", label: "On", kind: "boolean" },
+      { path: "long_term.spy_pct", label: "SPY (% of equity)", kind: "number" },
+      { path: "long_term.qqq_pct", label: "QQQ (% of equity)", kind: "number" },
+      { path: "long_term.leaders", label: "Leaders held", kind: "number" },
+      { path: "long_term.leader_pct", label: "Each leader (% of equity)", kind: "number" },
+      { path: "long_term.leader_trail_pct", label: "A leader's stop trails its price by (%)", kind: "number" },
+    ],
+  },
+  {
     title: "Stock sizing",
     fields: [
       { path: "risk.max_position_pct", label: "Max per position (% of equity)", kind: "number" },

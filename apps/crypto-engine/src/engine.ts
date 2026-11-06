@@ -24,6 +24,7 @@ import type { CandleCache } from "./market/candles"
 import type { MarketHub } from "./market/hub"
 import type { EngineContext } from "./orchestrator/context"
 import { CryptoCore } from "./orchestrator/core"
+import { CryptoLongTerm } from "./orchestrator/long-term"
 import { evaluateOutcomes } from "./orchestrator/outcomes"
 import { checkProtection } from "./orchestrator/protection"
 import { exitPosition, liquidateAll } from "./orchestrator/trading"
@@ -75,7 +76,7 @@ export type EngineDeps = {
  * The always-on engine. Owns the run state and every periodic job:
  *
  *   every 3s   position protection (stops, targets, trailing stops), regardless of pause or AI state
- *   every 1m   the trend core (./orchestrator/core): entries once an hour, trend-break exits once a day
+ *   every 1m   the long-term book (./orchestrator/long-term), then the trend core (./orchestrator/core): each acts once an hour
  *   every 15s  mark-to-market and the drawdown halt
  *   every 5s   heartbeat to MongoDB (the dashboard's Admin page)
  *   every 5m   portfolio snapshot and paper-wallet reconciliation
@@ -102,6 +103,8 @@ export class Engine {
   readonly agent: CryptoAgent
   /** The trend core: rules that hold trending pairs by themselves (docs/CRYPTO.md). */
   readonly core: CryptoCore
+  /** The long-term book: BTC and ETH held through swings, sold on a weekly close below the 200-day average. */
+  readonly longTerm: CryptoLongTerm
 
   private readonly abort = new AbortController()
   private readonly protectionInFlight = new Set<string>()
@@ -154,6 +157,11 @@ export class Engine {
       },
     })
     this.core = new CryptoCore(
+      this.ctx,
+      () => (d.state.state.agent_pause ? `entries paused by a breaker until the owner resumes them: ${d.state.state.agent_pause.reason}` : null),
+      () => this.agent.agent.current !== null,
+    )
+    this.longTerm = new CryptoLongTerm(
       this.ctx,
       () => (d.state.state.agent_pause ? `entries paused by a breaker until the owner resumes them: ${d.state.state.agent_pause.reason}` : null),
       () => this.agent.agent.current !== null,
@@ -300,7 +308,11 @@ export class Engine {
 
     const onError = (job: string) => (error: unknown) => log.warn(`${job} failed`, { error: errorMessage(error) })
     this.stops.push(every(3_000, () => checkProtection(this.ctx, this.protectionInFlight), onError("protection")))
-    this.stops.push(every(60_000, () => this.core.tick(), onError("trend core")))
+    // The long-term book first: it takes its share before the trend core fills what is left.
+    this.stops.push(every(60_000, async () => {
+      await this.longTerm.tick()
+      await this.core.tick()
+    }, onError("long-term book and trend core")))
     this.stops.push(every(15_000, () => this.markAndMonitor(), onError("mark-to-market"), { immediate: true }))
     this.stops.push(every(10_000, () => this.reporter.beat(), onError("heartbeat"), { immediate: true }))
     this.stops.push(every(5 * 60_000, () => this.periodic(), onError("snapshot")))

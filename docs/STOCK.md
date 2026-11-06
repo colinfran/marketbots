@@ -60,9 +60,19 @@ Rules, not the agent, hold the bot's core positions (`apps/stock-engine/src/bot/
 - Every buy and sell is a `decisions` document (`trigger_kind: "core"`, the checks `regime`, `rules_entry`, `size`); buys post to Discord when they fill, and its trend exits post too.
 - **The agent's overlay**: core positions show in YOUR BOOK as TREND CORE; the agent may raise their stops, and may sell one only in an episode news about it woke (or the owner's review), never on price alone.
 
+## The long-term book
+
+Index ETFs and long-term leaders held for months (in `bot/core.ts` with the trend core, `longTermLeaders` in `bot/core-rules.ts`; built 2026-11-06 at the owner's request, after the account ended a week holding nothing because every position was a day trade). It runs in the trend core's daily pass, 30 minutes after the open, after the core's exits and before its entries, so it takes its share first:
+
+- **Base**: SPY (`long_term.spy_pct`, 15%) and QQQ (`long_term.qqq_pct`, 10%), with **no stop**: maintenance gives them no default exits.
+- **Leaders**: `long_term.leaders` (5) stocks at `long_term.leader_pct` (5%) each, the strongest on 12-month momentum skipping the last month (from 252 to 21 sessions ago), above their 200-day average, daily ATR at most 6%, from the trend core's pool. Each gets a GTC stop `long_term.leader_trail_pct` (20%) below the fill that maintenance trails at that percentage below the price (`trail_pct`).
+- **Sells**: any holding after a week closing below its 200-day average (the last session before this week's Monday against the average then, `weeklyCloseVs200`); a leader also on its trailing stop, or at the month's first plan when it is no longer among the top three times as many as the book holds (the refresh).
+- **Buys**: a base ETF whose last weekly close is above its average, and leaders for the free slots (skipping a stock sold within `core.reentry_hours` or with negative news within `core.news_veto_hours`), each its share of equity within deployable cash. Not while the drawdown breaker pauses entries, the engine is paused or the day's loss limit blocks buys.
+- Its plans have `book: "long_term"`, `horizon: "multi_day"`; they don't count toward `risk.max_open_positions` (for the agent or the trend core), the overnight rules keep them, and its trades are `decisions` documents (`trigger_kind: "long_term"`). `long_term.enabled` turns it off. The agent sees them as LONG-TERM BOOK and may sell one only when news about it woke it.
+
 ## The agent
 
-An agent on the local model decides beside the trend core (above), which trades by fixed rules ([plans/LOCAL-AI.md §8](plans/LOCAL-AI.md#8-the-agent), `@mb/agent` and `src/agent/`). Code watches the session, prices, the setup screen and the news all the time and wakes it when something matters; in each wake-up (an *episode*) it looks things up one step at a time and decides. There are no timed cycles. Its level is `agent.level` in Admin:
+An agent on the local model decides beside the trend core and the long-term book (above), which trades by fixed rules ([plans/LOCAL-AI.md §8](plans/LOCAL-AI.md#8-the-agent), `@mb/agent` and `src/agent/`). Code watches the session, prices, the setup screen and the news all the time and wakes it when something matters; in each wake-up (an *episode*) it looks things up one step at a time and decides. There are no timed cycles. Its level is `agent.level` in Admin:
 
 - **on** (the default): it trades the Alpaca paper account, **stocks and options**, through the bot's own risk checks and execution, inside its envelope.
 - **off**: nothing decides. Stops and targets rest at the broker, and the options monitor, maintenance and the overnight rules run either way.

@@ -223,7 +223,7 @@ export type AiCallDoc = {
 }
 
 /** What started a cycle (absent on cycles from before it was recorded). core = a review of the long-term core book; agent = an agent episode (its decisions' cycle_id is the episode's id). */
-export type CycleKind = "scheduled" | "price_move" | "manual" | "event" | "seed" | "core" | "agent"
+export type CycleKind = "scheduled" | "price_move" | "manual" | "event" | "seed" | "core" | "long_term" | "agent"
 
 /** Rate-limit counter for the dashboard's sign-in endpoints, keyed by a hash of client IP + path. */
 export type LoginAttemptDoc = { _id: string; count: number; first_at: Date; expires_at: Date }

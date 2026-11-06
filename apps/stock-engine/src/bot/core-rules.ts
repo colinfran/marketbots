@@ -30,7 +30,19 @@ const NEAR_HIGH = 0.75
 /** Fund names of leveraged, inverse and volatility products. */
 export const GEARED_NAME = /\b(\d+(\.\d+)?x|ultra|ultrapro|leveraged|inverse|bear|bull|daily|vix|volatility)\b/i
 
-export type CoreStats = { symbol: string; close: number; sma50: number; sma200: number; high252: number; ret126Pct: number; atrPct: number; rsi: number; strength: number }
+export type CoreStats = {
+  symbol: string
+  close: number
+  sma50: number
+  sma200: number
+  high252: number
+  ret126Pct: number
+  /** 12-month return skipping the last month (from 252 to 21 sessions ago), %; null without 253 sessions. */
+  ret12_1Pct: number | null
+  atrPct: number
+  rsi: number
+  strength: number
+}
 
 export type CorePick = { symbol: string; close: number; stop_pct: number; strength: number; signal: string }
 
@@ -54,6 +66,7 @@ export const coreStats = (symbol: string, bars: Bar[]): CoreStats | null => {
     sma200,
     high252: Math.max(...bars.slice(-252).map((b) => b.h)),
     ret126Pct,
+    ret12_1Pct: closes.length >= 253 && closes.at(-253)! > 0 ? (closes.at(-22)! / closes.at(-253)! - 1) * 100 : null,
     atrPct,
     rsi: rsi14,
     strength: atrPct > 0 ? ret126Pct / atrPct : 0,
@@ -87,3 +100,13 @@ export const coreCandidates = (stats: CoreStats[], settings: Settings): CorePick
 
 /** A core position's trend broke: its last close below its 50-day average. */
 export const coreTrendBroken = (s: Pick<CoreStats, "close" | "sma50">) => s.close < s.sma50
+
+/**
+ * The long-term book's leaders: stocks above their 200-day average with a positive 12-month return
+ * (skipping the last month, the classic momentum measure), a daily ATR of at most 6%, ranked by
+ * that return.
+ */
+export const longTermLeaders = (stats: CoreStats[], settings: Settings): CoreStats[] =>
+  stats
+    .filter((s) => s.ret12_1Pct !== null && s.ret12_1Pct > 0 && s.close > s.sma200 && s.close >= settings.risk.min_price && s.atrPct <= MAX_ATR_PCT)
+    .sort((a, b) => b.ret12_1Pct! - a.ret12_1Pct!)

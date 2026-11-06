@@ -85,7 +85,8 @@
               "momentum",
               "event_driven",
               "discretionary",
-              "core"
+              "core",
+              "long_term"
             ]
           },
           "enabled": {

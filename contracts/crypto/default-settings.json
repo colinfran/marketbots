@@ -60,6 +60,10 @@
     "core": {
       "enabled": true,
       "max_exposure_pct": 90
+    },
+    "long_term": {
+      "enabled": true,
+      "max_exposure_pct": 50
     }
   },
   "core": {
@@ -68,6 +72,10 @@
     "stop_atr": 2.5,
     "reentry_hours": 48,
     "news_veto_hours": 24
+  },
+  "long_term": {
+    "btc_pct": 25,
+    "eth_pct": 15
   },
   "universe": {
     "kraken_symbols": [

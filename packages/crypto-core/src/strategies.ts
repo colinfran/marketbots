@@ -5,10 +5,10 @@
  * make money and how that claim is tested.
  */
 
-export const STRATEGY_IDS = ["trend", "daily_trend", "mean_reversion", "momentum", "event_driven", "discretionary", "core"] as const
+export const STRATEGY_IDS = ["trend", "daily_trend", "mean_reversion", "momentum", "event_driven", "discretionary", "core", "long_term"] as const
 export type StrategyId = (typeof STRATEGY_IDS)[number]
 
-/** The strategies an agent entry can follow: every one but the trend core, which trades by its own rules. */
+/** The strategies an agent entry can follow: every one but the trend core and the long-term book, which trade by their own rules. */
 export const AGENT_STRATEGY_IDS = ["trend", "daily_trend", "mean_reversion", "momentum", "event_driven", "discretionary"] as const satisfies readonly StrategyId[]
 
 export type StrategyInfo = {
@@ -88,5 +88,14 @@ export const STRATEGIES: Record<StrategyId, StrategyInfo> = {
       "Time-series momentum is crypto's best-documented edge, and it pays through a few large trends: being invested in them, with losses cut at the stop and winners left to run, matters more than picking entries. Rules don't hesitate, trim winners or sit in cash.",
     evaluation: "Compared with holding BTC and an equal-weight basket of the universe over the same weeks: return, drawdown, and how much of each trend it caught after fees.",
     ai_role: "An overlay: news negative enough to veto an entry blocks it, and the agent may close a core position only when news about it woke the agent.",
+  },
+  long_term: {
+    id: "long_term",
+    name: "Long-term book",
+    summary: "Rules, not the AI: holds BTC (25% of equity) and ETH (15%) for the long term, through short-term swings, and sells one only after a week closing below its 200-day average (buying it back after a week closing above).",
+    rationale:
+      "Most of crypto's return has come from a few long bull markets. Holding the two largest coins through them, and stepping aside only when the long-term trend breaks, captures that without trading the noise.",
+    evaluation: "Compared with simply holding BTC and ETH: does stepping aside below the 200-day average cut drawdowns more than it costs in missed upside?",
+    ai_role: "None in its rules; the agent may close one of its positions only when news about it woke the agent.",
   },
 }

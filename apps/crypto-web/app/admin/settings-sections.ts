@@ -16,6 +16,13 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     ],
   },
   {
+    title: "Long-term book (on/off and exposure cap under Strategies)",
+    fields: [
+      { path: "long_term.btc_pct", label: "BTC held long term (% of equity)", kind: "number" },
+      { path: "long_term.eth_pct", label: "ETH held long term (% of equity)", kind: "number" },
+    ],
+  },
+  {
     title: "Position sizing & exposure",
     fields: [
       { path: "kraken.risk_per_trade_pct", label: "Risk per trade (% of equity lost at the stop)", kind: "number", step: 0.05 },

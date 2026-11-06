@@ -100,6 +100,14 @@ export const coreSettingsSchema = z.object({
   news_veto_hours: z.number().min(0).max(168),
 })
 
+/** The long-term book (strategies.long_term turns it on and caps its exposure): BTC and ETH held through swings. */
+export const longTermSettingsSchema = z.object({
+  /** BTC's share of equity, %. 0: not held. */
+  btc_pct: pct(0, 50),
+  /** ETH's share of equity, %. 0: not held. */
+  eth_pct: pct(0, 50),
+})
+
 export const strategySettingsSchema = z.object({
   enabled: z.boolean(),
   /** Max % of account equity allocated to this strategy's open positions. */
@@ -147,6 +155,7 @@ export const settingsSchema = z
     schedule: scheduleSettingsSchema,
     strategies: z.object(strategiesShape),
     core: coreSettingsSchema,
+    long_term: longTermSettingsSchema,
     universe: z.object({
       kraken_symbols: z.array(z.string().regex(SYMBOL_PATTERN)).min(1).max(30),
     }),
@@ -217,6 +226,7 @@ export const DEFAULT_SETTINGS: Settings = {
     event_driven: { enabled: true, max_exposure_pct: 40 },
     discretionary: { enabled: true, max_exposure_pct: 30 },
     core: { enabled: true, max_exposure_pct: 90 },
+    long_term: { enabled: true, max_exposure_pct: 50 },
   },
   core: {
     max_positions: 5,
@@ -224,6 +234,10 @@ export const DEFAULT_SETTINGS: Settings = {
     stop_atr: 2.5,
     reentry_hours: 48,
     news_veto_hours: 24,
+  },
+  long_term: {
+    btc_pct: 25,
+    eth_pct: 15,
   },
   universe: {
     kraken_symbols: ["BTC/USD", "ETH/USD", "SOL/USD", "XRP/USD", "DOGE/USD", "ADA/USD", "LINK/USD", "AVAX/USD", "LTC/USD", "DOT/USD"],
