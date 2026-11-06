@@ -84,7 +84,8 @@
               "mean_reversion",
               "momentum",
               "event_driven",
-              "discretionary"
+              "discretionary",
+              "core"
             ]
           },
           "enabled": {

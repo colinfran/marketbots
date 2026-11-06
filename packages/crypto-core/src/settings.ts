@@ -86,6 +86,20 @@ export const scheduleSettingsSchema = z.object({
   trigger_move_atr: z.number().min(0.5).max(10),
 })
 
+/** The trend core (strategies.core turns it on and caps its exposure): rules that hold trending pairs by themselves. */
+export const coreSettingsSchema = z.object({
+  /** Most positions the core holds at once. */
+  max_positions: int(0, 20),
+  /** Equity lost if a core position's first stop is hit, as % of equity. */
+  risk_per_trade_pct: pct(0.05, 5),
+  /** The first stop's distance in daily ATRs, kept inside kraken.min_stop_pct–max_stop_pct; the stop then trails at that distance. */
+  stop_atr: z.number().min(0.5).max(10),
+  /** No core re-entry in a pair this long after the core left it. */
+  reentry_hours: z.number().min(0).max(720),
+  /** No core entry in a pair with negative news at review severity or above this recent (0: no veto). */
+  news_veto_hours: z.number().min(0).max(168),
+})
+
 export const strategySettingsSchema = z.object({
   enabled: z.boolean(),
   /** Max % of account equity allocated to this strategy's open positions. */
@@ -132,6 +146,7 @@ export const settingsSchema = z
     ai: aiSettingsSchema,
     schedule: scheduleSettingsSchema,
     strategies: z.object(strategiesShape),
+    core: coreSettingsSchema,
     universe: z.object({
       kraken_symbols: z.array(z.string().regex(SYMBOL_PATTERN)).min(1).max(30),
     }),
@@ -201,6 +216,14 @@ export const DEFAULT_SETTINGS: Settings = {
     momentum: { enabled: true, max_exposure_pct: 55 },
     event_driven: { enabled: true, max_exposure_pct: 40 },
     discretionary: { enabled: true, max_exposure_pct: 30 },
+    core: { enabled: true, max_exposure_pct: 90 },
+  },
+  core: {
+    max_positions: 5,
+    risk_per_trade_pct: 1,
+    stop_atr: 2.5,
+    reentry_hours: 48,
+    news_veto_hours: 24,
   },
   universe: {
     kraken_symbols: ["BTC/USD", "ETH/USD", "SOL/USD", "XRP/USD", "DOGE/USD", "ADA/USD", "LINK/USD", "AVAX/USD", "LTC/USD", "DOT/USD"],

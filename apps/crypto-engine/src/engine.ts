@@ -23,6 +23,7 @@ import type { Executor } from "./execution/executor"
 import type { CandleCache } from "./market/candles"
 import type { MarketHub } from "./market/hub"
 import type { EngineContext } from "./orchestrator/context"
+import { CryptoCore } from "./orchestrator/core"
 import { evaluateOutcomes } from "./orchestrator/outcomes"
 import { checkProtection } from "./orchestrator/protection"
 import { exitPosition, liquidateAll } from "./orchestrator/trading"
@@ -73,7 +74,8 @@ export type EngineDeps = {
 /**
  * The always-on engine. Owns the run state and every periodic job:
  *
- *   every 3s   position protection (stops / targets), regardless of pause or AI state
+ *   every 3s   position protection (stops, targets, trailing stops), regardless of pause or AI state
+ *   every 1m   the trend core (./orchestrator/core): entries once an hour, trend-break exits once a day
  *   every 15s  mark-to-market and the drawdown halt
  *   every 5s   heartbeat to MongoDB (the dashboard's Admin page)
  *   every 5m   portfolio snapshot and paper-wallet reconciliation
@@ -96,8 +98,10 @@ export class Engine {
   readonly ctx: EngineContext
   readonly control: ControlPlane<EngineRunStatus, WireItemDoc>
   readonly policy: WirePolicy
-  /** The agent (docs/plans/LOCAL-AI.md §8): the only thing that decides. */
+  /** The agent (docs/plans/LOCAL-AI.md §8): decides on news, setups and its book. */
   readonly agent: CryptoAgent
+  /** The trend core: rules that hold trending pairs by themselves (docs/CRYPTO.md). */
+  readonly core: CryptoCore
 
   private readonly abort = new AbortController()
   private readonly protectionInFlight = new Set<string>()
@@ -149,6 +153,11 @@ export class Engine {
         peak: (p) => d.state.update({ agent_promotion: p }, "engine", "agent.new_peak", {}),
       },
     })
+    this.core = new CryptoCore(
+      this.ctx,
+      () => (d.state.state.agent_pause ? `entries paused by a breaker until the owner resumes them: ${d.state.state.agent_pause.reason}` : null),
+      () => this.agent.agent.current !== null,
+    )
     this.commands = new CommandProcessor(d.db.col, d.bus, d.log.child({ component: "commands" }), (c, doc) => this.handleCommand(c, doc))
     d.stream.setCommands(this.commands)
     d.hub.heldSymbols = () => this.heldSymbols
@@ -291,6 +300,7 @@ export class Engine {
 
     const onError = (job: string) => (error: unknown) => log.warn(`${job} failed`, { error: errorMessage(error) })
     this.stops.push(every(3_000, () => checkProtection(this.ctx, this.protectionInFlight), onError("protection")))
+    this.stops.push(every(60_000, () => this.core.tick(), onError("trend core")))
     this.stops.push(every(15_000, () => this.markAndMonitor(), onError("mark-to-market"), { immediate: true }))
     this.stops.push(every(10_000, () => this.reporter.beat(), onError("heartbeat"), { immediate: true }))
     this.stops.push(every(5 * 60_000, () => this.periodic(), onError("snapshot")))

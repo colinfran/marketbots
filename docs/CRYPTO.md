@@ -83,7 +83,7 @@ The CLI runs via `execFile` (no shell), with validated arguments, a minimal envi
 
 ## The agent
 
-An agent on the local model is the only thing that decides ([plans/LOCAL-AI.md §8](plans/LOCAL-AI.md#8-the-agent), `@mb/agent` and `src/agent/`). Code watches everything all the time and wakes it when something matters; in each wake-up (an *episode*) it looks things up one step at a time and decides. There are no timed cycles. Its level is `agent.level` in Admin:
+An agent on the local model decides beside the trend core (below), which trades by fixed rules ([plans/LOCAL-AI.md §8](plans/LOCAL-AI.md#8-the-agent), `@mb/agent` and `src/agent/`). Code watches everything all the time and wakes it when something matters; in each wake-up (an *episode*) it looks things up one step at a time and decides. There are no timed cycles. Its level is `agent.level` in Admin:
 
 - **on** (the default): it trades the paper wallet through the bot's own sizing, risk engine and executor, inside its envelope.
 - **off**: nothing decides. Protection (stops and targets every 3 s), marks, reconciliation, the drawdown halt and outcome scoring run either way.
@@ -152,9 +152,21 @@ The timed cycles' research modes and event-cycle timings are gone with the cycle
 
 **Failure behavior**: the wire never throws into the engine. A broken source, a bad payload or a database hiccup costs at most that batch of items, and trading goes on as it would without the wire. On boot the cluster index and seen ids are rebuilt from MongoDB, and nothing from a source's first poll can trigger, so a restart never replays old news as new. A dead scraper sidecar only takes the headless sources down. Settings change live from Admin (`wire.mode: off` turns the whole engine off; `disabled_sources` turns single sources off).
 
+## The trend core
+
+Rules, not the agent, hold the bot's core positions (`apps/crypto-engine/src/strategies/core.ts` for the rules, `src/orchestrator/core.ts` for the runner; built 2026-11-06, when the owner chose a rule-based core with the agent as an overlay because the agent alone sat in cash and lost money). Time-series momentum is crypto's best-documented edge, and it pays through a few large trends: the core's job is to be in them, cut losers at the stop and let winners run.
+
+- **Regime**: new entries only while BTC trades above its 50-day average.
+- **Entry**, once an hour, 3 minutes after the hourly candle closes: a pair above a 50-day average that is above its 200-day, with a positive 30-day return and a daily RSI under 80, ranked by 30-day return per unit of daily volatility (30-day % ÷ daily ATR %). The strongest fill the free slots (`core.max_positions`, 5). It skips a pair it already holds (the agent's included), one it left within `core.reentry_hours` (48), and one with negative news (polarity −1) at review severity or above within `core.news_veto_hours` (24).
+- **Size**: `core.risk_per_trade_pct` (1%) of equity at a stop `core.stop_atr` (2.5) daily ATRs below, kept inside `kraken.min_stop_pct`–`max_stop_pct`; every risk engine gate and cap applies (`evaluateCryptoEntry` with `rules`: no conviction, edge, reward:risk or target checks). **No target.**
+- **Exit**: the trailing stop (the protection loop), or the trend breaking: below the 50-day average at the daily close (checked in the 00:03 UTC run, with no minimum hold).
+- It waits while an agent episode runs, and opens nothing while the drawdown breaker pauses entries or the engine's gate refuses them. `strategies.core.enabled` turns it off and `strategies.core.max_exposure_pct` (90) caps it.
+- Every entry and exit is a `decisions` document (`trigger_kind: "core"`, model `rules`, prompt version `trend-core-v1`), scored like any other; buys and its trend exits post to Discord.
+- **The agent's overlay**: core positions show in YOUR BOOK as TREND CORE; the agent may raise their stops, and may close one only in an episode news about it woke (or the owner's review), never on price alone (`newsWoke`).
+
 ## Strategies
 
-Trend following, mean reversion, relative strength and event-driven shocks. Each states its economic rationale (`packages/crypto-core/src/strategies.ts`). Strategies only *propose*: their screens wake the agent with setups, the agent decides, and the risk engine disposes. Each can be enabled or disabled and capped per strategy (Admin → Strategies).
+Trend following, mean reversion, relative strength and event-driven shocks, and the trend core above. Each states its economic rationale (`packages/crypto-core/src/strategies.ts`). Apart from the core, strategies only *propose*: their screens wake the agent with setups, the agent decides, and the risk engine disposes. Each can be enabled or disabled and capped per strategy (Admin → Strategies).
 
 Not every setup a screen finds is worth the agent's time. A setup whose own stop and target can't pass the risk engine (reward:risk under `min_reward_risk`, or a target too close to beat the estimated round trip by `min_edge_bps` even at the highest probability the engine allows) doesn't wake it, and one it was asked about recently waits: a day for daily-trend setups, which only change with a new daily candle, and 2 hours for the others.
 

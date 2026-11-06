@@ -73,6 +73,12 @@ export type DecisionInput = {
   wireItemIds?: string[]
   /** The agent's decisions: the episode, recorded on the decision. */
   agent?: { episodeId: string }
+  /**
+   * The trend core's decisions: an entry risks core.risk_per_trade_pct, has no target (its stop
+   * trails), and skips the checks of an AI's call (conviction, edge, reward:risk); an exit has no
+   * minimum hold. Every account gate and cap applies as to any entry.
+   */
+  rules?: boolean
 }
 
 export const processDecision = async (ctx: EngineContext, i: DecisionInput): Promise<DecisionDoc> => {
@@ -145,8 +151,8 @@ export const processDecision = async (ctx: EngineContext, i: DecisionInput): Pro
     const target = d.take_profit && d.take_profit > quote.mid ? d.take_profit : i.candidate.target_hint
     const riskState = await ctx.ledger.riskState()
     const limit = roundPrice(pair, quote.ask * (1 + settings.kraken.max_slippage_bps / 10_000))
-    // Risk per trade, a little more or less by conviction; the risk engine's caps can only cut it.
-    const riskPct = roundTo(settings.kraken.risk_per_trade_pct * convictionScale(d.conviction, settings.kraken.min_conviction, 100), 3)
+    // Risk per trade, a little more or less by the agent's conviction (the core's is fixed); the risk engine's caps can only cut it.
+    const riskPct = i.rules ? settings.core.risk_per_trade_pct : roundTo(settings.kraken.risk_per_trade_pct * convictionScale(d.conviction, settings.kraken.min_conviction, 100), 3)
     const size = cryptoSize({ equity: riskState?.equityUsd ?? 0, price: quote.ask, stop, riskPct, maxPositionPct: settings.kraken.max_position_pct })
     const qty = roundQty(pair, size.qty)
     const walkIn = walkBook(quote.book.asks, qty, limit, "buy")
@@ -154,7 +160,7 @@ export const processDecision = async (ctx: EngineContext, i: DecisionInput): Pro
     const inSlip = walkIn.avgPrice ? slippageBps(walkIn.avgPrice, quote.mid, "buy") - quote.spreadBps / 2 : settings.kraken.max_slippage_bps
     const outSlip = walkOut.avgPrice ? slippageBps(walkOut.avgPrice, quote.mid, "sell") - quote.spreadBps / 2 : settings.kraken.max_slippage_bps
     const roundTrip = roundTripCostBps({ takerFeeBps: i.takerBps, spreadBps: quote.spreadBps, entrySlippageBps: inSlip, exitSlippageBps: outSlip })
-    const edge = cryptoEdge({ price: quote.mid, stop, target, pAi: d.p_target_first, shrink: settings.ai.probability_shrink, roundTripBps: roundTrip })
+    const edge = i.rules ? null : cryptoEdge({ price: quote.mid, stop, target, pAi: d.p_target_first, shrink: settings.ai.probability_shrink, roundTripBps: roundTrip })
     doc.costs = { ...doc.costs, slippage_bps: roundTo(inSlip + outSlip, 2), round_trip_bps: roundTo(roundTrip, 2), fee_usd_est: roundTo((2 * size.notional * i.takerBps) / 10_000, 4) }
     if (edge) {
       doc.ev = { p_prior: roundTo(edge.pPrior, 4), p_adjusted: roundTo(edge.pAdjusted, 4), gross_edge_bps: roundTo(edge.grossEdgeBps, 2), net_edge_bps: roundTo(edge.netEdgeBps, 2) }
@@ -165,8 +171,8 @@ export const processDecision = async (ctx: EngineContext, i: DecisionInput): Pro
       risk_usd: roundTo(size.riskUsd, 2),
       limit_price: limit,
       stop_price: roundPrice(pair, stop),
-      take_profit_price: roundPrice(pair, target),
-      notes: [`risks ${riskPct}% of equity at the stop (conviction ${d.conviction})`],
+      take_profit_price: i.rules ? null : roundPrice(pair, target),
+      notes: [i.rules ? `risks ${riskPct}% of equity at the stop (the trend core); no target: the stop trails` : `risks ${riskPct}% of equity at the stop (conviction ${d.conviction})`],
     }
     risk = riskState
       ? evaluateCryptoEntry(
@@ -180,6 +186,7 @@ export const processDecision = async (ctx: EngineContext, i: DecisionInput): Pro
             limitPrice: limit,
             stopPrice: stop,
             takeProfitPrice: target,
+            rules: i.rules ?? false,
             conviction: d.conviction,
             netEdgeBps: edge?.netEdgeBps ?? Number.NEGATIVE_INFINITY,
             rewardRisk: edge?.rewardRisk ?? 0,
@@ -236,9 +243,9 @@ export const processDecision = async (ctx: EngineContext, i: DecisionInput): Pro
             Price: `$${formatPrice(pair, avg)}`,
             Cost: `$${cost.toFixed(2)}${riskState?.equityUsd ? ` (${((cost / riskState.equityUsd) * 100).toFixed(1)}% of equity)` : ""}`,
             Stop: `$${formatPrice(pair, stop)}`,
-            Target: `$${formatPrice(pair, target)}`,
-            Strategy: i.candidate.strategy.replace("_", " "),
-            Conviction: `${d.conviction}/100`,
+            Target: i.rules ? "none: the stop trails" : `$${formatPrice(pair, target)}`,
+            Strategy: i.rules ? "trend core (rules)" : i.candidate.strategy.replace("_", " "),
+            Conviction: i.rules ? "rules" : `${d.conviction}/100`,
           },
         })
       }
@@ -248,7 +255,7 @@ export const processDecision = async (ctx: EngineContext, i: DecisionInput): Pro
   } else if (d.action === "buy") {
     doc.execution = { ...doc.execution, status: "skipped", notes: ["no live order book at execution time"] }
   } else if ((d.action === "reduce" || d.action === "close") && i.position) {
-    const check = evaluateExit({ reason: "ai", openedAt: i.position.opened_at.getTime(), venueOnline: ctx.hub.tradingOnline, minHoldMinutes: settings.kraken.min_hold_minutes })
+    const check = evaluateExit({ reason: i.rules ? "rules" : "ai", openedAt: i.position.opened_at.getTime(), venueOnline: ctx.hub.tradingOnline, minHoldMinutes: settings.kraken.min_hold_minutes })
     doc.risk = { approved: check.approved, resized: false, checks: check.checks, reasons: check.reasons }
     risk = { approved: check.approved, resized: false, qty: 0, notionalUsd: 0, checks: check.checks, reasons: check.reasons }
     if (check.approved) {

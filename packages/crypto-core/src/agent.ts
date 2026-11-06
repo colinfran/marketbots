@@ -1,7 +1,7 @@
 import { agentAnswerFields } from "@mb/core/agent"
 import { z } from "zod"
 import { cryptoDecisionSchema, evidenceSchema, normalizeCryptoDecision, type NormalizedCryptoDecision } from "./report"
-import { STRATEGY_IDS, type StrategyId } from "./strategies"
+import { AGENT_STRATEGY_IDS, type StrategyId } from "./strategies"
 
 /**
  * The crypto agent's answer (docs/plans/LOCAL-AI.md §8.4): the cycle's decision schema, about what
@@ -25,7 +25,7 @@ export const cryptoAgentDecisionSchema = cryptoDecisionSchema.omit({ size_pct_of
   thesis: z.string().describe("2-3 sentences: why this action, why now. Cite numbers from the brief or your tool results."),
   bull_evidence: z.array(agentEvidenceSchema).describe("1-5 items for upside."),
   bear_evidence: z.array(agentEvidenceSchema).describe("1-5 counterarguments and downside risks. Always include at least one."),
-  strategy: z.enum(STRATEGY_IDS).nullable().describe("BUY only: the strategy the entry follows (discretionary when none fits). null otherwise."),
+  strategy: z.enum(AGENT_STRATEGY_IDS).nullable().describe("BUY only: the strategy the entry follows (discretionary when none fits). null otherwise."),
 })
 
 /** At most this many decisions about pairs not held (buys and no_trades) per answer; any held position may get one too. */

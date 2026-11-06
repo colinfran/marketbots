@@ -287,6 +287,23 @@
               "enabled",
               "max_exposure_pct"
             ]
+          },
+          "core": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "max_exposure_pct": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              }
+            },
+            "required": [
+              "enabled",
+              "max_exposure_pct"
+            ]
           }
         },
         "required": [
@@ -295,7 +312,45 @@
           "mean_reversion",
           "momentum",
           "event_driven",
-          "discretionary"
+          "discretionary",
+          "core"
+        ]
+      },
+      "core": {
+        "type": "object",
+        "properties": {
+          "max_positions": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 20
+          },
+          "risk_per_trade_pct": {
+            "type": "number",
+            "minimum": 0.05,
+            "maximum": 5
+          },
+          "stop_atr": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 10
+          },
+          "reentry_hours": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 720
+          },
+          "news_veto_hours": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 168
+          }
+        },
+        "required": [
+          "max_positions",
+          "risk_per_trade_pct",
+          "stop_atr",
+          "reentry_hours",
+          "news_veto_hours"
         ]
       },
       "universe": {
@@ -730,6 +785,7 @@
       "ai",
       "schedule",
       "strategies",
+      "core",
       "universe",
       "paper",
       "wire",
@@ -1034,6 +1090,24 @@
               "max_exposure_pct"
             ],
             "additionalProperties": false
+          },
+          "core": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "max_exposure_pct": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              }
+            },
+            "required": [
+              "enabled",
+              "max_exposure_pct"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -1042,7 +1116,46 @@
           "mean_reversion",
           "momentum",
           "event_driven",
-          "discretionary"
+          "discretionary",
+          "core"
+        ],
+        "additionalProperties": false
+      },
+      "core": {
+        "type": "object",
+        "properties": {
+          "max_positions": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 20
+          },
+          "risk_per_trade_pct": {
+            "type": "number",
+            "minimum": 0.05,
+            "maximum": 5
+          },
+          "stop_atr": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 10
+          },
+          "reentry_hours": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 720
+          },
+          "news_veto_hours": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 168
+          }
+        },
+        "required": [
+          "max_positions",
+          "risk_per_trade_pct",
+          "stop_atr",
+          "reentry_hours",
+          "news_veto_hours"
         ],
         "additionalProperties": false
       },
@@ -1491,6 +1604,7 @@
       "ai",
       "schedule",
       "strategies",
+      "core",
       "universe",
       "paper",
       "wire",

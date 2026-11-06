@@ -5,8 +5,11 @@
  * make money and how that claim is tested.
  */
 
-export const STRATEGY_IDS = ["trend", "daily_trend", "mean_reversion", "momentum", "event_driven", "discretionary"] as const
+export const STRATEGY_IDS = ["trend", "daily_trend", "mean_reversion", "momentum", "event_driven", "discretionary", "core"] as const
 export type StrategyId = (typeof STRATEGY_IDS)[number]
+
+/** The strategies an agent entry can follow: every one but the trend core, which trades by its own rules. */
+export const AGENT_STRATEGY_IDS = ["trend", "daily_trend", "mean_reversion", "momentum", "event_driven", "discretionary"] as const satisfies readonly StrategyId[]
 
 export type StrategyInfo = {
   id: StrategyId
@@ -75,5 +78,15 @@ export const STRATEGIES: Record<StrategyId, StrategyInfo> = {
       "Not a strategy with an edge of its own: a way to put a specific pair in front of the research desk (a catalyst you noticed, or simply to test the pipeline). Tracked separately so it can't flatter the screened strategies.",
     evaluation: "Scored like every decision (forward returns after costs). Disable it if it doesn't earn its keep.",
     ai_role: "Everything: with no screen signal behind it, the AI has to find a reason to trade, and no_trade is the expected default.",
+  },
+  core: {
+    id: "core",
+    name: "Trend core",
+    summary:
+      "Rules, not the AI: while BTC is above its 50-day average, holds the strongest coins in a long-term uptrend (above a 50-day average that is above the 200-day, ranked by 30-day return per unit of daily volatility), each risking 1% of equity at a 2.5-ATR stop that trails winners.",
+    rationale:
+      "Time-series momentum is crypto's best-documented edge, and it pays through a few large trends: being invested in them, with losses cut at the stop and winners left to run, matters more than picking entries. Rules don't hesitate, trim winners or sit in cash.",
+    evaluation: "Compared with holding BTC and an equal-weight basket of the universe over the same weeks: return, drawdown, and how much of each trend it caught after fees.",
+    ai_role: "An overlay: news negative enough to veto an entry blocks it, and the agent may close a core position only when news about it woke the agent.",
   },
 }

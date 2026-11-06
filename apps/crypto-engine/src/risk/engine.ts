@@ -96,6 +96,8 @@ export type CryptoEntry = {
   limitPrice: number
   stopPrice: number
   takeProfitPrice: number
+  /** The trend core's entry: no AI call to check (conviction, edge, reward:risk, a target). */
+  rules?: boolean
   conviction: number
   netEdgeBps: number
   rewardRisk: number
@@ -125,16 +127,19 @@ export const evaluateCryptoEntry = (p: CryptoEntry, account: AccountState, gate:
   const lastExit = account.lastExitAt.get(p.symbol)
   const cooldownLeft = lastExit ? k.reentry_cooldown_minutes - (now - lastExit) / 60_000 : 0
   c.check("reentry_cooldown", cooldownLeft <= 0, cooldownLeft > 0 ? `exited ${p.symbol} recently; ${Math.ceil(cooldownLeft)} min of cooldown left` : "no recent exit")
-  c.check("conviction", p.conviction >= k.min_conviction, `conviction ${p.conviction} (min ${k.min_conviction})`)
-  c.check("edge_after_costs", p.netEdgeBps >= k.min_edge_bps, `expected net edge ${p.netEdgeBps.toFixed(1)} bps (min ${k.min_edge_bps})`)
-  c.check("reward_risk", p.rewardRisk >= k.min_reward_risk, `reward:risk ${p.rewardRisk.toFixed(2)} (min ${k.min_reward_risk})`)
+  if (p.rules) c.check("rules_entry", true, "the trend core's rules: no AI conviction, edge or target to check; the stop trails")
+  else {
+    c.check("conviction", p.conviction >= k.min_conviction, `conviction ${p.conviction} (min ${k.min_conviction})`)
+    c.check("edge_after_costs", p.netEdgeBps >= k.min_edge_bps, `expected net edge ${p.netEdgeBps.toFixed(1)} bps (min ${k.min_edge_bps})`)
+    c.check("reward_risk", p.rewardRisk >= k.min_reward_risk, `reward:risk ${p.rewardRisk.toFixed(2)} (min ${k.min_reward_risk})`)
+  }
   const stopPct = ((p.mid - p.stopPrice) / p.mid) * 100
   c.check(
     "stop_distance",
     p.stopPrice < p.mid && stopPct >= k.min_stop_pct && stopPct <= k.max_stop_pct,
     `stop ${p.stopPrice} is ${pct(stopPct)} below (allowed ${k.min_stop_pct}-${k.max_stop_pct}%)`,
   )
-  c.check("target_above", p.takeProfitPrice > p.mid, `target ${p.takeProfitPrice} vs price ${p.mid}`)
+  if (!p.rules) c.check("target_above", p.takeProfitPrice > p.mid, `target ${p.takeProfitPrice} vs price ${p.mid}`)
   const limitDevBps = ((p.limitPrice - p.mid) / p.mid) * 10_000
   c.check("limit_price_sane", limitDevBps >= 0 && limitDevBps <= k.max_slippage_bps + p.spreadBps / 2 + 1, `limit ${limitDevBps.toFixed(1)} bps above mid`)
 
@@ -176,12 +181,12 @@ export const evaluateCryptoEntry = (p: CryptoEntry, account: AccountState, gate:
   return { approved: true, resized, qty, notionalUsd: qty * p.limitPrice, checks: c.list, reasons: resized ? [`resized from ${p.qty} to ${qty} by exposure limits`] : [] }
 }
 
-export type ExitReason = "ai" | "stop_loss" | "take_profit" | "kill_switch" | "drawdown" | "manual"
+export type ExitReason = "ai" | "rules" | "stop_loss" | "take_profit" | "kill_switch" | "drawdown" | "manual"
 
 /**
  * Exits reduce risk, so they're allowed while paused or halted. The one restriction is churn
  * control: the AI can't discretionarily close a position younger than `min_hold_minutes`.
- * Deterministic exits (stops, kill switch, manual) are never blocked.
+ * Deterministic exits (stops, the trend core's rules, kill switch, manual) are never blocked.
  */
 export const evaluateExit = ({
   reason,

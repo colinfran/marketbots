@@ -39,3 +39,10 @@ export const newsObservations = (
     }
   })
 }
+
+/**
+ * Whether news about `symbol` woke this episode, or the owner asked for a review: the only times
+ * the agent may close a position the trend core holds, which otherwise ends by the core's rules.
+ */
+export const newsWoke = (observations: readonly Pick<Observation, "id" | "kind" | "subject">[], symbol: string) =>
+  observations.some((o) => (o.kind === "news" && o.subject === symbol) || o.id.startsWith("review:"))

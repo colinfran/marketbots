@@ -56,7 +56,18 @@
     "discretionary": {
       "enabled": true,
       "max_exposure_pct": 30
+    },
+    "core": {
+      "enabled": true,
+      "max_exposure_pct": 90
     }
+  },
+  "core": {
+    "max_positions": 5,
+    "risk_per_trade_pct": 1,
+    "stop_atr": 2.5,
+    "reentry_hours": 48,
+    "news_veto_hours": 24
   },
   "universe": {
     "kraken_symbols": [

@@ -1,4 +1,5 @@
 import { checkEntry, type EnvelopeHistory } from "@mb/agent/envelope"
+import { newsWoke } from "@mb/agent/observations"
 import type { EpisodeInfo } from "@mb/agent/runtime"
 import type { AgentAction, BookAccount } from "@mb/core/agent"
 import { normalizeCryptoAgentDecisions, type CryptoAgentAnswer, type NormalizedCryptoAgentDecision } from "@mb/crypto-core/agent"
@@ -94,7 +95,7 @@ export const liveBookText = async (d: Pick<CryptoAgentDeps, "ctx">, now = new Da
     const m = mid(d.ctx)(p.symbol)
     const pnl = m ? ((m / p.avg_price - 1) * 100).toFixed(2) : "n/a"
     const hours = ((now.getTime() - p.opened_at.getTime()) / HOUR).toFixed(1)
-    return `- ${p.symbol}: ${p.qty} at ${price(d, p.symbol, p.avg_price)}, now ${price(d, p.symbol, m)} (${pnl}%), stop ${price(d, p.symbol, p.stop_price)}, target ${price(d, p.symbol, p.take_profit_price)}, held ${hours} h of an expected ${p.horizon_hours ?? "?"} h, ${p.strategy_id ?? "no strategy"}. Thesis: ${p.thesis ?? "none recorded"} Invalidation: ${p.invalidation ?? "none recorded"}`
+    return `- ${p.symbol}: ${p.qty} at ${price(d, p.symbol, p.avg_price)}, now ${price(d, p.symbol, m)} (${pnl}%), stop ${price(d, p.symbol, p.stop_price)}, target ${price(d, p.symbol, p.take_profit_price)}, held ${hours} h of an expected ${p.horizon_hours ?? "?"} h, ${p.strategy_id === "core" ? "TREND CORE (rules-managed: its stop trails and a broken trend closes it; close it yourself only on news that breaks the trend)" : (p.strategy_id ?? "no strategy")}. Thesis: ${p.thesis ?? "none recorded"} Invalidation: ${p.invalidation ?? "none recorded"}`
   })
   const gate = d.ctx.gate()
   const blocked = [
@@ -156,6 +157,11 @@ export const actOnCryptoAnswer = async (d: Pick<CryptoAgentDeps, "ctx">, answer:
     }
     if (dec.action !== "buy" && !position) {
       out.push(action(dec, "not_applicable", "not held"))
+      return
+    }
+    // The trend core's positions end by its rules (the trailing stop, a broken trend); the agent overrides them only on news.
+    if (dec.action === "close" && position?.strategy_id === "core" && !newsWoke(episode.wake.observations, dec.symbol)) {
+      out.push(action(dec, "blocked", "a trend-core position closes by its rules (its trailing stop, a broken trend); you may close it only when news about it woke you"))
       return
     }
     let decision: NormalizedCryptoAgentDecision = dec

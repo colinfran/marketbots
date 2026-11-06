@@ -6,6 +6,16 @@ import { AGENT_SETTINGS_SECTIONS, type SettingsSection } from "@mb/ui/lib/settin
  */
 export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
+    title: "Trend core (on/off and exposure cap under Strategies)",
+    fields: [
+      { path: "core.max_positions", label: "Max core positions", kind: "number" },
+      { path: "core.risk_per_trade_pct", label: "Risk per core position (% of equity lost at the first stop)", kind: "number", step: 0.05 },
+      { path: "core.stop_atr", label: "Stop distance (daily ATRs; the stop then trails at it)", kind: "number", step: 0.25 },
+      { path: "core.reentry_hours", label: "No re-entry in a pair the core left for (h)", kind: "number" },
+      { path: "core.news_veto_hours", label: "Negative news vetoes an entry for (h, 0 = off)", kind: "number" },
+    ],
+  },
+  {
     title: "Position sizing & exposure",
     fields: [
       { path: "kraken.risk_per_trade_pct", label: "Risk per trade (% of equity lost at the stop)", kind: "number", step: 0.05 },
