@@ -166,6 +166,7 @@ export class Engine {
       promotion: {
         get: () => d.state.state.agent_promotion ?? null,
         set: (p) => this.promoteAgent(p),
+        peak: (p) => d.state.update({ agent_promotion: p }, "engine", "agent.new_peak", {}),
       },
     })
     this.commands = new CommandProcessor(d.db.col, d.bus, d.log.child({ component: "commands" }), (c, doc) => this.handleCommand(c, doc))
@@ -453,7 +454,7 @@ export class Engine {
     return { open: true, reason: "regular session" }
   }
 
-  /** When the agent was turned on or its entries resumed: its time and equity, for the total-loss breaker. */
+  /** When the agent was turned on or its entries resumed: its time and equity, from which the drawdown breaker counts. */
   private async promoteAgent(p: { at: Date; equity_usd: number }) {
     await this.d.state.update({ agent_promotion: p }, "engine", "agent.promoted", {})
   }

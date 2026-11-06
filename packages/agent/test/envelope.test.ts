@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { trippedBreakers } from "../src/breakers"
+import { selfClearing, trippedBreakers, type BreakerHistory } from "../src/breakers"
 import { checkEntry, entryRoomUsd, type EnvelopeHistory } from "../src/envelope"
 import { SETTINGS } from "./helpers"
 
@@ -46,22 +46,30 @@ describe("agent envelope", () => {
 })
 
 describe("circuit breakers", () => {
-  const base = { episodes: [], entries: [], envelopeBlocksToday: 0, dayPnlPct: 0, totalPnlPct: 0, speeds: [] }
+  const base: BreakerHistory = { episodes: [], drawdownPct: 0, speeds: [] }
+  const episodes = (answered: number, invalid: number, minutesAgo = 1) => [
+    ...Array.from({ length: answered }, () => ({ at: now - minutesAgo * MIN, status: "answered" as const })),
+    ...Array.from({ length: invalid }, () => ({ at: now - minutesAgo * MIN, status: "invalid" as const })),
+  ]
 
-  it("trips on five risk rejections in a row and on a bad hour", () => {
-    const rejected = Array.from({ length: 5 }, (_, i) => ({ at: now - i * MIN, outcome: "rejected" as const }))
-    expect(trippedBreakers({ ...base, entries: rejected }, now).map((b) => b.name)).toEqual(["risk_rejections", "rejection_rate"])
-    const episodes = [...Array.from({ length: 8 }, () => ({ at: now - MIN, status: "answered" as const })), { at: now - MIN, status: "invalid" as const }]
-    expect(trippedBreakers({ ...base, episodes }, now).map((b) => b.name)).toEqual(["invalid_answers"])
+  it("trips on a 20% drawdown from the peak, a pause only the owner lifts", () => {
+    expect(trippedBreakers({ ...base, drawdownPct: -19.9 }, now)).toEqual([])
+    expect(trippedBreakers({ ...base, drawdownPct: -20 }, now)).toEqual([{ name: "drawdown", detail: "the paper account is 20.00% below its peak", owner: true }])
   })
 
-  it("trips on envelope blocks, losses and a slow model", () => {
-    expect(trippedBreakers({ ...base, envelopeBlocksToday: 3, dayPnlPct: -3.2, totalPnlPct: -6.5, speeds: [30, 28, 31, 29, 27] }, now).map((b) => b.name)).toEqual([
-      "envelope_blocks",
-      "daily_loss",
-      "total_loss",
-      "slow_model",
-    ])
+  it("counts invalid answers only when most of at least ten in the hour are invalid, and lets that clear by itself", () => {
+    // One bad answer in five tripped the old breaker and paused crypto's entries for two days.
+    expect(trippedBreakers({ ...base, episodes: episodes(4, 1) }, now)).toEqual([])
+    expect(trippedBreakers({ ...base, episodes: episodes(0, 9) }, now)).toEqual([])
+    expect(trippedBreakers({ ...base, episodes: episodes(5, 5) }, now)).toEqual([])
+    expect(trippedBreakers({ ...base, episodes: episodes(4, 6) }, now)).toEqual([{ name: "invalid_answers", detail: "6 of 10 answers invalid in the last hour", owner: false }])
+    expect(selfClearing({ episodes: episodes(4, 6), speeds: [] }, now)?.name).toBe("invalid_answers")
+    expect(selfClearing({ episodes: episodes(4, 6, 61), speeds: [] }, now)).toBeNull()
+  })
+
+  it("trips on a slow model while it lasts", () => {
+    expect(trippedBreakers({ ...base, speeds: [30, 28, 31, 29, 27] }, now).map((b) => [b.name, b.owner])).toEqual([["slow_model", false]])
     expect(trippedBreakers({ ...base, speeds: [30, 28, 44, 29, 27] }, now)).toEqual([])
+    expect(selfClearing({ episodes: [], speeds: [30, 28, 31, 29, 27, 44] }, now)).toBeNull()
   })
 })

@@ -81,6 +81,9 @@ describe("agent runtime", () => {
         set: async (p) => {
           promoted = p
         },
+        peak: async (p) => {
+          promoted = p
+        },
       },
       signal: new AbortController().signal,
       now: () => new Date(t),
@@ -205,19 +208,24 @@ describe("agent runtime", () => {
     expect(agent.queue.size).toBe(0)
   })
 
-  it("counts buys its envelope refused toward the envelope breaker, but not buys refused for their timing", async () => {
+  it("trips nothing when the rules refuse its entries: a refusal is the rules working", async () => {
     const buys = answer({ decisions: ["A", "B", "C"].map((s) => ({ symbol: `${s}/USD`, action: "buy" as const })) })
-    const run = async (detail: string) => {
-      const { chat } = scriptedChat([reply({ kind: "answer", answer: buys })])
-      const { agent, advance, at, run, events } = setup({ chat, outcomes: Array.from({ length: 3 }, () => ({ outcome: "blocked" as const, detail })) })
-      agent.observe(obs({ subject: "SOL/USD", at: at() }))
+    const { chat } = scriptedChat(Array.from({ length: 3 }, () => reply({ kind: "answer", answer: buys })))
+    const outcomes = [
+      { outcome: "rejected" as const, detail: "reward:risk 0.8 < 1.2" },
+      { outcome: "blocked" as const, detail: "envelope: 2/2 in the last hour" },
+      { outcome: "rejected" as const, detail: "budget $124 buys less than 1 share at $351" },
+    ]
+    const { agent, advance, at, run, events, pauseSet } = setup({ chat, outcomes })
+    for (const s of ["SOL/USD", "ETH/USD", "BTC/USD"]) {
+      agent.observe(obs({ subject: s, at: at() }))
       advance(11_000)
       await run()
-      return events.filter((e) => e.type === "agent.breaker").map((e) => (e.data as { name: string }).name)
     }
-    expect(await run("buys only in the regular session after the opening buffer")).toEqual([])
-    await db.col.agentEpisodes.deleteMany({})
-    expect(await run("envelope: 2/2 in the last hour")).toEqual(["envelope_blocks"])
+    expect(await db.col.agentEpisodes.countDocuments({ status: "answered" })).toBe(3)
+    expect(events.filter((e) => e.type === "agent.breaker")).toEqual([])
+    expect(pauseSet).not.toHaveBeenCalled()
+    expect(agent.entriesPaused()).toBeNull()
   })
 
   describe("breakers and the owner's controls", () => {
@@ -227,35 +235,49 @@ describe("agent runtime", () => {
     })
     const ON = SETTINGS
 
-    it("records the equity when turned on, counts the total loss from it, and pauses entries when a breaker trips until the owner resumes them", async () => {
+    it("records the equity when turned on, follows its peak, and pauses entries at a 20% drawdown from it until the owner resumes them", async () => {
       let equity = 12_000
-      const { chat } = scriptedChat([reply({ kind: "answer", answer: answer({ decisions: [] }) }), reply({ kind: "answer", answer: answer() })])
+      const { chat } = scriptedChat([reply({ kind: "answer", answer: answer() })])
       const { agent, advance, at, run, events, pauseSet, paused, promoted, setLevel, acted } = setup({ chat, settings: { ...SETTINGS, level: "off" }, accountOf: () => account(equity) })
       await run()
       setLevel("on")
       await run()
       expect(promoted()).toEqual({ at: at(), equity_usd: 12_000 })
       expect(agent.status()).toMatchObject({ level: "on", pause: null, entries_paused: null })
-      // Down 7% since it was turned on, though still up 4% since the account started.
-      equity = 11_160
+      // A day's loss (−5%) or a small slide isn't an extreme case.
+      equity = 11_400
       advance(16_000)
-      agent.observe(obs({ subject: "SOL/USD", at: at() }))
-      advance(11_000)
       await run()
-      expect(pauseSet).toHaveBeenCalledWith({ at: at(), reason: expect.stringMatching(/^total loss: /) }, "engine:agent-breaker")
-      expect(agent.status()).toMatchObject({ level: "on", pause: { reason: expect.stringMatching(/^total loss: /) } })
+      expect(pauseSet).not.toHaveBeenCalled()
+      // A new high is saved once it is 2% above the saved one.
+      equity = 12_100
+      advance(16_000)
+      await run()
+      expect(promoted()?.peak_usd).toBeUndefined()
+      equity = 13_000
+      advance(16_000)
+      await run()
+      expect(promoted()).toMatchObject({ equity_usd: 12_000, peak_usd: 13_000 })
+      // 20% below that peak, though still up since it was turned on: checked on the account read, no episode needed.
+      equity = 10_350
+      advance(16_000)
+      await run()
+      expect(pauseSet).toHaveBeenCalledWith({ at: at(), reason: expect.stringMatching(/^drawdown: the paper account is 20.38% below its peak/) }, "engine:agent-breaker")
+      expect(agent.status()).toMatchObject({ level: "on", pause: { reason: expect.stringMatching(/^drawdown: /) } })
       expect(events.find((e) => e.type === "agent.breaker")?.summary).toMatch(/new entries pause until you resume them; its exits carry on$/)
       // The agent keeps working, with its entries paused.
-      advance(400_000)
       agent.observe(obs({ subject: "ETH/USD", at: at() }))
       advance(11_000)
       await run()
-      expect(acted.at(-1)?.entriesPaused).toMatch(/^entries paused by a breaker until the owner resumes them: total loss/)
-      // Resuming lifts the pause and counts the loss afresh from the equity now.
+      expect(acted.at(-1)?.entriesPaused).toMatch(/^entries paused by a breaker until the owner resumes them: drawdown/)
+      // Resuming lifts the pause and counts the drawdown afresh from the equity now.
       expect(await agent.resumeEntries("owner@example.com")).toMatch(/^the agent's entries resumed/)
       expect(paused()).toBeNull()
-      expect(promoted()).toEqual({ at: at(), equity_usd: 11_160 })
+      expect(promoted()).toEqual({ at: at(), equity_usd: 10_350 })
       expect(agent.entriesPaused()).toBeNull()
+      advance(16_000)
+      await run()
+      expect(paused()).toBeNull()
       await expect(agent.resumeEntries("owner@example.com")).rejects.toThrow("the agent's entries aren't paused")
     })
 

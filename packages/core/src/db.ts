@@ -95,8 +95,8 @@ export type EngineStateDoc = {
   status: "running" | "paused" | "halted"
   pause_reason: string | null
   kill_switch: { engaged: boolean; reason: string | null; at: Date | null; by: string | null; liquidate: boolean }
-  /** When the agent was last turned on or its entries resumed, and the account's equity then: the total-loss breaker counts from it. */
-  agent_promotion?: { at: Date; equity_usd: number } | null
+  /** When the agent was last turned on or its entries resumed, the account's equity then, and its highest equity since: the drawdown breaker counts from that peak. */
+  agent_promotion?: { at: Date; equity_usd: number; peak_usd?: number } | null
   /** A circuit breaker's pause on the agent's new entries, until the owner resumes them (Admin). */
   agent_pause?: { at: Date; reason: string } | null
   /** Legacy: a breaker's drop to the old shadow level. Read once at startup and turned into `agent_pause`. */

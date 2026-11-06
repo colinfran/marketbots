@@ -26,7 +26,7 @@ import { errorMessage, type Logger } from "@mb/engine-kit/log"
 import { cleanLine, fenceUntrusted } from "@mb/engine-kit/util/text"
 import type { Collection } from "mongodb"
 import type { z } from "zod"
-import { slowModel, trippedBreakers, type BreakerHistory } from "./breakers"
+import { selfClearing, trippedBreakers, type Breaker, type BreakerHistory } from "./breakers"
 import type { ChatFn } from "./client"
 import { runEpisode } from "./episode"
 import { compactEpisode, episodeExpiry, type EpisodeArchive } from "./journal"
@@ -45,10 +45,11 @@ import { describeWatch, newsWatchFires, normalizeNote, normalizeWatch, watchFire
  * the bot's own execution to the paper account. An owner's question is read-only: its decisions are
  * recorded, never acted on.
  *
- * The breakers are enforced: a trip pauses the agent's new entries until the owner resumes them
- * (`pause`, kept in the engine's state), and a slow model pauses them until it is fast again. Exits
- * carry on either way. The loss breakers count from when the agent was turned on or its entries
- * last resumed, whose time and equity outlive a restart (`promotion`).
+ * The breakers are for extreme cases: a drawdown pauses the agent's new entries until the owner
+ * resumes them (`pause`, kept in the engine's state); a slow model or a run of invalid answers
+ * pauses them only while it lasts. Exits carry on either way. The drawdown counts from the highest
+ * equity since the agent was turned on or its entries last resumed, which outlives a restart
+ * (`promotion`), and is checked whenever the account is read, not only after episodes.
  *
  * Nothing here can stop trading: every failure is logged and the next tick carries on.
  */
@@ -67,8 +68,8 @@ export type EpisodeInfo = { id: string; wake: Wake; readOnly: boolean; urls: Rea
 /** The account the agent decides into, as the heartbeat and the breakers read it. */
 export type AgentAccount = { account: BookAccount; dayPnlPct: number }
 
-/** When the agent was last turned on or its entries resumed, and the account's equity then: the total-loss breaker counts from it. */
-export type Promotion = { at: Date; equity_usd: number }
+/** When the agent was last turned on or its entries resumed, the account's equity then, and its highest equity since: the drawdown breaker counts from that peak. */
+export type Promotion = { at: Date; equity_usd: number; peak_usd?: number }
 
 /** A breaker's pause on the agent's new entries: when and why. */
 export type Pause = { at: Date; reason: string }
@@ -114,8 +115,8 @@ export type AgentDeps<A extends AgentAnswerBase> = {
   archive?: EpisodeArchive | null
   /** A breaker's pause on new entries, kept in the engine's state (audited); null lifts it. */
   pause?: { get: () => Pause | null; set: (p: Pause | null, by: string) => Promise<void> }
-  /** When the agent was last turned on or its entries resumed, kept across restarts (the engine's state). */
-  promotion?: { get: () => Promotion | null; set: (p: Promotion) => Promise<void> }
+  /** When the agent was last turned on or its entries resumed, kept across restarts (the engine's state); `peak` saves a new high of the account's equity. */
+  promotion?: { get: () => Promotion | null; set: (p: Promotion) => Promise<void>; peak?: (p: Promotion) => Promise<void> }
   /** The engine's shutdown signal. */
   signal: AbortSignal
   now?: () => Date
@@ -124,6 +125,8 @@ export type AgentDeps<A extends AgentAnswerBase> = {
 const TICK_MS = 1_000
 const ACCOUNT_REFRESH_MS = 15_000
 const HOUR = 3_600_000
+/** A new equity peak is saved once it is this much above the saved one (a smaller rise is kept in memory). */
+const PEAK_SAVE_STEP = 0.02
 
 /** How the feed names a subject that isn't a symbol. */
 const SPECIAL_SUBJECT: Record<string, string> = { [OWNER_SUBJECT]: "the owner's question", [MARKET_SUBJECT]: "the market", [BOOK_SUBJECT]: "its book" }
@@ -141,9 +144,11 @@ export class Agent<A extends AgentAnswerBase> {
   private lastFinishedAt: Date | null = null
   /** The level the last tick saw (null before the first): turning on is a promotion. */
   private levelSeen: AgentLevel | null = null
-  private today = { day: "", episodes: 0, envelopeBlocks: 0, breakers: new Set<string>() }
+  private today = { day: "", episodes: 0, breakers: new Set<string>() }
   private accountCache: { at: number; value: AgentAccount | null } = { at: 0, value: null }
-  private breakers: Pick<BreakerHistory, "episodes" | "entries" | "speeds"> = { episodes: [], entries: [], speeds: [] }
+  private breakers: Pick<BreakerHistory, "episodes" | "speeds"> = { episodes: [], speeds: [] }
+  /** The highest equity seen since the promotion (the saved peak can trail it by PEAK_SAVE_STEP). */
+  private peakSeen = 0
   private readonly now: () => Date
 
   constructor(private readonly d: AgentDeps<A>) {
@@ -159,7 +164,7 @@ export class Agent<A extends AgentAnswerBase> {
   async start() {
     this.watches = await this.d.col.agentWatches.find({ status: "active" }).toArray()
     const day = this.now().toISOString().slice(0, 10)
-    this.today = { day, episodes: await this.d.col.agentEpisodes.countDocuments({ started_at: { $gte: new Date(`${day}T00:00:00Z`) } }), envelopeBlocks: 0, breakers: new Set() }
+    this.today = { day, episodes: await this.d.col.agentEpisodes.countDocuments({ started_at: { $gte: new Date(`${day}T00:00:00Z`) } }), breakers: new Set() }
     this.timer = setInterval(() => void this.tick(), TICK_MS)
     this.timer.unref?.()
   }
@@ -209,26 +214,26 @@ export class Agent<A extends AgentAnswerBase> {
     return `the agent will review ${subjects.join(", ")} now: see the Agent page`
   }
 
-  /** Why the agent may not open positions now: a breaker's pause, or a slow model (its exits carry on). */
+  /** Why the agent may not open positions now: a breaker's pause, or one that lasts only while its condition does (its exits carry on). */
   entriesPaused(): string | null {
     const pause = this.d.pause?.get()
     if (pause) return `entries paused by a breaker until the owner resumes them: ${pause.reason}`
-    const slow = slowModel(this.breakers.speeds)
-    return slow ? `entries paused: ${slow.detail}` : null
+    const passing = selfClearing(this.breakers, this.now().getTime())
+    return passing ? `entries paused: ${passing.detail}` : null
   }
 
-  /** The owner lifts a breaker's pause (Admin): the breakers count afresh, the loss breakers from the account's equity now. */
+  /** The owner lifts a breaker's pause (Admin): the breakers count afresh, the drawdown from the account's equity now. */
   async resumeEntries(by: string): Promise<string> {
     if (!this.d.pause?.get()) throw new Error("the agent's entries aren't paused")
     await this.d.pause.set(null, by)
-    this.breakers = { episodes: [], entries: [], speeds: [] }
+    this.breakers = { episodes: [], speeds: [] }
     this.today.breakers.clear()
-    this.today.envelopeBlocks = 0
     const account = await this.d.bot.account().catch(() => null)
     this.accountCache = { at: this.now().getTime(), value: account }
+    this.peakSeen = account?.account.equity_usd ?? 0
     if (account) await this.d.promotion?.set({ at: this.now(), equity_usd: account.account.equity_usd })
     this.d.log.info("agent entries resumed", { by, equity: account?.account.equity_usd })
-    return "the agent's entries resumed; its loss breakers count from the account's equity now"
+    return "the agent's entries resumed; its drawdown breaker counts from the account's equity now"
   }
 
   /** Every stored wire item: news watches. */
@@ -262,7 +267,7 @@ export class Agent<A extends AgentAnswerBase> {
 
   /**
    * A change of level. Turning on (or a start while on) is a promotion: the breakers count afresh,
-   * and the account's equity is recorded for the total-loss breaker, unless a restart finds the
+   * and the account's equity is recorded for the drawdown breaker, unless a restart finds the
    * promotion already recorded.
    */
   private async watchLevel(now: Date) {
@@ -272,9 +277,9 @@ export class Agent<A extends AgentAnswerBase> {
     this.levelSeen = level
     this.accountCache = { at: now.getTime(), value: await this.d.bot.account().catch(() => null) }
     if (level !== "on") return
-    this.breakers = { episodes: [], entries: [], speeds: [] }
+    this.breakers = { episodes: [], speeds: [] }
     this.today.breakers.clear()
-    this.today.envelopeBlocks = 0
+    this.peakSeen = 0
     if (started && this.d.promotion?.get()) return
     const equity = this.accountCache.value?.account.equity_usd
     if (equity) await this.d.promotion?.set({ at: now, equity_usd: equity })
@@ -283,7 +288,7 @@ export class Agent<A extends AgentAnswerBase> {
 
   private rollDay() {
     const day = this.now().toISOString().slice(0, 10)
-    if (day !== this.today.day) this.today = { day, episodes: 0, envelopeBlocks: 0, breakers: new Set() }
+    if (day !== this.today.day) this.today = { day, episodes: 0, breakers: new Set() }
   }
 
   /** One pass of the loop. Exported for tests (`tick` is what the timer calls). */
@@ -301,6 +306,8 @@ export class Agent<A extends AgentAnswerBase> {
       await this.watchLevel(now)
       if (now.getTime() - this.accountCache.at > ACCOUNT_REFRESH_MS) {
         this.accountCache = { at: now.getTime(), value: await this.d.bot.account().catch(() => this.accountCache.value) }
+        // Trades the agent didn't make (the trend core, stops) move the account too: the drawdown is checked on every read.
+        await this.checkBreakers(null).catch((e) => this.d.log.warn("agent breakers failed", { error: errorMessage(e) }))
       }
       await this.d.bot.tick?.(now).catch((e) => this.d.log.warn("agent observations failed", { error: errorMessage(e) }))
       await this.checkWatches(now)
@@ -554,30 +561,35 @@ export class Agent<A extends AgentAnswerBase> {
     await this.checkBreakers(doc).catch((e) => this.d.log.warn("agent breakers failed", { error: errorMessage(e) }))
   }
 
-  private async checkBreakers(doc: AgentEpisodeDoc) {
+  /** The account's drawdown from its peak since the promotion (0 or below). A new peak is remembered, and saved once it is PEAK_SAVE_STEP above the saved one. */
+  private async drawdownPct(account: AgentAccount | null): Promise<number> {
+    if (!account) return 0
+    const equity = account.account.equity_usd
+    const promotion = this.d.promotion?.get()
+    const saved = promotion ? Math.max(promotion.peak_usd ?? 0, promotion.equity_usd) : account.account.starting_usd
+    this.peakSeen = Math.max(this.peakSeen, saved, equity)
+    if (promotion && equity >= saved * (1 + PEAK_SAVE_STEP)) await this.d.promotion?.peak?.({ ...promotion, peak_usd: equity })
+    return this.peakSeen > 0 ? (equity / this.peakSeen - 1) * 100 : 0
+  }
+
+  /** After an episode (`doc`) and on every read of the account: what tripped is alerted once a day, and a drawdown pauses entries until the owner resumes them. */
+  private async checkBreakers(doc: AgentEpisodeDoc | null) {
     const t = this.now().getTime()
     const b = this.breakers
-    if (doc.status !== "running") b.episodes = [...b.episodes.filter((e) => t - e.at < HOUR), { at: t, status: doc.status }]
-    // A buy refused because of when it came (outside the session, entries paused) says nothing about the agent; one its envelope refused does.
-    const envelopeBlock = (a: AgentAction) => a.outcome === "blocked" && !!a.detail?.startsWith("envelope")
-    for (const a of doc.actions.filter((x) => x.action === "buy" && (x.outcome !== "blocked" || envelopeBlock(x)))) b.entries = [...b.entries, { at: t, outcome: a.outcome }].slice(-50)
-    this.today.envelopeBlocks += doc.actions.filter((a) => a.action === "buy" && envelopeBlock(a)).length
+    if (doc && doc.status !== "running") b.episodes = [...b.episodes.filter((e) => t - e.at < HOUR), { at: t, status: doc.status }]
     const account = this.accountCache.value ?? (await this.d.bot.account().catch(() => null))
-    // The total loss counts from when the agent was turned on or last resumed; before any, from the account's start.
-    const promotion = this.d.promotion?.get()
-    const totalPnlPct = promotion && account ? (account.account.equity_usd / promotion.equity_usd - 1) * 100 : (account?.account.return_pct ?? 0)
-    const tripped = trippedBreakers({ ...b, envelopeBlocksToday: this.today.envelopeBlocks, dayPnlPct: account?.dayPnlPct ?? 0, totalPnlPct }, t)
-    for (const br of tripped) {
-      if (this.today.breakers.has(br.name)) continue
-      this.today.breakers.add(br.name)
-      const pauses = br.name !== "slow_model"
-      const effect = pauses ? "the agent's new entries pause until you resume them; its exits carry on" : "the agent's entries pause until the model is fast again"
-      const name = br.name.replace(/_/g, " ")
-      this.d.bus.emit("agent.breaker", br, { summary: `Agent breaker tripped: ${name} (${br.detail}); ${effect}`, level: "warn" })
-      await this.d.alert(`Agent breaker: ${name}`, `${br.detail}. ${effect[0].toUpperCase()}${effect.slice(1)}.${pauses ? " Resume them from Admin once you've looked." : ""}`, `agent-breaker|${br.name}|${this.today.day}`)
-      if (pauses && !this.d.pause?.get()) {
-        await this.d.pause?.set({ at: this.now(), reason: `${name}: ${br.detail}` }, "engine:agent-breaker").catch((e) => this.d.log.error("pausing the agent's entries failed", { error: errorMessage(e) }))
-      }
+    for (const br of trippedBreakers({ ...b, drawdownPct: await this.drawdownPct(account) }, t)) await this.trip(br)
+  }
+
+  private async trip(br: Breaker) {
+    if (this.today.breakers.has(br.name)) return
+    this.today.breakers.add(br.name)
+    const effect = br.owner ? "the agent's new entries pause until you resume them; its exits carry on" : "the agent's entries pause until this clears by itself; its exits carry on"
+    const name = br.name.replace(/_/g, " ")
+    this.d.bus.emit("agent.breaker", { name: br.name, detail: br.detail }, { summary: `Agent breaker tripped: ${name} (${br.detail}); ${effect}`, level: "warn" })
+    await this.d.alert(`Agent breaker: ${name}`, `${br.detail}. ${effect[0].toUpperCase()}${effect.slice(1)}.${br.owner ? " Resume them from Admin once you've looked." : ""}`, `agent-breaker|${br.name}|${this.today.day}`)
+    if (br.owner && !this.d.pause?.get()) {
+      await this.d.pause?.set({ at: this.now(), reason: `${name}: ${br.detail}` }, "engine:agent-breaker").catch((e) => this.d.log.error("pausing the agent's entries failed", { error: errorMessage(e) }))
     }
   }
 

@@ -54,7 +54,7 @@ export const createCryptoAgent = ({
   /** A breaker's pause on new entries, kept in the engine's state. */
   pause?: { get: () => Pause | null; set: (p: Pause | null, by: string) => Promise<void> }
   /** When the agent was last turned on or its entries resumed, kept in the engine's state. */
-  promotion?: { get: () => Promotion | null; set: (p: Promotion) => Promise<void> }
+  promotion?: { get: () => Promotion | null; set: (p: Promotion) => Promise<void>; peak?: (p: Promotion) => Promise<void> }
 }): CryptoAgent => {
   const deps: CryptoAgentDeps = { ctx, history, research: research ?? null }
   const market = new CryptoMarketView(deps)
