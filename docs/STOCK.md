@@ -43,13 +43,26 @@ Browser ─https─▶ Vercel (Next.js dashboard) ─▶ Azure DocumentDB ◀─
 | 5 / 60 min | equity history and chart bars for the website |
 | continuous | the news engine: each source on its own interval or stream (below) |
 | 1 s | the agent: its observations, watches and the next episode (below) |
+| 60 s | the trend core (below): the day's plan before the session, its exits and entries 30 minutes after the open |
 | daily, before premarket | the scan universe for the news engine's price layers |
 
 Fills arrive instantly over Alpaca's `trade_updates` stream (binary JSON frames on paper). The REST sync still runs every minute, so a dropped connection never loses a fill. Market data comes from the IEX stream (the free plan allows one connection and 30 symbols, so the engine subscribes to held stocks, option underlyings, SPY/QQQ and then what the agent watches).
 
+## The trend core
+
+Rules, not the agent, hold the bot's core positions (`apps/stock-engine/src/bot/core-rules.ts` for the rules, `bot/core.ts` for the runner; built 2026-11-06, when the owner chose a rule-based core with the agent as an overlay because the agent alone traded positions of about 1% of equity, flattened every evening, and lost money). Momentum in stocks that are already trending is one of the best-documented edges; the core's job is to hold the strongest of them, cut losers at the stop and let winners run.
+
+- **The day's plan**, built at the first minute of the trading day (premarket) from completed daily bars (SIP, up to midnight New York time, about 400 days) of the scan universe's `core.universe_size` (500) most traded stocks and SPY, and kept in `cache` (`core:plan`) so a restart reuses it. Leveraged, inverse and volatility funds are left out by name (`GEARED_NAME`).
+- **Regime**: new entries only while SPY closes above its 200-day average.
+- **Picks**: above a 50-day average that is above the 200-day, up over 6 months (126 sessions), within 25% of the 52-week high, daily ATR at most 6%, daily RSI under 80, ranked by 6-month return per unit of daily volatility (6-month % ÷ daily ATR %).
+- **Once a day, 30 minutes after the open** (not in the last 30 minutes): it sells the core positions whose trend broke (the last close below the 50-day average), then fills the free slots (`core.max_positions`, 5, within `risk.max_open_positions`) with the strongest picks it doesn't hold, skipping a stock sold (by anyone) within `core.reentry_hours` (72) or with negative news at review severity within `core.news_veto_hours` (24). A buy risks `core.risk_per_trade_pct` (1%) of equity at a stop `core.stop_atr` (2) daily ATRs below (inside `risk.min_stop_pct`–`max_stop_pct`), within the position cap and deployable cash: a market order, then its plan (`book: "core"`, no target, `trail_usd`) and a plain GTC stop at the broker.
+- Maintenance trails its stop and protects it (a stop-only plan gets a plain stop), and the overnight rules keep it. It waits while an agent episode runs (and maintenance waits while it places orders), and opens nothing while the drawdown breaker pauses entries, the engine is paused or the day's loss limit blocks buys. `core.enabled` turns it off.
+- Every buy and sell is a `decisions` document (`trigger_kind: "core"`, the checks `regime`, `rules_entry`, `size`); buys post to Discord when they fill, and its trend exits post too.
+- **The agent's overlay**: core positions show in YOUR BOOK as TREND CORE; the agent may raise their stops, and may sell one only in an episode news about it woke (or the owner's review), never on price alone.
+
 ## The agent
 
-An agent on the local model is the only thing that decides ([plans/LOCAL-AI.md §8](plans/LOCAL-AI.md#8-the-agent), `@mb/agent` and `src/agent/`). Code watches the session, prices, the setup screen and the news all the time and wakes it when something matters; in each wake-up (an *episode*) it looks things up one step at a time and decides. There are no timed cycles. Its level is `agent.level` in Admin:
+An agent on the local model decides beside the trend core (above), which trades by fixed rules ([plans/LOCAL-AI.md §8](plans/LOCAL-AI.md#8-the-agent), `@mb/agent` and `src/agent/`). Code watches the session, prices, the setup screen and the news all the time and wakes it when something matters; in each wake-up (an *episode*) it looks things up one step at a time and decides. There are no timed cycles. Its level is `agent.level` in Admin:
 
 - **on** (the default): it trades the Alpaca paper account, **stocks and options**, through the bot's own risk checks and execution, inside its envelope.
 - **off**: nothing decides. Stops and targets rest at the broker, and the options monitor, maintenance and the overnight rules run either way.

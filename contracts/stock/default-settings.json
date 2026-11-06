@@ -42,6 +42,15 @@
     "monitor_seconds": 15,
     "contracts_per_underlying": 10
   },
+  "core": {
+    "enabled": true,
+    "max_positions": 5,
+    "risk_per_trade_pct": 1,
+    "stop_atr": 2,
+    "universe_size": 500,
+    "reentry_hours": 72,
+    "news_veto_hours": 24
+  },
   "schedule": {
     "premarket_lead_minutes": 90,
     "open_buffer_minutes": 10,

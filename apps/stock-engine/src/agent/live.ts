@@ -1,4 +1,5 @@
 import { checkEntry, type EnvelopeHistory } from "@mb/agent/envelope"
+import { newsWoke } from "@mb/agent/observations"
 import type { AgentAccount, EpisodeInfo } from "@mb/agent/runtime"
 import type { AgentAction } from "@mb/core/agent"
 import { cleanLine } from "@mb/engine-kit/util/text"
@@ -126,7 +127,7 @@ export const liveBookText = async (d: Pick<StockAgentDeps, "ctx" | "snapshot" | 
   const stocks = book.stocks.map((p) => {
     const plan = book.plans.get(p.symbol)
     const m = d.price(p.symbol) ?? Number(p.current_price)
-    return `- ${p.symbol}: ${p.qty} shares at ${Number(p.avg_entry_price).toFixed(2)}, now ${m} (${(Number(p.unrealized_plpc ?? 0) * 100).toFixed(2)}%), stop ${plan?.stop_loss ?? "none"}, target ${plan?.take_profit ?? "none"}, ${plan?.horizon ?? "?"} horizon${plan ? `, opened ${formatTime(plan.opened_at)}` : ""}. Thesis: ${plan?.thesis ?? "none recorded"} Invalidation: ${plan?.invalidation ?? "none recorded"}`
+    return `- ${p.symbol}: ${p.qty} shares at ${Number(p.avg_entry_price).toFixed(2)}, now ${m} (${(Number(p.unrealized_plpc ?? 0) * 100).toFixed(2)}%), stop ${plan?.stop_loss ?? "none"}, target ${plan?.take_profit ?? "none"}${plan?.book === "core" ? ", TREND CORE (rules-managed: its stop trails and a close below the 50-day average sells it; sell it yourself only on news that breaks the trend)" : ""}, ${plan?.horizon ?? "?"} horizon${plan ? `, opened ${formatTime(plan.opened_at)}` : ""}. Thesis: ${plan?.thesis ?? "none recorded"} Invalidation: ${plan?.invalidation ?? "none recorded"}`
   })
   const options = book.options.map(
     (o) =>
@@ -188,6 +189,11 @@ export const actOnStockAnswer = async (
     for (const dec of [...decisions].sort((a, b) => ORDER[a.action] - ORDER[b.action] || b.conviction - a.conviction)) {
       // A sale closes the position: trimming a winner cuts it, and code trails its stop instead.
       let decision = dec.action === "sell" ? { ...dec, sell_pct: null } : dec
+      // The trend core's positions end by its rules (the trailing stop, a broken trend); the agent overrides them only on news.
+      if (dec.action === "sell" && book.plans.get(dec.symbol)?.book === "core" && !newsWoke(episode.wake.observations, dec.symbol)) {
+        out.push(action(dec, "blocked", "a trend-core position closes by its rules (its trailing stop, a broken trend); you may sell it only when news about it woke you"))
+        continue
+      }
       if (dec.action === "buy" || dec.action === "buy_option") {
         if (episode.entriesPaused) {
           out.push(action(dec, "blocked", episode.entriesPaused))

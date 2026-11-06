@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { commandSchema } from "../src/commands"
-import { applySettingsPatch, DEFAULT_SETTINGS, diffSettings, settingsSchema } from "../src/settings"
+import { applySettingsPatch, DEFAULT_SETTINGS, diffSettings, settingsSchema, upgradeStockSettings, type SettingsPatch } from "../src/settings"
 
 describe("settings", () => {
   it("ships valid defaults matching the old risk rules", () => {
@@ -58,6 +58,18 @@ describe("settings", () => {
     expect(parsed.success && parsed.data).toEqual(DEFAULT_SETTINGS)
   })
 
+  it("drops the old core book's section, so the trend core starts from its defaults instead of the old enabled: false", () => {
+    // The live stock settings on 2026-11-06.
+    const oldCore = { enabled: false, target_pct: 50, band_pct: 5, min_holdings: 4, max_holdings: 8, max_holding_pct: 15, max_index_etf_pct: 25, max_theme_pct: 50, stop_pct: 15, min_conviction: 7, max_trades_per_review: 6, review_weekday: "mon", review_time_et: "10:15", universe_size: 100, themes: [] }
+    const naive = applySettingsPatch(DEFAULT_SETTINGS, { ...DEFAULT_SETTINGS, core: oldCore } as SettingsPatch)
+    expect(naive.ok && naive.settings.core).toMatchObject({ enabled: false, universe_size: 100 })
+    const upgraded = applySettingsPatch(DEFAULT_SETTINGS, upgradeStockSettings({ ...DEFAULT_SETTINGS, core: oldCore }) as SettingsPatch)
+    expect(upgraded.ok && upgraded.settings.core).toEqual(DEFAULT_SETTINGS.core)
+    // The trend core's own section, turned off by the owner, stays off.
+    const own = { ...DEFAULT_SETTINGS, core: { ...DEFAULT_SETTINGS.core, enabled: false } }
+    expect(upgradeStockSettings(own)).toBe(own)
+  })
+
   it("loads settings saved with a daily AI budget: the budget and the event reserve are dropped", () => {
     const saved = { ...DEFAULT_SETTINGS, ai: { daily_budget_usd: 10 }, wire: { ...DEFAULT_SETTINGS.wire, event_budget_reserve_pct: 30 } }
     const parsed = settingsSchema.safeParse(saved)
@@ -74,8 +86,9 @@ describe("settings", () => {
       // Even a core book that no longer validated (its refinements are gone with it).
       core: { enabled: true, target_pct: 90, min_holdings: 9, max_holdings: 8, review_time_et: "16:00", themes: ["Chips: 2330"] },
     }
-    const parsed = settingsSchema.safeParse(saved)
-    expect(parsed.success && parsed.data).toEqual(DEFAULT_SETTINGS)
+    // The trend core reuses the name: the old section is dropped by the upgrade, and the trend core takes its defaults.
+    const loaded = applySettingsPatch(DEFAULT_SETTINGS, upgradeStockSettings(saved) as SettingsPatch)
+    expect(loaded.ok && loaded.settings).toEqual(DEFAULT_SETTINGS)
   })
 
   it("migrates stored settings from before the agent by filling it from the defaults", () => {

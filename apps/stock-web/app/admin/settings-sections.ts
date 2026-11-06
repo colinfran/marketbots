@@ -6,6 +6,18 @@ import { AGENT_SETTINGS_SECTIONS, type SettingsSection } from "@mb/ui/lib/settin
  */
 export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
+    title: "Trend core (rules that hold the strongest stocks in an uptrend)",
+    fields: [
+      { path: "core.enabled", label: "On", kind: "boolean" },
+      { path: "core.max_positions", label: "Max core positions", kind: "number" },
+      { path: "core.risk_per_trade_pct", label: "Risk per core position (% of equity lost at the first stop)", kind: "number", step: 0.05 },
+      { path: "core.stop_atr", label: "Stop distance (daily ATRs; the stop then trails at it)", kind: "number", step: 0.25 },
+      { path: "core.universe_size", label: "Stocks it ranks (most traded of the scan universe)", kind: "number" },
+      { path: "core.reentry_hours", label: "No re-entry after a sale for (h)", kind: "number" },
+      { path: "core.news_veto_hours", label: "Negative news vetoes an entry for (h, 0 = off)", kind: "number" },
+    ],
+  },
+  {
     title: "Stock sizing",
     fields: [
       { path: "risk.max_position_pct", label: "Max per position (% of equity)", kind: "number" },

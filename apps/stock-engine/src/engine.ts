@@ -24,6 +24,7 @@ import type { TradeStream } from "./alpaca/trade-stream"
 import type { EventBus } from "./bus/event-bus"
 import { CommandProcessor } from "./commands/processor"
 import type { EngineContext } from "./bot/context"
+import { StockCore } from "./bot/core"
 import { cancelSymbolOrders } from "./bot/execute"
 import { flattenStocks, maintain, recordDailyStats } from "./bot/maintenance"
 import { closeOptionPosition, liquidateOptions, monitorOptions, reconcileOptions } from "./bot/options"
@@ -84,7 +85,8 @@ const MIN = 60_000
  *   every 5s    heartbeat to MongoDB (the dashboard's Admin page)
  *   every 15s   account snapshot for the dashboard, live-price subscriptions, the daily loss limit
  *   every 30s   the market calendar (today's session)
- *   every 60s   maintenance: order sync, stock protection, overnight rules, options reconciliation
+ *   every 60s   maintenance: order sync, trailing stops, stock protection, overnight rules, options reconciliation
+ *   every 60s   the trend core (./bot/core): the day's plan before the session, its exits and entries 30 min in
  *   every ~15s  options exits (value stop, take profit, underlying levels, time stop)
  *   periodic    equity history and chart bars for the website
  *   every 1s    the agent (./agent): its observations, watches and the next episode
@@ -103,8 +105,10 @@ export class Engine {
   readonly ctx: EngineContext
   readonly control: ControlPlane<EngineRunStatus, WireItemDoc>
   readonly policy: WirePolicy
-  /** The agent (docs/plans/LOCAL-AI.md §8): it trades the paper account. */
+  /** The agent (docs/plans/LOCAL-AI.md §8): it trades the paper account on news, setups and its book. */
   readonly agent: StockAgent
+  /** The trend core: rules that hold the strongest stocks in an uptrend by themselves (docs/STOCK.md). */
+  readonly core: StockCore
 
   private readonly abort = new AbortController()
   private stops: (() => void)[] = []
@@ -168,6 +172,11 @@ export class Engine {
         set: (p) => this.promoteAgent(p),
         peak: (p) => d.state.update({ agent_promotion: p }, "engine", "agent.new_peak", {}),
       },
+    })
+    this.core = new StockCore(this.ctx, {
+      session: () => this.session,
+      entriesPaused: () => (d.state.state.agent_pause ? `entries paused by a breaker until the owner resumes them: ${d.state.state.agent_pause.reason}` : null),
+      busy: () => this.agent.agent.current !== null,
     })
     this.commands = new CommandProcessor(d.db.col, d.bus, d.log.child({ component: "commands" }), (c, doc) => this.handleCommand(c, doc))
     d.stream.setCommands(this.commands)
@@ -335,6 +344,7 @@ export class Engine {
     this.stops.push(every(15_000, () => this.refreshAccount(), onError("account refresh")))
     this.stops.push(every(30_000, () => this.refreshSession().then(() => undefined), onError("market calendar"), { immediate: true }))
     this.stops.push(every(15_000, () => this.periodicMaintenance(), onError("maintenance")))
+    this.stops.push(every(60_000, () => this.core.tick(), onError("trend core")))
     this.stops.push(every(5_000, () => this.watchOptions(), onError("options monitor")))
     this.stops.push(every(60_000, () => this.refreshSiteData(false), onError("site data")))
     this.d.tradeStream.start()
@@ -502,9 +512,9 @@ export class Engine {
     const near = this.nearSession(session, now)
     if (Date.now() - this.lastMaintenance < (near ? MIN : 15 * MIN)) return
     this.lastMaintenance = Date.now()
-    // While an agent episode is trading, only sync: re-protecting a stock it is selling would fight
-    // it for the shares. The next pass does it after the episode.
-    if (this.agent.agent.current) {
+    // While an agent episode or the trend core is trading, only sync: re-protecting a stock either is
+    // buying or selling would fight it for the shares. The next pass does it after.
+    if (this.agent.agent.current || this.core.acting) {
       await syncOrders(this.d.db.col, this.d.alpaca)
       return
     }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { DEFAULT_SETTINGS, settingsSchema } from "@mb/stock-core/settings"
+import { applySettingsPatch, DEFAULT_SETTINGS, upgradeStockSettings, type SettingsPatch } from "@mb/stock-core/settings"
 import { computeRiskState as compute } from "../../src/bot/risk"
 import { account } from "../helpers/factories"
 
@@ -108,7 +108,9 @@ describe("computeRiskState", () => {
   })
 
   it("keeps no share of equity for the old core book, even with its section still stored", () => {
-    const stored = settingsSchema.parse({ ...DEFAULT_SETTINGS, core: { enabled: true, target_pct: 50 } })
+    const upgraded = applySettingsPatch(DEFAULT_SETTINGS, upgradeStockSettings({ ...DEFAULT_SETTINGS, core: { enabled: true, target_pct: 50 } }) as SettingsPatch)
+    if (!upgraded.ok) throw new Error(upgraded.errors.join("; "))
+    const stored = upgraded.settings
     const risk = compute(acct(10_000, 10_000, 6_000), 1, 0, stored)
     expect(risk.deployable_cash).toBe(5_500)
     expect(risk.notes).toEqual([])

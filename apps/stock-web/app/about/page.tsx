@@ -46,6 +46,7 @@ export default async function AboutPage() {
 
   const rules = [
     `Starts with ${usd(settings.account.starting_capital, { whole: true })} of fake money (an Alpaca paper account). Stocks are long only, with no margin.`,
+    `The trend core trades by rules, not the AI${settings.core.enabled ? "" : " (switched off now)"}: while SPY is above its 200-day average, it holds up to ${settings.core.max_positions} of the strongest stocks in an uptrend (above a 50-day average that is above the 200-day, up over 6 months, near their 52-week high), ranked among the ${settings.core.universe_size} most traded. Each risks ${settings.core.risk_per_trade_pct}% of equity at a stop ${settings.core.stop_atr} daily ATRs below, with no target; it sells when the stop is hit or the stock closes below its 50-day average, and the agent can sell one of its positions only on news.`,
     `Each buy risks ${r.risk_per_trade_pct}% of equity at its stop (a little more or less by conviction), at most ${r.max_position_pct}% of equity per stock, and ${r.max_open_positions} stock positions at once. ${r.cash_reserve_pct}% is always kept in cash.`,
     `Every stock buy is a bracket order with a stop-loss and a take-profit held by the broker, so exits fire even if the engine is down. Minimum reward:risk is ${r.min_reward_risk}.`,
     `Day P&L of −${r.max_daily_loss_pct}% blocks new buys. At −${r.flatten_loss_pct}% everything is liquidated. Both lift the next session.`,

@@ -6,6 +6,7 @@ import {
   pct,
   refineWireThresholds,
   type SettingsValidation as SettingsValidationOf,
+  upgradeStoredSettings,
   wireSettingsBase,
 } from "@mb/core/settings"
 import { z } from "zod"
@@ -109,6 +110,23 @@ export const optionsSettingsSchema = z.object({
   contracts_per_underlying: int(2, 30),
 })
 
+/** The trend core: rules that hold the strongest stocks in an uptrend by themselves, beside the agent. */
+export const coreSettingsSchema = z.object({
+  enabled: z.boolean(),
+  /** Most positions the core holds at once. */
+  max_positions: int(0, 20),
+  /** Equity lost if a core position's first stop is hit, as % of equity. */
+  risk_per_trade_pct: pct(0.05, 5),
+  /** The first stop's distance in daily ATRs, kept inside risk.min_stop_pct–max_stop_pct; the stop then trails at that distance. */
+  stop_atr: z.number().min(0.5).max(10),
+  /** It ranks this many of the scan universe's stocks, the most traded first. */
+  universe_size: int(50, 1_500),
+  /** No core entry in a stock sold (by anyone) this recently. */
+  reentry_hours: z.number().min(0).max(720),
+  /** No core entry in a stock with negative news at review severity or above this recent (0: no veto). */
+  news_veto_hours: z.number().min(0).max(168),
+})
+
 export const scheduleSettingsSchema = z.object({
   /** How early before the open the agent is woken to plan the day. */
   premarket_lead_minutes: z.number().min(10).max(240),
@@ -154,6 +172,7 @@ export const settingsSchema = z
     }),
     risk: riskSettingsSchema,
     options: optionsSettingsSchema,
+    core: coreSettingsSchema,
     schedule: scheduleSettingsSchema,
     universe: z.object({
       /** ETFs always included in the market snapshot so the model can read the tape. */
@@ -228,6 +247,15 @@ export const DEFAULT_SETTINGS: Settings = {
     monitor_seconds: 15,
     contracts_per_underlying: 10,
   },
+  core: {
+    enabled: true,
+    max_positions: 5,
+    risk_per_trade_pct: 1,
+    stop_atr: 2,
+    universe_size: 500,
+    reentry_hours: 72,
+    news_veto_hours: 24,
+  },
   schedule: {
     premarket_lead_minutes: 90,
     open_buffer_minutes: 10,
@@ -293,3 +321,16 @@ export type SettingsValidation = SettingsValidationOf<Settings>
 
 /** Applies a patch and validates the result. The only way settings change. */
 export const applySettingsPatch = (base: Settings, patch: SettingsPatch): SettingsValidation => sharedApplySettingsPatch(settingsSchema, base, patch)
+
+/**
+ * Stored settings, upgraded before they are read: the shared upgrade, then the old core book's
+ * `core` section (target_pct, themes, …; off since the agent-only bot) is dropped. The trend core
+ * reuses the name, and without this the old section's `enabled: false` would merge over its
+ * defaults and keep it off.
+ */
+export const upgradeStockSettings = (stored: unknown): unknown => {
+  const s = upgradeStoredSettings(stored)
+  if (typeof s !== "object" || s === null || !("core" in s)) return s
+  const { core, ...rest } = s as Record<string, unknown>
+  return typeof core === "object" && core !== null && "target_pct" in core ? rest : s
+}

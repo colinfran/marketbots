@@ -155,6 +155,20 @@ describe("stock agent", () => {
       expect(closed).toMatchObject({ outcome: "blocked", detail: expect.stringContaining("outside the regular session") })
     })
 
+    it("sells a trend-core position only when news about it woke the agent", async () => {
+      const { d, ctx, known, broker, refresh } = await setup()
+      broker.setPrice("AAPL", 200)
+      await actOnStockAnswer(d, answer([decision()]), ep("e1"), known)
+      await refresh()
+      await ctx.col.plans.updateOne({ _id: "AAPL" }, { $set: { book: "core" } })
+      expect(await bookText(d)).toContain("TREND CORE (rules-managed")
+      const [blocked] = await actOnStockAnswer(d, answer([decision({ action: "sell" })]), ep("e2"), known)
+      expect(blocked).toMatchObject({ outcome: "blocked", detail: expect.stringMatching(/^a trend-core position closes by its rules/) })
+      const news: Observation = { id: "news:1", subject: "AAPL", kind: "news", priority: 0, salience: 90, summary: "CEO arrested", refs: {}, at: new Date() }
+      const [sold] = await actOnStockAnswer(d, answer([decision({ action: "sell" })]), { ...ep("e3"), wake: { ...ep("e3").wake, observations: [news] } }, known)
+      expect(sold).toMatchObject({ outcome: "filled", detail: "sold 10 of 10 shares" })
+    })
+
     it("buys an option only from a menu it loaded in the same episode", async () => {
       const { d, ctx, known, broker } = await setup()
       prices.NVDA = 142
