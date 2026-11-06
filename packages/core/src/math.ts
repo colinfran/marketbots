@@ -54,3 +54,10 @@ export const roundToStep = (value: number, step: number): number => {
 
 export const bps = (fraction: number) => fraction * 10_000
 export const fromBps = (value: number) => value / 10_000
+
+/**
+ * How much of an entry's base risk it takes, by its conviction: 0.75x at the minimum conviction
+ * the rules accept, 1x halfway, 1.25x at the top. Conviction ranks ideas; it isn't a probability,
+ * so it moves size only a little either way.
+ */
+export const convictionScale = (conviction: number, min: number, max: number) => (max > min ? 0.75 + 0.5 * clamp((conviction - min) / (max - min), 0, 1) : 1)

@@ -24,7 +24,7 @@ export const heldSymbols = async (d: StockAgentDeps, stored?: StoredBook): Promi
 }
 
 /** The envelope's history in the paper account. */
-export const envelopeHistory = async (d: StockAgentDeps, now = Date.now()): Promise<EnvelopeHistory> => liveEnvelopeHistory(d, Number(d.snapshot()?.account.equity ?? 0), now)
+export const envelopeHistory = (d: StockAgentDeps, now = Date.now()): Promise<EnvelopeHistory> => liveEnvelopeHistory(d, now)
 
 /** YOUR BOOK and LIMITS: the brief's account part, also the `book` tool's answer. */
 export const bookText = (d: StockAgentDeps, now = new Date()) => liveBookText(d, now)

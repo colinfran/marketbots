@@ -14,15 +14,12 @@ const agentEvidenceSchema = evidenceSchema.extend({
   source_url: z.string().nullable().describe("A URL that appears in the brief or a tool result and supports the claim, or null. Never invent URLs."),
 })
 
-export const cryptoAgentDecisionSchema = cryptoDecisionSchema.extend({
+/** No size field: code sizes every entry from its stop and its conviction. */
+export const cryptoAgentDecisionSchema = cryptoDecisionSchema.omit({ size_pct_of_max: true }).extend({
   action: cryptoDecisionSchema.shape.action.describe("Pairs you don't hold: buy or no_trade. Pairs you hold (YOUR BOOK): hold, reduce or close. no_trade is a normal, often correct answer."),
   thesis: z.string().describe("2-3 sentences: why this action, why now. Cite numbers from the brief or your tool results."),
   bull_evidence: z.array(agentEvidenceSchema).describe("1-5 items for upside."),
   bear_evidence: z.array(agentEvidenceSchema).describe("1-5 counterarguments and downside risks. Always include at least one."),
-  size_pct_of_max: z
-    .number()
-    .nullable()
-    .describe("BUY only: a whole number from 10 to 100, the percent of the largest position the risk checks allow (100 = the largest, 50 = half of it). Size down when uncertain. null otherwise."),
   strategy: z.enum(STRATEGY_IDS).nullable().describe("BUY only: the strategy the entry follows (discretionary when none fits). null otherwise."),
 })
 
@@ -44,9 +41,8 @@ export type NormalizedCryptoAgentDecision = NormalizedCryptoDecision & { strateg
 
 /**
  * Keeps decisions on known pairs (the first per pair), bounded like the cycle's: every held pair's,
- * since the agent manages the whole book, and at most MAX_NEW_PAIRS about pairs not held. A size of
- * 1 or less is read as a fraction (the local model sometimes writes 0.5 for 50%), so it isn't
- * clamped up to the 10% floor.
+ * since the agent manages the whole book, and at most MAX_NEW_PAIRS about pairs not held. They
+ * carry no size preference: code sizes entries.
  */
 export const normalizeCryptoAgentDecisions = (
   decisions: CryptoAgentAnswer["decisions"],
@@ -68,10 +64,8 @@ export const normalizeCryptoAgentDecisions = (
       dropped.push(`${symbol}: more than ${MAX_NEW_PAIRS} pairs not held`)
       continue
     }
-    const fraction = d.size_pct_of_max !== null && d.size_pct_of_max > 0 && d.size_pct_of_max <= 1
-    const n = normalizeCryptoDecision(fraction ? { ...d, size_pct_of_max: d.size_pct_of_max! * 100 } : d, symbol, held.has(symbol), sourceUrls)
-    if (fraction) n.notes.push(`size_pct_of_max ${d.size_pct_of_max} read as ${d.size_pct_of_max! * 100}%`)
-    out.push({ ...n, strategy: n.action === "buy" ? (d.strategy ?? "discretionary") : null })
+    const n = normalizeCryptoDecision({ ...d, size_pct_of_max: null }, symbol, held.has(symbol), sourceUrls)
+    out.push({ ...n, size_pct_of_max: null, strategy: n.action === "buy" ? (d.strategy ?? "discretionary") : null })
   }
   return { decisions: out, dropped }
 }

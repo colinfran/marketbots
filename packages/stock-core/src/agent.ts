@@ -22,6 +22,7 @@ export const stockAgentDecisionSchema = decisionSchema.extend({
     .describe(
       "Stocks you don't hold: buy (opens a position; never adds). Stocks you hold (YOUR BOOK): sell some or all, adjust_exits (new stop and target), or hold. Options: buy_option opens one from an option_menu result (symbol = the underlying); close_option or hold_option manage an open options position by its structure_id.",
     ),
+  allocation_pct: z.number().nullable().describe("null: code sizes every buy to risk a set share of equity at its stop, by your conviction."),
   rationale: z.string().describe("1-3 sentences: why this, why now. Cite numbers from the brief or your tool results."),
   evidence: z.array(z.string()).describe("2-5 concrete facts with numbers or times, from the brief or your tool results."),
   structure_id: z.string().nullable().describe("close_option / hold_option: the id of an options position in YOUR BOOK. null otherwise."),

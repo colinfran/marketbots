@@ -116,10 +116,6 @@ export const agentSettingsBase = z.object({
   envelope: z.object({
     entries_per_day: int(0, 50),
     entries_per_hour: int(0, 20),
-    /** Money committed to new entries in any hour, % of equity. */
-    commit_per_hour_pct: pct(0, 100),
-    /** An agent entry's size, % of what the risk checks allow. */
-    size_pct: pct(1, 100),
     max_open_positions: int(0, 30),
     /** One action per symbol this often (tightening a stop is exempt). */
     symbol_action_minutes: z.number().min(0).max(1_440),

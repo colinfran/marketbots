@@ -12,7 +12,7 @@ export const heldPositions = async (d: CryptoAgentDeps): Promise<Held[]> =>
   (await d.ctx.ledger.openPositions()).map((p) => ({ id: p._id, symbol: p.symbol, entry: p.avg_price, stop: p.stop_price, reviewPrice: p.last_review_price, reviewedAt: p.last_reviewed_at }))
 
 /** The envelope's history in the paper account. */
-export const envelopeHistory = async (d: CryptoAgentDeps, now = Date.now()): Promise<EnvelopeHistory> => liveEnvelopeHistory(d, (await d.ctx.ledger.account())?.equity_usd ?? 0, now)
+export const envelopeHistory = (d: CryptoAgentDeps, now = Date.now()): Promise<EnvelopeHistory> => liveEnvelopeHistory(d, now)
 
 /** YOUR BOOK and LIMITS: the brief's account part, also the `book` tool's answer. */
 export const bookText = (d: CryptoAgentDeps, now = new Date()) => liveBookText(d, now)

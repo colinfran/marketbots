@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto"
 import type { DecisionAction, DecisionDoc, PositionDoc } from "@mb/crypto-core/db"
 import type { CycleKind } from "@mb/crypto-core/db"
-import { roundTo } from "@mb/crypto-core/math"
+import { convictionScale, roundTo } from "@mb/crypto-core/math"
 import { MAX_HORIZON_HOURS, type NormalizedCryptoDecision } from "@mb/crypto-core/report"
 import type { Settings } from "@mb/crypto-core/settings"
 import { ACCOUNT_ID, MODE } from "@mb/crypto-core/venues"
@@ -71,8 +71,8 @@ export type DecisionInput = {
   promptVersion: string
   /** Event decisions: the wire items behind them. */
   wireItemIds?: string[]
-  /** The agent's decisions (level auto): the episode, recorded on the decision, and the most its envelope lets a buy commit. */
-  agent?: { episodeId: string; maxNotionalUsd: number }
+  /** The agent's decisions: the episode, recorded on the decision. */
+  agent?: { episodeId: string }
 }
 
 export const processDecision = async (ctx: EngineContext, i: DecisionInput): Promise<DecisionDoc> => {
@@ -145,35 +145,28 @@ export const processDecision = async (ctx: EngineContext, i: DecisionInput): Pro
     const target = d.take_profit && d.take_profit > quote.mid ? d.take_profit : i.candidate.target_hint
     const riskState = await ctx.ledger.riskState()
     const limit = roundPrice(pair, quote.ask * (1 + settings.kraken.max_slippage_bps / 10_000))
-    const size = cryptoSize({
-          equity: riskState?.equityUsd ?? 0,
-          price: quote.ask,
-          stop,
-          riskPct: settings.kraken.risk_per_trade_pct,
-          maxPositionPct: settings.kraken.max_position_pct,
-          sizePctOfMax: d.size_pct_of_max ?? 50,
-        })
-    // The agent's envelope can cap what a buy commits below what risk-based sizing would.
-    const capped = i.agent !== undefined && size.qty * limit > i.agent.maxNotionalUsd
-    const qty = roundQty(pair, capped ? i.agent!.maxNotionalUsd / limit : size.qty)
+    // Risk per trade, a little more or less by conviction; the risk engine's caps can only cut it.
+    const riskPct = roundTo(settings.kraken.risk_per_trade_pct * convictionScale(d.conviction, settings.kraken.min_conviction, 100), 3)
+    const size = cryptoSize({ equity: riskState?.equityUsd ?? 0, price: quote.ask, stop, riskPct, maxPositionPct: settings.kraken.max_position_pct })
+    const qty = roundQty(pair, size.qty)
     const walkIn = walkBook(quote.book.asks, qty, limit, "buy")
     const walkOut = walkBook(quote.book.bids, qty, null, "sell")
     const inSlip = walkIn.avgPrice ? slippageBps(walkIn.avgPrice, quote.mid, "buy") - quote.spreadBps / 2 : settings.kraken.max_slippage_bps
     const outSlip = walkOut.avgPrice ? slippageBps(walkOut.avgPrice, quote.mid, "sell") - quote.spreadBps / 2 : settings.kraken.max_slippage_bps
     const roundTrip = roundTripCostBps({ takerFeeBps: i.takerBps, spreadBps: quote.spreadBps, entrySlippageBps: inSlip, exitSlippageBps: outSlip })
     const edge = cryptoEdge({ price: quote.mid, stop, target, pAi: d.p_target_first, shrink: settings.ai.probability_shrink, roundTripBps: roundTrip })
-    doc.costs = { ...doc.costs, slippage_bps: roundTo(inSlip + outSlip, 2), round_trip_bps: roundTo(roundTrip, 2), fee_usd_est: roundTo((2 * (capped ? qty * limit : size.notional) * i.takerBps) / 10_000, 4) }
+    doc.costs = { ...doc.costs, slippage_bps: roundTo(inSlip + outSlip, 2), round_trip_bps: roundTo(roundTrip, 2), fee_usd_est: roundTo((2 * size.notional * i.takerBps) / 10_000, 4) }
     if (edge) {
       doc.ev = { p_prior: roundTo(edge.pPrior, 4), p_adjusted: roundTo(edge.pAdjusted, 4), gross_edge_bps: roundTo(edge.grossEdgeBps, 2), net_edge_bps: roundTo(edge.netEdgeBps, 2) }
     }
     doc.sizing = {
       qty,
       notional_usd: roundTo(qty * limit, 2),
-      risk_usd: roundTo(capped ? qty * Math.max(0, quote.ask - stop) : size.riskUsd, 2),
+      risk_usd: roundTo(size.riskUsd, 2),
       limit_price: limit,
       stop_price: roundPrice(pair, stop),
       take_profit_price: roundPrice(pair, target),
-      notes: capped ? [`capped at $${i.agent!.maxNotionalUsd.toFixed(2)} by the agent's envelope`] : [],
+      notes: [`risks ${riskPct}% of equity at the stop (conviction ${d.conviction})`],
     }
     risk = riskState
       ? evaluateCryptoEntry(

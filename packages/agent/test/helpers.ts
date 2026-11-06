@@ -28,14 +28,12 @@ export const SETTINGS: AgentSettings = {
   wake_cooldown_minutes: 5,
   sweep_minutes: 120,
   envelope: {
-    entries_per_day: 4,
-    entries_per_hour: 2,
-    commit_per_hour_pct: 10,
-    size_pct: 50,
+    entries_per_day: 8,
+    entries_per_hour: 3,
     max_open_positions: 4,
     symbol_action_minutes: 30,
-    reentry_after_stop_hours: 24,
-    flip_hours: 6,
+    reentry_after_stop_hours: 6,
+    flip_hours: 2,
   },
   public_thinking: false,
 }

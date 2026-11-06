@@ -133,11 +133,15 @@ describe("sizing and edge", () => {
     expect(cryptoEdge({ price: 100, stop: 101, target: 110, pAi: 0.5, shrink: 0.5, roundTripBps: 0 })).toBeNull()
   })
 
-  it("sizes by risk, capped by the max position and scaled by preference", () => {
-    // Risk $75 (0.75%) with a $5 stop → 15 units = $1,500; capped at 12% = $1,200; then 50% → $600.
-    const s = cryptoSize({ equity: 10_000, price: 100, stop: 95, riskPct: 0.75, maxPositionPct: 12, sizePctOfMax: 50 })
-    expect(s.notional).toBeCloseTo(600)
-    expect(s.riskUsd).toBeCloseTo(30)
+  it("sizes by risk, capped by the max position", () => {
+    // Risk $75 (0.75%) with a $5 stop → 15 units = $1,500; capped at 12% = $1,200.
+    const s = cryptoSize({ equity: 10_000, price: 100, stop: 95, riskPct: 0.75, maxPositionPct: 12 })
+    expect(s.notional).toBeCloseTo(1_200)
+    expect(s.riskUsd).toBeCloseTo(60)
+    // Risk $100 (1%) with a $10 stop → 10 units = $1,000, under a 20% cap: all of it.
+    const wide = cryptoSize({ equity: 10_000, price: 100, stop: 90, riskPct: 1, maxPositionPct: 20 })
+    expect(wide.notional).toBeCloseTo(1_000)
+    expect(wide.riskUsd).toBeCloseTo(100)
   })
 
   it("walks the book and measures slippage", () => {

@@ -4,6 +4,7 @@ import type { AlpacaAsset, AlpacaOrder, AlpacaPosition, Snapshot } from "@mb/sto
 import type { ChainContract } from "@mb/stock-core/context"
 import type { CycleKind, DecisionDoc, PositionPlanDoc } from "@mb/stock-core/db"
 import type { RiskCheck } from "@mb/stock-core/events"
+import { convictionScale } from "@mb/stock-core/math"
 import { describeContract, STRATEGY_LABEL } from "@mb/stock-core/options"
 import { isOptionAction, type BotReport, type Decision } from "@mb/stock-core/report"
 import type { Phase, RiskSettings, Settings } from "@mb/stock-core/settings"
@@ -162,14 +163,19 @@ export const evaluateStockBuy = (i: StockBuyInput): StockBuyResult => {
   if (failed || i.price === null) return result()
   check("min price", i.price >= r.min_price, `$${i.price} ≥ $${r.min_price}`, `price $${i.price} below $${r.min_price} minimum`)
 
-  const allocationPct = Math.min(d.allocation_pct ?? 0, i.risk.max_position_pct)
-  check("allocation", allocationPct > 0, `${allocationPct}% of equity (max ${i.risk.max_position_pct}%)`, "no allocation_pct given")
+  const exits = resolveExits(i.price, d.stop_loss, d.take_profit, r)
+  // A buy that names no allocation (the agent's) loses risk_per_trade_pct of equity at its stop,
+  // a little more or less by conviction; the position cap and cash can only cut it.
+  const stopPct = ((i.price - exits.stop) / i.price) * 100
+  const riskPct = r.risk_per_trade_pct * convictionScale(d.conviction, r.min_conviction, 10)
+  const allocationPct = round2(Math.min(d.allocation_pct ?? (stopPct > 0 ? (riskPct / stopPct) * 100 : 0), i.risk.max_position_pct))
+  const sized = d.allocation_pct === null ? `: risks ${round2(riskPct)}% of equity at a ${round2(stopPct)}% stop` : ""
+  check("allocation", allocationPct > 0, `${allocationPct}% of equity${sized} (max ${i.risk.max_position_pct}%)`, "no allocation_pct given")
   const budget = Math.min((i.risk.equity * allocationPct) / 100, i.cash)
   const qty = Math.floor(budget / i.price)
   check("size", qty >= 1, `${qty} shares ($${round2(qty * i.price)})`, `budget $${round2(budget)} buys less than 1 share at $${i.price}`)
   if (failed) return result()
 
-  const exits = resolveExits(i.price, d.stop_loss, d.take_profit, r)
   check(
     "reward:risk",
     exits.rewardRisk >= r.min_reward_risk,

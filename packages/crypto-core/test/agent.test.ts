@@ -10,7 +10,6 @@ const decision = (over: Partial<CryptoAgentAnswer["decisions"][number]> = {}): C
   stop_loss: 177.6,
   take_profit: 191,
   horizon_hours: 48,
-  size_pct_of_max: 50,
   reduce_pct: null,
   priced_in: "partially",
   thesis: "Breakout.",
@@ -27,15 +26,15 @@ const opts = { universe: new Set(["SOL/USD", "BTC/USD"]), held: new Set(["BTC/US
 describe("crypto agent decisions", () => {
   it("bounds them with the cycle's rules and defaults a buy's strategy to discretionary", () => {
     const { decisions } = normalizeCryptoAgentDecisions([decision()], opts)
-    expect(decisions[0]).toMatchObject({ symbol: "SOL/USD", conviction: 65, size_pct_of_max: 50, strategy: "discretionary" })
+    expect(decisions[0]).toMatchObject({ symbol: "SOL/USD", conviction: 65, strategy: "discretionary" })
     // An invented URL is dropped and its claim downgraded.
     expect(decisions[0].bull_evidence[0]).toMatchObject({ kind: "speculation", source_url: null, verified_source: false })
   })
 
-  it("reads a size of 1 or less as a fraction", () => {
-    const [d] = normalizeCryptoAgentDecisions([decision({ size_pct_of_max: 0.5 })], opts).decisions
-    expect(d.size_pct_of_max).toBe(50)
-    expect(d.notes).toContain("size_pct_of_max 0.5 read as 50%")
+  it("carries no size preference: code sizes entries from the stop and conviction", () => {
+    const [d] = normalizeCryptoAgentDecisions([decision()], opts).decisions
+    expect(d.size_pct_of_max).toBeNull()
+    expect(d.notes).toEqual([])
   })
 
   it("keeps known pairs only, the first per pair, and fits actions to the book", () => {

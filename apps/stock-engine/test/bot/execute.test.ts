@@ -461,8 +461,23 @@ describe("executeDecisions: buy rejections", () => {
     await rejected(decision({ symbol: "PENNY" }), "price $3 below $5 minimum")
   })
 
-  it.each([null, 0, -5])("needs a positive allocation (got %s)", async (allocation) => {
+  it.each([0, -5])("needs a positive allocation (got %s)", async (allocation) => {
     await rejected(decision({ symbol: "AAPL", allocation_pct: allocation }), "no allocation_pct given")
+  })
+
+  it("sizes a buy that names no allocation to lose 1% of equity at its stop, a little less or more by conviction", async () => {
+    await execute([
+      decision({ symbol: "AAPL", allocation_pct: null, stop_loss: 96, take_profit: 106, conviction: 6 }),
+      decision({ symbol: "NVDA", allocation_pct: null, stop_loss: 48, take_profit: 53, conviction: 10 }),
+    ])
+    // Conviction at the minimum: 0.75% at a 4% stop is 18.75% of $10,000.
+    const low = await recordFor("AAPL")
+    expect(low).toMatchObject({ status: "executed", qty: 18 })
+    expect(low.checks.find((c) => c.name === "allocation")?.detail).toBe("18.75% of equity: risks 0.75% of equity at a 4% stop (max 20%)")
+    // Conviction 10: 1.25% at a 4% stop would be 31.25%, capped at the 20% position limit.
+    const high = await recordFor("NVDA")
+    expect(high).toMatchObject({ status: "executed", qty: 40 })
+    expect(high.checks.find((c) => c.name === "allocation")?.detail).toBe("20% of equity: risks 1.25% of equity at a 4% stop (max 20%)")
   })
 
   it("rejects allocations too small for one share", async () => {

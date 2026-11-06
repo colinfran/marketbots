@@ -679,16 +679,6 @@
                 "minimum": 0,
                 "maximum": 20
               },
-              "commit_per_hour_pct": {
-                "type": "number",
-                "minimum": 0,
-                "maximum": 100
-              },
-              "size_pct": {
-                "type": "number",
-                "minimum": 1,
-                "maximum": 100
-              },
               "max_open_positions": {
                 "type": "integer",
                 "minimum": 0,
@@ -713,8 +703,6 @@
             "required": [
               "entries_per_day",
               "entries_per_hour",
-              "commit_per_hour_pct",
-              "size_pct",
               "max_open_positions",
               "symbol_action_minutes",
               "reentry_after_stop_hours",
@@ -1450,16 +1438,6 @@
                 "minimum": 0,
                 "maximum": 20
               },
-              "commit_per_hour_pct": {
-                "type": "number",
-                "minimum": 0,
-                "maximum": 100
-              },
-              "size_pct": {
-                "type": "number",
-                "minimum": 1,
-                "maximum": 100
-              },
               "max_open_positions": {
                 "type": "integer",
                 "minimum": 0,
@@ -1484,8 +1462,6 @@
             "required": [
               "entries_per_day",
               "entries_per_hour",
-              "commit_per_hour_pct",
-              "size_pct",
               "max_open_positions",
               "symbol_action_minutes",
               "reentry_after_stop_hours",

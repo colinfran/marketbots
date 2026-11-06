@@ -1,4 +1,4 @@
-import { checkEntry, entryRoomUsd, type EnvelopeHistory } from "@mb/agent/envelope"
+import { checkEntry, type EnvelopeHistory } from "@mb/agent/envelope"
 import type { AgentAccount, EpisodeInfo } from "@mb/agent/runtime"
 import type { AgentAction } from "@mb/core/agent"
 import { cleanLine } from "@mb/engine-kit/util/text"
@@ -17,9 +17,9 @@ import { limitsText, sessionWindow, type StockAgentDeps } from "./book"
  * The stock agent's decisions into the paper account (docs/plans/LOCAL-AI.md §8.4, §9), stocks and
  * options, through the bot's execution path (`executeDecisions`: the buy rules, the
  * options rules, bracket and OCO orders at the broker, a `decisions` record per decision). Before
- * that, the envelope: an entry must pass its rate limits, and its size (a buy's allocation, an
- * option's premium) is cut to the envelope's share and the hour's commitment budget. Buys happen only
- * in the regular session after the opening buffer; sales, exits and holds are never rate-limited.
+ * that, the envelope: an entry must pass its rate limits. A buy's size is code's (risk per trade at
+ * its stop, by conviction), an option's premium is capped per position. Buys happen only in the
+ * regular session after the opening buffer; sales, exits and holds are never rate-limited.
  *
  * The account comes from the engine's latest snapshot (every 15 s), so reading it costs no broker
  * call; executing refreshes what it needs.
@@ -53,10 +53,10 @@ export const liveBook = async (d: Pick<StockAgentDeps, "ctx" | "snapshot">, stor
 }
 
 /** What the envelope needs from the paper account: the agent's own entries and actions (its decisions), every stock sale and every stop-out. */
-export const liveEnvelopeHistory = async (d: Pick<StockAgentDeps, "ctx">, equityUsd: number, now = Date.now()): Promise<EnvelopeHistory> => {
+export const liveEnvelopeHistory = async (d: Pick<StockAgentDeps, "ctx">, now = Date.now()): Promise<EnvelopeHistory> => {
   const since = new Date(now - LOOKBACK_MS)
   const [decisions, sales, plans, options] = await Promise.all([
-    d.ctx.col.decisions.find({ agent_episode_id: { $exists: true }, status: "executed", created_at: { $gte: since }, action: { $in: [...TRADES] } }, { projection: { symbol: 1, action: 1, created_at: 1, notional: 1, option: 1 } }).sort({ created_at: 1 }).toArray(),
+    d.ctx.col.decisions.find({ agent_episode_id: { $exists: true }, status: "executed", created_at: { $gte: since }, action: { $in: [...TRADES] } }, { projection: { symbol: 1, action: 1, created_at: 1 } }).sort({ created_at: 1 }).toArray(),
     d.ctx.col.orders.find({ side: "sell", asset_class: "us_equity", filled_at: { $gte: since } }, { projection: { symbol: 1, filled_at: 1, role: 1 } }).toArray(),
     d.ctx.col.plans.find({}, { projection: { decision_id: 1 } }).toArray(),
     d.ctx.col.optionPositions.find({ status: { $in: [...OPEN_OPTIONS] } }, { projection: { decision_id: 1 } }).toArray(),
@@ -68,7 +68,7 @@ export const liveEnvelopeHistory = async (d: Pick<StockAgentDeps, "ctx">, equity
   for (const x of decisions) {
     const at = x.created_at.getTime()
     lastAction.set(x.symbol, at)
-    if ((x.action === "buy" || x.action === "buy_option") && now - at < 24 * HOUR) entries.push({ symbol: x.symbol, at, notionalUsd: x.notional ?? x.option?.cost_usd ?? 0 })
+    if ((x.action === "buy" || x.action === "buy_option") && now - at < 24 * HOUR) entries.push({ symbol: x.symbol, at })
   }
   const lastExit = new Map<string, number>()
   const lastStopOut = new Map<string, number>()
@@ -77,7 +77,7 @@ export const liveEnvelopeHistory = async (d: Pick<StockAgentDeps, "ctx">, equity
     lastExit.set(o.symbol, at)
     if (o.role === "stop_loss") lastStopOut.set(o.symbol, at)
   }
-  return { equityUsd, openPositions, entries, lastAction, lastExit, lastStopOut }
+  return { openPositions, entries, lastAction, lastExit, lastStopOut }
 }
 
 /** The paper account as the risk rules see it, with the envelope's history; null before the engine's first snapshot. */
@@ -86,7 +86,7 @@ export const liveRiskState = async (d: Pick<StockAgentDeps, "ctx" | "snapshot">,
   if (!book.snap) return null
   const tradesToday = await d.ctx.col.decisions.countDocuments({ trading_day: marketDay(now), status: "executed", action: { $in: [...TRADES] } })
   const risk = computeRiskState(book.snap.account, book.stocks.length, tradesToday, d.ctx.settings.current)
-  return { risk, history: await liveEnvelopeHistory(d, risk.equity, now.getTime()), book }
+  return { risk, history: await liveEnvelopeHistory(d, now.getTime()), book }
 }
 
 /** The paper account, summarized for the heartbeat and the breakers. */
@@ -206,13 +206,11 @@ export const actOnStockAnswer = async (
           out.push(action(dec, "blocked", `envelope: ${envelope.reason}`))
           continue
         }
-        // The envelope's share of what the rules allow, within the hour's budget, as % of equity.
-        const share = settings.agent.envelope.size_pct / 100
-        const roomPct = state.risk.equity > 0 ? (entryRoomUsd(Number.POSITIVE_INFINITY, state.history, settings.agent.envelope, Date.now()) / state.risk.equity) * 100 : 0
-        if (dec.action === "buy") decision = { ...dec, allocation_pct: roundTo(Math.min(Math.min(dec.allocation_pct ?? 0, state.risk.max_position_pct) * share, roomPct), 2) }
+        // Code sizes a buy from its stop and conviction (no allocation); an option's premium stays within the per-position cap.
+        if (dec.action === "buy") decision = { ...dec, allocation_pct: null }
         else if (dec.option) {
           const perTrade = state.risk.profit_lock ? settings.options.max_premium_per_trade_pct / 2 : settings.options.max_premium_per_trade_pct
-          decision = { ...dec, option: { ...dec.option, premium_pct: roundTo(Math.min(Math.min(dec.option.premium_pct ?? perTrade, perTrade) * share, roomPct), 2) } }
+          decision = { ...dec, option: { ...dec.option, premium_pct: roundTo(Math.min(dec.option.premium_pct ?? perTrade, perTrade), 2) } }
         }
       }
       const started = new Date()

@@ -61,7 +61,6 @@ const decision = (over: Partial<CryptoAgentAnswer["decisions"][number]> = {}): C
   stop_loss: 63_000,
   take_profit: 70_000,
   horizon_hours: 48,
-  size_pct_of_max: 100,
   reduce_pct: null,
   priced_in: "partially",
   thesis: "Breakout above the 20×4h high on rising volume.",
@@ -79,18 +78,19 @@ const pastEntry = (id: string, minutes: number, notionalUsd: number) =>
   ({ _id: id, agent_episode_id: "e0", symbol: `X${id}/USD`, action: "buy", created_at: new Date(Date.now() - minutes * 60_000), execution: { status: "filled", filled_qty: 1, avg_price: notionalUsd, order_ids: [], notes: [] } }) as unknown as DecisionDoc
 
 describe("crypto agent decisions", () => {
-  it("buys on the paper account through the bot's execution path, at the envelope's share, and records its episode on the decision", async () => {
+  it("buys on the paper account through the bot's execution path, sized by code from its stop and conviction, and records its episode on the decision", async () => {
     const { d, ctx } = await setup()
     const [a] = await actOnCryptoAnswer(d, answer([decision()]), ep("e1", new Set(["https://example.com/etf"])))
     expect(a).toMatchObject({ symbol: "BTC/USD", action: "buy", outcome: "filled", detail: expect.stringMatching(/^bought /) })
     const [p] = await ctx.ledger.openPositions()
-    // Risk allows the 20% max position ($2,000); the envelope takes half, inside the hour's $1,000.
-    expect(p.qty * p.avg_price).toBeGreaterThan(900)
-    expect(p.qty * p.avg_price).toBeLessThan(1_010)
+    // 1% risk ×0.92 at conviction 70 over a 3.1% stop would be ~$2,960: the 20% max position ($2,000) caps it.
+    expect(p.qty * p.avg_price).toBeGreaterThan(1_900)
+    expect(p.qty * p.avg_price).toBeLessThan(2_010)
     expect(p).toMatchObject({ symbol: "BTC/USD", stop_price: 63_000, take_profit_price: 70_000, strategy_id: "trend" })
     const [doc] = await ctx.col.decisions.find().toArray()
     expect(doc).toMatchObject({ cycle_id: "e1", agent_episode_id: "e1", trigger_kind: "agent", research_id: null, model: DEFAULT_SETTINGS.agent.model, execution: { status: "filled" } })
-    const history = await liveEnvelopeHistory(d, 10_000)
+    expect(doc.sizing.notes).toEqual(["risks 0.917% of equity at the stop (conviction 70)"])
+    const history = await liveEnvelopeHistory(d)
     expect(history).toMatchObject({ openPositions: 1, entries: [expect.objectContaining({ symbol: "BTC/USD" })] })
   })
 
@@ -101,14 +101,21 @@ describe("crypto agent decisions", () => {
     expect(await ctx.ledger.openPositions()).toEqual([])
   })
 
-  it("blocks a buy the hour's budget can't fund, instead of sizing it to dust, and one the envelope's rate refuses", async () => {
+  it("never cuts a buy by what the hour already committed", async () => {
     const { d, ctx } = await setup()
-    await ctx.col.decisions.insertOne(pastEntry("1", 30, 998.5))
-    const [dust] = await actOnCryptoAnswer(d, answer([decision()]), ep("e1"))
-    expect(dust).toMatchObject({ outcome: "blocked", detail: expect.stringMatching(/^envelope: \$\d+ of this hour's \$\d+ left/) })
-    await ctx.col.decisions.insertOne(pastEntry("2", 10, 10))
-    const [rate] = await actOnCryptoAnswer(d, answer([decision()]), ep("e2"))
-    expect(rate).toMatchObject({ outcome: "blocked", detail: "envelope: 2/2 in the last hour" })
+    // Until 2026-11-06 an hour could commit only 10% of equity: this buy would have been refused.
+    await ctx.col.decisions.insertOne(pastEntry("1", 30, 5_000))
+    const [a] = await actOnCryptoAnswer(d, answer([decision()]), ep("e1"))
+    expect(a).toMatchObject({ outcome: "filled" })
+    const [p] = await ctx.ledger.openPositions()
+    expect(p.qty * p.avg_price).toBeGreaterThan(1_900)
+  })
+
+  it("blocks a buy the envelope's rate refuses", async () => {
+    const { d, ctx } = await setup()
+    await ctx.col.decisions.insertMany([pastEntry("1", 30, 500), pastEntry("2", 20, 500), pastEntry("3", 10, 500)])
+    const [rate] = await actOnCryptoAnswer(d, answer([decision()]), ep("e1"))
+    expect(rate).toMatchObject({ outcome: "blocked", detail: "envelope: 3/3 in the last hour" })
     expect(await ctx.ledger.openPositions()).toEqual([])
   })
 
@@ -167,7 +174,7 @@ describe("crypto agent decisions", () => {
     const text = await bookText(d)
     expect(text).toContain("YOUR BOOK (the paper account: your decisions trade it; started with $10,000)")
     expect(text).toContain("- New entries: allowed.")
-    expect(text).toContain("an entry is 50% of what the risk checks allow")
+    expect(text).toContain("Sizing is code's: a buy risks 1% of equity at its stop")
     expect(text).toContain("taker fee 40 bps a side")
   })
 })

@@ -74,29 +74,15 @@ export const roundTripCostBps = ({ takerFeeBps, spreadBps, entrySlippageBps, exi
   2 * takerFeeBps + Math.max(0, spreadBps) + Math.max(0, entrySlippageBps) + Math.max(0, exitSlippageBps)
 
 /**
- * Risk-based size: lose `riskPct` of equity if the stop is hit, capped at the max position, then
- * scaled by the AI's size preference (share of max).
+ * Risk-based size: lose `riskPct` of equity if the stop is hit, capped at the max position. The
+ * caller scales `riskPct` by conviction; nothing else cuts it.
  */
-export const cryptoSize = ({
-  equity,
-  price,
-  stop,
-  riskPct,
-  maxPositionPct,
-  sizePctOfMax,
-}: {
-  equity: number
-  price: number
-  stop: number
-  riskPct: number
-  maxPositionPct: number
-  sizePctOfMax: number
-}) => {
+export const cryptoSize = ({ equity, price, stop, riskPct, maxPositionPct }: { equity: number; price: number; stop: number; riskPct: number; maxPositionPct: number }) => {
   const perUnitRisk = price - stop
   if (!(equity > 0) || !(perUnitRisk > 0)) return { notional: 0, qty: 0, riskUsd: 0 }
   const riskNotional = ((equity * riskPct) / 100 / perUnitRisk) * price
   const capNotional = (equity * maxPositionPct) / 100
-  const notional = Math.min(riskNotional, capNotional) * (sizePctOfMax / 100)
+  const notional = Math.min(riskNotional, capNotional)
   const qty = notional / price
   return { notional, qty, riskUsd: qty * perUnitRisk }
 }

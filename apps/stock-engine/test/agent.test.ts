@@ -127,16 +127,16 @@ describe("stock agent", () => {
   })
 
   describe("on the paper account", () => {
-    it("buys through the bot's execution path, at the envelope's share, and records its episode", async () => {
+    it("buys through the bot's execution path, sized by code from its stop and conviction, and records its episode", async () => {
       const { d, ctx, known, broker } = await setup()
       broker.setPrice("AAPL", 200)
       const [a] = await actOnStockAnswer(d, answer([decision()]), ep("e1"), known)
-      // 10% of $10,000 asked; the envelope's half is 5%: $500 buys 2 shares at 200.
-      expect(a).toMatchObject({ symbol: "AAPL", action: "buy", outcome: "filled", detail: expect.stringMatching(/^bought 2 shares/) })
-      expect(await broker.getPositions()).toEqual([expect.objectContaining({ symbol: "AAPL", qty: "2" })])
+      // Its 10% is ignored: 0.875% at risk (conviction 7) over the default 2% stop would be 43.75%, capped at 20%: $2,000 buys 10 shares at 200.
+      expect(a).toMatchObject({ symbol: "AAPL", action: "buy", outcome: "filled", detail: expect.stringMatching(/^bought 10 shares/) })
+      expect(await broker.getPositions()).toEqual([expect.objectContaining({ symbol: "AAPL", qty: "10" })])
       const docs = await ctx.col.decisions.find().toArray()
-      expect(docs).toEqual([expect.objectContaining({ cycle_id: "e1", agent_episode_id: "e1", trigger_kind: "agent", status: "executed", request: expect.objectContaining({ allocation_pct: 5 }) })])
-      expect(await liveEnvelopeHistory(d, 10_000)).toMatchObject({ openPositions: 1, entries: [expect.objectContaining({ symbol: "AAPL", notionalUsd: 400 })] })
+      expect(docs).toEqual([expect.objectContaining({ cycle_id: "e1", agent_episode_id: "e1", trigger_kind: "agent", status: "executed", request: expect.objectContaining({ allocation_pct: null }) })])
+      expect(await liveEnvelopeHistory(d)).toMatchObject({ openPositions: 1, entries: [expect.objectContaining({ symbol: "AAPL" })] })
     })
 
     it("sells what it holds and posts the exit, and buys nothing outside the session or while paused", async () => {
@@ -144,9 +144,9 @@ describe("stock agent", () => {
       broker.setPrice("AAPL", 200)
       await actOnStockAnswer(d, answer([decision()]), ep("e1"), known)
       await refresh()
-      expect(await bookText(d)).toContain("- AAPL: 2 shares at 200.00")
+      expect(await bookText(d)).toContain("- AAPL: 10 shares at 200.00")
       const [sold] = await actOnStockAnswer(d, answer([decision({ action: "sell", sell_pct: 100 })]), ep("e2"), known)
-      expect(sold).toMatchObject({ outcome: "filled", detail: "sold 2 of 2 shares" })
+      expect(sold).toMatchObject({ outcome: "filled", detail: "sold 10 of 10 shares" })
       expect(alerts.map((x) => [x.title, x.path])).toContainEqual(["Agent sold AAPL", "/agent/e2"])
       const [paused] = await actOnStockAnswer(d, answer([decision({ symbol: "SPY" })]), { ...ep("e3"), entriesPaused: "entries paused by a breaker until the owner resumes them: daily loss" }, known)
       expect(paused).toMatchObject({ outcome: "blocked", detail: "entries paused by a breaker until the owner resumes them: daily loss" })
@@ -174,7 +174,8 @@ describe("stock agent", () => {
       const menu = stockAgentTools(d).find((t) => t.name === "option_menu")!
       expect(await menu.run({ symbol: "NVDA" } as never, { episodeId: "e2", urls: new Set(), signal: new AbortController().signal })).toContain(NVDA_CALL_150)
       const [bought] = await actOnStockAnswer(d, answer([buy]), ep("e2"), known)
-      expect(bought).toMatchObject({ outcome: "filled", detail: expect.stringMatching(/^bought 1 contract/) })
+      // Its 2% of equity in premium, no longer halved: $200 buys 2 contracts at $0.95.
+      expect(bought).toMatchObject({ outcome: "filled", detail: expect.stringMatching(/^bought 2 contracts at \$0\.95 \(\$190\)/) })
       expect(await ctx.col.optionPositions.countDocuments({ underlying: "NVDA", status: "open" })).toBe(1)
       // The menu was the episode's alone.
       expect(d.offered.size).toBe(0)

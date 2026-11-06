@@ -75,8 +75,6 @@ export const AGENT_SETTINGS_SECTIONS: SettingsSection[] = [
     fields: [
       { path: "agent.envelope.entries_per_day", label: "Entries per 24 h", kind: "number" },
       { path: "agent.envelope.entries_per_hour", label: "Entries per hour", kind: "number" },
-      { path: "agent.envelope.commit_per_hour_pct", label: "Committed per hour (% of equity)", kind: "number" },
-      { path: "agent.envelope.size_pct", label: "Entry size (% of what risk allows)", kind: "number" },
       { path: "agent.envelope.max_open_positions", label: "Max open positions", kind: "number" },
       { path: "agent.envelope.symbol_action_minutes", label: "One action per symbol every (min)", kind: "number" },
       { path: "agent.envelope.reentry_after_stop_hours", label: "No re-entry after a stop-out for (h)", kind: "number" },

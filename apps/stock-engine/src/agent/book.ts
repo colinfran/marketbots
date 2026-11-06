@@ -1,4 +1,4 @@
-import { checkEntry, entryRoomUsd, type EnvelopeHistory } from "@mb/agent/envelope"
+import { checkEntry, type EnvelopeHistory } from "@mb/agent/envelope"
 import type { HistoryStore } from "@mb/history/store"
 import type { LocalResearch } from "@mb/wire/research/local"
 import type { AlpacaAccount, AlpacaPosition } from "@mb/stock-core/alpaca"
@@ -59,12 +59,12 @@ export const limitsText = (d: Pick<StockAgentDeps, "ctx" | "session">, { risk, h
   const window = sessionWindow(d, now)
   const env = d.ctx.settings.current.agent.envelope
   const envelope = checkEntry("", history, env, now.getTime())
-  const room = entryRoomUsd(Number.POSITIVE_INFINITY, history, env, now.getTime())
   return [
     "LIMITS (enforced by code)",
     `- Market: ${window.reason}. New buys: ${blocked.length ? `blocked (${blocked.join("; ")})` : envelope.approved ? "allowed" : `blocked by your envelope (${envelope.reason})`}.`,
-    `- Your envelope: ${history.entries.length}/${env.entries_per_day} entries in 24 h, ${history.entries.filter((e) => now.getTime() - e.at < 3_600_000).length}/${env.entries_per_hour} in the last hour, ${history.openPositions}/${env.max_open_positions} open; $${room.toFixed(0)} more can be committed this hour; an entry is ${env.size_pct}% of what the risk checks allow; one action per ticker per ${env.symbol_action_minutes} min; no re-entry for ${env.reentry_after_stop_hours} h after a stop-out or ${env.flip_hours} h after an exit.`,
-    `- Risk checks: at most ${risk.max_position_pct}% of equity per position ($${risk.max_position_usd}); ${risk.open_positions}/${risk.max_open_positions} positions; conviction ≥ ${r.min_conviction}/10 (≥ 8 for an overnight buy in the closing window, and none intraday then); price ≥ $${r.min_price}; stop ${r.min_stop_pct}-${r.max_stop_pct}% below the price (default ${r.default_stop_pct}%); reward:risk ≥ ${r.min_reward_risk}; no rebuy within ${r.rebuy_cooldown_minutes} min of a sale; $${risk.deployable_cash} deployable cash.`,
+    `- Your envelope: ${history.entries.length}/${env.entries_per_day} entries in 24 h, ${history.entries.filter((e) => now.getTime() - e.at < 3_600_000).length}/${env.entries_per_hour} in the last hour, ${history.openPositions}/${env.max_open_positions} open; one action per ticker per ${env.symbol_action_minutes} min; no re-entry for ${env.reentry_after_stop_hours} h after a stop-out or ${env.flip_hours} h after an exit.`,
+    `- Sizing is code's: a buy risks ${r.risk_per_trade_pct}% of equity at its stop (×0.75 at conviction ${r.min_conviction}, up to ×1.25 at 10), up to ${risk.max_position_pct}% of equity per position ($${risk.max_position_usd}). A closer stop means more shares; leave allocation_pct null.`,
+    `- Risk checks: ${risk.open_positions}/${risk.max_open_positions} positions; conviction ≥ ${r.min_conviction}/10 (≥ 8 for an overnight buy in the closing window, and none intraday then); price ≥ $${r.min_price}; stop ${r.min_stop_pct}-${r.max_stop_pct}% below the price (default ${r.default_stop_pct}%); reward:risk ≥ ${r.min_reward_risk}; no rebuy within ${r.rebuy_cooldown_minutes} min of a sale; $${risk.deployable_cash} deployable cash.`,
   ]
 }
 

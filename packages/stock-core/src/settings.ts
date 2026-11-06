@@ -39,6 +39,8 @@ export const INDEX_ETFS = ["SPY", "QQQ", "DIA", "IWM", "VTI", "VOO"] as const
 export const riskSettingsSchema = z.object({
   /** Max % of equity in any single stock position. */
   max_position_pct: pct(1, 100),
+  /** Equity lost if a buy's stop is hit, as % of equity: sets the size of a buy that names no allocation (the agent's), with the stop distance and its conviction. */
+  risk_per_trade_pct: pct(0.05, 5),
   max_open_positions: int(1, 30),
   /** Max new stock buys in one cycle. */
   max_new_buys_per_cycle: int(0, 10),
@@ -192,6 +194,7 @@ export const DEFAULT_SETTINGS: Settings = {
   account: { starting_capital: 10_000 },
   risk: {
     max_position_pct: 20,
+    risk_per_trade_pct: 1,
     max_open_positions: 6,
     max_new_buys_per_cycle: 3,
     cash_reserve_pct: 5,
@@ -279,14 +282,12 @@ export const DEFAULT_SETTINGS: Settings = {
     wake_cooldown_minutes: 5,
     sweep_minutes: 120,
     envelope: {
-      entries_per_day: 4,
-      entries_per_hour: 2,
-      commit_per_hour_pct: 10,
-      size_pct: 50,
+      entries_per_day: 8,
+      entries_per_hour: 3,
       max_open_positions: 4,
       symbol_action_minutes: 30,
-      reentry_after_stop_hours: 24,
-      flip_hours: 6,
+      reentry_after_stop_hours: 6,
+      flip_hours: 2,
     },
     public_thinking: false,
   },

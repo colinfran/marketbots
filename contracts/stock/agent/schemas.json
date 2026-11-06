@@ -249,7 +249,7 @@
               "description": "Stocks you don't hold: buy (opens a position; never adds). Stocks you hold (YOUR BOOK): sell some or all, adjust_exits (new stop and target), or hold. Options: buy_option opens one from an option_menu result (symbol = the underlying); close_option or hold_option manage an open options position by its structure_id."
             },
             "allocation_pct": {
-              "description": "Stock buy only: % of total account equity to commit (e.g. 8 means 8%). null otherwise.",
+              "description": "null: code sizes every buy to risk a set share of equity at its stop, by your conviction.",
               "type": [
                 "number",
                 "null"

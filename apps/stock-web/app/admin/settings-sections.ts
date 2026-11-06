@@ -9,6 +9,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     title: "Stock sizing",
     fields: [
       { path: "risk.max_position_pct", label: "Max per position (% of equity)", kind: "number" },
+      { path: "risk.risk_per_trade_pct", label: "Risk per buy (% of equity lost at the stop)", kind: "number", step: 0.05 },
       { path: "risk.max_open_positions", label: "Max open stock positions", kind: "number" },
       { path: "risk.max_new_buys_per_cycle", label: "Max new buys in one answer", kind: "number" },
       { path: "risk.cash_reserve_pct", label: "Cash always kept (% of equity)", kind: "number" },

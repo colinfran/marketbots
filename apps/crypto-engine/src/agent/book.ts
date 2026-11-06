@@ -1,4 +1,4 @@
-import { checkEntry, entryRoomUsd, type EnvelopeHistory } from "@mb/agent/envelope"
+import { checkEntry, type EnvelopeHistory } from "@mb/agent/envelope"
 import { roundTo } from "@mb/crypto-core/math"
 import type { Settings } from "@mb/crypto-core/settings"
 import type { HistoryStore } from "@mb/history/store"
@@ -45,13 +45,13 @@ export const limitsText = (d: Pick<CryptoAgentDeps, "ctx">, { equityUsd, history
   const k = d.ctx.settings.current.kraken
   const env = d.ctx.settings.current.agent.envelope
   const envelope = checkEntry("", history, env, now.getTime())
-  const room = entryRoomUsd(Number.POSITIVE_INFINITY, history, env, now.getTime())
   const maxPosition = (equityUsd * k.max_position_pct) / 100
   return [
     "LIMITS (enforced by code)",
     `- New entries: ${blocked.length ? `blocked (${blocked.join("; ")})` : envelope.approved ? "allowed" : `blocked by your envelope (${envelope.reason})`}.`,
-    `- Your envelope: ${history.entries.length}/${env.entries_per_day} entries in 24 h, ${history.entries.filter((e) => now.getTime() - e.at < 3_600_000).length}/${env.entries_per_hour} in the last hour, ${history.openPositions}/${env.max_open_positions} open; $${room.toFixed(0)} more can be committed this hour; an entry is ${env.size_pct}% of what the risk checks allow; one action per pair per ${env.symbol_action_minutes} min; no re-entry for ${env.reentry_after_stop_hours} h after a stop-out or ${env.flip_hours} h after an exit.`,
-    `- Risk checks: lose at most ${k.risk_per_trade_pct}% of equity at the stop; at most ${k.max_position_pct}% of equity in one position ($${maxPosition.toFixed(0)}); reward:risk ≥ ${k.min_reward_risk}; edge after costs ≥ ${k.min_edge_bps} bps; conviction ≥ ${k.min_conviction}; stop ${k.min_stop_pct}-${k.max_stop_pct}% below the price; spread ≤ ${k.max_spread_bps} bps; positions held at least ${k.min_hold_minutes} min before you can close them.`,
+    `- Your envelope: ${history.entries.length}/${env.entries_per_day} entries in 24 h, ${history.entries.filter((e) => now.getTime() - e.at < 3_600_000).length}/${env.entries_per_hour} in the last hour, ${history.openPositions}/${env.max_open_positions} open; one action per pair per ${env.symbol_action_minutes} min; no re-entry for ${env.reentry_after_stop_hours} h after a stop-out or ${env.flip_hours} h after an exit.`,
+    `- Sizing is code's: a buy risks ${k.risk_per_trade_pct}% of equity at its stop (×0.75 at conviction ${k.min_conviction}, up to ×1.25 at 100), up to ${k.max_position_pct}% of equity in one position ($${maxPosition.toFixed(0)}). A closer stop means a bigger position.`,
+    `- Risk checks: reward:risk ≥ ${k.min_reward_risk}; edge after costs ≥ ${k.min_edge_bps} bps; conviction ≥ ${k.min_conviction}; stop ${k.min_stop_pct}-${k.max_stop_pct}% below the price; spread ≤ ${k.max_spread_bps} bps; positions held at least ${k.min_hold_minutes} min before you can close them.`,
     `- Costs: taker fee ${d.ctx.feeBps()} bps a side plus ${k.paper_slippage_bps} bps slippage, and the spread.`,
   ]
 }

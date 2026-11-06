@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { floorToStep, roundToStep } from "../src/math"
+import { convictionScale, floorToStep, roundToStep } from "../src/math"
 
 describe("rounding helpers", () => {
   it("floors to lot steps without float drift", () => {
@@ -21,5 +21,17 @@ describe("rounding helpers", () => {
   it("rounds to price ticks", () => {
     expect(roundToStep(45285.24, 0.1)).toBe(45285.2)
     expect(roundToStep(0.5549, 0.001)).toBe(0.555)
+  })
+})
+
+describe("conviction scale", () => {
+  it("moves an entry's risk from 0.75x at the minimum conviction to 1.25x at the top, clamped", () => {
+    expect(convictionScale(55, 55, 100)).toBe(0.75)
+    expect(convictionScale(77.5, 55, 100)).toBe(1)
+    expect(convictionScale(100, 55, 100)).toBe(1.25)
+    expect(convictionScale(8, 6, 10)).toBe(1)
+    expect(convictionScale(3, 6, 10)).toBe(0.75)
+    expect(convictionScale(12, 6, 10)).toBe(1.25)
+    expect(convictionScale(7, 10, 10)).toBe(1)
   })
 })

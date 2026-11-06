@@ -1,4 +1,4 @@
-import { checkEntry, entryRoomUsd, type EnvelopeHistory } from "@mb/agent/envelope"
+import { checkEntry, type EnvelopeHistory } from "@mb/agent/envelope"
 import type { EpisodeInfo } from "@mb/agent/runtime"
 import type { AgentAction, BookAccount } from "@mb/core/agent"
 import { normalizeCryptoAgentDecisions, type CryptoAgentAnswer, type NormalizedCryptoAgentDecision } from "@mb/crypto-core/agent"
@@ -16,8 +16,8 @@ import { CRYPTO_AGENT_PROMPT_VERSION } from "./prompts"
  * The crypto agent's decisions into the paper account (docs/plans/LOCAL-AI.md §8.4, §9), through the
  * bot's execution path (`processDecision`: the risk engine, the executor, the ledger, a
  * `decisions` record scored like any other). Before that, the envelope: an entry must pass
- * its rate limits, is sized at its share of what the risk checks allow and capped by the hour's
- * commitment budget. Exits, reductions and stops obey only the risk engine's minimum hold.
+ * its rate limits; its size is the risk engine's, from its stop and conviction. Exits and stops
+ * obey only the risk engine's minimum hold.
  *
  * The positions it inherited from the bot's earlier designs are its to manage; the envelope's
  * open-position limit counts only the ones it opened.
@@ -31,7 +31,7 @@ const ORDER: Record<NormalizedCryptoAgentDecision["action"], number> = { close: 
 const action = (d: NormalizedCryptoAgentDecision, outcome: AgentAction["outcome"], detail: string | null): AgentAction => ({ symbol: d.symbol, action: d.action, conviction: d.conviction, outcome, detail })
 
 /** What the envelope needs from the paper account: the agent's own entries and actions (its decisions), every exit and every stop-out. */
-export const liveEnvelopeHistory = async (d: Pick<CryptoAgentDeps, "ctx">, equityUsd: number, now = Date.now()): Promise<EnvelopeHistory> => {
+export const liveEnvelopeHistory = async (d: Pick<CryptoAgentDeps, "ctx">, now = Date.now()): Promise<EnvelopeHistory> => {
   const since = new Date(now - LOOKBACK_MS)
   const [decisions, closed, open] = await Promise.all([
     d.ctx.col.decisions
@@ -48,7 +48,7 @@ export const liveEnvelopeHistory = async (d: Pick<CryptoAgentDeps, "ctx">, equit
   for (const x of decisions) {
     const at = x.created_at.getTime()
     lastAction.set(x.symbol, at)
-    if (x.action === "buy" && now - at < 24 * HOUR) entries.push({ symbol: x.symbol, at, notionalUsd: x.execution.filled_qty * (x.execution.avg_price ?? 0) })
+    if (x.action === "buy" && now - at < 24 * HOUR) entries.push({ symbol: x.symbol, at })
   }
   const lastExit = new Map<string, number>()
   const lastStopOut = new Map<string, number>()
@@ -57,13 +57,13 @@ export const liveEnvelopeHistory = async (d: Pick<CryptoAgentDeps, "ctx">, equit
     lastExit.set(p.symbol, at)
     if (p.exit_reason === "stop_loss") lastStopOut.set(p.symbol, at)
   }
-  return { equityUsd, openPositions, entries, lastAction, lastExit, lastStopOut }
+  return { openPositions, entries, lastAction, lastExit, lastStopOut }
 }
 
 /** The paper account as the risk engine sees it, with the envelope's history and the open positions. */
 export const liveRiskState = async (d: Pick<CryptoAgentDeps, "ctx">, now = Date.now()): Promise<{ state: AccountState | null; history: EnvelopeHistory; open: PositionDoc[] }> => {
-  const [state, open] = await Promise.all([d.ctx.ledger.riskState(now), d.ctx.ledger.openPositions()])
-  return { state, history: await liveEnvelopeHistory(d, state?.equityUsd ?? 0, now), open }
+  const [state, open, history] = await Promise.all([d.ctx.ledger.riskState(now), d.ctx.ledger.openPositions(), liveEnvelopeHistory(d, now)])
+  return { state, history, open }
 }
 
 /** The paper account, summarized for the heartbeat and the breakers. */
@@ -160,7 +160,6 @@ export const actOnCryptoAnswer = async (d: Pick<CryptoAgentDeps, "ctx">, answer:
     }
     let decision: NormalizedCryptoAgentDecision = dec
     let candidate: CryptoCandidate | null = null
-    let maxNotionalUsd = Number.POSITIVE_INFINITY
     if (dec.action === "buy") {
       if (episode.entriesPaused) {
         out.push(action(dec, "blocked", episode.entriesPaused))
@@ -182,8 +181,7 @@ export const actOnCryptoAnswer = async (d: Pick<CryptoAgentDeps, "ctx">, answer:
       const target = dec.take_profit !== null && dec.take_profit > q.mid ? dec.take_profit : q.mid + 2.5 * (q.mid - stop)
       const strategy = dec.strategy ?? "discretionary"
       candidate = { instrument: dec.symbol, symbol: dec.symbol, strategy, score: dec.conviction, signal: `agent: ${cleanLine(dec.thesis, 120)}`, features: f ? candidateFeatures(f) : {}, stop_hint: stop, target_hint: target }
-      decision = { ...dec, stop_loss: stop, take_profit: target, size_pct_of_max: ((dec.size_pct_of_max ?? 50) * settings.agent.envelope.size_pct) / 100 }
-      maxNotionalUsd = entryRoomUsd(Number.POSITIVE_INFINITY, history, settings.agent.envelope, Date.now())
+      decision = { ...dec, stop_loss: stop, take_profit: target }
     }
     const doc = await processDecision(ctx, {
       cycleId: episode.id,
@@ -198,7 +196,7 @@ export const actOnCryptoAnswer = async (d: Pick<CryptoAgentDeps, "ctx">, answer:
       triggerKind: "agent",
       promptVersion: CRYPTO_AGENT_PROMPT_VERSION,
       wireItemIds,
-      agent: { episodeId: episode.id, maxNotionalUsd },
+      agent: { episodeId: episode.id },
     })
     const result = outcomeOf(dec, doc)
     out.push(result)
