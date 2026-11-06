@@ -382,7 +382,7 @@ Check with `docker stats --no-stream` (§5.2).
 
 ### 5.6 Settings
 
-Live trading settings (risk, AI models and timeouts, news engine, schedule) live in MongoDB and change only from the dashboard's **Admin** page, as an audited `settings.update` command. `.env` holds only first-boot defaults such as `STOCK_STARTING_CAPITAL`; changing those, or `DEFAULT_SETTINGS` in code, doesn't change a running bot.
+Live trading settings (risk, AI models and timeouts, news engine, schedule) live in MongoDB and change only as an audited `settings.update` command: from the dashboard's **Admin** page, or sent by an agent to the engine's signed `POST /v1/commands` once the owner has approved the change ([AGENTS.md](../AGENTS.md) rule 3). `.env` holds only first-boot defaults such as `STOCK_STARTING_CAPITAL`; changing those, or `DEFAULT_SETTINGS` in code, doesn't change a running bot.
 
 ### 5.7 Starting over
 
