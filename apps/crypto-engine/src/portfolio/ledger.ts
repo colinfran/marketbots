@@ -38,6 +38,7 @@ export type PositionMeta = {
   invalidation?: string | null
   stop_price?: number | null
   take_profit_price?: number | null
+  trail_usd?: number | null
   horizon_hours?: number | null
 }
 
@@ -191,6 +192,7 @@ export class Ledger {
           invalidation: meta.invalidation ?? null,
           stop_price: meta.stop_price ?? null,
           take_profit_price: meta.take_profit_price ?? null,
+          trail_usd: meta.trail_usd ?? null,
           horizon_hours: meta.horizon_hours ?? null,
           last_reviewed_at: at,
           last_review_price: price,
@@ -266,7 +268,7 @@ export class Ledger {
   }
 
   /** Updates position metadata (stops, review times) without touching quantities. */
-  updatePosition(id: string, fields: Partial<Pick<PositionDoc, "stop_price" | "take_profit_price" | "last_reviewed_at" | "last_review_price" | "thesis" | "invalidation" | "horizon_hours">>) {
+  updatePosition(id: string, fields: Partial<Pick<PositionDoc, "stop_price" | "take_profit_price" | "trail_usd" | "last_reviewed_at" | "last_review_price" | "thesis" | "invalidation" | "horizon_hours">>) {
     const set = { ...fields, updated_at: new Date() }
     return this.writePositions(() => this.col.positions.updateOne({ _id: id }, { $set: set }), { id, fields: set })
   }

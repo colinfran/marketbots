@@ -134,7 +134,7 @@ export const evaluateOptionEntry = (i: OptionEntryInput): OptionEntryResult => {
   if (failed) return result()
 
   const equity = i.risk.equity
-  const perTradePct = (i.risk.profit_lock ? s.max_premium_per_trade_pct / 2 : s.max_premium_per_trade_pct)
+  const perTradePct = s.max_premium_per_trade_pct
   const wantPct = Math.min(o.premium_pct ?? perTradePct, perTradePct)
   const totalRoom = Math.max(0, (equity * s.max_total_premium_pct) / 100 - i.premiumOpenUsd)
   const budget = Math.min((equity * wantPct) / 100, totalRoom, i.risk.deployable_cash, i.optionsBuyingPower ?? Number.POSITIVE_INFINITY)

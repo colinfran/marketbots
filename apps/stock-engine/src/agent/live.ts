@@ -139,7 +139,7 @@ export const liveBookText = async (d: Pick<StockAgentDeps, "ctx" | "snapshot" | 
   )
   const o = settings.options
   const premium = book.options.reduce((s, x) => s + premiumOf(x), 0)
-  const perTrade = risk.profit_lock ? o.max_premium_per_trade_pct / 2 : o.max_premium_per_trade_pct
+  const perTrade = o.max_premium_per_trade_pct
   const equity = Number(book.snap!.account.equity)
   const lastEquity = Number(book.snap!.account.last_equity)
   const starting = settings.account.starting_capital
@@ -151,7 +151,7 @@ export const liveBookText = async (d: Pick<StockAgentDeps, "ctx" | "snapshot" | 
     "",
     ...limitsText(d, { risk, history, blocked }, now),
     `- Options: ${o.enabled ? `open premium $${premium.toFixed(0)} of the ${o.max_total_premium_pct}% of equity cap ($${((equity * o.max_total_premium_pct) / 100).toFixed(0)}); at most ${perTrade}% of equity per position; ${book.options.length}/${o.max_open_positions} positions; conviction ≥ ${o.min_conviction}; long calls and puts${o.allow_spreads ? ", call and put debit spreads" : ""}; buy |delta| ${o.min_delta}-${o.max_delta}, ${o.min_dte}-${o.max_dte} days to expiration; contracts only from an option_menu result in this episode; exits default to -${o.default_stop_loss_pct}% / +${o.default_take_profit_pct}% of the position's value, and code closes positions before expiration` : "disabled"}.`,
-    "- Intraday stock positions are closed by code in the last minutes of the session; stops and targets rest at the broker as bracket or OCO orders.",
+    "- Intraday stock positions are closed by code in the last minutes of the session; overnight and multi-day ones stay. Stops and targets rest at the broker as bracket or OCO orders, and once a position is up by its stop distance code trails its stop at that distance behind the price.",
   ].join("\n")
 }
 
@@ -186,7 +186,8 @@ export const actOnStockAnswer = async (
   }
   try {
     for (const dec of [...decisions].sort((a, b) => ORDER[a.action] - ORDER[b.action] || b.conviction - a.conviction)) {
-      let decision = dec
+      // A sale closes the position: trimming a winner cuts it, and code trails its stop instead.
+      let decision = dec.action === "sell" ? { ...dec, sell_pct: null } : dec
       if (dec.action === "buy" || dec.action === "buy_option") {
         if (episode.entriesPaused) {
           out.push(action(dec, "blocked", episode.entriesPaused))
@@ -209,7 +210,7 @@ export const actOnStockAnswer = async (
         // Code sizes a buy from its stop and conviction (no allocation); an option's premium stays within the per-position cap.
         if (dec.action === "buy") decision = { ...dec, allocation_pct: null }
         else if (dec.option) {
-          const perTrade = state.risk.profit_lock ? settings.options.max_premium_per_trade_pct / 2 : settings.options.max_premium_per_trade_pct
+          const perTrade = settings.options.max_premium_per_trade_pct
           decision = { ...dec, option: { ...dec.option, premium_pct: roundTo(Math.min(dec.option.premium_pct ?? perTrade, perTrade), 2) } }
         }
       }

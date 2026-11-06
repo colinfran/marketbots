@@ -197,6 +197,8 @@ export type PositionPlanDoc = {
   decision_id: string | null
   stop_loss: number | null
   take_profit: number | null
+  /** The trailing stop's distance below the price, in $: the entry's stop distance (absent on plans from before 2026-11-06). */
+  trail_usd?: number | null
   horizon: Horizon
   setup: string
   thesis: string

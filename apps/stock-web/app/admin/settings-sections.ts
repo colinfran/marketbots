@@ -13,7 +13,6 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
       { path: "risk.max_open_positions", label: "Max open stock positions", kind: "number" },
       { path: "risk.max_new_buys_per_cycle", label: "Max new buys in one answer", kind: "number" },
       { path: "risk.cash_reserve_pct", label: "Cash always kept (% of equity)", kind: "number" },
-      { path: "risk.max_overnight_pct", label: "Max carried overnight (% of equity)", kind: "number" },
     ],
   },
   {
@@ -34,7 +33,6 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     fields: [
       { path: "risk.max_daily_loss_pct", label: "Day loss that blocks new buys (%)", kind: "number", step: 0.5 },
       { path: "risk.flatten_loss_pct", label: "Day loss that liquidates everything (%)", kind: "number", step: 0.5 },
-      { path: "risk.profit_lock_pct", label: "Day gain that halves new sizes (%)", kind: "number", step: 0.5 },
     ],
   },
   {

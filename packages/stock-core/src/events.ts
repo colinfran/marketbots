@@ -76,7 +76,7 @@ export type EventDataMap = {
   "order.rejected": { order_id: string; symbol: string; reason: string }
   "position.opened": { symbol: string; asset_class: AssetClass; qty: number; price: number | null; structure_id: string | null }
   "position.closed": { symbol: string; asset_class: AssetClass; realized_pnl_usd: number | null; return_pct: number | null; reason: string; structure_id: string | null }
-  "protection.placed": { symbol: string; stop: number; target: number }
+  "protection.placed": { symbol: string; stop: number; target: number | null }
   "protection.triggered": { symbol: string; kind: ProtectionKind; price: number | null; structure_id: string | null }
   "command.received": Shared["command.received"]
   "command.completed": Shared["command.completed"]

@@ -53,6 +53,7 @@ export const limitsText = (d: Pick<CryptoAgentDeps, "ctx">, { equityUsd, history
     `- Sizing is code's: a buy risks ${k.risk_per_trade_pct}% of equity at its stop (×0.75 at conviction ${k.min_conviction}, up to ×1.25 at 100), up to ${k.max_position_pct}% of equity in one position ($${maxPosition.toFixed(0)}). A closer stop means a bigger position.`,
     `- Risk checks: reward:risk ≥ ${k.min_reward_risk}; edge after costs ≥ ${k.min_edge_bps} bps; conviction ≥ ${k.min_conviction}; stop ${k.min_stop_pct}-${k.max_stop_pct}% below the price; spread ≤ ${k.max_spread_bps} bps; positions held at least ${k.min_hold_minutes} min before you can close them.`,
     `- Costs: taker fee ${d.ctx.feeBps()} bps a side plus ${k.paper_slippage_bps} bps slippage, and the spread.`,
+    "- Exits: once a position is up by its stop distance, code trails its stop at that distance behind the bid (checked every 3 s), so winners run without you.",
   ]
 }
 

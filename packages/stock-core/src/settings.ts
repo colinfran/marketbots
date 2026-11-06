@@ -50,8 +50,6 @@ export const riskSettingsSchema = z.object({
   max_daily_loss_pct: pct(0.1, 50),
   /** Day P&L at or below -X% liquidates everything. */
   flatten_loss_pct: pct(0.1, 50),
-  /** Day P&L at or above +X% halves new position sizes to protect the green day. */
-  profit_lock_pct: pct(0.1, 50),
   /** Max orders (entries + exits) per day. Stops runaway churn. */
   max_trades_per_day: int(0, 500),
   /** Minimum share price for a stock buy (and for an option's underlying). */
@@ -66,8 +64,6 @@ export const riskSettingsSchema = z.object({
   min_reward_risk: z.number().min(0.5).max(10),
   /** No re-buying a stock within X minutes of selling it (including broker-triggered exits). */
   rebuy_cooldown_minutes: z.number().min(0).max(1_440),
-  /** Max % of equity in stocks carried overnight. */
-  max_overnight_pct: pct(0, 100),
 })
 
 /**
@@ -200,7 +196,6 @@ export const DEFAULT_SETTINGS: Settings = {
     cash_reserve_pct: 5,
     max_daily_loss_pct: 2.5,
     flatten_loss_pct: 4,
-    profit_lock_pct: 1.5,
     max_trades_per_day: 30,
     min_price: 5,
     min_conviction: 6,
@@ -209,7 +204,6 @@ export const DEFAULT_SETTINGS: Settings = {
     default_stop_pct: 2,
     min_reward_risk: 1.2,
     rebuy_cooldown_minutes: 30,
-    max_overnight_pct: 50,
   },
   options: {
     enabled: true,

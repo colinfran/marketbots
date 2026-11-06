@@ -54,11 +54,6 @@
             "minimum": 0.1,
             "maximum": 50
           },
-          "profit_lock_pct": {
-            "type": "number",
-            "minimum": 0.1,
-            "maximum": 50
-          },
           "max_trades_per_day": {
             "type": "integer",
             "minimum": 0,
@@ -98,11 +93,6 @@
             "type": "number",
             "minimum": 0,
             "maximum": 1440
-          },
-          "max_overnight_pct": {
-            "type": "number",
-            "minimum": 0,
-            "maximum": 100
           }
         },
         "required": [
@@ -113,7 +103,6 @@
           "cash_reserve_pct",
           "max_daily_loss_pct",
           "flatten_loss_pct",
-          "profit_lock_pct",
           "max_trades_per_day",
           "min_price",
           "min_conviction",
@@ -121,8 +110,7 @@
           "max_stop_pct",
           "default_stop_pct",
           "min_reward_risk",
-          "rebuy_cooldown_minutes",
-          "max_overnight_pct"
+          "rebuy_cooldown_minutes"
         ]
       },
       "options": {
@@ -763,11 +751,6 @@
             "minimum": 0.1,
             "maximum": 50
           },
-          "profit_lock_pct": {
-            "type": "number",
-            "minimum": 0.1,
-            "maximum": 50
-          },
           "max_trades_per_day": {
             "type": "integer",
             "minimum": 0,
@@ -807,11 +790,6 @@
             "type": "number",
             "minimum": 0,
             "maximum": 1440
-          },
-          "max_overnight_pct": {
-            "type": "number",
-            "minimum": 0,
-            "maximum": 100
           }
         },
         "required": [
@@ -822,7 +800,6 @@
           "cash_reserve_pct",
           "max_daily_loss_pct",
           "flatten_loss_pct",
-          "profit_lock_pct",
           "max_trades_per_day",
           "min_price",
           "min_conviction",
@@ -830,8 +807,7 @@
           "max_stop_pct",
           "default_stop_pct",
           "min_reward_risk",
-          "rebuy_cooldown_minutes",
-          "max_overnight_pct"
+          "rebuy_cooldown_minutes"
         ],
         "additionalProperties": false
       },

@@ -239,12 +239,11 @@
               "type": "string",
               "enum": [
                 "buy",
+                "no_trade",
                 "hold",
-                "reduce",
-                "close",
-                "no_trade"
+                "close"
               ],
-              "description": "Pairs you don't hold: buy or no_trade. Pairs you hold (YOUR BOOK): hold, reduce or close. no_trade is a normal, often correct answer."
+              "description": "Pairs you don't hold: buy or no_trade. Pairs you hold (YOUR BOOK): hold (optionally raising the stop) or close. Code trails every stop once a position is up, so close only when the thesis is broken, not to bank a small gain."
             },
             "conviction": {
               "type": "number",

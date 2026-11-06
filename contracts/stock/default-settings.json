@@ -10,7 +10,6 @@
     "cash_reserve_pct": 5,
     "max_daily_loss_pct": 2.5,
     "flatten_loss_pct": 4,
-    "profit_lock_pct": 1.5,
     "max_trades_per_day": 30,
     "min_price": 5,
     "min_conviction": 6,
@@ -18,8 +17,7 @@
     "max_stop_pct": 8,
     "default_stop_pct": 2,
     "min_reward_risk": 1.2,
-    "rebuy_cooldown_minutes": 30,
-    "max_overnight_pct": 50
+    "rebuy_cooldown_minutes": 30
   },
   "options": {
     "enabled": true,

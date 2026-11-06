@@ -21,8 +21,7 @@ export const computeRiskState = (account: AlpacaAccount, openPositions: number, 
 
   const circuitBreaker = dayPnlPct <= -r.max_daily_loss_pct
   const killSwitch = dayPnlPct <= -r.flatten_loss_pct
-  const profitLock = dayPnlPct >= r.profit_lock_pct
-  const maxPositionPct = profitLock ? r.max_position_pct / 2 : r.max_position_pct
+  const maxPositionPct = r.max_position_pct
   const tradesRemaining = Math.max(0, r.max_trades_per_day - tradesToday)
   // Cash only: never touch margin buying power.
   const deployable = Math.max(0, Math.min(cash, equity) - (equity * r.cash_reserve_pct) / 100)
@@ -30,7 +29,6 @@ export const computeRiskState = (account: AlpacaAccount, openPositions: number, 
   const notes: string[] = []
   if (killSwitch) notes.push(`KILL SWITCH: day P&L ${dayPnlPct.toFixed(2)}% <= -${r.flatten_loss_pct}%. Everything is being liquidated.`)
   else if (circuitBreaker) notes.push(`CIRCUIT BREAKER: day P&L ${dayPnlPct.toFixed(2)}% <= -${r.max_daily_loss_pct}%. No new buys today; only manage/exit positions.`)
-  if (profitLock) notes.push(`PROFIT LOCK: up ${dayPnlPct.toFixed(2)}% today. New positions are capped at ${maxPositionPct}% of equity; protect the green day (tighten stops, take profits).`)
   if (tradesRemaining === 0) notes.push("Daily trade limit reached: no new orders except risk-reducing exits.")
   if (openPositions >= r.max_open_positions) notes.push(`Max open positions (${r.max_open_positions}) reached: sell a stock before buying another.`)
 
@@ -49,7 +47,6 @@ export const computeRiskState = (account: AlpacaAccount, openPositions: number, 
     trades_today: tradesToday,
     trades_remaining: tradesRemaining,
     circuit_breaker: circuitBreaker,
-    profit_lock: profitLock,
     kill_switch: killSwitch,
     new_buys_allowed: !circuitBreaker && !killSwitch && tradesRemaining > 0 && openPositions < r.max_open_positions,
     notes,

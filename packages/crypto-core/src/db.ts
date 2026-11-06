@@ -176,6 +176,8 @@ export type PositionDoc = {
   invalidation: string | null
   stop_price: number | null
   take_profit_price: number | null
+  /** The trailing stop's distance below the price, in $: the entry's stop distance (absent on positions from before 2026-11-06). */
+  trail_usd?: number | null
   horizon_hours: number | null
   last_reviewed_at: Date | null
   last_review_price: number | null

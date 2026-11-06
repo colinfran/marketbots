@@ -213,6 +213,8 @@ export const processDecision = async (ctx: EngineContext, i: DecisionInput): Pro
           invalidation: d.invalidation,
           stop_price: doc.sizing.stop_price,
           take_profit_price: doc.sizing.take_profit_price,
+          // The trailing stop keeps the entry's stop distance once the position is that far up.
+          trail_usd: quote.ask - stop,
           horizon_hours: d.horizon_hours,
         },
       })

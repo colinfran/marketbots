@@ -279,10 +279,10 @@ describe("executeDecisions: buys", () => {
     expect((await recordFor("AAPL")).qty).toBe(20)
   })
 
-  it("halves the max position size once the profit lock is on", async () => {
-    broker.lastEquity = 9_800 // +2% today
+  it("keeps the full max position size on a green day", async () => {
+    broker.lastEquity = 9_700 // +3% today: the old profit lock halved sizes here
     await execute([decision({ symbol: "AAPL", allocation_pct: 20 })])
-    expect((await recordFor("AAPL")).qty).toBe(10)
+    expect((await recordFor("AAPL")).qty).toBe(20)
   })
 
   it("only spends deployable cash, and tracks it across buys in one cycle", async () => {
@@ -367,8 +367,9 @@ describe("executeDecisions: buy rejections", () => {
     await rejected(decision({ symbol: "AAPL", horizon: "intraday", conviction: 9 }), "no new intraday buys in the closing window", "close")
   })
 
-  it("requires conviction 8+ for closing-window buys", async () => {
-    await rejected(decision({ symbol: "AAPL", horizon: "multi_day", conviction: 7 }), "closing-window buys need conviction >= 8", "close")
+  it("takes a swing buy in the closing window at the normal minimum conviction", async () => {
+    await execute([decision({ symbol: "AAPL", horizon: "multi_day", conviction: 6 })], "close")
+    expect(await recordFor("AAPL")).toMatchObject({ status: "executed", qty: 10 })
   })
 
   it("never adds to a position", async () => {

@@ -52,7 +52,6 @@ export type RiskState = {
   trades_today: number
   trades_remaining: number
   circuit_breaker: boolean
-  profit_lock: boolean
   kill_switch: boolean
   new_buys_allowed: boolean
   notes: string[]

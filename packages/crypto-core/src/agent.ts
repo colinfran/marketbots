@@ -14,9 +14,14 @@ const agentEvidenceSchema = evidenceSchema.extend({
   source_url: z.string().nullable().describe("A URL that appears in the brief or a tool result and supports the claim, or null. Never invent URLs."),
 })
 
+/** The agent's actions: no reduce, since trimming a winner pays fees to cut it; code trails the stop instead. */
+export const CRYPTO_AGENT_ACTIONS = ["buy", "no_trade", "hold", "close"] as const
+
 /** No size field: code sizes every entry from its stop and its conviction. */
 export const cryptoAgentDecisionSchema = cryptoDecisionSchema.omit({ size_pct_of_max: true }).extend({
-  action: cryptoDecisionSchema.shape.action.describe("Pairs you don't hold: buy or no_trade. Pairs you hold (YOUR BOOK): hold, reduce or close. no_trade is a normal, often correct answer."),
+  action: z
+    .enum(CRYPTO_AGENT_ACTIONS)
+    .describe("Pairs you don't hold: buy or no_trade. Pairs you hold (YOUR BOOK): hold (optionally raising the stop) or close. Code trails every stop once a position is up, so close only when the thesis is broken, not to bank a small gain."),
   thesis: z.string().describe("2-3 sentences: why this action, why now. Cite numbers from the brief or your tool results."),
   bull_evidence: z.array(agentEvidenceSchema).describe("1-5 items for upside."),
   bear_evidence: z.array(agentEvidenceSchema).describe("1-5 counterarguments and downside risks. Always include at least one."),

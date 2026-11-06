@@ -1,8 +1,9 @@
 import type { AlpacaPosition } from "@mb/stock-core/alpaca"
+import type { PositionPlanDoc } from "@mb/stock-core/db"
 import { marketDay, minutesBetween } from "@mb/stock-core/time"
 import { errorMessage } from "@mb/engine-kit/log"
 import type { TradingContext } from "./context"
-import { cancelSymbolOrders, heldExitBounds, placeExitOrders, resolveExits } from "./execute"
+import { cancelSymbolOrders, heldExitBounds, protect, resolveExits } from "./execute"
 import { liquidateOptions, reconcileOptions } from "./options"
 import { clientId, loadRealizedFills, syncOrders } from "./orders"
 import { computeRiskState } from "./risk"
@@ -65,6 +66,8 @@ export const ensureProtection = async (ctx: TradingContext): Promise<string[]> =
     if (qty < 1) continue
     const price = Number(position.current_price)
     const plan = planBySymbol.get(position.symbol)
+    // A plan with a stop and no target (the trend core's) gets a plain stop: it rides its trend.
+    const stopOnly = !!plan && plan.stop_loss !== null && plan.take_profit === null
     const exits = resolveExits(price, plan?.stop_loss ?? null, plan?.take_profit ?? null, r, heldExitBounds(r))
     if (plan?.stop_loss != null && exits.stop < plan.stop_loss - 0.005) {
       bus.emit("protection.triggered", { symbol: position.symbol, kind: "unprotected_stop", price, structure_id: null }, { summary: `${position.symbol} is through its ${plan.stop_loss} stop with no exit orders; selling`, level: "warn", instrument: position.symbol })
@@ -76,11 +79,11 @@ export const ensureProtection = async (ctx: TradingContext): Promise<string[]> =
       continue
     }
     try {
-      await placeExitOrders(ctx, position.symbol, qty, exits.stop, exits.target, plan?.decision_id ?? null)
+      await protect(ctx, position.symbol, qty, exits.stop, stopOnly ? null : exits.target, plan?.decision_id ?? null)
       await col.plans.updateOne(
         { _id: position.symbol },
         {
-          $set: { stop_loss: exits.stop, take_profit: exits.target, updated_at: new Date() },
+          $set: { stop_loss: exits.stop, take_profit: stopOnly ? null : exits.target, updated_at: new Date() },
           $setOnInsert: {
             decision_id: null,
             horizon: "overnight",
@@ -92,7 +95,7 @@ export const ensureProtection = async (ctx: TradingContext): Promise<string[]> =
         },
         { upsert: true },
       )
-      notes.push(`protected ${position.symbol}: stop ${exits.stop}, target ${exits.target}`)
+      notes.push(`protected ${position.symbol}: stop ${exits.stop}${stopOnly ? ", no target" : `, target ${exits.target}`}`)
     } catch (error) {
       notes.push(`could not protect ${position.symbol}: ${errorMessage(error)}`)
       await alerts.send("error", `${position.symbol} has no stop-loss`, `Placing protective exit orders failed: ${errorMessage(error)}`, {
@@ -105,29 +108,59 @@ export const ensureProtection = async (ctx: TradingContext): Promise<string[]> =
 }
 
 /**
- * The overnight rules for stocks, enforced in code in the last minutes of the session:
- * - sell every position whose plan still says "intraday" (the agent keeps one only by switching it
- *   to an overnight horizon with adjust_exits)
- * - then, if what's left is over max_overnight_pct of equity, sell the weakest positions until it fits
- * Options positions are multi-day by design and are governed by their own limits.
+ * The overnight rule for stocks, enforced in code in the last minutes of the session: sell every
+ * position whose plan still says "intraday" (the agent keeps one only by switching it to an
+ * overnight horizon with adjust_exits). Swing positions stay, protected by their resting stops.
+ * Options positions are multi-day by design and are governed by their own limits. (Until 2026-11-06
+ * a cap on what was carried overnight also sold the weakest swing positions.)
  */
 export const enforceOvernightRules = async (ctx: TradingContext): Promise<string[]> => {
-  const { alpaca, col, settings } = ctx
-  const [account, positions, plans] = await Promise.all([alpaca.getAccount(), alpaca.getPositions(), col.plans.find().toArray()])
+  const { alpaca, col } = ctx
+  const [positions, plans] = await Promise.all([alpaca.getPositions(), col.plans.find().toArray()])
   const intraday = new Set(plans.filter((p) => p.horizon === "intraday").map((p) => p._id))
-  const longs = positions.filter((p) => isStock(p) && p.side === "long")
-  const kept = longs.filter((p) => !intraday.has(p.symbol))
+  return flatten(ctx, positions.filter((p) => isStock(p) && p.side === "long" && intraday.has(p.symbol)))
+}
 
-  const maxPct = settings.current.risk.max_overnight_pct
-  const cap = (Number(account.equity) * maxPct) / 100
-  let exposure = kept.reduce((sum, p) => sum + Number(p.market_value), 0)
-  const overCap: AlpacaPosition[] = []
-  for (const p of [...kept].sort((a, b) => Number(a.unrealized_plpc) - Number(b.unrealized_plpc))) {
-    if (exposure <= cap) break
-    overCap.push(p)
-    exposure -= Number(p.market_value)
+/** A trailing stop moves only in steps of at least this share of the price: each step replaces the resting exit orders. */
+const TRAIL_STEP = 0.005
+
+/**
+ * The trailed stop for a held stock at `price`, or null while it doesn't move: its trail is the
+ * entry's stop distance (`trail_usd`; for plans from before it, the distance from the entry to a
+ * stop still below it), and it starts once the price is that far above the entry, so a winner keeps
+ * running and gives back at most that much of its gain. Stops only move up.
+ */
+export const trailedStop = (plan: Pick<PositionPlanDoc, "stop_loss" | "trail_usd">, entry: number, price: number): { stop: number; trail: number } | null => {
+  const current = plan.stop_loss
+  const trail = plan.trail_usd ?? (current !== null && current < entry ? entry - current : null)
+  if (trail === null || !(trail > 0) || price < entry + trail) return null
+  const stop = Math.floor((price - trail) * 100) / 100
+  if (current !== null && stop < current + Math.max(0.01, price * TRAIL_STEP)) return null
+  return { stop, trail }
+}
+
+/** Raises winners' stops behind the price: the resting exits are replaced with the higher stop (and the plan's target, if it has one). */
+export const trailStops = async (ctx: TradingContext, positions: AlpacaPosition[]): Promise<string[]> => {
+  const plans = new Map((await ctx.col.plans.find().toArray()).map((p) => [p._id, p]))
+  const notes: string[] = []
+  for (const position of positions) {
+    if (!isStock(position) || position.side !== "long") continue
+    const plan = plans.get(position.symbol)
+    const qty = Math.floor(Number(position.qty))
+    if (!plan || qty < 1) continue
+    const next = trailedStop(plan, Number(position.avg_entry_price), Number(position.current_price))
+    if (!next) continue
+    try {
+      // If placing the new exits fails, ensureProtection re-protects the shares at the plan's old levels in this same pass.
+      await cancelSymbolOrders(ctx.alpaca, position.symbol)
+      await protect(ctx, position.symbol, qty, next.stop, plan.take_profit, plan.decision_id)
+      await ctx.col.plans.updateOne({ _id: position.symbol }, { $set: { stop_loss: next.stop, trail_usd: next.trail, updated_at: new Date() } })
+      notes.push(`trailed ${position.symbol}: stop ${plan.stop_loss} → ${next.stop}`)
+    } catch (error) {
+      notes.push(`could not trail ${position.symbol}: ${errorMessage(error)}`)
+    }
   }
-  return [...(await flatten(ctx, longs.filter((p) => intraday.has(p.symbol)))), ...(await flatten(ctx, overCap, ` (over the ${maxPct}% overnight cap)`))]
+  return notes
 }
 
 /** The regular upkeep. In the last minutes of the session the overnight rules are how the day ends. */
@@ -161,6 +194,7 @@ export const maintain = async (ctx: TradingContext, session: Session, { now = ne
     if (flattened.length) await alerts.send("info", "Overnight rules: sold the day's intraday positions", flattened.join("\n"), { path: `/journal/${session.day}` })
   }
 
+  notes.push(...(await trailStops(ctx, positions)))
   notes.push(...(await ensureProtection(ctx)))
   notes.push(...(await reconcileOptions(ctx, positions, now)))
 

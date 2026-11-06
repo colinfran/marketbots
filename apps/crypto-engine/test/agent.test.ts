@@ -12,6 +12,7 @@ import { bookText } from "../src/agent/view"
 import type { Alerts } from "../src/alerts"
 import { Executor } from "../src/execution/executor"
 import { PaperWalletExecution } from "../src/execution/paper-wallet"
+import { checkProtection, trailedStop } from "../src/orchestrator/protection"
 import type { CandleCache } from "../src/market/candles"
 import type { MarketHub } from "../src/market/hub"
 import type { EngineContext } from "../src/orchestrator/context"
@@ -304,5 +305,37 @@ describe("crypto agent observations and tools", () => {
     expect(urls.has("https://coindesk.com/x")).toBe(true)
     const history = cryptoAgentTools(d).find((t) => t.name === "history")!
     expect(await history.run({ symbol: "BTC/USD", days: 30 } as never, { episodeId: "e1", urls, signal: new AbortController().signal })).toBe("the history store is not available")
+  })
+})
+
+describe("trailing stops (the protection loop)", () => {
+  it("starts trailing once a position is up by its stop distance, at that distance, in steps of at least 0.25%", () => {
+    const p = { avg_price: 100, stop_price: 95, trail_usd: 5 }
+    expect(trailedStop(p, 104.9)).toBeNull()
+    expect(trailedStop(p, 106)).toEqual({ stop: 101, trail: 5 })
+    // Positions from before trail_usd: the entry's distance to a stop still below it.
+    expect(trailedStop({ avg_price: 100, stop_price: 90 }, 112)).toEqual({ stop: 102, trail: 10 })
+    expect(trailedStop({ avg_price: 100, stop_price: 101 }, 120)).toBeNull()
+    // Only up, by at least 0.25% of the price.
+    expect(trailedStop({ avg_price: 100, stop_price: 101, trail_usd: 5 }, 106.2)).toBeNull()
+  })
+
+  it("raises a winner's stop behind the bid, and sells when the bid falls back to it", async () => {
+    const quotes = { "BTC/USD": quote() }
+    const { d, ctx } = await setup(DEFAULT_SETTINGS, quotes)
+    await actOnCryptoAnswer(d, answer([decision()]), ep("e1"))
+    const [p] = await ctx.ledger.openPositions()
+    // The ask at entry less the stop: 65,010 − 63,000.
+    expect(p.trail_usd).toBeCloseTo(2_010)
+    quotes["BTC/USD"] = quote({ bid: 67_490, ask: 67_510, mid: 67_500 })
+    await checkProtection(ctx, new Set())
+    expect((await ctx.ledger.openPositions())[0].stop_price).toBe(65_480)
+    quotes["BTC/USD"] = quote({ bid: 65_400, ask: 65_420, mid: 65_410 })
+    await checkProtection(ctx, new Set())
+    expect(await ctx.ledger.openPositions()).toEqual([])
+    const [closed] = await ctx.col.positions.find({ status: "closed" }).toArray()
+    expect(closed).toMatchObject({ exit_reason: "stop_loss" })
+    // A scratch, fees only: the original stop at 63,000 would have lost about $78.
+    expect(closed.realized_pnl_usd).toBeGreaterThan(-25)
   })
 })

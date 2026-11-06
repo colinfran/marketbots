@@ -26,7 +26,6 @@ describe("computeRiskState", () => {
       trades_today: 0,
       trades_remaining: 30,
       circuit_breaker: false,
-      profit_lock: false,
       kill_switch: false,
       new_buys_allowed: true,
       notes: [],
@@ -70,13 +69,13 @@ describe("computeRiskState", () => {
     expect(risk.notes[0]).toMatch(/^KILL SWITCH: day P&L -4\.00% <= -4%/)
   })
 
-  it("halves position size once the profit lock is hit", () => {
-    const risk = computeRiskState(acct(10_150, 10_000), 0, 0) // exactly +1.5%
-    expect(risk.profit_lock).toBe(true)
-    expect(risk.max_position_pct).toBe(10)
-    expect(risk.max_position_usd).toBe(1_015)
+  it("keeps full size on a green day: a good day is no reason to stop pressing", () => {
+    // Until 2026-11-06 a +1.5% day (live: +3%) halved new positions.
+    const risk = computeRiskState(acct(10_500, 10_000), 0, 0)
+    expect(risk.max_position_pct).toBe(20)
+    expect(risk.max_position_usd).toBe(2_100)
     expect(risk.new_buys_allowed).toBe(true)
-    expect(risk.notes).toEqual([expect.stringContaining("PROFIT LOCK: up 1.50% today. New positions are capped at 10% of equity")])
+    expect(risk.notes).toEqual([])
   })
 
   it("stops buying when the daily trade limit is used up, never going negative", () => {
@@ -96,7 +95,7 @@ describe("computeRiskState", () => {
 
   it("collects every applicable note", () => {
     const risk = computeRiskState(acct(10_200, 10_000), 6, 30)
-    expect(risk.notes).toHaveLength(3)
+    expect(risk.notes).toEqual(["Daily trade limit reached: no new orders except risk-reducing exits.", "Max open positions (6) reached: sell a stock before buying another."])
   })
 
   it("deploys cash only, never margin", () => {

@@ -3,7 +3,7 @@ import type { EngineEvent } from "@mb/stock-core/events"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { Alpaca } from "../../src/alpaca/client"
 import type { EngineContext } from "../../src/bot/context"
-import { enforceOvernightRules as overnight, ensureProtection as protect, maintain as upkeep, recordDailyStats as dailyStats } from "../../src/bot/maintenance"
+import { enforceOvernightRules as overnight, ensureProtection as protect, maintain as upkeep, recordDailyStats as dailyStats, trailedStop, trailStops } from "../../src/bot/maintenance"
 import type { Session } from "../../src/bot/session"
 import type { EventBus } from "../../src/bus/event-bus"
 import { fakeBroker, type FakeBroker } from "../helpers/broker"
@@ -109,11 +109,12 @@ describe("ensureProtection", () => {
     expect(broker.submitted[0].qty).toBe("7")
   })
 
-  it("protects a former core holding like any other position: OCO exits at its plan's levels", async () => {
+  it("protects a plan with a stop and no target (the trend core's) with a plain stop: it rides its trend", async () => {
     broker.setPosition("NVDA", 5, 200)
     await addPlan("NVDA", { book: "core", stop_loss: 190, take_profit: null, horizon: "multi_day" })
-    expect(await ensureProtection()).toEqual(["protected NVDA: stop 190, target 220"])
-    expect(broker.submitted).toEqual([expect.objectContaining({ symbol: "NVDA", qty: "5", order_class: "oco", take_profit: { limit_price: "220.00" }, stop_loss: { stop_price: "190.00" } })])
+    expect(await ensureProtection()).toEqual(["protected NVDA: stop 190, no target"])
+    expect(broker.submitted).toEqual([expect.objectContaining({ symbol: "NVDA", qty: "5", side: "sell", type: "stop", time_in_force: "gtc", stop_price: "190.00" })])
+    expect(await plan("NVDA")).toMatchObject({ stop_loss: 190, take_profit: null })
   })
 
   it("reports and alerts when protection fails", async () => {
@@ -170,27 +171,26 @@ describe("enforceOvernightRules", () => {
     expect(await settle(enforceOvernightRules())).toEqual([])
   })
 
-  it("sells the weakest overnight positions until exposure fits the cap", async () => {
-    // Equity 10,110; the 50% cap allows 5,055 overnight and 6,610 is held.
-    broker.setPosition("WIN", 30, 105, { avg: 100 }) // 3,150 (+5%)
-    broker.setPosition("LOSER", 25, 98, { avg: 100 }) // 2,450 (−2%)
-    broker.setPosition("FLAT", 10, 101, { avg: 100 }) // 1,010 (+1%)
+  it("keeps every swing position overnight, however much of the account is invested", async () => {
+    // 66% of equity held: the old 50% cap would have sold LOSER.
+    broker.setPosition("WIN", 30, 105, { avg: 100 })
+    broker.setPosition("LOSER", 25, 98, { avg: 100 })
+    broker.setPosition("FLAT", 10, 101, { avg: 100 })
     for (const s of ["WIN", "LOSER", "FLAT"]) await addPlan(s, { horizon: "overnight" })
-
-    expect(await settle(enforceOvernightRules())).toEqual(["flattened LOSER (over the 50% overnight cap)"])
-    expect([...broker.holdings.keys()]).toEqual(["WIN", "FLAT"])
+    expect(await settle(enforceOvernightRules())).toEqual([])
+    expect([...broker.holdings.keys()]).toEqual(["WIN", "LOSER", "FLAT"])
   })
 
-  it("counts a former core holding toward the cap like any other position", async () => {
-    broker.setPosition("SPY", 12, 500) // 6,000: over the cap on its own
+  it("keeps a trend-core holding overnight like any swing position", async () => {
+    broker.setPosition("SPY", 12, 500)
     await addPlan("SPY", { book: "core", horizon: "multi_day" })
     broker.setPosition("SWING", 20, 100)
     await addPlan("SWING", { horizon: "multi_day" })
-    expect(await settle(enforceOvernightRules())).toEqual(["flattened SPY (over the 50% overnight cap)"])
-    expect([...broker.holdings.keys()]).toEqual(["SWING"])
+    expect(await settle(enforceOvernightRules())).toEqual([])
+    expect([...broker.holdings.keys()]).toEqual(["SPY", "SWING"])
   })
 
-  it("sells intraday positions first and counts only what's left toward the cap", async () => {
+  it("sells intraday positions and keeps the swing ones", async () => {
     broker.setPosition("DAY", 60, 100) // 6,000, would break the cap on its own
     await addPlan("DAY", { horizon: "intraday" })
     broker.setPosition("SWING", 20, 100) // 2,000
@@ -198,6 +198,40 @@ describe("enforceOvernightRules", () => {
 
     expect(await settle(enforceOvernightRules())).toEqual(["flattened DAY"])
     expect([...broker.holdings.keys()]).toEqual(["SWING"])
+  })
+})
+
+describe("trailing stops", () => {
+  it("starts trailing once a position is up by its stop distance, at that distance, in steps of at least 0.5%", () => {
+    const plan = { stop_loss: 95, trail_usd: 5 }
+    expect(trailedStop(plan, 100, 104.99)).toBeNull()
+    expect(trailedStop(plan, 100, 106)).toEqual({ stop: 101, trail: 5 })
+    // Plans from before trail_usd: the entry's distance to a stop still below it.
+    expect(trailedStop({ stop_loss: 90 }, 100, 112)).toEqual({ stop: 102, trail: 10 })
+    expect(trailedStop({ stop_loss: 101 }, 100, 120)).toBeNull()
+    // Only moves up, by at least 0.5% of the price.
+    expect(trailedStop({ stop_loss: 101, trail_usd: 5 }, 100, 106.3)).toBeNull()
+    expect(trailedStop({ stop_loss: 101, trail_usd: 5 }, 100, 106.6)).toEqual({ stop: 101.6, trail: 5 })
+  })
+
+  it("replaces a winner's exits with the higher stop and the same target, and records it on the plan", async () => {
+    broker.setPosition("AAPL", 10, 106, { avg: 100 })
+    addExits("AAPL", 10)
+    await addPlan("AAPL", { stop_loss: 95, take_profit: 120, trail_usd: 5, decision_id: "dec-1" })
+    broker.setPosition("LAG", 10, 103, { avg: 100 })
+    await addPlan("LAG", { stop_loss: 95, take_profit: 120, trail_usd: 5 })
+    const notes = await settle(trailStops(ctx, await alpaca.getPositions()))
+    expect(notes).toEqual(["trailed AAPL: stop 95 → 101"])
+    expect(broker.submitted).toEqual([expect.objectContaining({ symbol: "AAPL", qty: "10", order_class: "oco", take_profit: { limit_price: "120.00" }, stop_loss: { stop_price: "101.00" } })])
+    expect(await plan("AAPL")).toMatchObject({ stop_loss: 101, take_profit: 120, trail_usd: 5 })
+  })
+
+  it("trails a stop-only plan with a plain stop", async () => {
+    broker.setPosition("NVDA", 5, 230, { avg: 200 })
+    await addPlan("NVDA", { book: "core", stop_loss: 190, take_profit: null, horizon: "multi_day" })
+    expect(await settle(trailStops(ctx, await alpaca.getPositions()))).toEqual(["trailed NVDA: stop 190 → 220"])
+    expect(broker.submitted).toEqual([expect.objectContaining({ symbol: "NVDA", type: "stop", stop_price: "220.00" })])
+    expect(await plan("NVDA")).toMatchObject({ stop_loss: 220, take_profit: null, trail_usd: 10 })
   })
 })
 

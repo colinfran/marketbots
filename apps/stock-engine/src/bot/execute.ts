@@ -100,6 +100,18 @@ export const placeExitOrders = async (ctx: Pick<TradingContext, "alpaca" | "col"
   return order
 }
 
+/** Places a protective GTC stop sell with no target, for a position that rides its trend until its (trailing) stop. */
+export const placeStopOrder = async (ctx: Pick<TradingContext, "alpaca" | "col" | "bus">, symbol: string, qty: number, stop: number, decisionId: string | null): Promise<AlpacaOrder> => {
+  const order = await ctx.alpaca.submitOrder({ symbol, qty: String(qty), side: "sell", type: "stop", time_in_force: "gtc", stop_price: stop.toFixed(2), client_order_id: clientId("stop") })
+  await saveOrders(ctx.col, [order], { decisionId })
+  ctx.bus.emit("protection.placed", { symbol, stop, target: null }, { summary: `${symbol}: stop set at ${stop}, no target`, instrument: symbol })
+  return order
+}
+
+/** The resting exits for a held position: an OCO pair when it has a target, else a plain stop. */
+export const protect = (ctx: Pick<TradingContext, "alpaca" | "col" | "bus">, symbol: string, qty: number, stop: number, target: number | null, decisionId: string | null) =>
+  target !== null ? placeExitOrders(ctx, symbol, qty, stop, target, decisionId) : placeStopOrder(ctx, symbol, qty, stop, decisionId)
+
 // ─── Stock buy rules (pure) ──────────────────────────────────────────────────
 
 export type StockBuyInput = {
@@ -149,7 +161,6 @@ export const evaluateStockBuy = (i: StockBuyInput): StockBuyResult => {
   check("loss limits", !i.risk.kill_switch && !i.risk.circuit_breaker, `day P&L ${i.risk.day_pnl_pct}%`, "daily loss circuit breaker is active")
   if (i.phase === "close") {
     check("closing window", d.horizon !== "intraday", "overnight/multi-day horizon", "no new intraday buys in the closing window")
-    check("closing conviction", d.conviction >= 8, `conviction ${d.conviction}`, "closing-window buys need conviction >= 8")
   }
   check("not held", !i.held, "new position", "already held: the bot never adds to positions")
   check("open positions", i.openCount < r.max_open_positions, `${i.openCount}/${r.max_open_positions}`, `max open positions (${r.max_open_positions}) reached`)
@@ -511,9 +522,9 @@ export const executeDecisions = async (
     if (filled.status === "rejected" || filled.status === "canceled" || filled.status === "expired") {
       return { status: "failed", reason: `order ${filled.status} by broker`, order_ids: [filled.id], checks: evaluation.checks }
     }
-    await upsertPlan(d, decisionId, exits.stop, exits.target)
-
     const fillPrice = filled.filled_avg_price ? Number(filled.filled_avg_price) : price
+    // The trailing stop keeps the entry's stop distance once the position is that far up.
+    await upsertPlan(d, decisionId, exits.stop, exits.target, undefined, round2(fillPrice - exits.stop))
     cash -= qty * fillPrice
     openCount += 1
     newBuys += 1
@@ -532,15 +543,15 @@ export const executeDecisions = async (
     }
   }
 
-  /** Records the live plan for a position. Adjusting an existing plan keeps its original thesis. */
-  async function upsertPlan(d: Decision, decisionId: string, stop: number, target: number, existing?: PositionPlanDoc) {
+  /** Records the live plan for a position. Adjusting an existing plan keeps its original thesis and trail. */
+  async function upsertPlan(d: Decision, decisionId: string, stop: number, target: number, existing?: PositionPlanDoc, trail?: number) {
     const levels = { stop_loss: stop, take_profit: target, horizon: d.horizon, invalidation: d.invalidation, updated_at: new Date() }
     await col.plans.updateOne(
       { _id: d.symbol },
       existing
         ? { $set: levels }
         : {
-            $set: { ...levels, decision_id: decisionId, setup: d.setup, thesis: d.rationale },
+            $set: { ...levels, decision_id: decisionId, setup: d.setup, thesis: d.rationale, trail_usd: trail ?? null },
             $setOnInsert: { opened_at: new Date() },
           },
       { upsert: true },

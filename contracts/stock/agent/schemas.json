@@ -246,7 +246,7 @@
                 "close_option",
                 "hold_option"
               ],
-              "description": "Stocks you don't hold: buy (opens a position; never adds). Stocks you hold (YOUR BOOK): sell some or all, adjust_exits (new stop and target), or hold. Options: buy_option opens one from an option_menu result (symbol = the underlying); close_option or hold_option manage an open options position by its structure_id."
+              "description": "Stocks you don't hold: buy (opens a position; never adds). Stocks you hold (YOUR BOOK): sell (the whole position), adjust_exits (a higher stop, a new target), or hold. Options: buy_option opens one from an option_menu result (symbol = the underlying); close_option or hold_option manage an open options position by its structure_id."
             },
             "allocation_pct": {
               "description": "null: code sizes every buy to risk a set share of equity at its stop, by your conviction.",
@@ -256,7 +256,7 @@
               ]
             },
             "sell_pct": {
-              "description": "Stock sell only: % of the currently held shares to sell, 1-100 (100 = close the position). null otherwise.",
+              "description": "null: a sell closes the whole position. Code trails every stop once a position is up, so sell only when the thesis is broken.",
               "type": [
                 "number",
                 "null"
