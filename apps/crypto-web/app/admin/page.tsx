@@ -8,10 +8,12 @@ import { Badge } from "@mb/ui/components/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@mb/ui/components/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mb/ui/components/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@mb/ui/components/tabs"
+import { BannedAddresses } from "@mb/ui/bans"
 import { SettingsForm } from "@mb/ui/settings-form"
 import { Empty, PageHeader, SectionTitle, StatusBadge } from "@/components/bits"
 import { CommandButton } from "@/components/command"
 import { getViewer } from "@/lib/auth"
+import { listBans } from "@/lib/bans"
 import { getAudit, getCommands, getDatabaseStorage, getEngine, getEngineState, getNotifications, getRecentEvents, getSettings } from "@/lib/data"
 import { ago, dateTime, titleCase, usd } from "@/lib/format"
 import { SETTINGS_SECTIONS } from "./settings-sections"
@@ -22,7 +24,7 @@ export const metadata: Metadata = { title: "Admin", robots: { index: false, foll
 export default async function AdminPage() {
   const viewer = await getViewer()
   if (!viewer.owner) redirect("/login")
-  const [doc, state, engine, audit, problems, notifications, commands, storage] = await Promise.all([
+  const [doc, state, engine, audit, problems, notifications, commands, storage, bans] = await Promise.all([
     getSettings(),
     getEngineState(),
     getEngine(),
@@ -31,6 +33,7 @@ export default async function AdminPage() {
     getNotifications(20),
     getCommands(20),
     getDatabaseStorage(),
+    listBans(),
   ])
   const parsed = settingsSchema.safeParse(doc?.settings)
   const settings = parsed.success ? parsed.data : DEFAULT_SETTINGS
@@ -155,8 +158,9 @@ export default async function AdminPage() {
           <TabsTrigger value="settings">Settings</TabsTrigger>
           <TabsTrigger value="logs">Logs</TabsTrigger>
         </TabsList>
-        <TabsContent value="system" className="mt-4">
+        <TabsContent value="system" className="mt-4 space-y-8">
           <SystemHealth engine={engine} problems={problems} storage={storage} />
+          <BannedAddresses bans={bans} dateTime={dateTime} />
         </TabsContent>
         {/* Kept mounted so unsaved edits survive switching tabs. */}
         <TabsContent value="settings" forceMount className="mt-4 data-[state=inactive]:hidden">

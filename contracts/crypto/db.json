@@ -25,7 +25,8 @@
     "authUsers": "auth_users",
     "authSessions": "auth_sessions",
     "authAccounts": "auth_accounts",
-    "authVerifications": "auth_verifications"
+    "authVerifications": "auth_verifications",
+    "webBans": "web_bans"
   },
   "indexes": {
     "events": [

@@ -332,7 +332,7 @@ The MONGO section holds a password for each of the database's users. `docker/mon
 | `MONGO_ROOT_PASSWORD` | `root` | everything: `init.js`, restores and maintenance by hand |
 | `MONGO_CRYPTO_ENGINE_PASSWORD` | `crypto_engine` | read and write `cryptomarketbot` (`readWrite`), nothing else |
 | `MONGO_STOCK_ENGINE_PASSWORD` | `stock_engine` | read and write `stockmarketbot`, nothing else |
-| `MONGO_CRYPTO_WEB_PASSWORD` | `crypto_web` | role `crypto_dashboard`: read `cryptomarketbot`; insert into `audit_log`; read, insert and update `login_attempts`; read, insert, update and delete the four `auth_*` collections; list the databases and their sizes (Admin → System's storage card) |
+| `MONGO_CRYPTO_WEB_PASSWORD` | `crypto_web` | role `crypto_dashboard`: read `cryptomarketbot`; insert into `audit_log`; read, insert and update `login_attempts`; read, insert, update and delete `web_bans` (the rate limit's bans, §8.6) and the four `auth_*` collections; list the databases and their sizes (Admin → System's storage card) |
 | `MONGO_STOCK_WEB_PASSWORD` | `stock_web` | role `stock_dashboard`: the same on `stockmarketbot` |
 | `MONGO_BACKUP_PASSWORD` | `backup` | the `backup` role: `mongo-backup`'s dumps |
 
@@ -854,9 +854,12 @@ Requests from this machine to the public names come back through the router, fro
 
 - Each visitor, keyed by the address Caddy puts in `X-Forwarded-For` (an IPv6 address by its /64), has a bucket of 180 points that refills at 3 a second. A request costs 1. An empty bucket answers `429 Too Many Requests` with `Retry-After`.
 - A link prefetch costs 0.2. Next's router prefetches every link in view, so one page view makes up to ~120 prefetches, and Next answers each with only the route's shell (~230 bytes against 200-400 KB for the page). Measured in a real browser on 2026-11-08: the heaviest page view costs ~25 points, and clicking a link every 2 s ~70 a minute, so two or three readers behind one address stay well under the limit while a scraper is held to 3 pages a second. Only `RSC: 1` with `Next-Router-Prefetch: 1` counts as a prefetch: either header alone gets the whole page. Next hides those headers from the proxy unless `next.config.ts` sets `skipProxyUrlNormalize` (both dashboards do; it changes nothing else here, since the proxy never rewrites or redirects).
-- A visitor refused 100 points' worth within 10 minutes is banned: 1 hour, doubling with each ban within a day of the last, up to 24 hours. Each ban is logged: `docker compose logs crypto-web | Select-String rate-limit` shows `[rate-limit] <address> banned for 60 min (ban 1 within a day)`. An address banned again and again belongs in Caddy's list.
-- The owner's session lifts the limit, and any ban, for its address for an hour. It is looked up only once the address is over the limit, at most once a minute per address, so forged cookies can't turn into database load.
-- The state is the container's memory (one container per dashboard): a deploy or `docker compose restart <bot>-web` clears every count and ban.
+- A visitor refused 100 points' worth within 10 minutes is **banned for good**: every request from it gets `403 Forbidden` until the owner lifts the ban (the owner's choice, 2026-11-08). The bans are kept in the bot's database, `web_bans` (one document per address: when, why, the request that earned it, and how many requests it has been refused since), so they survive deploys and restarts. The proxy loads them before the first requests after a start (waiting 3 s at most), then again every minute, and saves a new ban at once. Each ban is logged (`docker compose logs crypto-web | Select-String rate-limit` shows `[rate-limit] <address> banned for good: …`) and written to the audit log (actor `rate limit`, action `ban`).
+- **Admin → System → Banned addresses** lists them, newest first, with an **Unban** button: it removes the ban and writes an `unban` audit entry, and the proxy lets the address back in within a minute. The audit log keeps the history of every ban and unban.
+- The owner's session lifts the limit for its address for an hour, and lifts a ban on it for good (audited as an `unban`). It is looked up only once the address is over the limit, at most once a minute per address, so forged cookies can't turn into database load.
+- The buckets (the counts that lead to a ban) are the container's memory, one container per dashboard: a deploy or a restart empties them, but not the bans.
+- Each dashboard bans on its own (the bots share nothing at runtime). To block an address on both sites, before it reaches either dashboard, add it to Caddy's list.
+- Bans are kept by the address itself, not a hash like sign-ins: a ban list has to be readable. An IPv6 visitor is banned by its /64.
 
 Sign-in has its own, stricter limits per address, kept in MongoDB (Better Auth; §3.4).
 
@@ -984,7 +987,8 @@ A run takes about a minute, and costs nothing (`ai_calls`: `cost_source: "local"
 | Stock: spreads rejected by the broker | Options level below 3: raise it in Alpaca or turn spreads off in Settings. |
 | Headless news sources down in Admin | The scraper isn't running or is unhealthy: `docker compose ps scraper`, `docker compose logs scraper`, the health check in §5.3. |
 | Header says "No stream" | The dashboard has no `ENGINE_STREAM_URL`: the bot's `<BOT>_ENGINE_STREAM_URL` in `.env`, then `docker compose up -d --no-build <bot>-web`. |
-| A dashboard answers `Too many requests` | The rate limit (§8.6): that address used up its bucket, or was banned (`docker compose logs <bot>-web \| Select-String rate-limit`). Signing in as the owner lifts it for the owner's address; `docker compose restart <bot>-web` clears every count and ban. |
+| A dashboard answers `Too many requests` (429) | The rate limit (§8.6): that address used up its bucket, which refills at 3 requests a second. Signing in as the owner lifts the limit for the owner's address. |
+| A dashboard answers `This address is blocked` (403) | The rate limit banned that address for good (§8.6). Admin → System → Banned addresses → Unban, or sign in as the owner from that address. |
 | A site drops the connection (empty reply) | The address is in Caddy's ban list, `C:\Caddy\marketbots-banned.caddy` (§8.6). |
 | Stream stuck on "reconnecting" | Caddy isn't running or lacks the engine's site, `STREAM_ALLOWED_ORIGINS` doesn't include the exact dashboard origin (handshake refused), or the dashboard was started with another `STREAM_TOKEN_SECRET` than the engine (connection closed with 4003: recreate both after changing it in `.env`). |
 | "Owner sign-in is not configured" | `BETTER_AUTH_SECRET` (32+ characters) or `OWNER_EMAIL` is missing from the dashboard (`.env`'s `<BOT>_BETTER_AUTH_SECRET`, `OWNER_EMAIL`; then `docker compose up -d --no-build <bot>-web`). |

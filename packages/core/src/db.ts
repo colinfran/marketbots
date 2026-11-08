@@ -3,8 +3,8 @@ import type { WireStatus } from "./wire"
 
 /**
  * MongoDB document types and indexes both bots share. The engine is the only writer of trading
- * state; the web app reads everything and writes only audit entries, login rate limits and owner
- * sign-in records (its database user can write nothing else). Each bot adds its own collections, documents and indexes, and binds the generic types
+ * state; the web app reads everything and writes only audit entries, login rate limits, rate-limit
+ * bans and owner sign-in records (its database user can write nothing else). Each bot adds its own collections, documents and indexes, and binds the generic types
  * below to its settings, commands and events.
  */
 
@@ -31,6 +31,8 @@ export const BASE_COLLECTIONS = {
   authSessions: "auth_sessions",
   authAccounts: "auth_accounts",
   authVerifications: "auth_verifications",
+  // Addresses the dashboard's rate limit banned (docs/SERVER.md §8.6), written only by the dashboard.
+  webBans: "web_bans",
 } as const
 
 /** A bot's collection map: every base collection under its base name, plus the bot's own (in the bot's order). */
@@ -227,6 +229,23 @@ export type CycleKind = "scheduled" | "price_move" | "manual" | "event" | "seed"
 
 /** Rate-limit counter for the dashboard's sign-in endpoints, keyed by a hash of client IP + path. */
 export type LoginAttemptDoc = { _id: string; count: number; first_at: Date; expires_at: Date }
+
+/**
+ * An address the dashboard's rate limit banned for good (docs/SERVER.md §8.6), until the owner lifts
+ * it on the Admin page. `_id` is the address itself (an IPv6 address by its /64): a ban list has to
+ * be readable, unlike the hashed addresses of sign-ins and login limits.
+ */
+export type WebBanDoc = {
+  _id: string
+  banned_at: Date
+  reason: string
+  /** The request that earned the ban: its path (no query) and user agent. */
+  path: string | null
+  user_agent: string | null
+  /** Requests refused since, and the last one, counted in batches about once a minute. */
+  blocked: number
+  last_seen_at: Date | null
+}
 
 /**
  * The cluster's storage cap: the Azure DocumentDB free tier (docs/SERVER.md §1). MongoDB can't report

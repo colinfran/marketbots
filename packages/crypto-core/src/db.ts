@@ -28,6 +28,7 @@ export type {
   LoginAttemptDoc,
   NotificationDoc,
   TokenUsage,
+  WebBanDoc,
 } from "@mb/core/db"
 
 /**
@@ -69,6 +70,8 @@ export const COLLECTIONS = {
   authSessions: "auth_sessions",
   authAccounts: "auth_accounts",
   authVerifications: "auth_verifications",
+  // Addresses the dashboard's rate limit banned (docs/SERVER.md §8.6), written only by the dashboard.
+  webBans: "web_bans",
 } as const satisfies CollectionMap
 
 export type SettingsDoc = SettingsDocOf<Settings>

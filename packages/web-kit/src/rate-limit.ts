@@ -4,7 +4,7 @@ import { getSessionCookie } from "better-auth/cookies"
 import { type NextRequest, NextResponse } from "next/server"
 
 /**
- * Per-visitor rate limit and automatic bans for the dashboards, run by each app's proxy.ts on every
+ * Per-visitor rate limit and permanent bans for the dashboards, run by each app's proxy.ts on every
  * request but build assets and static files (docs/SERVER.md §8.6).
  *
  * A visitor (the address in Caddy's X-Forwarded-For; IPv6 by /64) has a bucket of 180 points that
@@ -14,13 +14,15 @@ import { type NextRequest, NextResponse } from "next/server"
  * ~70 a minute, so two or three readers behind one address stay under the limit, while a scraper is
  * held to 3 pages a second. An empty bucket answers 429.
  *
- * A visitor refused 100 points' worth within 10 minutes is banned: 1 hour, doubling with each ban
- * within a day of the last, up to 24 hours. The owner's session lifts the limit (and any ban) for its
- * address for an hour; it is looked up only once the address is over the limit, at most once a
- * minute per address, so forged cookies can't turn into database load.
+ * A visitor refused 100 points' worth within 10 minutes is banned for good: 403 on every request
+ * until the owner lifts it on the Admin page. Bans are kept in the bot's database (`BanStore`,
+ * @mb/web-kit/bans), so they survive deploys; `BanSync` loads them and picks up unbans. The owner's
+ * session lifts the limit (and a ban) for its address for an hour; it is looked up only once the
+ * address is over the limit, at most once a minute per address, so forged cookies can't turn into
+ * database load.
  *
- * The state is this process's memory: each dashboard is one container, so there is nothing to share,
- * and a deploy clears it. Permanent bans are Caddy's (C:\Caddy\marketbots-banned.caddy, §8.6).
+ * The buckets are this process's memory: each dashboard is one container, and a deploy clears them.
+ * Caddy's ban list (C:\Caddy\marketbots-banned.caddy, §8.6) blocks an address on every site at once.
  */
 
 const MINUTE = 60_000
@@ -36,15 +38,11 @@ export type Limits = {
   /** Refused points within `strikeWindowMs` that earn a ban. */
   banAfter: number
   strikeWindowMs: number
-  /** The first ban; each further ban within `banMemoryMs` of the last one's end doubles it, up to `maxBanMs`. */
-  banMs: number
-  maxBanMs: number
-  banMemoryMs: number
   /** How long the owner's session exempts its address. */
   ownerMs: number
   /** At most one owner lookup per address per this long. */
   ownerCheckMs: number
-  /** Visitors remembered at most; the oldest unbanned go first. */
+  /** Visitors whose buckets are remembered at most; the oldest go first. */
   maxEntries: number
 }
 
@@ -54,9 +52,6 @@ export const LIMITS: Limits = {
   prefetchCost: 0.2,
   banAfter: 100,
   strikeWindowMs: 10 * MINUTE,
-  banMs: HOUR,
-  maxBanMs: 24 * HOUR,
-  banMemoryMs: 24 * HOUR,
   ownerMs: HOUR,
   ownerCheckMs: MINUTE,
   maxEntries: 100_000,
@@ -67,28 +62,26 @@ type Entry = {
   at: number
   strikes: number
   strikesSince: number
-  bannedUntil: number
-  bans: number
   ownerUntil: number
   ownerCheckedAt: number
 }
 
 export type Verdict =
   | { allowed: true }
-  | {
-      allowed: false
-      /** Seconds until a request would be let through. */
-      retryAfter: number
-      banned: boolean
-      /** Set on the request that earned a ban. */
-      newBan?: { minutes: number; count: number }
-    }
+  | { allowed: false; banned: false; retryAfter: number }
+  | { allowed: false; banned: true; newBan: boolean }
+
+/** Requests refused from banned addresses since the last drain: how many, and the last one's time. */
+export type BlockedCounts = Map<string, { count: number; last: number }>
 
 const ALLOWED: Verdict = { allowed: true }
 const seconds = (ms: number) => Math.max(1, Math.ceil(ms / 1000))
 
 export class RateLimiter {
   private readonly entries = new Map<string, Entry>()
+  /** Banned addresses, with when this process banned or loaded each. */
+  private banned = new Map<string, number>()
+  private blocked: BlockedCounts = new Map()
   private sweptAt: number
 
   constructor(
@@ -98,9 +91,18 @@ export class RateLimiter {
     this.sweptAt = now()
   }
 
-  /** Visitors remembered. */
+  /** Why an address was banned, as stored and shown on the Admin page. */
+  get reason() {
+    return `kept going while rate-limited: ${this.limits.banAfter} requests refused within ${this.limits.strikeWindowMs / MINUTE} minutes`
+  }
+
+  /** Visitors whose buckets are remembered. */
   get size() {
     return this.entries.size
+  }
+
+  isBanned(key: string) {
+    return this.banned.has(key)
   }
 
   /** Spends a request's points from the visitor's bucket, or refuses it (and bans a visitor who keeps going). */
@@ -109,8 +111,11 @@ export class RateLimiter {
     if (now - this.sweptAt >= MINUTE) this.sweep(now)
     const e = this.entry(key, now)
     if (e.ownerUntil > now) return ALLOWED
-    if (e.bannedUntil > now) return { allowed: false, banned: true, retryAfter: seconds(e.bannedUntil - now) }
-    const { burst, perSecond, prefetchCost, banAfter, strikeWindowMs, banMs, maxBanMs, banMemoryMs } = this.limits
+    if (this.banned.has(key)) {
+      this.blocked.set(key, { count: (this.blocked.get(key)?.count ?? 0) + 1, last: now })
+      return { allowed: false, banned: true, newBan: false }
+    }
+    const { burst, perSecond, prefetchCost, banAfter, strikeWindowMs } = this.limits
     const cost = prefetch ? prefetchCost : 1
     e.tokens = Math.min(burst, e.tokens + ((now - e.at) / 1000) * perSecond)
     e.at = now
@@ -124,12 +129,9 @@ export class RateLimiter {
     }
     e.strikes += cost
     if (e.strikes < banAfter) return { allowed: false, banned: false, retryAfter: seconds(((cost - e.tokens) / perSecond) * 1000) }
-    if (now - e.bannedUntil > banMemoryMs) e.bans = 0
-    const ms = Math.min(maxBanMs, banMs * 2 ** e.bans)
-    e.bans += 1
-    e.bannedUntil = now + ms
     e.strikes = 0
-    return { allowed: false, banned: true, retryAfter: seconds(ms), newBan: { minutes: ms / MINUTE, count: e.bans } }
+    this.banned.set(key, now)
+    return { allowed: false, banned: true, newBan: true }
   }
 
   /** Whether to look up the owner's session for this address now: at most once per `ownerCheckMs`. */
@@ -141,51 +143,143 @@ export class RateLimiter {
     return true
   }
 
-  /** The owner is at this address: no limit for `ownerMs`, and any ban is lifted. */
-  markOwner(key: string) {
+  /** The owner is at this address: no limit for `ownerMs`. True when that lifted a ban. */
+  markOwner(key: string): boolean {
     const now = this.now()
     const e = this.entry(key, now)
     e.ownerUntil = now + this.limits.ownerMs
-    if (e.bannedUntil > now) e.bannedUntil = now
-    e.bans = 0
     e.strikes = 0
     e.tokens = this.limits.burst
     e.at = now
+    this.blocked.delete(key)
+    return this.banned.delete(key)
+  }
+
+  /** The refused requests from banned addresses since the last call. */
+  drainBlocked(): BlockedCounts {
+    const out = this.blocked
+    this.blocked = new Map()
+    return out
+  }
+
+  /**
+   * Replaces the bans with the stored list, so a ban lifted on the Admin page drops out, but keeps a
+   * ban of this process's own that the store may not have yet (`keep`).
+   */
+  replaceBans(stored: Iterable<string>, keep: (key: string, since: number) => boolean) {
+    const now = this.now()
+    const next = new Map<string, number>()
+    for (const key of stored) next.set(key, this.banned.get(key) ?? now)
+    for (const [key, since] of this.banned) if (!next.has(key) && keep(key, since)) next.set(key, since)
+    this.banned = next
   }
 
   private entry(key: string, now: number): Entry {
     let e = this.entries.get(key)
     if (!e) {
-      e = { tokens: this.limits.burst, at: now, strikes: 0, strikesSince: -Infinity, bannedUntil: -Infinity, bans: 0, ownerUntil: -Infinity, ownerCheckedAt: -Infinity }
+      e = { tokens: this.limits.burst, at: now, strikes: 0, strikesSince: -Infinity, ownerUntil: -Infinity, ownerCheckedAt: -Infinity }
       this.entries.set(key, e)
-      if (this.entries.size > this.limits.maxEntries) this.evict(key, now)
+      if (this.entries.size > this.limits.maxEntries) {
+        const oldest = this.entries.keys().next().value
+        if (oldest !== undefined && oldest !== key) this.entries.delete(oldest)
+      }
     }
     return e
   }
 
-  /** Forgets the oldest visitor that isn't banned (or, if all are, the oldest). */
-  private evict(keep: string, now: number) {
-    let oldest: string | undefined
-    for (const [key, e] of this.entries) {
-      if (key === keep) continue
-      oldest ??= key
-      if (e.bannedUntil <= now) {
-        this.entries.delete(key)
-        return
-      }
-    }
-    if (oldest !== undefined) this.entries.delete(oldest)
-  }
-
-  /** Forgets visitors with a full bucket, no recent refusals, no ban to remember and no owner exemption. */
+  /** Forgets visitors with a full bucket, no recent refusals and no owner exemption. */
   private sweep(now: number) {
     this.sweptAt = now
-    const { burst, perSecond, strikeWindowMs, banMemoryMs } = this.limits
+    const { burst, perSecond, strikeWindowMs } = this.limits
     for (const [key, e] of this.entries) {
       const full = e.tokens + ((now - e.at) / 1000) * perSecond >= burst
       const quiet = now - e.strikesSince > strikeWindowMs
-      const remembered = now - e.bannedUntil <= banMemoryMs
-      if (full && quiet && !remembered && e.ownerUntil <= now) this.entries.delete(key)
+      if (full && quiet && e.ownerUntil <= now) this.entries.delete(key)
+    }
+  }
+}
+
+/** A ban as the proxy reports it to the store. */
+export type BanRecord = { key: string; at: Date; reason: string; path: string | null; userAgent: string | null }
+
+/** Where bans are kept (the bot's database: @mb/web-kit/bans). */
+export type BanStore = {
+  /** Every banned address. */
+  load: () => Promise<string[]>
+  add: (ban: BanRecord) => Promise<void>
+  /** The owner's session came from a banned address: the ban goes. */
+  lift: (key: string) => Promise<void>
+  recordBlocked: (counts: BlockedCounts) => Promise<void>
+}
+
+const SYNC_MS = MINUTE
+/** How long the first requests after a start wait for the stored bans. */
+const FIRST_LOAD_WAIT_MS = 3_000
+
+const message = (error: unknown) => (error instanceof Error ? error.message : String(error))
+
+/**
+ * Keeps the limiter's bans and the store in step. The first requests after a start wait for the
+ * stored list (3 s at most); then it is read again every minute in the background, which picks up
+ * the Admin page's unbans and saves the counts of refused requests. A new ban is saved at once.
+ */
+export class BanSync {
+  private first: Promise<void> | null = null
+  private firstStarted = 0
+  private firstDone = false
+  private running = false
+  private lastRun = -Infinity
+  /** Bans being saved: kept even if a reload that started before the save doesn't list them. */
+  private readonly saving = new Set<string>()
+
+  constructor(
+    private readonly limiter: RateLimiter,
+    private readonly store: BanStore,
+    private readonly now: () => number = Date.now,
+  ) {}
+
+  /** Call before each request: waits for the first load, then starts a reload when one is due. */
+  async ready(): Promise<void> {
+    if (!this.first) {
+      this.firstStarted = this.now()
+      this.first = this.run().finally(() => {
+        this.firstDone = true
+      })
+    }
+    if (!this.firstDone) {
+      const wait = this.firstStarted + FIRST_LOAD_WAIT_MS - this.now()
+      if (wait > 0) await Promise.race([this.first, new Promise((resolve) => setTimeout(resolve, wait))])
+      return
+    }
+    if (!this.running && this.now() - this.lastRun >= SYNC_MS) void this.run()
+  }
+
+  banned(ban: BanRecord) {
+    this.saving.add(ban.key)
+    this.store
+      .add(ban)
+      .catch((error: unknown) => console.error(`[rate-limit] ban of ${ban.key} not saved:`, message(error)))
+      .finally(() => this.saving.delete(ban.key))
+  }
+
+  lifted(key: string) {
+    this.store.lift(key).catch((error: unknown) => console.error(`[rate-limit] lifted ban of ${key} not removed:`, message(error)))
+  }
+
+  /** The reload, awaited by tests. */
+  async run() {
+    this.running = true
+    const started = this.now()
+    this.lastRun = started
+    try {
+      const counts = this.limiter.drainBlocked()
+      if (counts.size) await this.store.recordBlocked(counts).catch((error: unknown) => console.error("[rate-limit] refused-request counts not saved:", message(error)))
+      const stored = await this.store.load()
+      this.limiter.replaceBans(stored, (key, since) => since >= started || this.saving.has(key))
+    } catch (error) {
+      console.error("[rate-limit] ban list not loaded:", message(error))
+    } finally {
+      this.running = false
     }
   }
 }
@@ -222,31 +316,39 @@ export const clientKey = (forwardedFor: string | null): string => {
  */
 const isPrefetch = (h: Headers) => h.get("rsc") === "1" && h.get("next-router-prefetch") === "1"
 
-const tooMany = (retryAfter: number) =>
-  new NextResponse("Too many requests. Wait a minute and try again.\n", {
-    status: 429,
-    headers: { "retry-after": String(retryAfter), "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
-  })
+const text = (status: number, body: string, headers: Record<string, string> = {}) =>
+  new NextResponse(body, { status, headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store", ...headers } })
+
+const tooMany = (retryAfter: number) => text(429, "Too many requests. Wait a minute and try again.\n", { "retry-after": String(retryAfter) })
+
+const forbidden = () => text(403, "This address is blocked from this site for sending too many requests.\n")
 
 /**
- * The dashboard's proxy (proxy.ts): lets a request through or answers 429. `isOwner` is the auth
- * module's session check for a request's headers.
+ * The dashboard's proxy (proxy.ts): lets a request through, or answers 429 (over the limit) or 403
+ * (banned). `isOwner` is the auth module's session check for a request's headers; `store` keeps the
+ * bans across deploys.
  */
-export const rateLimitProxy =
-  ({ isOwner, limiter = new RateLimiter() }: { isOwner: (headers: Headers) => Promise<boolean>; limiter?: RateLimiter }) =>
-  async (request: NextRequest): Promise<NextResponse> => {
+export const rateLimitProxy = ({ isOwner, store, limiter = new RateLimiter() }: { isOwner: (headers: Headers) => Promise<boolean>; store?: BanStore; limiter?: RateLimiter }) => {
+  const sync = store ? new BanSync(limiter, store) : null
+  return async (request: NextRequest): Promise<NextResponse> => {
+    await sync?.ready()
     const key = clientKey(request.headers.get("x-forwarded-for"))
     const verdict = limiter.take(key, isPrefetch(request.headers))
     if (verdict.allowed) return NextResponse.next()
     const owner = () =>
       isOwner(request.headers).catch((error: unknown) => {
-        console.error("[rate-limit] owner check failed:", error instanceof Error ? error.message : String(error))
+        console.error("[rate-limit] owner check failed:", message(error))
         return false
       })
     if (getSessionCookie(request) && limiter.shouldCheckOwner(key) && (await owner())) {
-      limiter.markOwner(key)
+      if (limiter.markOwner(key)) sync?.lifted(key)
       return NextResponse.next()
     }
-    if (verdict.newBan) console.warn(`[rate-limit] ${key} banned for ${verdict.newBan.minutes} min (ban ${verdict.newBan.count} within a day)`)
-    return tooMany(verdict.retryAfter)
+    if (!verdict.banned) return tooMany(verdict.retryAfter)
+    if (verdict.newBan) {
+      console.warn(`[rate-limit] ${key} banned for good: ${limiter.reason}`)
+      sync?.banned({ key, at: new Date(), reason: limiter.reason, path: request.nextUrl.pathname.slice(0, 300), userAgent: request.headers.get("user-agent")?.slice(0, 300) ?? null })
+    }
+    return forbidden()
   }
+}

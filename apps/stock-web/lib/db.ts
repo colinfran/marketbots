@@ -10,6 +10,7 @@ import type {
   EngineStateDoc,
   EventDoc,
   LoginAttemptDoc,
+  WebBanDoc,
   NotificationDoc,
   OptionPositionDoc,
   OrderDoc,
@@ -23,7 +24,7 @@ import { env } from "./env"
 
 /**
  * MongoDB access for the dashboard (@mb/web-kit/db). The dashboard reads everything the engine
- * writes and writes only audit entries, login rate limits and owner sign-in records (via Better
+ * writes and writes only audit entries, login rate limits, rate-limit bans and owner sign-in records (via Better
  * Auth). One client per process (reused across hot reloads in dev).
  */
 export const { mongoClient, db, collections } = createDb({
@@ -47,6 +48,7 @@ export const { mongoClient, db, collections } = createDb({
     dailyStats: d.collection<DailyStatsDoc>(COLLECTIONS.dailyStats),
     cache: d.collection<CacheDoc>(COLLECTIONS.cache),
     loginAttempts: d.collection<LoginAttemptDoc>(COLLECTIONS.loginAttempts),
+    webBans: d.collection<WebBanDoc>(COLLECTIONS.webBans),
     agentEpisodes: d.collection<AgentEpisodeDoc>(COLLECTIONS.agentEpisodes),
     agentWatches: d.collection<AgentWatchDoc>(COLLECTIONS.agentWatches),
     agentNotes: d.collection<AgentNoteDoc>(COLLECTIONS.agentNotes),

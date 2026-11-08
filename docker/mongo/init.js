@@ -48,12 +48,14 @@ if (!signedIn) {
 }
 
 // 4. A dashboard reads its own bot's database and writes only what it writes (from a grep of every
-// dashboard write): audit entries, the login rate limits and Better Auth's sign-in records. Admin →
+// dashboard write): audit entries, the login rate limits, the rate limit's bans and Better Auth's sign-in records. Admin →
 // System's storage card lists the databases and their sizes, both bots' (dbStats only, no data).
 const dashboardPrivileges = (dbName) => [
   { resource: { db: dbName, collection: "" }, actions: ["find", "listCollections", "listIndexes", "collStats", "dbStats"] },
   { resource: { db: dbName, collection: "audit_log" }, actions: ["insert"] },
   { resource: { db: dbName, collection: "login_attempts" }, actions: ["find", "insert", "update"] },
+  // The rate limit's permanent bans (docs/SERVER.md §8.6): added by the proxy, lifted on the Admin page.
+  { resource: { db: dbName, collection: "web_bans" }, actions: ["find", "insert", "update", "remove"] },
   ...["auth_users", "auth_sessions", "auth_accounts", "auth_verifications"].map((collection) => ({
     resource: { db: dbName, collection },
     actions: ["find", "insert", "update", "remove"],
