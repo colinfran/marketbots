@@ -134,44 +134,34 @@ export function HistoryHealthCard({ history }: { history: NonNullable<Status["hi
 }
 
 /**
- * The MongoDB cluster both bots share, read when the page loads. With Azure Monitor configured, the
- * headline is the disk as Azure counts it (logs and system files included) and the databases are a
- * part of it; without, it is the databases against the free tier's cap.
+ * The server's MongoDB, which both bots share (each with its own database), read when the page loads:
+ * the databases as MongoDB reports them against their 32 GB budget, and the disk they are on.
  */
 export function DatabaseStorageCard({ storage }: { storage: DatabaseStorageView }) {
-  const az = storage.azure
-  const used = az ? az.used_bytes : storage.used_bytes
-  const limit = az ? az.limit_bytes : storage.limit_bytes
-  const usedPct = az ? az.percent : used === null ? null : (used / limit) * 100
-  const errors = [storage.azure_error, storage.error].filter((e): e is string => !!e)
+  const used = storage.used_bytes
+  const pct = used === null ? null : (used / storage.budget_bytes) * 100
+  const disk = storage.disk
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
-          <HealthDot ok={usedPct !== null && usedPct < 80 && !errors.length} /> Database storage
+          <HealthDot ok={!storage.error && pct !== null && pct < 80} /> Database storage
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <Meter value={usedPct} className="mb-2" />
-        <KV label={az ? "On disk (Azure)" : "Used"}>{used === null ? "—" : `${bytes(used)} of ${bytes(limit)} (${num(usedPct, 1)}%)`}</KV>
-        <KV label="Free">{used === null ? "—" : bytes(Math.max(0, limit - used))}</KV>
-        {az && <KV label="Databases (MongoDB)">{bytes(storage.used_bytes)}</KV>}
+        <Meter value={pct} className="mb-2" />
+        <KV label="Databases">{used === null ? "—" : `${bytes(used)} of ${bytes(storage.budget_bytes)} (${num(pct, 1)}%)`}</KV>
         {storage.databases.map((d) => (
           <KV key={d.name} label={d.name}>
             {bytes(d.bytes)}
           </KV>
         ))}
-        {az && storage.used_bytes !== null && <KV label="Logs and system files">{bytes(Math.max(0, az.used_bytes - storage.used_bytes))}</KV>}
-        {az && <KV label="Azure measured">{ago(az.at)}</KV>}
-        {errors.map((e) => (
-          <p key={e} className="text-loss mt-2 line-clamp-3 text-xs">
-            {e}
-          </p>
-        ))}
+        {disk && <KV label="Docker's disk">{`${bytes(disk.used_bytes)} used of ${bytes(disk.total_bytes)}`}</KV>}
+        {storage.error && <p className="text-loss mt-2 line-clamp-3 text-xs">{storage.error}</p>}
         <p className="text-muted-foreground mt-2 text-xs">
-          {az
-            ? "The Azure DocumentDB free tier, shared by both bots. Azure counts the whole disk; logs and system files are the rest of it beyond the databases (the database engine's write-ahead log, its own files and working space)."
-            : "The Azure DocumentDB free tier, shared by both bots: the databases as MongoDB reports them. Azure's own count, with logs and system files, needs the AZURE_* variables."}
+          MongoDB on this server, shared by both bots, each with its own database. The {bytes(storage.budget_bytes)} is a budget, the old Azure free tier&apos;s size:
+          nothing is refused at it, but both dashboards alert on Discord at 80% and 90%. The data is on Docker&apos;s disk with every image and volume; that disk is a file on C:,
+          so C:&apos;s free space (Admin → Server) is the hard limit.
         </p>
       </CardContent>
     </Card>

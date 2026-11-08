@@ -248,27 +248,33 @@ export type WebBanDoc = {
 }
 
 /**
- * The cluster's storage cap: the Azure DocumentDB free tier (docs/SERVER.md §1). MongoDB can't report
- * it; Azure Monitor can, so this is only used without the AZURE_* variables.
+ * What both bots' databases together may take (docs/SERVER.md §6.6): the old Azure free tier's 32 GB.
+ * A budget, not a cap: MongoDB can't cap itself, and nothing is refused at it. Admin → System shows
+ * the databases against it, and the dashboards alert on Discord at each of `DB_STORAGE_ALERT_PCTS`.
  */
-export const DB_STORAGE_LIMIT_BYTES = 32 * 1024 ** 3
+export const DB_STORAGE_BUDGET_BYTES = 32 * 1024 ** 3
+
+/** Percentages of the budget that alert, highest first. */
+export const DB_STORAGE_ALERT_PCTS = [90, 80] as const
 
 /**
- * Admin → System's database card: what the cluster's databases take on disk, as MongoDB reports it
- * (`used_bytes` null and `error` set when it couldn't be read), and the disk as Azure counts it.
+ * Admin → System's database card: what the server's MongoDB (docs/SERVER.md §6.6) holds, as MongoDB
+ * reports it (`used_bytes` null and `error` set when it couldn't be read), against the budget, and
+ * the disk it is on.
  */
 export type DatabaseStorageView = {
+  /** Every database's data and indexes on disk, together. */
   used_bytes: number | null
-  limit_bytes: number
+  budget_bytes: number
   /** Each database's data and indexes on disk, largest first. */
   databases: { name: string; bytes: number }[]
-  error: string | null
   /**
-   * Azure Monitor's storage metrics (StorageUsed, StoragePercent): data, indexes, logs and system
-   * files, against the disk they fill. Null without the AZURE_* variables or when they failed.
+   * The filesystem the data is on, as MongoDB sees it (dbStats' fsUsedSize and fsTotalSize): Docker's
+   * virtual disk, which every image and volume share. It is a file on C:, so C:'s free space is the
+   * real limit. Null when MongoDB didn't report it.
    */
-  azure: { used_bytes: number; limit_bytes: number; percent: number; at: Date } | null
-  azure_error: string | null
+  disk: { used_bytes: number; total_bytes: number } | null
+  error: string | null
 }
 
 /** UTC calendar day, e.g. "2026-10-25". */

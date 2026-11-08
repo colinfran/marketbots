@@ -22,7 +22,7 @@ Until 2026-11-07 the dashboards ran on Vercel and both bots' database was an Azu
 
 ## 1. Accounts and secrets (once)
 
-**MongoDB**: the stack's own `mongo` container (§6.6), MongoDB 8.0 as a single-member replica set, with no account anywhere. Its users and their passwords are in `.env`'s MONGO section (§3.8). Admin → System's *Database storage* card shows what MongoDB reports, against `DB_STORAGE_LIMIT_BYTES` in `@mb/core/db` (still the old free tier's 32 GB).
+**MongoDB**: the stack's own `mongo` container (§6.6), MongoDB 8.0 as a single-member replica set, with no account anywhere. Its users and their passwords are in `.env`'s MONGO section (§3.8). Admin → System's *Database storage* card shows what MongoDB reports, against a 32 GB budget (§6.6).
 
 **Azure DocumentDB** (retired on 2026-11-07, kept until the owner deletes it): the free-tier cluster both bots used from 2026-10-30. Its compute was burstable, and from 2026-10-31 its CPU allowance stayed used up: the capped cluster refused some queries with `TooManyLogicalSessions` (*An unexpected internal error has occurred.*, code 261), which the engines retried and the dashboards reported as *Server error* alerts. That is why the database moved onto the server ([plans/LOCAL-MONGO.md](plans/LOCAL-MONGO.md)). Nothing in the stack reads it any more; `.env` still holds its `MONGODB_URI` (local dev, §3.5) and the read-only metrics service principal (`AZURE_*`, `marketbots-metrics`), both deleted with the cluster.
 
@@ -203,7 +203,7 @@ notepad .env                          # every secret and setting, in sections (�
 
 | Section | Names | Read by |
 | --- | --- | --- |
-| SHARED | no prefix: the news and research keys, `OWNER_EMAIL`, useSend, the time zone, `HOST_API_SECRET`; `MONGODB_URI` and `AZURE_*` for local dev only | both bots |
+| SHARED | no prefix: the news and research keys, `OWNER_EMAIL`, useSend, the time zone, `HOST_API_SECRET`; `MONGODB_URI` for local dev only | both bots |
 | CRYPTO | `CRYPTO_*` | the crypto engine and dashboard |
 | STOCK | `STOCK_*` | the stock engine and dashboard |
 | HISTORY | `HISTORY_*` | the history service (§3.6) |
@@ -265,7 +265,6 @@ A variable that isn't in `.env` reaches its container empty, and the engines rea
 | `HOST_API_SECRET` | `HOST_API_SECRET` | `HOST_API_SECRET` | the agent's own value; without it, Admin → Server shows the agent offline |
 
 - `NEXT_PUBLIC_DISPLAY_TIMEZONE` is a build argument, not a runtime variable: `next build` writes `NEXT_PUBLIC_*` values into the code. compose passes `.env`'s value (default `America/Los_Angeles`); after changing it, rebuild both dashboards (§8.2).
-- No `AZURE_*`: Admin → System's storage card shows what MongoDB reports.
 - Nothing else reaches a dashboard: no broker or AI keys, no other bot's values.
 
 ### 3.5 Local dev overrides
@@ -622,6 +621,7 @@ Both bots' MongoDB data, the books (accounts, positions, orders, fills, decision
 - **Never remove it.** No `docker volume rm`, no `down -v` ([AGENTS.md](../AGENTS.md) rule 6).
 - **Never start the crypto engine on a database without its books.** To it, a missing `accounts` document means a fresh database, and it resets the paper wallet to match (§6). Before it starts on a restored or new database, check that the document is there (below).
 - It is a named volume (ext4 inside Docker's disk), never a bind mount from the Windows disk: MongoDB needs real fsync and file locking.
+- **A 32 GB budget**, the old Azure free tier's size (`DB_STORAGE_BUDGET_BYTES` in `@mb/core/db`; the owner's choice, 2026-11-08). MongoDB can't cap its own size, so it is a budget, not a cap: nothing is refused at it. Admin → System's *Database storage* card shows both bots' databases against it (red from 80%), and each dashboard checks it hourly (and a minute after it starts) and alerts on its bot's Discord channel at 80% and 90%, then once a day while above (`@mb/web-kit/storage`, started from `instrumentation.ts`). Both databases took 171 MB on 2026-11-08: the high-volume collections expire on their own (TTL indexes). The hard limit is the disk: the card also shows Docker's disk, which is a file on C:, so C:'s free space (Admin → Server) is what runs out.
 - **MongoDB 8.0 refuses to start on Linux kernels 6.19 through 7.0.13** (a TCMalloc incompatibility), and Docker Desktop brings its own kernel. Before updating Docker Desktop, check the kernel it would bring; after an update, `docker info --format "{{.KernelVersion}}"` (6.18.54 on 2026-11-07).
 
 **The server** (`mongo`): MongoDB 8.0.34, the official image pinned by digest, as a single-member replica set `rs0` (Better Auth's sign-in writes use transactions, which need one), with auth on and network compression off (CVE-2025-14847). `docker/mongo/start.sh` writes a fresh keyFile to tmpfs at every start (a replica set with auth needs one; with a single member nothing else reads it), then runs the image's entrypoint. It runs as the image's `mongodb` user with a read-only root and no capabilities, on the internal `db` network only: no host port, no internet. Every client connects to `mongo:27017` with `replicaSet=rs0`.

@@ -6,7 +6,6 @@ import { ACCOUNT_ID } from "@mb/crypto-core/venues"
 import { signEngineRequest } from "@mb/crypto-core/stream-token"
 import { createEngineStatus, type EngineSummary as EngineSummaryOf } from "@mb/web-kit/engine-status"
 import { createQueries, decisionLatency } from "@mb/web-kit/queries"
-import { azureMonitorConfig } from "@mb/web-kit/azure"
 import { databaseStorage } from "@mb/web-kit/storage"
 import { connection } from "next/server"
 import { getEpisodesBetween } from "./agent"
@@ -42,10 +41,10 @@ export const {
   recentEventsFilter: { level: { $ne: "debug" } },
 })
 
-/** Admin → System: the cluster's storage, both bots' databases included, and Azure's count when configured (@mb/web-kit/storage). */
+/** Admin → System: the cluster's storage, both bots' databases and the disk they are on (@mb/web-kit/storage). */
 export const getDatabaseStorage = async () => {
   await connection()
-  return databaseStorage(mongoClient(), azureMonitorConfig(env))
+  return databaseStorage(mongoClient())
 }
 
 export const getAccount = async () => {

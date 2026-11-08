@@ -8,7 +8,6 @@ import { addDays, marketDay, marketTime } from "@mb/stock-core/time"
 import { signEngineRequest } from "@mb/stock-core/stream-token"
 import { createEngineStatus, type EngineSummary as EngineSummaryOf } from "@mb/web-kit/engine-status"
 import { createQueries, decisionLatency } from "@mb/web-kit/queries"
-import { azureMonitorConfig } from "@mb/web-kit/azure"
 import { databaseStorage } from "@mb/web-kit/storage"
 import { connection } from "next/server"
 import { getEpisodesBetween } from "./agent"
@@ -66,10 +65,10 @@ const readCache = async <T>(key: string): Promise<{ data: T; fetched_at: Date } 
 }
 
 /** Account, positions and clock from the engine's snapshot (refreshed every 15 seconds and after every fill). */
-/** Admin → System: the cluster's storage, both bots' databases included, and Azure's count when configured (@mb/web-kit/storage). */
+/** Admin → System: the cluster's storage, both bots' databases and the disk they are on (@mb/web-kit/storage). */
 export const getDatabaseStorage = async () => {
   await connection()
-  return databaseStorage(mongoClient(), azureMonitorConfig(env))
+  return databaseStorage(mongoClient())
 }
 
 export const getLiveAccount = async () => {
