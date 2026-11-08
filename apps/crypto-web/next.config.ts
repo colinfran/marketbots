@@ -1,6 +1,9 @@
 import type { NextConfig } from "next"
 
 const nextConfig: NextConfig = {
+  // A self-contained server (.next/standalone) for the web image (docker/web/Dockerfile). The trace
+  // starts at the repo root (the lockfile's folder), so the workspace packages are in it.
+  output: "standalone",
   // The shared packages ship TypeScript sources.
   transpilePackages: ["@mb/core", "@mb/crypto-core", "@mb/ui", "@mb/web-kit"],
   poweredByHeader: false,

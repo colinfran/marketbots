@@ -1,7 +1,7 @@
 import "server-only"
 
 /**
- * Server-side environment for a dashboard (Vercel), under the variable names both bots use.
+ * Server-side environment for a dashboard (its container on the server), under the variable names both bots use.
  * Nothing here is ever sent to the browser: the only value a browser sees is the public engine
  * stream URL, handed out with each token. Each app binds its own default database name; the owner's
  * address and the email settings have no defaults and come only from the environment.
@@ -15,7 +15,7 @@ const read = (name: string) => {
 export const dashboardEnv = ({ dbName }: { dbName: string }) => ({
   mongoUri: () => read("MONGODB_URI"),
   mongoDb: () => read("MONGODB_DB_NAME") ?? dbName,
-  /** The host agent's API (Admin → Server), the same machine for both dashboards: e.g. https://engine.cryptomarketbot.app/host. */
+  /** The host agent's API (Admin → Server), the same machine for both dashboards: e.g. http://host.docker.internal:8789. */
   hostApiUrl: () => read("HOST_API_URL"),
   /** Sent with every call to the host agent's API; never to the browser. */
   hostApiSecret: () => read("HOST_API_SECRET"),
@@ -31,7 +31,9 @@ export const dashboardEnv = ({ dbName }: { dbName: string }) => ({
   streamTokenSecret: () => read("STREAM_TOKEN_SECRET"),
   /** Public WebSocket URL of the engine behind your reverse proxy, e.g. wss://engine.example.com/v1/stream */
   engineStreamUrl: () => read("ENGINE_STREAM_URL"),
-  /** Public URL of the dashboard; sign-in links point here. Defaults to the Vercel production domain. */
+  /** Optional: where the dashboard's server calls the engine's signed endpoints, e.g. http://host.docker.internal:8787. Unset: the stream URL's origin. */
+  engineUrl: () => read("ENGINE_URL"),
+  /** Public URL of the dashboard; sign-in links point here. Defaults to the Vercel production domain (VERCEL_PROJECT_PRODUCTION_URL), if any. */
   siteUrl: () => read("SITE_URL") ?? (read("VERCEL_PROJECT_PRODUCTION_URL") ? `https://${read("VERCEL_PROJECT_PRODUCTION_URL")}` : null),
   /** Optional: unhandled server errors on the dashboard are posted here. */
   discordWebhookUrl: () => read("DISCORD_WEBHOOK_URL"),

@@ -12,5 +12,5 @@ export const { submitCommand, getEngineCommand } = createCommands({
   commandSchema,
   settingsSchema,
   applySettingsPatch: (base, patch) => applySettingsPatch(base, patch as SettingsPatch),
-  engine: { streamUrl: env.engineStreamUrl, secret: env.streamTokenSecret, sign: signEngineRequest },
+  engine: { streamUrl: env.engineStreamUrl, url: env.engineUrl, secret: env.streamTokenSecret, sign: signEngineRequest },
 })

@@ -10,13 +10,13 @@ How StockMarketBot is built and why: the deployment boundaries, the engine's loo
 | **Alpaca paper only** | Trading always goes to `paper-api.alpaca.markets`; there is no live-trading code path. Only the engine holds the keys. |
 | **Defined-risk options only** | Long calls, long puts, call/put debit spreads. The most any position can lose is what was paid, so there are no margin calls, a spread's short leg is always covered by its long leg, and engine downtime can't turn into an unbounded loss. |
 | **A local model** | Qwen 3.6 35B-A3B on the server's two GPUs (llama.cpp), as `local/qwen3.6-35b-a3b-q2`, through llama.cpp's OpenAI-compatible API: no outside AI service, no key, no cost. The agent runs on it, and researches through our own search service and scraper, without X ([SERVER.md §9](SERVER.md#9-the-local-model-server-llm)). Grok, through Vercel AI Gateway, did both until 2026-10-28. |
-| **MongoDB (Azure DocumentDB)** | One database shared by the engine (the only writer of trading state) and the Vercel dashboard. |
+| **MongoDB on the server** | The stack's own MongoDB container (no host port): one database shared by the engine (the only writer of trading state) and the dashboard, each with its own user. Azure DocumentDB until 2026-11-07, whose free tier's CPU cap refused queries ([SERVER.md §1](SERVER.md#1-accounts-and-secrets-once)). |
 | **Monorepo (pnpm workspaces)** | `packages/core` holds what both apps must agree on: settings, events, commands, document types, the report schema, options helpers, FIFO P&L. |
 
 ## Components and boundaries
 
 ```
-Browser ─https─▶ Vercel (Next.js dashboard) ─▶ Azure DocumentDB ◀── Engine (Docker, your server)
+Browser ─https─▶ Caddy ─▶ Next.js dashboard ─▶ MongoDB (Docker) ◀── Engine (Docker, your server)
    │                                                                   │  ▲  ▲
    └──────── wss://engine.stockmarketbot.app/v1/stream (reverse proxy) ─┘  │  │
                                        Alpaca paper: REST, trade_updates WS, IEX data WS
@@ -26,8 +26,8 @@ Browser ─https─▶ Vercel (Next.js dashboard) ─▶ Azure DocumentDB ◀─
 ```
 
 - **The engine owns trading.** It is the only process that talks to Alpaca or the model server. A MongoDB lease guarantees a single running instance.
-- **The dashboard never trades and holds no broker keys.** It reads MongoDB (including the account, equity history and chart bars the engine copies into the `cache` collection) and writes only commands, audit entries and owner sign-in records.
-- **Control goes straight to the engine, signed.** The dashboard's server sends each command to the engine's `POST /v1/commands`, signed with the stream secret (an HMAC with stock's `smb-request.` prefix over the method, path, a millisecond timestamp and the body; a minute of clock tolerance). The engine validates it again, runs it at once, one at a time, and answers with a result the page polls (`GET /v1/commands/<id>`); every command is audited. Nothing is queued: while the engine can't be reached (restarting, say), the dashboard says so and sends nothing, and the owner sends the command again once the engine is back. So the secret now authorizes commands as well as the owner stream: it stays in `.env` and on Vercel only. (Until 2026-10-31 every command went through MongoDB, polled every second; until 2026-11-02 the dashboard still queued one there when it couldn't reach the engine, checked every 3 seconds.)
+- **The dashboard never trades and holds no broker keys.** It reads MongoDB (including the account, equity history and chart bars the engine copies into the `cache` collection) and writes only audit entries, login rate limits and owner sign-in records; its database user can't write anything else.
+- **Control goes straight to the engine, signed.** The dashboard's server sends each command to the engine's `POST /v1/commands`, signed with the stream secret (an HMAC with stock's `smb-request.` prefix over the method, path, a millisecond timestamp and the body; a minute of clock tolerance). The engine validates it again, runs it at once, one at a time, and answers with a result the page polls (`GET /v1/commands/<id>`); every command is audited. Nothing is queued: while the engine can't be reached (restarting, say), the dashboard says so and sends nothing, and the owner sends the command again once the engine is back. So the secret now authorizes commands as well as the owner stream: it stays in `.env` and the engine's and dashboard's containers only. (Until 2026-10-31 every command went through MongoDB, polled every second; until 2026-11-02 the dashboard still queued one there when it couldn't reach the engine, checked every 3 seconds.)
 - **Pause and the kill switch never wait on the database.** They take effect in the engine first and are saved after, retried until MongoDB takes them (and once more at shutdown); so do the agent's breakers. Resume and releasing the kill switch are saved first: if MongoDB fails, the engine stays paused.
 - **Stocks don't depend on the engine to be protected.** Every buy is a bracket order and every held position gets an OCO pair, all resting at Alpaca. Options exits do need the engine (Alpaca has no bracket orders for options), which is why options are limited to defined risk.
 
@@ -154,7 +154,7 @@ Each closed minute becomes one bar per tracked symbol, the close from the best l
 
 The engine runs an authenticated WebSocket server (`/v1/stream`) plus `/healthz` and `/readyz`, published on `127.0.0.1:8788`; the reverse proxy terminates TLS for `engine.stockmarketbot.app`.
 
-1. The browser asks the dashboard for a 60-second HMAC token (`/api/stream-token`), `owner` scope with a valid owner session, `public` otherwise. The secret is shared by Vercel and the engine.
+1. The browser asks the dashboard for a 60-second HMAC token (`/api/stream-token`), `owner` scope with a valid owner session, `public` otherwise. The secret is shared by the dashboard and the engine.
 2. The browser connects and sends the token in the first frame (never in the URL), with the last `seq` it saw.
 3. The engine replays everything after that `seq` (from memory, falling back to MongoDB), then streams live. 15-second pings; the client reconnects with backoff and a fresh token.
 

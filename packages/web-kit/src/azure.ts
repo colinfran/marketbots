@@ -22,7 +22,7 @@ export const azureMonitorConfig = (env: {
 const TIMEOUT_MS = 8_000
 const WINDOW_MS = 30 * 60_000
 
-/** One token per serverless instance, reused until a minute before it expires (an hour). */
+/** One token per process, reused until a minute before it expires (an hour). */
 let cached: { clientId: string; token: string; expiresAt: number } | null = null
 
 const accessToken = async (cfg: AzureMonitorConfig) => {

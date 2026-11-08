@@ -1,13 +1,17 @@
-# The marketbots stack on the trading server: both engines, one shared scraper, the local model
-# server and the history store. The dashboards run on Vercel; their MongoDB is Azure DocumentDB.
+# The marketbots stack on the trading server: both engines, both dashboards, their MongoDB, one
+# shared scraper, the local model server and the history store. Caddy on the host serves the
+# dashboards and the engines' streams; the landing page stays on Vercel.
 #
-#   docker compose up -d --build                         build and start (restarts after reboots)
 #   docker compose up -d --build stock-engine            redeploy one engine; the other is untouched
 #   docker compose logs -f crypto-engine                 follow one engine's structured logs
 #   docker compose up -d llm                             (re)start the local model server
 #
-# The two engines share nothing at runtime: separate images, containers, ports, variables,
-# databases (one history database each, too) and leases. See docs/SERVER.md.
+# The dashboards deploy themselves on every commit to main here (the repo's git hooks start
+# docker/web/autodeploy.mjs, which builds from a clean checkout of the commit; docs/SERVER.md §8).
+# Running `up -d --build` without names would rebuild them from this working tree instead.
+#
+# The two bots share nothing at runtime: separate images, containers, ports, variables,
+# databases and database users (one history database each, too) and leases. See docs/SERVER.md.
 #
 # Every secret and setting is in .env at the repo root (template .env.example; docs/SERVER.md §3),
 # which compose reads by itself. Each service below takes only its own variables, under the names its
@@ -34,8 +38,8 @@ x-logging: &logging
     max-file: "5"
 
 # What both engines read: .env's SHARED section, and the addresses of the stack's own services.
+# (Each builds its own MONGODB_URI, below: its own database user on the stack's `mongo`.)
 x-engine-env: &engine-env
-  MONGODB_URI: ${MONGODB_URI:-}
   SEC_USER_AGENT: ${SEC_USER_AGENT:-}
   FINNHUB_API_KEY: ${FINNHUB_API_KEY:-}
   FRED_API_KEY: ${FRED_API_KEY:-}
@@ -61,6 +65,8 @@ services:
     environment:
       <<: *engine-env
       STREAM_PORT: 8787
+      # Its own database user, which can't see stock's database (docker/mongo/init.js).
+      MONGODB_URI: mongodb://crypto_engine:${MONGO_CRYPTO_ENGINE_PASSWORD:-}@mongo:27017/?authSource=admin&replicaSet=rs0
       KRAKEN_OHLCVT_DIR: /data/ohlcvt
       # Its own history database, with the password the history service created its role with.
       HISTORY_URL: postgres://crypto_history:${HISTORY_CRYPTO_PASSWORD:-}@history:5432/crypto_history
@@ -80,9 +86,10 @@ services:
       ETHERSCAN_API_KEY: ${CRYPTO_ETHERSCAN_API_KEY:-}
       COINALYZE_API_KEY: ${CRYPTO_COINALYZE_API_KEY:-}
     ports:
-      # Loopback only: Caddy on the host forwards wss://engine.cryptomarketbot.app here.
+      # Loopback only: Caddy on the host forwards wss://engine.cryptomarketbot.app here, and the
+      # dashboard reaches it through host.docker.internal.
       - "127.0.0.1:8787:8787"
-    networks: [default, ai]
+    networks: [default, ai, db]
     volumes:
       # The Kraken CLI paper wallet (balances + trade journal). Losing it means a paper reset.
       - kraken-paper:/data/kraken
@@ -106,6 +113,7 @@ services:
     environment:
       <<: *engine-env
       STREAM_PORT: 8788
+      MONGODB_URI: mongodb://stock_engine:${MONGO_STOCK_ENGINE_PASSWORD:-}@mongo:27017/?authSource=admin&replicaSet=rs0
       HISTORY_URL: postgres://stock_history:${HISTORY_STOCK_PASSWORD:-}@history:5432/stock_history
       MONGODB_DB_NAME: ${STOCK_MONGODB_DB_NAME:-}
       STREAM_TOKEN_SECRET: ${STOCK_STREAM_TOKEN_SECRET:-}
@@ -125,15 +133,219 @@ services:
       MASSIVE_API_KEY: ${STOCK_MASSIVE_API_KEY:-}
       EIA_API_KEY: ${STOCK_EIA_API_KEY:-}
     ports:
-      # Loopback only: Caddy on the host forwards wss://engine.stockmarketbot.app here.
+      # Loopback only: Caddy on the host forwards wss://engine.stockmarketbot.app here, and the
+      # dashboard reaches it through host.docker.internal.
       - "127.0.0.1:8788:8788"
-    networks: [default, ai]
+    networks: [default, ai, db]
     volumes:
       # The log history (see crypto-engine).
       - ./logs/stock-engine:/logs
     stop_grace_period: 30s
     # Up from 768 MB: headroom at the open with ~1,500 tracked symbols.
     mem_limit: 1g
+    logging: *logging
+
+  # The crypto dashboard (https://cryptomarketbot.app): its Next.js standalone server
+  # (docker/web/Dockerfile), behind Caddy on the host. Its server calls the engine's signed API and
+  # the host agent through host.docker.internal (the host's 127.0.0.1), and MongoDB over `db` as
+  # crypto_web, which reads crypto's database and writes only sign-ins and audit entries
+  # (docker/mongo/init.js). On `web`, not `default`: it can't reach the scraper or search. Deployed
+  # by docker/web/autodeploy.mjs on every commit to main (docs/SERVER.md §8).
+  crypto-web:
+    <<: *hardened
+    build:
+      context: .
+      dockerfile: docker/web/Dockerfile
+      args:
+        APP: crypto-web
+        CORE: crypto-core
+        NEXT_PUBLIC_DISPLAY_TIMEZONE: ${NEXT_PUBLIC_DISPLAY_TIMEZONE:-America/Los_Angeles}
+    image: marketbots-crypto-web:latest
+    container_name: marketbots-crypto-web
+    environment:
+      MONGODB_URI: mongodb://crypto_web:${MONGO_CRYPTO_WEB_PASSWORD:-}@mongo:27017/?authSource=admin&replicaSet=rs0
+      MONGODB_DB_NAME: ${CRYPTO_MONGODB_DB_NAME:-}
+      # Sign-in links point here.
+      SITE_URL: ${CRYPTO_SITE_URL:-https://cryptomarketbot.app}
+      # The browser's stream (through Caddy), and the server's own way to the engine.
+      ENGINE_STREAM_URL: ${CRYPTO_ENGINE_STREAM_URL:-}
+      ENGINE_URL: http://host.docker.internal:8787
+      STREAM_TOKEN_SECRET: ${CRYPTO_STREAM_TOKEN_SECRET:-}
+      BETTER_AUTH_SECRET: ${CRYPTO_BETTER_AUTH_SECRET:-}
+      OWNER_EMAIL: ${OWNER_EMAIL:-}
+      USESEND_API_KEY: ${USESEND_API_KEY:-}
+      USESEND_BASE_URL: ${USESEND_BASE_URL:-}
+      USESEND_FROM_EMAIL: ${CRYPTO_USESEND_FROM_EMAIL:-}
+      DISCORD_WEBHOOK_URL: ${CRYPTO_DISCORD_WEBHOOK_URL:-}
+      HOST_API_URL: http://host.docker.internal:8789
+      HOST_API_SECRET: ${HOST_API_SECRET:-}
+    ports:
+      # Loopback only: Caddy on the host forwards https://cryptomarketbot.app here.
+      - "127.0.0.1:3101:3000"
+    networks: [web, db]
+    tmpfs:
+      - /tmp
+      # Next's fetch cache (the candles route's Kraken calls).
+      - /app/apps/crypto-web/.next/cache:uid=1000,gid=1000
+    stop_grace_period: 10s
+    mem_limit: 512m
+    logging: *logging
+
+  # The stock dashboard (https://stockmarketbot.app), like crypto-web, as stock_web.
+  stock-web:
+    <<: *hardened
+    build:
+      context: .
+      dockerfile: docker/web/Dockerfile
+      args:
+        APP: stock-web
+        CORE: stock-core
+        NEXT_PUBLIC_DISPLAY_TIMEZONE: ${NEXT_PUBLIC_DISPLAY_TIMEZONE:-America/Los_Angeles}
+    image: marketbots-stock-web:latest
+    container_name: marketbots-stock-web
+    environment:
+      MONGODB_URI: mongodb://stock_web:${MONGO_STOCK_WEB_PASSWORD:-}@mongo:27017/?authSource=admin&replicaSet=rs0
+      MONGODB_DB_NAME: ${STOCK_MONGODB_DB_NAME:-}
+      SITE_URL: ${STOCK_SITE_URL:-https://stockmarketbot.app}
+      ENGINE_STREAM_URL: ${STOCK_ENGINE_STREAM_URL:-}
+      ENGINE_URL: http://host.docker.internal:8788
+      STREAM_TOKEN_SECRET: ${STOCK_STREAM_TOKEN_SECRET:-}
+      BETTER_AUTH_SECRET: ${STOCK_BETTER_AUTH_SECRET:-}
+      OWNER_EMAIL: ${OWNER_EMAIL:-}
+      USESEND_API_KEY: ${USESEND_API_KEY:-}
+      USESEND_BASE_URL: ${USESEND_BASE_URL:-}
+      USESEND_FROM_EMAIL: ${STOCK_USESEND_FROM_EMAIL:-}
+      DISCORD_WEBHOOK_URL: ${STOCK_DISCORD_WEBHOOK_URL:-}
+      HOST_API_URL: http://host.docker.internal:8789
+      HOST_API_SECRET: ${HOST_API_SECRET:-}
+    ports:
+      # Loopback only: Caddy on the host forwards https://stockmarketbot.app here.
+      - "127.0.0.1:3102:3000"
+    networks: [web, db]
+    tmpfs:
+      - /tmp
+      - /app/apps/stock-web/.next/cache:uid=1000,gid=1000
+    stop_grace_period: 10s
+    mem_limit: 512m
+    logging: *logging
+
+  # Both bots' MongoDB (docs/SERVER.md §6.6): a single-member replica set "rs0" (Better Auth's
+  # sign-in writes use transactions, which need one) with auth on: a user per engine, per dashboard
+  # and for the backup, each limited to what it does (docker/mongo/init.js, run once per new volume
+  # and after a MONGO_* password changes). No host port and no internet: only the engines, the
+  # dashboards and mongo-backup reach it, over `db`. Its data is the mongo-data volume, the books of
+  # both bots: never removed (AGENTS.md rule 6). Recreating it pauses both bots' database for a few
+  # seconds (they retry): do it at a quiet time. Network compression stays off (CVE-2025-14847).
+  mongo:
+    image: mongo:8.0.34@sha256:b9924c330a8bbc5800fe9c69f04a84e221eca7b28fd049a0354147d9908fa142
+    container_name: marketbots-mongo
+    restart: unless-stopped
+    user: "999:999"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # docker/mongo/start.sh writes a fresh keyFile (needed by a replica set with auth) to tmpfs,
+    # then runs the image's own entrypoint.
+    entrypoint: ["sh", "/etc/mongo/start.sh"]
+    command: [mongod, --replSet, rs0, --keyFile, /run/mongo/keyfile, --bind_ip_all, --quiet, --wiredTigerCacheSizeGB, "0.5", --networkMessageCompressors, disabled]
+    environment:
+      # Read only by docker/mongo/init.js (docs/SERVER.md §3.8).
+      MONGO_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-}
+      MONGO_CRYPTO_ENGINE_PASSWORD: ${MONGO_CRYPTO_ENGINE_PASSWORD:-}
+      MONGO_STOCK_ENGINE_PASSWORD: ${MONGO_STOCK_ENGINE_PASSWORD:-}
+      MONGO_CRYPTO_WEB_PASSWORD: ${MONGO_CRYPTO_WEB_PASSWORD:-}
+      MONGO_STOCK_WEB_PASSWORD: ${MONGO_STOCK_WEB_PASSWORD:-}
+      MONGO_BACKUP_PASSWORD: ${MONGO_BACKUP_PASSWORD:-}
+      CRYPTO_DB: ${CRYPTO_MONGODB_DB_NAME:-cryptomarketbot}
+      STOCK_DB: ${STOCK_MONGODB_DB_NAME:-stockmarketbot}
+    volumes:
+      - mongo-data:/data/db
+      - ./docker/mongo/start.sh:/etc/mongo/start.sh:ro
+      - ./docker/mongo/init.js:/etc/mongo/init.js:ro
+    tmpfs:
+      - /tmp
+      - /run/mongo:uid=999,gid=999
+      - /data/configdb:uid=999,gid=999
+    networks: [db]
+    healthcheck:
+      # ping needs no user.
+      test: ["CMD", "mongosh", "--quiet", "--norc", "--eval", "quit(db.adminCommand('ping').ok ? 0 : 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    stop_grace_period: 60s
+    mem_limit: 1536m
+    logging: *logging
+
+  # Daily copy of both bots' databases (users and roles included) to backups/mongo/ on the host
+  # disk, which survives a Docker or WSL reset: one consistent snapshot (--oplog) of the whole
+  # server. Once at start, then daily at 11:00 UTC; the newest 14 kept. Restore: docs/SERVER.md §6.6.
+  mongo-backup:
+    image: mongo:8.0.34@sha256:b9924c330a8bbc5800fe9c69f04a84e221eca7b28fd049a0354147d9908fa142
+    container_name: marketbots-mongo-backup
+    restart: unless-stopped
+    user: "999:999"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp
+    environment:
+      MONGO_BACKUP_PASSWORD: ${MONGO_BACKUP_PASSWORD:-}
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        umask 077
+        # The password goes to mongodump in a file on tmpfs, never on a command line.
+        printf 'password: "%s"\n' "$$MONGO_BACKUP_PASSWORD" > /tmp/mongodump.yml
+        backup() {
+          f=/backups/mongo-$$(date -u +%Y%m%dT%H%M%SZ).archive.gz
+          if mongodump --config=/tmp/mongodump.yml --host=rs0/mongo:27017 --username=backup --authenticationDatabase=admin --oplog --gzip --archive="$$f.part" --quiet; then
+            mv "$$f.part" "$$f" && echo "backed up $$f ($$(du -h "$$f" | cut -f1))"
+            ls -1t /backups/mongo-*.archive.gz | tail -n +15 | xargs -r rm -f
+          else
+            rm -f "$$f.part"; echo "backup failed"; return 1
+          fi
+        }
+        until backup; do echo "retrying in 5 minutes"; sleep 300; done
+        while true; do
+          now=$$(date -u +%s); next=$$(( now / 86400 * 86400 + 39600 )); [ "$$next" -le "$$now" ] && next=$$(( next + 86400 ))
+          sleep $$(( next - now ))
+          backup || true
+        done
+    volumes:
+      - ./backups/mongo:/backups
+    networks: [db]
+    mem_limit: 512m
+    logging: *logging
+
+  # A MongoDB for local dev (`pnpm dev:<bot>-*`, docs/SERVER.md §3.5), never the live data: a
+  # one-member replica set (for Better Auth's transactions) without auth, on loopback. Not part of
+  # `up` (profile "dev"): docker compose --profile dev up -d mongo-dev. Its healthcheck initiates the
+  # replica set on a new volume.
+  mongo-dev:
+    profiles: ["dev"]
+    image: mongo:8.0.34@sha256:b9924c330a8bbc5800fe9c69f04a84e221eca7b28fd049a0354147d9908fa142
+    container_name: marketbots-mongo-dev
+    restart: unless-stopped
+    command: [mongod, --replSet, rs0, --bind_ip_all, --quiet, --wiredTigerCacheSizeGB, "0.25", --networkMessageCompressors, disabled]
+    ports:
+      - "127.0.0.1:27018:27017"
+    volumes:
+      - mongo-dev-data:/data/db
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--norc", "--eval", "try { rs.status().ok } catch (e) { rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: '127.0.0.1:27017' }] }).ok }"]
+      interval: 10s
+      timeout: 10s
+      retries: 3
+    mem_limit: 512m
     logging: *logging
 
   # Headless Chromium for news sources that need JavaScript, shared by both engines. No ports:
@@ -401,6 +613,14 @@ volumes:
   # The history store's data (docs/plans/LOCAL-AI.md §6). The news archive in it is backed up
   # nightly (history-backup); everything else the backfills can fetch again.
   history-data:
+  # THE books of both bots (mongo). `external`, like the wallet, so compose never creates an empty
+  # one: the crypto engine would see a fresh database and reset the paper wallet to match. Created
+  # once by hand (docs/SERVER.md §6.6); backed up daily (mongo-backup).
+  mongo-data:
+    external: true
+    name: marketbots_mongo-data
+  # mongo-dev's throwaway data.
+  mongo-dev-data:
 
 networks:
   default:
@@ -408,3 +628,10 @@ networks:
   # engines join it beside the default network.
   ai:
     internal: true
+  # The database side: no internet. mongo and mongo-backup sit only here; the engines and the
+  # dashboards join it.
+  db:
+    internal: true
+  # The dashboards' own network, with internet (useSend, Discord, Kraken's candles) but without the
+  # scraper or search.
+  web:

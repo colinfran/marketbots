@@ -1,0 +1,3 @@
+#!/bin/sh
+# A pull or merge that moves main deploys the dashboards too, like a commit (post-commit).
+exec "$(dirname "$0")/post-commit"

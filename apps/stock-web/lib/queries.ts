@@ -28,7 +28,7 @@ import { env } from "./env"
 export type EngineSummary = EngineSummaryOf<EngineStatusDoc>
 
 /** The engine's heartbeat, from the engine itself (@mb/web-kit/engine-status). */
-export const getEngine = createEngineStatus<EngineStatusDoc>({ streamUrl: env.engineStreamUrl, secret: env.streamTokenSecret, sign: signEngineRequest })
+export const getEngine = createEngineStatus<EngineStatusDoc>({ streamUrl: env.engineStreamUrl, url: env.engineUrl, secret: env.streamTokenSecret, sign: signEngineRequest })
 
 export const {
   getEngineState,

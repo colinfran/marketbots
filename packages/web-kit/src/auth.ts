@@ -86,7 +86,7 @@ export const createAuth = ({
       account: { modelName: BASE_COLLECTIONS.authAccounts },
       verification: { modelName: BASE_COLLECTIONS.authVerifications },
       disabledPaths: UNUSED_OTP_PATHS,
-      // Stored in MongoDB so every serverless instance shares the limits (expires on its own).
+      // Stored in MongoDB, so the limits survive a restart or a redeploy (expires on its own).
       rateLimit: {
         customStorage: {
           consume: async (key, { window, max }) => {

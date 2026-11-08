@@ -1,15 +1,16 @@
-# Boot test for new engine images, beside the live stack (docs/SERVER.md §6.3).
+# Boot test for new engine and dashboard images, beside the live stack (docs/SERVER.md §6.3).
 #
 #   docker compose build                                            build the images first
-#   docker compose -f compose.smoke.yml up -d                       boot both engines (MB_TAG=<tag> for other images)
+#   docker compose -f compose.smoke.yml up -d                       boot both engines and dashboards (MB_TAG=<tag> for other images)
+#   http://127.0.0.1:13101, http://127.0.0.1:13102                   the dashboards (public view: no sign-in here)
 #   docker compose -f compose.smoke.yml ps / logs -f crypto-engine
 #   docker compose -f compose.smoke.yml down && docker volume rm marketbots-smoke_wallet
 #
 # (Not `down -v`: this file also declares the LIVE wallet volume. It is external, so compose
 # shouldn't remove it, but there is no reason to rely on that.)
 #
-# Safe beside the live engines by construction: its own project name, a throwaway local MongoDB
-# (nothing touches the live cluster) and history store (crypto_staging, stock_staging, in memory), loopback ports 18787/18788, a COPY of the paper wallet, fake Alpaca
+# Safe beside the live engines by construction: its own project name, a throwaway MongoDB in memory
+# (nothing touches the live one) and history store (crypto_staging, stock_staging, in memory), loopback ports 18787/18788, a COPY of the paper wallet, fake Alpaca
 # keys (the live ones would knock out the live engine's market-data stream: one connection per
 # account), and no AI, Discord, email or news API keys. No local model either: the live `llm` fills
 # both GPUs, so there is no LLM_URL here and article summaries stay off.
@@ -31,13 +32,21 @@ x-engine: &engine
   mem_limit: 1g
   depends_on:
     mongo:
-      condition: service_started
+      condition: service_healthy
 
 services:
+  # The live stack's MongoDB version, as a one-member replica set like it (Better Auth's sign-in
+  # writes need one), without auth. The healthcheck initiates the replica set.
   mongo:
-    image: mongo:8.0
+    image: mongo:8.0.34@sha256:b9924c330a8bbc5800fe9c69f04a84e221eca7b28fd049a0354147d9908fa142
+    command: [mongod, --replSet, rs0, --bind_ip_all, --quiet, --networkMessageCompressors, disabled]
     tmpfs:
       - /data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--norc", "--eval", "try { rs.status().ok } catch (e) { rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'mongo:27017' }] }).ok }"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
     mem_limit: 1g
 
   # Copies the live wallet (read-only) into a throwaway volume, so the smoke engine can't touch it.
@@ -53,10 +62,10 @@ services:
     <<: *engine
     image: marketbots-crypto-engine:${MB_TAG:-latest}
     environment:
-      MONGODB_URI: mongodb://mongo:27017
+      MONGODB_URI: mongodb://mongo:27017/?replicaSet=rs0
       MONGODB_DB_NAME: cryptomarketbot_staging
       STREAM_TOKEN_SECRET: smoke-test-secret-0123456789abcdef0123456789abcdef
-      STREAM_ALLOWED_ORIGINS: http://localhost:3000
+      STREAM_ALLOWED_ORIGINS: http://localhost:3000,http://127.0.0.1:13101,http://127.0.0.1:13102
       STREAM_PORT: 8787
       KRAKEN_WORKSPACE: cryptomarketbot
       SCRAPER_URL: http://scraper:8790
@@ -70,7 +79,7 @@ services:
       - wallet:/data/kraken
     depends_on:
       mongo:
-        condition: service_started
+        condition: service_healthy
       wallet-copy:
         condition: service_completed_successfully
 
@@ -78,12 +87,12 @@ services:
     <<: *engine
     image: marketbots-stock-engine:${MB_TAG:-latest}
     environment:
-      MONGODB_URI: mongodb://mongo:27017
+      MONGODB_URI: mongodb://mongo:27017/?replicaSet=rs0
       MONGODB_DB_NAME: stockmarketbot_staging
       ALPACA_API_KEY: SMOKE-FAKE-KEY
       ALPACA_SECRET_KEY: SMOKE-FAKE-SECRET
       STREAM_TOKEN_SECRET: smoke-test-secret-0123456789abcdef0123456789abcdef
-      STREAM_ALLOWED_ORIGINS: http://localhost:3000
+      STREAM_ALLOWED_ORIGINS: http://localhost:3000,http://127.0.0.1:13101,http://127.0.0.1:13102
       STREAM_PORT: 8788
       SCRAPER_URL: http://scraper:8790
       HISTORY_URL: postgres://stock_staging:smoke-stock-history@history:5432/stock_staging
@@ -91,6 +100,43 @@ services:
       LOG_DIR: /tmp/logs
     ports:
       - "127.0.0.1:18788:8788"
+
+  # The dashboard images against the smoke engines and their staging databases, on loopback 13101
+  # and 13102 (where Vercel's preview deployments used to be). No sign-in (no auth secret or email
+  # here): the public view, with the engines' status and stream.
+  crypto-web:
+    <<: *engine
+    image: marketbots-crypto-web:${MB_TAG:-latest}
+    mem_limit: 512m
+    environment:
+      MONGODB_URI: mongodb://mongo:27017/?replicaSet=rs0
+      MONGODB_DB_NAME: cryptomarketbot_staging
+      SITE_URL: http://127.0.0.1:13101
+      ENGINE_STREAM_URL: ws://127.0.0.1:18787/v1/stream
+      ENGINE_URL: http://crypto-engine:8787
+      STREAM_TOKEN_SECRET: smoke-test-secret-0123456789abcdef0123456789abcdef
+    tmpfs:
+      - /tmp
+      - /app/apps/crypto-web/.next/cache:uid=1000,gid=1000
+    ports:
+      - "127.0.0.1:13101:3000"
+
+  stock-web:
+    <<: *engine
+    image: marketbots-stock-web:${MB_TAG:-latest}
+    mem_limit: 512m
+    environment:
+      MONGODB_URI: mongodb://mongo:27017/?replicaSet=rs0
+      MONGODB_DB_NAME: stockmarketbot_staging
+      SITE_URL: http://127.0.0.1:13102
+      ENGINE_STREAM_URL: ws://127.0.0.1:18788/v1/stream
+      ENGINE_URL: http://stock-engine:8788
+      STREAM_TOKEN_SECRET: smoke-test-secret-0123456789abcdef0123456789abcdef
+    tmpfs:
+      - /tmp
+      - /app/apps/stock-web/.next/cache:uid=1000,gid=1000
+    ports:
+      - "127.0.0.1:13102:3000"
 
   # Its own history store, in memory: the staging databases, never the live ones.
   history:

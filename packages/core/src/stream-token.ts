@@ -2,7 +2,7 @@ import { createHmac, randomUUID, timingSafeEqual } from "node:crypto"
 import type { EventVisibility } from "./events"
 
 /**
- * Short-lived tokens for an engine's WebSocket stream. The Vercel app mints one per connection
+ * Short-lived tokens for an engine's WebSocket stream. The dashboard's server mints one per connection
  * attempt (public scope for anyone, owner scope only with a valid owner session); the engine
  * verifies it with the same shared secret. Tokens are only checked when a socket connects, so a
  * 60-second lifetime is plenty and a leaked token is useless almost immediately.

@@ -9,13 +9,13 @@ This document explains how CryptoMarketBot is built and why: the deployment boun
 | **Kraken spot, paper only** | Orders execute in a Kraken CLI paper workspace at live Kraken prices. Kraken has no self-service *spot* sandbox (Spot UAT is on request via an account manager; the self-service demo is Futures only), and the official CLI's paper wallet is the closest thing to a Kraken-hosted paper account. The engine has no live-trading code path and holds no exchange keys. |
 | **No Polymarket** | Polymarket US has no paper/demo environment, so prediction markets were removed from scope. |
 | **A local model** | Qwen 3.6 35B-A3B on the server's two GPUs (llama.cpp), as `local/qwen3.6-35b-a3b-q2`, through llama.cpp's OpenAI-compatible API: no outside AI service, no key, no cost. The agent runs on it, and researches through our own search service and scraper, without X ([SERVER.md §9](SERVER.md#9-the-local-model-server-llm)). Grok, through Vercel AI Gateway, did both until 2026-10-28. |
-| **Hosted MongoDB (Azure DocumentDB)** | One cluster shared by the engine and the Vercel dashboard. No database container on the server. |
+| **MongoDB on the server** | The stack's own MongoDB container (no host port), shared by the engine and the dashboard, each with its own user. Atlas until 2026-10-30, Azure DocumentDB until 2026-11-07, whose free tier's CPU cap refused queries ([SERVER.md §1](SERVER.md#1-accounts-and-secrets-once)). |
 | **Monorepo (pnpm workspaces)** | `packages/core` holds everything both apps must agree on: settings schema, event schema, commands, DB types, metrics. |
 
 ## Components and boundaries
 
 ```
-Browser ─https─▶ Vercel (Next.js dashboard) ─▶ Azure DocumentDB ◀── Engine (Docker, your server)
+Browser ─https─▶ Caddy ─▶ Next.js dashboard ─▶ MongoDB (Docker) ◀── Engine (Docker, your server)
    │                                                                    │   ▲
    └──────── wss://engine.<domain>/v1/stream (via your reverse proxy) ──┘   │
                                                        Kraken public API ───┘ (WebSocket v2 + REST)
@@ -26,16 +26,16 @@ Browser ─https─▶ Vercel (Next.js dashboard) ─▶ Azure DocumentDB ◀─
 ```
 
 - **The engine owns trading state.** It is the only writer of positions, orders, fills and accounts, and a MongoDB lease guarantees a single running instance (a second engine waits; an engine that loses the lease stops).
-- **The dashboard never trades.** It reads MongoDB and writes only commands, audit entries and owner sign-in records. Vercel's serverless runtime isn't asked to hold connections or run loops.
-- **Control goes straight to the engine, signed.** The dashboard's server sends each command to the engine's `POST /v1/commands`, signed with the stream secret (an HMAC with crypto's `cmb-request.` prefix over the method, path, a millisecond timestamp and the body; a minute of clock tolerance). The engine validates it again (web and engine), runs it at once, one at a time, and answers with a result the page polls (`GET /v1/commands/<id>`); every command is audited. Nothing is queued: while the engine can't be reached (restarting, say), the dashboard says so and sends nothing, and the owner sends the command again once the engine is back. So the secret now authorizes commands as well as the owner stream: it stays in `.env` and on Vercel only. (Until 2026-10-31 every command went through MongoDB, polled every second; until 2026-11-02 the dashboard still queued one there when it couldn't reach the engine, checked every 3 seconds.)
+- **The dashboard never trades.** It reads MongoDB and writes only audit entries, login rate limits and owner sign-in records; its database user can't write anything else. It runs no loops of its own.
+- **Control goes straight to the engine, signed.** The dashboard's server sends each command to the engine's `POST /v1/commands`, signed with the stream secret (an HMAC with crypto's `cmb-request.` prefix over the method, path, a millisecond timestamp and the body; a minute of clock tolerance). The engine validates it again (web and engine), runs it at once, one at a time, and answers with a result the page polls (`GET /v1/commands/<id>`); every command is audited. Nothing is queued: while the engine can't be reached (restarting, say), the dashboard says so and sends nothing, and the owner sends the command again once the engine is back. So the secret now authorizes commands as well as the owner stream: it stays in `.env` and the engine's and dashboard's containers only. (Until 2026-10-31 every command went through MongoDB, polled every second; until 2026-11-02 the dashboard still queued one there when it couldn't reach the engine, checked every 3 seconds.)
 - **Pause and the kill switch never wait on the database.** They take effect in the engine first and are saved after, retried until MongoDB takes them (and once more at shutdown); so do the engine's own halts and the agent's breakers. Resume and releasing the kill switch are saved first: if MongoDB fails, the engine stays paused.
-- **The engine doesn't depend on the dashboard.** Closed browsers, a Vercel outage or a broken proxy don't affect trading.
+- **The engine doesn't depend on the dashboard.** Closed browsers, a stopped dashboard or a broken proxy don't affect trading.
 
 ## Live stream design
 
 The engine runs an authenticated WebSocket server (`/v1/stream`) plus `/healthz` and `/readyz`, published only on `127.0.0.1:8787`; your existing reverse proxy terminates TLS and forwards `wss://engine.<domain>` to it.
 
-1. The browser asks the dashboard for a token (`/api/stream-token`): an HMAC-signed, 60-second token with `public` or `owner` scope (owner only with a valid owner session). The secret (`STREAM_TOKEN_SECRET`) is shared by Vercel and the engine.
+1. The browser asks the dashboard for a token (`/api/stream-token`): an HMAC-signed, 60-second token with `public` or `owner` scope (owner only with a valid owner session). The secret (`STREAM_TOKEN_SECRET`) is shared by the dashboard and the engine.
 2. The browser connects and sends the token **in the first frame** (never in the URL, so it can't land in proxy logs), with the last `seq` it saw.
 3. The engine replays everything after that `seq` (from memory, falling back to MongoDB), then streams live. It pings every 15s; the client treats 45s of silence as a dead connection and reconnects with exponential backoff and jitter, fetching a fresh token each time.
 

@@ -5,7 +5,7 @@ Two autonomous, AI-driven paper-trading bots in one pnpm monorepo:
 - **CryptoMarketBot** trades Kraken spot pairs 24/7 in a Kraken CLI paper wallet. Dashboard: [cryptomarketbot.app](https://cryptomarketbot.app).
 - **StockMarketBot** trades US stocks and defined-risk options on market days in an Alpaca paper account. Dashboard: [stockmarketbot.app](https://stockmarketbot.app).
 
-Both run on a local model (Qwen 3.6 35B-A3B, on the server's two GPUs), and in both, deterministic code sizes and checks every order. Each bot has its own always-on engine, its own Next.js dashboard on Vercel with its own owner sign-in, and its own database on Azure DocumentDB (MongoDB). One Docker stack, `marketbots`, runs on the owner's Windows server: both engines, the local model server, a web search service (SearXNG), a shared headless scraper and the history store (Postgres with TimescaleDB: price bars and the news archive).
+Both run on a local model (Qwen 3.6 35B-A3B, on the server's two GPUs), and in both, deterministic code sizes and checks every order. Each bot has its own always-on engine, its own Next.js dashboard with its own owner sign-in, and its own database on the stack's MongoDB. One Docker stack, `marketbots`, runs on the owner's Windows server, behind Caddy: both engines, both dashboards, their MongoDB, the local model server, a web search service (SearXNG), a shared headless scraper and the history store (Postgres with TimescaleDB: price bars and the news archive).
 
 **Paper trading only.** Neither engine has a live-trading code path.
 
@@ -38,12 +38,13 @@ The plan behind the agent, and how it earns more authority, is [docs/plans/LOCAL
 ```mermaid
 flowchart LR
     browser[Browser]
-    dashboards[Vercel dashboards]
-    db[(Azure DocumentDB<br/>separate database per bot)]
+    caddy[Caddy on the server<br/>TLS for the sites]
     services[Kraken paper wallet<br/>Alpaca paper account<br/>news sources]
     internet[Search engines<br/>and article pages]
 
     subgraph server["marketbots Docker stack, on the owner's server"]
+        dashboards[Dashboards<br/>Next.js, one per bot]
+        db[(MongoDB<br/>separate database per bot)]
         crypto[Crypto engine]
         stock[Stock engine]
         llm[Local LLM, Qwen 3.6 on two GPUs<br/>the agents, summaries, research]
@@ -52,10 +53,11 @@ flowchart LR
         history[(History store<br/>price bars and news archive)]
     end
 
-    browser -->|HTTPS| dashboards
-    dashboards -->|Read data and write commands| db
-    browser -->|Engine WebSocket stream| crypto
-    browser -->|Engine WebSocket stream| stock
+    browser -->|HTTPS| caddy
+    caddy --> dashboards
+    caddy -->|Engine WebSocket stream| crypto & stock
+    dashboards -->|Signed status and commands| crypto & stock
+    dashboards -->|Read data, write sign-ins| db
     crypto -->|Own trading state| db
     stock -->|Own trading state| db
     crypto & stock --> llm
@@ -70,9 +72,9 @@ flowchart LR
 
 ```
 apps/crypto-engine/     crypto engine (Docker)
-apps/crypto-web/        crypto dashboard (Vercel)
+apps/crypto-web/        crypto dashboard (Docker)
 apps/stock-engine/      stock engine (Docker)
-apps/stock-web/         stock dashboard (Vercel)
+apps/stock-web/         stock dashboard (Docker)
 apps/scraper/           headless Chromium sidecar shared by both engines (own npm lockfile)
 packages/config/        tsconfig base, ESLint presets with the import boundaries, Vitest presets
 packages/core/          pure shared schemas and helpers, no I/O
@@ -113,7 +115,7 @@ pnpm backtest -- --symbols BTC/USD,ETH/USD,SOL/USD --strategies trend,momentum -
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): the platform: topology, layout, what is shared and what stays per bot.
 - [docs/CRYPTO.md](docs/CRYPTO.md), [docs/STOCK.md](docs/STOCK.md): each bot's design.
-- [docs/SERVER.md](docs/SERVER.md): the server, the Docker stack, the env file, deploys, Vercel, troubleshooting.
+- [docs/SERVER.md](docs/SERVER.md): the server, the Docker stack, the env file, deploys, the web apps, troubleshooting.
 - [docs/plans/LOCAL-AI.md](docs/plans/LOCAL-AI.md): the local model, the history store and the agent: the plan, the measurements behind it, and what was built.
 - [AGENTS.md](AGENTS.md): conventions for changing this repo (package boundaries, shared code, safety rules).
 

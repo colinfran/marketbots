@@ -23,9 +23,9 @@ import { createDb } from "@mb/web-kit/db"
 import { env } from "./env"
 
 /**
- * MongoDB (Azure DocumentDB) access for the dashboard (@mb/web-kit/db). The dashboard reads everything the
- * engine writes and writes only three things: commands, audit entries and owner sign-in records
- * (via Better Auth). One client is reused per serverless instance (and across hot reloads in dev).
+ * MongoDB access for the dashboard (@mb/web-kit/db). The dashboard reads everything the engine
+ * writes and writes only audit entries, login rate limits and owner sign-in records (via Better
+ * Auth). One client per process (reused across hot reloads in dev).
  */
 export const { mongoClient, db, collections } = createDb({
   globalKey: "_cmbMongo",

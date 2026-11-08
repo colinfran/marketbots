@@ -3,8 +3,8 @@ import type { WireStatus } from "./wire"
 
 /**
  * MongoDB document types and indexes both bots share. The engine is the only writer of trading
- * state; the web app reads everything and writes only commands, audit entries and owner sign-in
- * records. Each bot adds its own collections, documents and indexes, and binds the generic types
+ * state; the web app reads everything and writes only audit entries, login rate limits and owner
+ * sign-in records (its database user can write nothing else). Each bot adds its own collections, documents and indexes, and binds the generic types
  * below to its settings, commands and events.
  */
 

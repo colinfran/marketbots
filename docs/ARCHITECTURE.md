@@ -8,28 +8,30 @@ The platform view of marketbots: how the two bots run side by side, what the rep
 | --- | --- | --- |
 | Trades | Kraken spot pairs, 24/7, in a Kraken CLI paper wallet | US stocks and defined-risk options on market days, in an Alpaca paper account |
 | Engine | `apps/crypto-engine` → container `marketbots-crypto-engine`, 127.0.0.1:8787 | `apps/stock-engine` → container `marketbots-stock-engine`, 127.0.0.1:8788 |
-| Dashboard | `apps/crypto-web` → Vercel, cryptomarketbot.app | `apps/stock-web` → Vercel, stockmarketbot.app |
+| Dashboard | `apps/crypto-web` → container `marketbots-crypto-web`, 127.0.0.1:3101, at cryptomarketbot.app | `apps/stock-web` → container `marketbots-stock-web`, 127.0.0.1:3102, at stockmarketbot.app |
 | Live stream | `wss://engine.cryptomarketbot.app/v1/stream` | `wss://engine.stockmarketbot.app/v1/stream` |
-| Database (Azure DocumentDB) | `cryptomarketbot` | `stockmarketbot` |
+| Database (the stack's `mongo`) | `cryptomarketbot`, users `crypto_engine` and `crypto_web` | `stockmarketbot`, users `stock_engine` and `stock_web` |
 | Config | `.env`: SHARED and `CRYPTO_*` | `.env`: SHARED and `STOCK_*` |
 | Design doc | [CRYPTO.md](CRYPTO.md) | [STOCK.md](STOCK.md) |
 
 The rules behind the layout:
 
 - **Two independent engines.** Separate images, containers, processes, ports, databases, leases and variables (each gets only its own from `.env`). They share library code, compiled into each image at build time, and have no runtime link to each other. A crash, deploy or restart of one never touches the other.
-- **Two dashboards with separate auth.** Each has its own auth secret, database, domain and owner check.
+- **Two dashboards with separate auth.** Each has its own container, auth secret, database and database user, domain and owner check.
 - **Share code only when both bots mean the same thing by it.** If sharing would need flags that switch between two behaviors, or would bend one bot's model to fit the other's, the code stays per bot.
 - **Paper trading only.** Neither engine has a live-trading code path.
 
 ## Runtime topology
 
 ```
-Browser ──https──▶ Vercel: cryptomarketbot.app, stockmarketbot.app ──▶ Azure DocumentDB
-   │                                                                              ▲
-   └── wss://engine.<domain>/v1/stream ──▶ Caddy (Windows host)                   │
-                                             ├─▶ 127.0.0.1:8787  crypto-engine ───┤
-                                             ├─▶ 127.0.0.1:8788  stock-engine  ───┘
-Vercel (Admin → Server) ── https://engine.<domain>/host ──┴─▶ 127.0.0.1:8789  host agent (its readings in a local SQLite file)
+Browser ──https──▶ Caddy (Windows host)
+                     ├─ cryptomarketbot.app        ─▶ 127.0.0.1:3101  crypto-web   (network web: internet, no scraper or search)
+                     ├─ stockmarketbot.app         ─▶ 127.0.0.1:3102  stock-web
+                     └─ engine.<domain>/v1/stream  ─▶ 127.0.0.1:8787  crypto-engine, 127.0.0.1:8788  stock-engine
+crypto-web, stock-web ── host.docker.internal:8787 / 8788 ─▶ the engines' signed /v1/status and /v1/commands
+                      ── host.docker.internal:8789        ─▶ host agent (Admin → Server; its readings in a local SQLite file)
+                      ── mongo:27017 ─▶ mongo (MongoDB, one-member replica set) ◀── crypto-engine, stock-engine, mongo-backup
+                                        network db: no host port, no internet
                      marketbots stack:  crypto-engine, stock-engine ──▶ scraper (Playwright), no host port
                                                                     ──▶ search (SearXNG, local research), no host port
                                                                     ──▶ llm (llama.cpp, Qwen 3.6, both GPUs),
@@ -41,8 +43,10 @@ External: Kraken (CLI wallet in its volume), Alpaca, ~150 news sources, and the 
 
 - **Each engine owns its bot's trading state.** It is the only writer of positions, orders and fills, and a MongoDB lease in its own database guarantees one running instance per bot.
 - **The dashboards never trade.** They read MongoDB, read the engine's heartbeat from the engine itself (its signed `GET /v1/status`; it isn't stored), send the owner's commands straight to the engine (signed with the stream secret; refused, never queued, while the engine can't be reached), and write only audit entries and sign-in records.
-- **The engines listen only on loopback**: the read-only live stream, `/healthz` and `/readyz`, and the command endpoints, which answer only requests signed with the stream secret. Caddy on the host terminates TLS and forwards each `engine.<domain>` to its port. Ports, Caddy sites and domains are the same as before the merge.
-- **The host agent reads the machine itself** ([SERVER.md §11](SERVER.md#11-the-host-agent-admin--server)): a Node process on Windows, not in Docker (containers see only the Docker VM). It keeps the hardware readings on the server (a SQLite file) and serves them, with the owner's fan and settings commands, through a small API on loopback that Caddy publishes at `/host` on each engine domain. The dashboards' servers call it with a shared secret only while Admin → Server is open, so nothing about the machine goes to the database. It also runs the motherboard fans.
+- **The engines listen only on loopback**: the read-only live stream, `/healthz` and `/readyz`, and the status and command endpoints, which answer only requests signed with the stream secret. Caddy on the host terminates TLS and forwards each `engine.<domain>` to its port for the browsers' stream. The dashboards' servers call the signed endpoints over Docker Desktop's `host.docker.internal`, which reaches the host's loopback (`ENGINE_URL`, `@mb/web-kit/engine-link`; without it, the stream URL's origin).
+- **The dashboards run in the stack too**: each app's Next.js standalone server in its own container (`docker/web/Dockerfile`), on a loopback port behind Caddy, which serves the bot's domain. They sit on the `web` network (the internet for useSend, Discord and Kraken's candles, but not the scraper or search) and on `db`. Every commit to `main` on the server deploys them ([SERVER.md §8](SERVER.md#8-the-web-apps)).
+- **The database is the stack's own** (`mongo`): MongoDB 8.0 as a single-member replica set (Better Auth's sign-in uses transactions), with auth, on the internal `db` network: no host port, no internet. Each engine has a user that reads and writes only its own database; each dashboard a user that reads its bot's database and writes only sign-ins, login rate limits and audit entries (`docker/mongo/init.js`). Its volume is backed up daily (`mongo-backup`, [SERVER.md §6.6](SERVER.md#66-the-database-volume-and-its-backups)).
+- **The host agent reads the machine itself** ([SERVER.md §11](SERVER.md#11-the-host-agent-admin--server)): a Node process on Windows, not in Docker (containers see only the Docker VM). It keeps the hardware readings on the server (a SQLite file) and serves them, with the owner's fan and settings commands, through a small API on loopback. The dashboards' servers call it over `host.docker.internal` with a shared secret, only while Admin → Server is open, so nothing about the machine goes to the database. It also runs the motherboard fans.
 
 ### What the bots share at runtime
 
@@ -52,12 +56,12 @@ External: Kraken (CLI wallet in its volume), Alpaca, ~150 news sources, and the 
 | Local model | One llama.cpp server on both GPUs (`llm`, Qwen 3.6 35B-A3B at 2-bit) on the internal `ai` network, `http://llm:8080` (OpenAI-compatible), with a slot per bot and one for news. It runs every AI call of both engines: the agents' episodes, their research and the article summaries. If it is down, the engines still protect positions but make no new decisions ([SERVER.md §9](SERVER.md#9-the-local-model-server-llm)). |
 | Search service | One SearXNG container, `http://search:8080` on the compose network, that runs the web searches of the agents' research tool (`@mb/wire/research`) for both engines, on free search engines only. If it is down, research fails and the agent decides without it. |
 | History store | One Postgres container (TimescaleDB, pgvector) on the internal `ai` network, with a database and a role per bot (`crypto_history`, `stock_history`): each engine's `HISTORY_URL` holds only its own password. Each engine writes its closed 1-minute bars and archives its news there (`@mb/history`, [plans/LOCAL-AI.md §6](plans/LOCAL-AI.md#6-the-history-store-history)). If it is down, only history stops. |
-| Database cluster (Azure DocumentDB) | One cluster, a separate database per bot. |
+| MongoDB | One `mongo` container on the internal `db` network, a database per bot, and a user per engine and per dashboard that reaches only its bot's database. If it is down, the engines retry and reconnect, and the dashboards' pages fail until it is back. |
 | Host agent | One process on Windows ([SERVER.md §11](SERVER.md#11-the-host-agent-admin--server)) keeps one copy of the machine's readings, which both dashboards fetch from its API, and either dashboard can send it commands. If it is down, only Admin → Server goes offline (and the BIOS runs the fans). |
 | The server's IP | Outbound rate limits (SEC, GDELT, ForexFactory…) apply to both bots together. |
-| Caddy | One host process, one site per engine; each site also forwards `/host` to the host agent. |
+| Caddy | One host process: a site per dashboard and per engine (the engine sites pass on only the stream and the health checks). Its admin API listens on 127.0.0.2, which the containers can't reach. |
 
-Not shared: databases (MongoDB and history), leases, the bots' own variables (`CRYPTO_*`, `STOCK_*`), auth secrets, stream token secrets (whose HMAC context prefixes, `cmb-stream.` and `smb-stream.`, also keep tokens from crossing bots), and the Kraken wallet volume (crypto only).
+Not shared: databases (MongoDB and history) and their users, leases, the bots' own variables (`CRYPTO_*`, `STOCK_*`), auth secrets, stream token secrets (whose HMAC context prefixes, `cmb-stream.` and `smb-stream.`, also keep tokens from crossing bots), and the Kraken wallet volume (crypto only).
 
 ## Repo layout
 
@@ -65,9 +69,10 @@ Not shared: databases (MongoDB and history), leases, the bots' own variables (`C
 marketbots/
 ├─ apps/
 │  ├─ crypto-engine/   @mb/crypto-engine   (was cryptomarketbot/apps/engine)
-│  ├─ crypto-web/      @mb/crypto-web      (was cryptomarketbot/apps/web)      → Vercel (crypto)
+│  ├─ crypto-web/      @mb/crypto-web      (was cryptomarketbot/apps/web)      → container crypto-web
 │  ├─ stock-engine/    @mb/stock-engine    (was stockmarketbot/apps/engine)
-│  ├─ stock-web/       @mb/stock-web       (was stockmarketbot/apps/web)       → Vercel (stock)
+│  ├─ stock-web/       @mb/stock-web       (was stockmarketbot/apps/web)       → container stock-web
+│  ├─ landing/         @mb/landing         the landing page                    → Vercel (marketbots.vercel.app)
 │  ├─ host-agent/      @mb/host-agent      the Windows host agent (Admin → Server, the fans); the server's own Node, not Docker
 │  └─ scraper/         @mb/scraper         one sidecar; own npm lockfile, outside the pnpm workspace
 ├─ packages/
@@ -82,6 +87,8 @@ marketbots/
 │  ├─ crypto-core/     @mb/crypto-core     crypto schemas (was cryptomarketbot/packages/core)
 │  └─ stock-core/      @mb/stock-core      stock schemas (was stockmarketbot/packages/core)
 ├─ contracts/          behavior snapshots per bot (contracts/<bot>/)
+├─ docker/             web/: the dashboards' Dockerfile and auto-deploy; mongo/: the database's start and init scripts
+├─ .githooks/          post-commit, post-merge: a commit on main deploys the dashboards
 ├─ docs/               ARCHITECTURE.md (this file), CRYPTO.md, STOCK.md, SERVER.md
 ├─ compose.yml         the marketbots stack
 ├─ compose.smoke.yml   boot test of new images beside the live stack
@@ -144,7 +151,7 @@ No package or app ever imports an app. ESLint enforces this with `no-restricted-
 
 - **As TypeScript source.** A package exports `"./*": "./src/*.ts"` and is imported by subpath (`@mb/crypto-core/settings`). Nothing is built ahead:
   - the engines bundle packages with esbuild (`apps/*-engine/build.mjs` → `dist/main.js`);
-  - the dashboards list them in `transpilePackages` (`next.config.ts`);
+  - the dashboards list them in `transpilePackages` (`next.config.ts`), and their image copies the ones it uses (`docker/web/Dockerfile`);
   - Vitest and `tsc` read the source directly.
 - `@mb/config` exports its files as they are (`"./*": "./*"`): `tsconfig.base.json`, `eslint.mjs`, `vitest.mjs`. Its `mb-env` command (`mb-env.mjs`, `env.mjs`) runs the apps' `dev` scripts with one bot's variables from `.env` and `.env.local`.
 - **Plain pnpm workspaces**, no Turborepo. The scraper is outside the workspace, with its own npm lockfile and image.
@@ -156,14 +163,16 @@ No package or app ever imports an app. ESLint enforces this with `no-restricted-
 | Engines | A Docker image each, built from the repo root: `pnpm fetch` (lockfile only, cached), an offline install filtered to `@mb/<bot>-engine...`, the esbuild bundle. Runtime: `node:22-bookworm-slim` pinned by digest, tini, non-root, healthcheck. Crypto adds the checksummed Kraken CLI and the `/data/kraken` volume. | `docker compose up -d --build <bot>-engine` on the server |
 | Scraper | The official Playwright image plus `playwright-core` | `docker compose up -d --build scraper` |
 | History store | The official TimescaleDB image (Postgres 17 with TimescaleDB and pgvector) pinned by digest; no build | `docker compose up -d history history-backup` |
-| Dashboards and landing page | Vercel, Root Directory `apps/<bot>-web` (landing: `apps/landing`), files outside the root included | push to `main`; Vercel skips a project when neither its app nor a workspace package it depends on changed |
+| Dashboards | A Docker image each, from one `docker/web/Dockerfile` (`APP`, `CORE`): `pnpm fetch`, the app and the packages it uses, an offline install filtered to `@mb/<bot>-web...`, `next build` with `output: "standalone"`. Runtime: the same pinned `node:22-bookworm-slim`, tini, non-root, read-only root, healthcheck on `/robots.txt` | every commit to `main` on the server: the git hooks start the `Web deploy` task (`docker/web/autodeploy.mjs`), which builds from a clean checkout of the commit; an app whose image didn't change keeps its container ([SERVER.md §8](SERVER.md#8-the-web-apps)) |
+| Landing page | Vercel, Root Directory `apps/landing`, files outside the root included | push to `main`; Vercel skips it when neither the app nor a workspace package it depends on changed |
+| MongoDB | The official `mongo` 8.0 image pinned by digest; no build. `docker/mongo/start.sh` and `init.js` | `docker compose up -d mongo mongo-backup`, only at a quiet time (both bots' database pauses for a few seconds) |
 | Host agent | An esbuild bundle on the server (`apps/host-agent/build.mjs`): the agent, its fan watchdog, the one-off history import | `pnpm --filter @mb/host-agent build`, then restart its scheduled task ([SERVER.md §11.3](SERVER.md#113-deploy-restart-logs)) |
 
 Every deploy is gated by `pnpm typecheck && pnpm test && pnpm lint && pnpm build`. The contract snapshots under `contracts/<bot>/` change only with a deliberate, owner-approved behavior change ([AGENTS.md](../AGENTS.md)).
 
 ## Configuration
 
-One env file, `.env` at the repo root, in sections: SHARED (no prefix, the same for both bots), `CRYPTO_*`, `STOCK_*`, `HISTORY_*` (the history store's passwords), SEARCH and HOST. The code reads the names it always used: `compose.yml` gives each container only its own variables, without the bot prefix (`CRYPTO_MONGODB_DB_NAME` is the crypto engine's `MONGODB_DB_NAME`), and sets `STREAM_HOST`, `STREAM_PORT`, `SCRAPER_URL`, `LLM_URL`, `SEARCH_URL` and each engine's `HISTORY_URL`, built from its bot's history password. Local dev renames the same way through `mb-env` (`@mb/config`), reading `.env`, then `.env.local`. Each Vercel project holds its dashboard's values under the unprefixed names. The host agent reads `.env` directly. Details: [SERVER.md §3](SERVER.md#3-the-env-file), [§11.1](SERVER.md#111-its-variables).
+One env file, `.env` at the repo root, in sections: SHARED (no prefix, the same for both bots), `CRYPTO_*`, `STOCK_*`, `HISTORY_*` (the history store's passwords), `MONGO_*` (the database users' passwords), SEARCH and HOST. The code reads the names it always used: `compose.yml` gives each container only its own variables, without the bot prefix (`CRYPTO_MONGODB_DB_NAME` is the crypto engine's `MONGODB_DB_NAME`), and sets `STREAM_HOST`, `STREAM_PORT`, `SCRAPER_URL`, `LLM_URL`, `SEARCH_URL`, the dashboards' `ENGINE_URL` and `HOST_API_URL`, each engine's `HISTORY_URL`, and every service's `MONGODB_URI`, built from its own password. The dashboards' containers get their values the same way. Local dev renames the same way through `mb-env` (`@mb/config`), reading `.env`, then `.env.local`, and uses `mongo-dev`. The host agent reads `.env` directly. Details: [SERVER.md §3](SERVER.md#3-the-env-file), [§11.1](SERVER.md#111-its-variables).
 
 Live trading settings are not configuration: they live in each bot's database and change only from its dashboard's Admin page.
 

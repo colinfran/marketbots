@@ -1,6 +1,6 @@
 # Server setup and operations
 
-How the `marketbots` Docker stack runs on the Windows server: first-time setup, the env file, everyday commands, the paper wallet volume, the swap from the old stacks, the Vercel projects, the local LLM and troubleshooting. Commands are for **PowerShell** on the server, run from the repo root (`C:\Users\colin\Documents\GitHub\marketbots`) unless noted.
+How the `marketbots` Docker stack runs on the Windows server: first-time setup, the env file, everyday commands, the paper wallet and database volumes, the swap from the old stacks, the web apps, the local LLM and troubleshooting. Commands are for **PowerShell** on the server, run from the repo root (`C:\Users\colin\Documents\GitHub\marketbots`) unless noted.
 
 This replaces both old `docs/WINDOWS_SERVER_SETUP.md` guides (cryptomarketbot and stockmarketbot). How the pieces fit together: [ARCHITECTURE.md](ARCHITECTURE.md).
 
@@ -8,34 +8,23 @@ What runs where:
 
 | Where | What | Config |
 | --- | --- | --- |
-| Windows server, Docker stack `marketbots` | `crypto-engine` on 127.0.0.1:8787 (with the Kraken CLI paper wallet), `stock-engine` on 127.0.0.1:8788, `scraper` (no host port), `llm` (llama.cpp with the local model on both GPUs, no host port), `search` (SearXNG for local research, no host port), `history` (Postgres with TimescaleDB and pgvector, no host port) and `history-backup` | `compose.yml`, `.env` at the repo root |
-| Caddy on the Windows host | `engine.cryptomarketbot.app` → 127.0.0.1:8787, `engine.stockmarketbot.app` → 127.0.0.1:8788 (WebSocket); `/host/*` on both → the host agent's API on 127.0.0.1:8789 | `C:\Caddy\Caddyfile` |
-| The Windows host, outside Docker | The host agent and its LibreHardwareMonitor (Admin → Server, the motherboard fans; §11) | `.env` at the repo root (its HOST section) |
-| Vercel | two projects: `apps/crypto-web` at cryptomarketbot.app, `apps/stock-web` at stockmarketbot.app | each project's environment variables |
-| Azure DocumentDB (MongoDB-compatible, free tier) | one cluster, databases `cryptomarketbot` and `stockmarketbot` | `MONGODB_URI` |
+| Windows server, Docker stack `marketbots` | `crypto-engine` on 127.0.0.1:8787 (with the Kraken CLI paper wallet), `stock-engine` on 127.0.0.1:8788, the dashboards `crypto-web` on 127.0.0.1:3101 and `stock-web` on 127.0.0.1:3102, `mongo` (both bots' MongoDB, no host port) and `mongo-backup`, `scraper` (no host port), `llm` (llama.cpp with the local model on both GPUs, no host port), `search` (SearXNG for local research, no host port), `history` (Postgres with TimescaleDB and pgvector, no host port), `history-backup` and `wallet-backup`. For local dev only: `mongo-dev` (profile `dev`, 127.0.0.1:27018) | `compose.yml`, `.env` at the repo root |
+| Caddy on the Windows host | `cryptomarketbot.app` → 127.0.0.1:3101, `stockmarketbot.app` → 127.0.0.1:3102 (their `www.` names redirect); `engine.cryptomarketbot.app` → 127.0.0.1:8787, `engine.stockmarketbot.app` → 127.0.0.1:8788 (only the WebSocket stream and the health checks) | `C:\Caddy\Caddyfile` |
+| The Windows host, outside Docker | The host agent and its LibreHardwareMonitor (Admin → Server, the motherboard fans; §11); the `Web deploy` task, which the repo's git hooks start on every commit to `main` (§8) | `.env` at the repo root (its HOST section) |
+| Vercel | one project: the landing page, `apps/landing` at marketbots.vercel.app (§8.5) | its project settings |
 | Alpaca | the stock bot's paper account | `.env` (`STOCK_ALPACA_*`, engine only) |
 
-The two engines are independent: separate images, containers, ports, variables, databases, leases and stream secrets. Deploying, restarting or crashing one never touches the other. At runtime they share only the scraper, the LLM, the history service (each with its own database and role on it) and the server's IP address.
+The two bots are independent: separate images, containers, ports, variables, databases, database users, leases and stream secrets. Deploying, restarting or crashing one never touches the other. At runtime they share only the scraper, the LLM, the history service and the MongoDB server (each bot with its own database and users on both), and the server's IP address.
+
+Until 2026-11-07 the dashboards ran on Vercel and both bots' database was an Azure DocumentDB free-tier cluster (§1, §7). The two dashboard projects on Vercel and the cluster stay, unused, until the owner deletes them.
 
 ---
 
 ## 1. Accounts and secrets (once)
 
-**Azure DocumentDB** (MongoDB-compatible; the free tier: 32 GB): one cluster serves both bots, each in its own database. (The host agent keeps its readings on the server, §11.)
-1. The cluster's admin user, with a long random password (no `$`, §3.3). Users can't be limited to one database: every user sees the whole cluster.
-2. *Networking*: the firewall rule `0.0.0.0 – 255.255.255.255`. Vercel connects from changing IPs (and isn't on Azure, so *Allow Azure services* doesn't cover it); the strong password is the protection. With no rule, nothing connects.
-3. *Connection strings*: copy the `mongodb+srv://…` string and put the password in.
+**MongoDB**: the stack's own `mongo` container (§6.6), MongoDB 8.0 as a single-member replica set, with no account anywhere. Its users and their passwords are in `.env`'s MONGO section (§3.8). Admin → System's *Database storage* card shows what MongoDB reports, against `DB_STORAGE_LIMIT_BYTES` in `@mb/core/db` (still the old free tier's 32 GB).
 
-The free tier has no backups and no high availability, and pauses after 60 days without a connection (the engines are always connected). One free cluster per Azure subscription. Its compute is burstable (Azure bills it as *Free - Burstable*): steady load can use up its CPU allowance, and then the capped cluster answers everyone slowly or with `TooManyLogicalSessions` (*An unexpected internal error has occurred.*). On 2026-10-31 that happened 12 hours after the move: the heartbeats rewrote tens of kilobytes every 5 seconds and counted the whole `events` collection, unindexed. Whatever runs on a timer must stay small and indexed. The cluster's CPU: `az monitor metrics list --resource $id --metrics CpuPercent --interval PT30M` (`$id` as below). Admin → System's *Database storage* card shows how full the disk is. With the four `AZURE_*` variables (below) it shows Azure Monitor's count, `StorageUsed` against the disk it fills, and splits it into the databases (as MongoDB reports them) and *Logs and system files*: the rest, the database engine's write-ahead log, its own files and working space. On 2026-10-30 that was 4.6 GB of 31.2 GB: 193 MB of databases, 4.4 GB of the rest. Without them it shows only what MongoDB reports, against `DB_STORAGE_LIMIT_BYTES` in `@mb/core/db` (32 GB).
-
-**Azure Monitor for the card** (optional): a service principal that can read the cluster's metrics and nothing else. Once, with the Azure CLI signed in as the subscription's owner (`az login`):
-
-```powershell
-$id = az resource list --resource-type Microsoft.DocumentDB/mongoClusters --query "[0].id" --output tsv
-az ad sp create-for-rbac --name marketbots-metrics --role "Monitoring Reader" --scopes $id --years 2
-```
-
-Its output has `tenant`, `appId` and `password`: they go into `AZURE_TENANT_ID`, `AZURE_CLIENT_ID` and `AZURE_CLIENT_SECRET`, and `$id` into `AZURE_DOCUMENTDB_RESOURCE_ID`, on both Vercel projects (§3.4) and in `.env` (SHARED) for local dev. The secret expires after 2 years: the card then shows *Azure sign-in failed (HTTP 401)*; run `az ad sp credential reset --id <appId> --years 2` and update the four places.
+**Azure DocumentDB** (retired on 2026-11-07, kept until the owner deletes it): the free-tier cluster both bots used from 2026-10-30. Its compute was burstable, and from 2026-10-31 its CPU allowance stayed used up: the capped cluster refused some queries with `TooManyLogicalSessions` (*An unexpected internal error has occurred.*, code 261), which the engines retried and the dashboards reported as *Server error* alerts. That is why the database moved onto the server ([plans/LOCAL-MONGO.md](plans/LOCAL-MONGO.md)). Nothing in the stack reads it any more; `.env` still holds its `MONGODB_URI` (local dev, §3.5) and the read-only metrics service principal (`AZURE_*`, `marketbots-metrics`), both deleted with the cluster.
 
 **Alpaca (stock)**: the paper account, reset to **10,000**. Total return is measured from $10,000 and every P&L number comes from Alpaca, so the account belongs to this bot alone. A reset can issue new keys. Debit spreads need **options level 3** (Admin shows the level the engine sees). Alpaca's free market-data stream allows **one connection per account**: never run a second engine, script or notebook with these keys.
 
@@ -59,7 +48,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 The server is a shared Windows 11 Pro home PC (i5-11400, 32 GB RAM, an RTX 3070 8 GB and an RTX 2080 SUPER 8 GB) that also runs Jellyfin, a torrent stack, useSend and other containers. Every service in this stack has a memory cap (§5.5).
 
-**Docker Desktop** with the WSL2 backend; the engines are Linux containers. In *Settings → General*, enable *Start Docker Desktop when you sign in*, and make sure the machine signs in after a reboot, or Docker won't start. The Docker VM has 15.5 GiB (half the host's RAM, no `.wslconfig`), which is enough. Docker's disk, and with it every named volume, is on C: (`%LOCALAPPDATA%\Docker\wsl\disk`).
+**Docker Desktop** with the WSL2 backend; the engines are Linux containers. In *Settings → General*, enable *Start Docker Desktop when you sign in*, and make sure the machine signs in after a reboot, or Docker won't start, and with it the engines, the dashboards and the database. The Docker VM has 15.5 GiB (half the host's RAM, no `.wslconfig`), which is enough. Docker's disk, and with it every named volume, is on C: (`%LOCALAPPDATA%\Docker\wsl\disk`).
 
 ```powershell
 docker version          # "Server: ... OS/Arch: linux/amd64" (not windows/amd64)
@@ -82,29 +71,93 @@ Register-ScheduledTask -TaskName "GPU power limit (2080 SUPER)" -TaskPath "\mark
 nvidia-smi --query-gpu=name,power.limit,power.default_limit --format=csv   # 200.00 W on the 2080 SUPER
 ```
 
-**Caddy** runs on the Windows host, not in Docker: `C:\Caddy\caddy.exe run --config C:\Caddy\Caddyfile`, started by a scheduled task (`C:\Caddy\CaddyTray.ps1` is its tray controller). It terminates TLS and passes WebSocket upgrades through on its own. The engine sites:
+**Caddy** runs on the Windows host, not in Docker: `C:\Caddy\caddy.exe run --config C:\Caddy\Caddyfile`, started at sign-in by the scheduled task *Caddy Reverse Proxy* (`C:\Caddy\StartCaddy.vbs`). `C:\Caddy\CaddyTray.ps1` is its tray controller; its *Restart* stops the process and starts the task again, which blinks every site for a second. Caddy terminates TLS, gets and renews the certificates, and passes WebSocket upgrades through on its own. It also serves the server's other stacks (useSend, cron, the Jellyfin passthrough); only the sites below are this stack's.
+
+Its admin API listens on 127.0.0.2, not on the default 127.0.0.1 (global options at the top of the Caddyfile, beside the Jellyfin passthrough's `servers` block):
 
 ```caddy
-engine.cryptomarketbot.app {
-	handle_path /host/* {
-		reverse_proxy 127.0.0.1:8789
+{
+	admin 127.0.0.2:2019 {
+		origins 127.0.0.2:2019
 	}
-	handle {
-		reverse_proxy 127.0.0.1:8787
-	}
-}
-
-engine.stockmarketbot.app {
-	handle_path /host/* {
-		reverse_proxy 127.0.0.1:8789
-	}
-	handle {
-		reverse_proxy 127.0.0.1:8788
-	}
+	servers :443 { … }
 }
 ```
 
-The engines serve `/v1/stream`, `/healthz`, `/readyz`, and `/v1/commands`: the dashboards' commands, answered only when signed with the bot's `STREAM_TOKEN_SECRET` (docs/CRYPTO.md, docs/STOCK.md). `/host/*` goes to the host agent's API (§11), with the `/host` prefix stripped; it answers only requests that carry `HOST_API_SECRET`. After editing the Caddyfile: `C:\Caddy\caddy.exe validate --config C:\Caddy\Caddyfile`, then `C:\Caddy\caddy.exe reload --config C:\Caddy\Caddyfile`.
+(`origins` lets a request addressed to 127.0.0.2 through Caddy's `Host` check, which only accepts `localhost` and 127.0.0.1 by default. That check is no protection, since a client chooses its `Host` header; the address is.)
+
+Docker Desktop forwards `host.docker.internal` to the host's 127.0.0.1, so every container on this machine reaches whatever listens there. On 2026-11-05 a throwaway container read Caddy's configuration through the default admin address with a forged `Host` header: it could have rewritten it, for example to serve `C:\` on a public site. The containers don't reach 127.0.0.2 (probed on 2026-11-07), and the host still can, so a reload needs no restart. The other loopback services the containers reach all require a secret: the engines' signed API, the host agent, LibreHardwareMonitor, the cron stack's Postgres.
+
+The dashboards' sites:
+
+```caddy
+(webapp) {
+	# The dashboards use no WebSockets (the stream goes to engine.<domain>) and no image optimizer:
+	# both are where 2026's self-hosted-only Next.js advisories were.
+	@upgrade header Upgrade *
+	respond @upgrade 400
+	respond /_next/image* 404
+}
+
+cryptomarketbot.app {
+	import webapp
+	reverse_proxy 127.0.0.1:3101
+}
+
+www.cryptomarketbot.app {
+	redir https://cryptomarketbot.app{uri} permanent
+}
+
+stockmarketbot.app {
+	import webapp
+	reverse_proxy 127.0.0.1:3102
+}
+
+www.stockmarketbot.app {
+	redir https://stockmarketbot.app{uri} permanent
+}
+```
+
+Caddy sets `X-Forwarded-For` to the visitor's address (one sent by the visitor is replaced) and `X-Forwarded-Host`: the login rate limit keys on a hash of the first, the dashboards' same-origin check reads the second. Next compresses its own responses, so the sites have no `encode`, which could hold back streamed pages.
+
+The engine sites pass on only what browsers use: the live stream and the health checks.
+
+```caddy
+(engine) {
+	@public path /v1/stream /healthz /readyz
+	handle @public {
+		reverse_proxy {args[0]}
+	}
+	handle {
+		respond 404
+	}
+}
+
+engine.cryptomarketbot.app {
+	import engine 127.0.0.1:8787
+}
+
+engine.stockmarketbot.app {
+	import engine 127.0.0.1:8788
+}
+```
+
+The engines also serve `/v1/status` and `/v1/commands`: the dashboards' heartbeat reads and commands, answered only when signed with the bot's `STREAM_TOKEN_SECRET` (docs/CRYPTO.md, docs/STOCK.md). The dashboards call those over `host.docker.internal` (`ENGINE_URL`, §3.4), and the host agent's API the same way (§11), so neither faces the internet. Until 2026-11-07 the engine sites passed everything on, with `/host/*` going to the agent, for the dashboards on Vercel.
+
+After editing the Caddyfile, validate it, then reload:
+
+```powershell
+C:\Caddy\caddy.exe validate --config C:\Caddy\Caddyfile
+C:\Caddy\caddy.exe reload --config C:\Caddy\Caddyfile --address 127.0.0.2:2019
+```
+
+Where Windows' Application Control blocks `caddy.exe` (it does in agent sessions), post the file to the admin API instead. Caddy refuses a config that doesn't load and keeps running the old one:
+
+```powershell
+Invoke-RestMethod -Method Post -Uri http://127.0.0.2:2019/load -ContentType text/caddyfile -InFile C:\Caddy\Caddyfile
+```
+
+**DNS**: both domains' DNS is at Vercel (nameservers `ns1`/`ns2.vercel-dns.com`, *Domains → the domain → DNS Records*). `@`, `www` and `engine` are A records to the server's public address, the home connection's; the router forwards ports 80 and 443 to this machine. The CAA records allow Let's Encrypt. A new site gets its certificate within seconds once its name points here: add it to the Caddyfile only then, because Caddy can't get one while the name points elsewhere, and its failed tries back off. Nothing updates the records if the home address changes: update them by hand.
 
 **The repo**:
 
@@ -125,30 +178,31 @@ notepad .env                          # every secret and setting, in sections (�
 
 ### 3.1 One file, in sections
 
-`.env` at the repo root holds every secret and setting of the stack: both engines, both dashboards (for local dev; Vercel keeps its own copy), the history and search services, and the host agent. It is git-ignored and kept out of Docker build contexts (`.dockerignore`); only its template, `.env.example`, is committed. Its sections:
+`.env` at the repo root holds every secret and setting of the stack: both engines, both dashboards, the database, the history and search services, and the host agent. It is git-ignored and kept out of Docker build contexts (`.dockerignore`); only its template, `.env.example`, is committed. Its sections:
 
 | Section | Names | Read by |
 | --- | --- | --- |
-| SHARED | no prefix: `MONGODB_URI`, the news and research keys, `OWNER_EMAIL`, useSend, Azure Monitor, the time zone | both bots; `MONGODB_URI` also the host agent |
+| SHARED | no prefix: the news and research keys, `OWNER_EMAIL`, useSend, the time zone, `HOST_API_SECRET`; `MONGODB_URI` and `AZURE_*` for local dev only | both bots |
 | CRYPTO | `CRYPTO_*` | the crypto engine and dashboard |
 | STOCK | `STOCK_*` | the stock engine and dashboard |
 | HISTORY | `HISTORY_*` | the history service (§3.6) |
+| MONGO | `MONGO_*` | the database: its users' passwords (§3.8) |
 | SEARCH | `SEARCH_PROXY_URL` | the search service (§3.7) |
 | HOST | `FAN_CONTROL`, `VESYNC_*`, `HOST_*` | the host agent (§11.1) |
 
 The code reads a bot's variables without the prefix: `CRYPTO_MONGODB_DB_NAME` is the crypto engine's and dashboard's `MONGODB_DB_NAME`. In each bot's section, the comments say which variables its engine reads, which its dashboard, and which both.
 
-- **Containers**: compose reads `.env` by itself (for the `${…}` in `compose.yml`), and `compose.yml` gives each service only its own variables, renamed (§3.2). An engine never sees the other bot's keys or the dashboards' secrets.
-- **Vercel** can't read the file. Each project gets its dashboard's values under the names without the prefix (§3.4).
+- **Containers**: compose reads `.env` by itself (for the `${…}` in `compose.yml`), and `compose.yml` gives each service only its own variables, renamed (§3.2, the dashboards' §3.4). An engine never sees the other bot's keys or the dashboards' secrets, and a dashboard never sees broker keys.
 - **Local dev**: the `pnpm dev:*` scripts read `.env`, then `.env.local`, through `mb-env` (`packages/config/mb-env.mjs`), which renames them the same way (§3.5).
 - **The host agent** reads `.env` directly (`node --env-file`); its names have no prefix (§11.1).
 
 ### 3.2 What each service gets
 
-`compose.yml` lists every variable each service gets, and where from. Both engines get the SHARED section's `MONGODB_URI`, news keys (`SEC_USER_AGENT`, `FINNHUB_API_KEY`, `FRED_API_KEY`, `BLS_API_KEY`) and research keys (`TAVILY_API_KEY`, `EXA_API_KEY`, `BRIGHTDATA_*`), and their own section's variables without the prefix. compose sets these itself; don't put them in `.env`:
+`compose.yml` lists every variable each service gets, and where from. Both engines get the SHARED section's news keys (`SEC_USER_AGENT`, `FINNHUB_API_KEY`, `FRED_API_KEY`, `BLS_API_KEY`) and research keys (`TAVILY_API_KEY`, `EXA_API_KEY`, `BRIGHTDATA_*`), and their own section's variables without the prefix. compose sets these itself; don't put them in `.env`:
 
 | Variable | crypto-engine | stock-engine |
 | --- | --- | --- |
+| `MONGODB_URI` | `mongodb://crypto_engine:<MONGO_CRYPTO_ENGINE_PASSWORD>@mongo:27017/?authSource=admin&replicaSet=rs0` | `mongodb://stock_engine:<MONGO_STOCK_ENGINE_PASSWORD>@mongo:27017/?authSource=admin&replicaSet=rs0` |
 | `STREAM_HOST` | `0.0.0.0` | `0.0.0.0` |
 | `STREAM_PORT` | `8787` | `8788` |
 | `SCRAPER_URL` | `http://scraper:8790` | `http://scraper:8790` |
@@ -157,64 +211,47 @@ The code reads a bot's variables without the prefix: `CRYPTO_MONGODB_DB_NAME` is
 | `LOG_DIR` | `/logs` | `/logs` |
 | `HISTORY_URL` | `postgres://crypto_history:<HISTORY_CRYPTO_PASSWORD>@history:5432/crypto_history` | `postgres://stock_history:<HISTORY_STOCK_PASSWORD>@history:5432/stock_history` |
 
-Crypto also gets `KRAKEN_OHLCVT_DIR=/data/ohlcvt`, the read-only mount of Kraken's history files (§6.5). `history` gets the three `HISTORY_*` passwords, under the names its image and `initdb.sh` read (`POSTGRES_PASSWORD`, `CRYPTO_HISTORY_PASSWORD`, `STOCK_HISTORY_PASSWORD`); `history-backup` gets only the superuser's, and `search` only `SEARCH_PROXY_URL`.
+Crypto also gets `KRAKEN_OHLCVT_DIR=/data/ohlcvt`, the read-only mount of Kraken's history files (§6.5). `history` gets the three `HISTORY_*` passwords, under the names its image and `initdb.sh` read (`POSTGRES_PASSWORD`, `CRYPTO_HISTORY_PASSWORD`, `STOCK_HISTORY_PASSWORD`); `history-backup` gets only the superuser's, and `search` only `SEARCH_PROXY_URL`. `mongo` gets the six `MONGO_*` passwords and the two database names (`CRYPTO_DB`, `STOCK_DB`), for `docker/mongo/init.js` (§3.8); `mongo-backup` gets only `MONGO_BACKUP_PASSWORD`. The dashboards' variables are in §3.4.
 
 A variable that isn't in `.env` reaches its container empty, and the engines read an empty value as unset, so the code's default applies. **A new variable** goes into `.env.example` and into the `environment` of each service that reads it in `compose.yml`: one that is only in `.env` reaches no container.
 
 ### 3.3 Rules
 
 - One value per line, no trailing spaces. The engine trims stray `\r`.
-- **A value containing `$`, a space or `#`** (a Mongo password, a sender like `CryptoMarketBot <no-reply@…>`) goes in single quotes: `MONGODB_URI='mongodb+srv://user:pa$word@…'`. Compose expands `$` in unquoted values; single quotes keep it literal for both compose and Node's `--env-file` (local dev, the host agent). The old `$$` escape doesn't work here: Node reads it as two dollar signs. On Vercel, paste the value without the quotes.
+- **A value containing `$`, a space or `#`** (a password, a sender like `CryptoMarketBot <no-reply@…>`) goes in single quotes: `CRYPTO_USESEND_FROM_EMAIL='CryptoMarketBot <no-reply@…>'`. Compose expands `$` in unquoted values; single quotes keep it literal for both compose and Node's `--env-file` (local dev, the host agent). The old `$$` escape doesn't work here: Node reads it as two dollar signs. The HISTORY and MONGO passwords go into URLs: keep them hex.
 - compose finds `.env` in the project folder, so run compose from the repo root. Without the file every variable reaches the containers empty, and the engines stop at start (`Invalid engine environment`).
 - **After editing** it, run `docker compose up -d <service>` for each service that reads what you changed (§3.2). That recreates the container with the new values; `restart` keeps the old ones.
 - Never commit it or paste its contents anywhere. `docker compose config` without `--quiet` prints every value; don't share its output.
 
-### 3.4 What goes into each Vercel project
+### 3.4 What each dashboard container gets
 
-Set for Production and Preview, under the Vercel name, with the value of the `.env` variable beside it. Vercel applies env changes to new deployments only, so redeploy after changing one.
+`crypto-web` and `stock-web` get their values from `.env` the way the engines do, under the names the code reads. compose sets the addresses itself. After changing one of these in `.env`, recreate the dashboard on its current image: `docker compose up -d --no-build crypto-web` (a few seconds of 502).
 
-**Crypto** (the cryptomarketbot.app project):
+| Variable | crypto-web | stock-web | Notes |
+| --- | --- | --- | --- |
+| `MONGODB_URI` | compose: `mongodb://crypto_web:<MONGO_CRYPTO_WEB_PASSWORD>@mongo:27017/?authSource=admin&replicaSet=rs0` | the same with `stock_web` | its own user: reads its bot's database, writes only sign-ins, login rate limits and audit entries (§3.8) |
+| `MONGODB_DB_NAME` | `CRYPTO_MONGODB_DB_NAME` | `STOCK_MONGODB_DB_NAME` | `cryptomarketbot`, `stockmarketbot` |
+| `SITE_URL` | `CRYPTO_SITE_URL`, else `https://cryptomarketbot.app` | `STOCK_SITE_URL`, else `https://stockmarketbot.app` | sign-in links point here; sign in only on this origin |
+| `ENGINE_STREAM_URL` | `CRYPTO_ENGINE_STREAM_URL` | `STOCK_ENGINE_STREAM_URL` | the browser's stream through Caddy: `wss://engine.<domain>/v1/stream` |
+| `ENGINE_URL` | compose: `http://host.docker.internal:8787` | compose: `http://host.docker.internal:8788` | where the dashboard's server calls the engine's signed `/v1/status` and `/v1/commands` (the host's loopback port); without it, the stream URL's origin |
+| `STREAM_TOKEN_SECRET` | `CRYPTO_STREAM_TOKEN_SECRET` | `STOCK_STREAM_TOKEN_SECRET` | the engine's own value, so the two can't drift |
+| `BETTER_AUTH_SECRET` | `CRYPTO_BETTER_AUTH_SECRET` | `STOCK_BETTER_AUTH_SECRET` | 32+ characters; changing it signs you out everywhere |
+| `OWNER_EMAIL` | `OWNER_EMAIL` | `OWNER_EMAIL` | the only address that can sign in; required, no default |
+| `USESEND_API_KEY`, `USESEND_BASE_URL` | the same names | the same names | the useSend key and its instance's URL; required, no defaults |
+| `USESEND_FROM_EMAIL` | `CRYPTO_USESEND_FROM_EMAIL` | `STOCK_USESEND_FROM_EMAIL` | the verified sender; required, no default |
+| `DISCORD_WEBHOOK_URL` | `CRYPTO_DISCORD_WEBHOOK_URL` | `STOCK_DISCORD_WEBHOOK_URL` | optional: unhandled dashboard errors go to the engine's Discord channel |
+| `HOST_API_URL` | compose: `http://host.docker.internal:8789` | the same | the host agent's API for Admin → Server (§11); `.env`'s own `HOST_API_URL` is for local dev |
+| `HOST_API_SECRET` | `HOST_API_SECRET` | `HOST_API_SECRET` | the agent's own value; without it, Admin → Server shows the agent offline |
 
-| Vercel variable | `.env` variable | Value |
-| --- | --- | --- |
-| `MONGODB_URI` | `MONGODB_URI` | same as the engine |
-| `MONGODB_DB_NAME` | `CRYPTO_MONGODB_DB_NAME` | `cryptomarketbot` |
-| `STREAM_TOKEN_SECRET` | `CRYPTO_STREAM_TOKEN_SECRET` | **identical** to the engine's |
-| `BETTER_AUTH_SECRET` | `CRYPTO_BETTER_AUTH_SECRET` | 32+ characters; changing it signs you out everywhere |
-| `OWNER_EMAIL` | `OWNER_EMAIL` | the only address that can sign in; required, no default |
-| `USESEND_API_KEY`, `USESEND_BASE_URL` | the same names | the useSend key and its instance's URL; required, no defaults |
-| `USESEND_FROM_EMAIL` | `CRYPTO_USESEND_FROM_EMAIL` | the verified sender; required, no default |
-| `ENGINE_STREAM_URL` | `CRYPTO_ENGINE_STREAM_URL` | `wss://engine.cryptomarketbot.app/v1/stream` |
-| `DISCORD_WEBHOOK_URL` | `CRYPTO_DISCORD_WEBHOOK_URL` | optional: unhandled dashboard errors go to the engine's Discord channel |
-| `NEXT_PUBLIC_DISPLAY_TIMEZONE` | `NEXT_PUBLIC_DISPLAY_TIMEZONE` | `America/Los_Angeles` |
-| `HOST_API_URL` | (none: `.env` holds the local address) | `https://engine.cryptomarketbot.app/host`: the host agent's API for Admin → Server (§11) |
-| `HOST_API_SECRET` | `HOST_API_SECRET` | **identical** to the agent's; without both, Admin → Server shows the agent offline |
-| `SITE_URL` | `CRYPTO_SITE_URL` | optional: defaults to the project's production domain |
-| `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_DOCUMENTDB_RESOURCE_ID` | the same names | optional, all four or none: Azure Monitor's count of the database's storage on Admin → System (§1) |
-
-**Stock** (the stockmarketbot.app project):
-
-| Vercel variable | `.env` variable | Value |
-| --- | --- | --- |
-| `MONGODB_URI` | `MONGODB_URI` | same as the engine |
-| `MONGODB_DB_NAME` | `STOCK_MONGODB_DB_NAME` | `stockmarketbot` |
-| `STREAM_TOKEN_SECRET` | `STOCK_STREAM_TOKEN_SECRET` | **identical** to the engine's |
-| `BETTER_AUTH_SECRET` | `STOCK_BETTER_AUTH_SECRET` | 32+ characters; changing it signs you out everywhere |
-| `OWNER_EMAIL` | `OWNER_EMAIL` | the only address that can sign in; required, no default |
-| `USESEND_API_KEY`, `USESEND_BASE_URL` | the same names | the useSend key and its instance's URL; required, no defaults |
-| `USESEND_FROM_EMAIL` | `STOCK_USESEND_FROM_EMAIL` | the verified sender; required, no default |
-| `ENGINE_STREAM_URL` | `STOCK_ENGINE_STREAM_URL` | `wss://engine.stockmarketbot.app/v1/stream` |
-| `DISCORD_WEBHOOK_URL` | `STOCK_DISCORD_WEBHOOK_URL` | optional: unhandled dashboard errors go to the engine's Discord channel |
-| `HOST_API_URL` | (none: `.env` holds the local address) | `https://engine.stockmarketbot.app/host`: the host agent's API for Admin → Server (§11) |
-| `HOST_API_SECRET` | `HOST_API_SECRET` | **identical** to the agent's; without both, Admin → Server shows the agent offline |
-| `SITE_URL` | `STOCK_SITE_URL` | optional: defaults to the project's production domain |
-| `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_DOCUMENTDB_RESOURCE_ID` | the same names | optional, all four or none: Azure Monitor's count of the database's storage on Admin → System (§1) |
-
-Nothing else goes to Vercel: the dashboards hold no broker or AI keys. Vercel sets `VERCEL_PROJECT_PRODUCTION_URL` itself (the default for `SITE_URL`); sign in on the production domain, not on preview URLs.
+- `NEXT_PUBLIC_DISPLAY_TIMEZONE` is a build argument, not a runtime variable: `next build` writes `NEXT_PUBLIC_*` values into the code. compose passes `.env`'s value (default `America/Los_Angeles`); after changing it, rebuild both dashboards (§8.2).
+- No `AZURE_*`: Admin → System's storage card shows what MongoDB reports.
+- Nothing else reaches a dashboard: no broker or AI keys, no other bot's values.
 
 ### 3.5 Local dev overrides
 
-`.env.local` (git-ignored) is read after `.env`, under the same names, and its values win. Local engines must not touch live state:
+`.env.local` (git-ignored) is read after `.env`, under the same names, and its values win. Local engines must not touch live state.
+
+**The database for local dev** is `mongo-dev` (`docker compose --profile dev up -d mongo-dev`): MongoDB on 127.0.0.1:27018, a one-member replica set (Better Auth's sign-in needs one) without auth, in its own volume, never the live data. The live `mongo` has no host port, so nothing on the host can reach it. `.env`'s `MONGODB_URI` still points at the retired Azure cluster (its `_dev` databases) until the owner deletes it; then it becomes mongo-dev's, `MONGODB_URI=mongodb://127.0.0.1:27018/?directConnection=true` (as in `.env.example`). Keep the `_dev` names below either way:
 
 ```ini
 # .env.local
@@ -226,12 +263,12 @@ STOCK_ALPACA_API_KEY=fake-key
 STOCK_ALPACA_SECRET_KEY=fake-secret
 ```
 
-- `mb-env <bot>` gives a dev process the variables without a bot prefix under their own names (the HISTORY, SEARCH and HOST ones too, which it doesn't read) and its bot's without the prefix, a bot's winning over a shared one of the same name; the other bot's are left out. The shell's own variables win over both files.
-- On the live database a local engine would wait for the live engine's lease, and take over trading as soon as the live one stopped.
+- `mb-env <bot>` gives a dev process the variables without a bot prefix under their own names (the HISTORY, MONGO, SEARCH and HOST ones too, which it doesn't read) and its bot's without the prefix, a bot's winning over a shared one of the same name; the other bot's are left out. The shell's own variables win over both files.
+- On a database with the live names a local engine would start fresh books, and a local crypto engine would reset its CLI workspace to match: keep the `_dev` names.
 - A local engine keeps no history (only `compose.yml` builds `HISTORY_URL`, and `history` has no host port) and runs no AI (`LLM_URL` too is set only by compose), so it spends none of the research allowances.
 - A local stock engine with the live keys would knock out the live engine's market data (one connection per account). With fake keys it boots and logs Alpaca auth errors.
 - A local crypto engine needs the Kraken CLI on `PATH` (or `CRYPTO_KRAKEN_CLI_PATH` in `.env.local`) and uses that machine's own CLI workspace, never the server's volume.
-- A local dashboard on the live database writes real commands that the live engine executes.
+- A local dashboard sends its commands to the engine at `ENGINE_STREAM_URL`'s origin (`ENGINE_URL` is set only by compose): with the live stream URL and secret, those are real commands the live engine executes.
 
 ### 3.6 The history passwords
 
@@ -265,6 +302,24 @@ Research's search accounts (§9):
 - At start, `packages/wire/docker/searxng-start.sh` writes the proxy URL into a copy of the settings in the container's `/tmp`; the committed `searxng.yml` holds only a placeholder.
 - After changing one, recreate whatever reads it: `docker compose up -d search` for the proxy, `docker compose up -d crypto-engine stock-engine` for the search APIs.
 
+### 3.8 The MongoDB passwords
+
+The MONGO section holds a password for each of the database's users. `docker/mongo/init.js` creates the users with them (§6.6), and compose builds each service's `MONGODB_URI` from its own, so a URL can't drift from its password:
+
+| Variable | User | Can |
+| --- | --- | --- |
+| `MONGO_ROOT_PASSWORD` | `root` | everything: `init.js`, restores and maintenance by hand |
+| `MONGO_CRYPTO_ENGINE_PASSWORD` | `crypto_engine` | read and write `cryptomarketbot` (`readWrite`), nothing else |
+| `MONGO_STOCK_ENGINE_PASSWORD` | `stock_engine` | read and write `stockmarketbot`, nothing else |
+| `MONGO_CRYPTO_WEB_PASSWORD` | `crypto_web` | role `crypto_dashboard`: read `cryptomarketbot`; insert into `audit_log`; read, insert and update `login_attempts`; read, insert, update and delete the four `auth_*` collections; list the databases and their sizes (Admin → System's storage card) |
+| `MONGO_STOCK_WEB_PASSWORD` | `stock_web` | role `stock_dashboard`: the same on `stockmarketbot` |
+| `MONGO_BACKUP_PASSWORD` | `backup` | the `backup` role: `mongo-backup`'s dumps |
+
+- A dashboard that was broken into can't change the books or read the other bot. A new write in a dashboard's code needs its privilege in `init.js` too, or it fails with `Unauthorized`.
+- Generate them like the other secrets (§1), hex.
+- **After changing one** in `.env`: `docker compose up -d mongo` (it reads them from its environment; a few seconds' pause for both bots), then `docker compose exec mongo mongosh --quiet /etc/mongo/init.js`, which sets every user's password to `.env`'s, then recreate what uses the changed one (`docker compose up -d --no-build crypto-engine`, `crypto-web`, `mongo-backup`…). `init.js` signs in as root with `MONGO_ROOT_PASSWORD`: change root's by hand first (`db.getSiblingDB("admin").changeUserPassword("root", …)` as root), then the value in `.env`.
+- Without its password a service's URL has none: MongoDB refuses it, and the engine retries (`MongoDB connection failed; retrying`).
+
 ---
 
 ## 4. Build and start (first time)
@@ -272,10 +327,19 @@ Research's search accounts (§9):
 ```powershell
 docker volume inspect cryptomarketbot_kraken-paper   # must exist: the paper wallet (§6)
 docker compose config --quiet                       # checks compose.yml and .env; silent when fine
+# The database first, only on a new server (§6.6): an empty volume, the replica set and users.
+docker volume create marketbots_mongo-data
+docker compose up -d mongo mongo-backup
+docker compose exec mongo mongosh --quiet /etc/mongo/init.js   # "done"; run it again if mongo was still starting
+docker compose restart mongo-backup                 # its first backup, now that its user exists
+# Then everything else.
 docker compose build                                # several minutes the first time
-docker compose up -d                                # the engines, scraper, history, the backups, llm (the first start downloads its 12 GB model, §9)
-docker compose ps                                   # engines "healthy" within ~90 s (crypto) / ~60 s (stock)
+docker compose up -d                                # the engines, dashboards, scraper, history, the backups, llm (the first start downloads its 12 GB model, §9)
+docker compose ps                                   # engines "healthy" within ~90 s (crypto) / ~60 s (stock), dashboards within ~30 s
+.dockerwebinstall-autodeploy.ps1                  # administrator PowerShell: the dashboards deploy on each commit from now on (§8)
 ```
+
+On this server the database volume holds the live books: never create it again, and never start the crypto engine on an empty one (§6.6). On a new server with a backup, restore it (§6.6) before the first `up`.
 
 During the crypto build you should see the Kraken CLI download, its **checksum verified**, and `kraken 0.4.1` from the `RUN kraken --version` step. If the build stops there, the CLI can't run on the image.
 
@@ -304,8 +368,12 @@ docker compose up -d --build scraper           # both bots' headless sources pau
 docker compose up -d history history-backup    # the history store (engines buffer bars and retry meanwhile)
 docker compose up -d llm                       # the local model server, after a change to its service (summaries pause ~1 min)
 docker compose up -d search                    # the search service for local research (a few seconds)
-docker compose up -d --build                   # everything whose image or config changed
+docker compose up -d mongo mongo-backup        # the database: both bots wait for it for a few seconds (below)
 ```
+
+The dashboards deploy themselves: every commit on `main` here (and a `git pull` that moves it) starts the `Web deploy` task, which builds them from a clean checkout of the commit (§8). By hand: `Start-ScheduledTask -TaskPath 'marketbots\x27 -TaskName 'Web deploy'`, or `node docker/web/autodeploy.mjs` to watch it.
+
+**Never `docker compose up -d --build` without service names.** It would rebuild and restart the dashboards from this working tree, work in progress included, and recreate every service whose config changed, `mongo` and both engines too.
 
 - Naming the service is how you deploy one bot without touching the other. Shared code (`packages/*`) is compiled into each image at build time, so a change there reaches an engine only when that engine is rebuilt.
 - **Stock**: any time, market hours included; pick a moment when the agent isn't in an episode (the Agent page's live feed shows no model call running). Stops rest at Alpaca; options exits wait for the engine, which is back in about a minute.
@@ -313,14 +381,17 @@ docker compose up -d --build                   # everything whose image or confi
 - A stop is graceful (30 s grace period): the engine releases its lease, so the new container takes over at once.
 - **History**: any time. While it's down the engines keep up to 50,000 bars each in memory and copy the news they missed when it's back; trading never waits for it.
 - **llm**: any time. Recreating it reloads the model (~1 minute), during which the summaries back off and retry; trading never waits for it.
+- **mongo**: only at a quiet time, between agent episodes of both bots: recreating it stops both bots' database for a few seconds (`stop_grace_period` 60 s). The engines retry and carry on; a dashboard page that loads meanwhile fails. A deploy of anything else never touches it (no `depends_on`).
+- **The dashboards**: any time; a deploy never touches trading. An app whose image changed is swapped in a few seconds (Caddy answers 502 meanwhile); one whose image didn't change keeps running.
 - **The host agent** isn't in compose: it is built and restarted on Windows (§11.3).
-- Dashboards deploy by pushing to `main` (Vercel, §8).
+- **The landing page** deploys on Vercel when the owner pushes `main` (§8.5).
 
 ### 5.2 Status, logs, restart
 
 ```powershell
 docker compose ps                                          # every service and its health
 docker compose logs -f --since 1h crypto-engine            # follow one engine
+docker compose logs --since 1h crypto-web                  # a dashboard: its server errors (they also go to Discord)
 docker compose logs --since 24h stock-engine | Select-String '"level":"error"'
 Get-Content logs\crypto-engine\2026-10-27.log -Tail 50 -Wait   # the history, across deploys (below)
 Select-String '"level":"error"' logs\stock-engine\*.log    # every error in the kept history
@@ -328,13 +399,13 @@ docker compose restart stock-engine                        # same image, same en
 docker compose up -d stock-engine                          # after editing a STOCK_ value in .env
 docker compose stop crypto-engine                          # one engine; the other keeps running
 docker compose start crypto-engine
-docker stats --no-stream marketbots-crypto-engine marketbots-stock-engine marketbots-scraper
+docker stats --no-stream marketbots-crypto-engine marketbots-stock-engine marketbots-crypto-web marketbots-stock-web marketbots-mongo marketbots-scraper
 ```
 
 - Containers come back on their own after a crash or a reboot (`restart: unless-stopped`) once Docker Desktop is running. A container stopped by hand stays stopped across reboots.
-- `docker compose down` stops and removes every container in the stack, both engines included. Volumes survive it. **Never add `-v`** (§6).
+- `docker compose down` stops and removes every container in the stack, both engines and the database included. Volumes survive it. **Never add `-v`** (§6).
 - Logs are JSON lines. Docker's copy is capped per container at 5 × 10 MB (scraper 3 × 10 MB), and it goes when the container is replaced, so at every deploy.
-- The engines also append every line to `logs\<service>\<UTC date>.log` in the repo folder (`LOG_DIR`; git-ignored, on the Windows disk). A deploy, a Docker reset or a WSL reset leaves it alone: the new container carries on in the same day's file. Files older than 90 days are deleted, and a day's file stops at 25 MB (Docker's copy still gets every line). The scraper's logs are only in Docker's copy.
+- The dashboards' and the database's logs are only in Docker's copy. The engines also append every line to `logs\<service>\<UTC date>.log` in the repo folder (`LOG_DIR`; git-ignored, on the Windows disk). A deploy, a Docker reset or a WSL reset leaves it alone: the new container carries on in the same day's file. Files older than 90 days are deleted, and a day's file stops at 25 MB (Docker's copy still gets every line). The scraper's logs are only in Docker's copy.
 
 ### 5.3 Health endpoints
 
@@ -345,7 +416,11 @@ curl.exe http://127.0.0.1:8788/healthz
 curl.exe http://127.0.0.1:8788/readyz
 curl.exe https://engine.cryptomarketbot.app/healthz     # through Caddy, from any machine
 curl.exe https://engine.stockmarketbot.app/healthz
+curl.exe -sI http://127.0.0.1:3101/robots.txt          # a dashboard: 200 (needs neither the database nor the engine); 3102 for stock
+curl.exe -sI https://cryptomarketbot.app/                # through Caddy
 ```
+
+The database publishes no port. `docker compose ps mongo` shows its health (a `ping` every 30 s); a look inside: §6.6.
 
 The scraper publishes no port. Its health, from inside its container:
 
@@ -363,9 +438,15 @@ The detailed view (every dependency, data freshness, AI calls) is each dashboard
 - [ ] The dashboard shows the engine *Running*, and the header's stream indicator ticks.
 - [ ] Optional: *Pause* → *Paused* within ~3 s; *Resume* → *Running*.
 
+After a dashboard deploy:
+
+- [ ] `logsautodeploy<UTC date>.log` says `deployed` (or `unchanged`) for each app, and `docker compose ps` shows it `healthy`.
+- [ ] The site loads, the header's stream indicator ticks, and Admin → System shows the engine.
+- [ ] No *Server error* alert in the bot's Discord channel.
+
 ### 5.5 Memory caps
 
-The Docker VM has 15.5 GiB and the other stacks use ~3.5 GiB of it. Every service here is capped:
+The Docker VM has 15.5 GiB and the other stacks use ~3.5 GiB of it. Every service here is capped. A dashboard image build (`next build`) takes 1–2 GB more for a minute or two.
 
 | Service | Limit | Expected |
 | --- | --- | --- |
@@ -377,6 +458,10 @@ The Docker VM has 15.5 GiB and the other stacks use ~3.5 GiB of it. Every servic
 | `search` | 512 MB | ~0.2 GB |
 | `history` | 2 GB (`shared_buffers` 512 MB, tuned for that) | 0.6–1.2 GB, mostly cache |
 | `history-backup` | 256 MB | a few MB; more for a minute at 10:30 UTC |
+| `crypto-web`, `stock-web` | 512 MB each | 150–250 MB each |
+| `mongo` | 1.5 GB (WiredTiger cache 0.5 GB) | ~0.3–0.6 GB for ~0.2 GB of data |
+| `mongo-backup` | 512 MB | a few MB; more for a minute at 11:00 UTC |
+| `mongo-dev` | 512 MB (cache 0.25 GB) | not running unless started for local dev |
 
 Check with `docker stats --no-stream` (§5.2).
 
@@ -387,7 +472,7 @@ Live trading settings (risk, AI models and timeouts, news engine, schedule) live
 ### 5.7 Starting over
 
 - **Crypto**: Admin → *Reset paper wallet*. It resets the CLI wallet and the books together. Don't delete the volume by hand: the books in MongoDB would no longer match.
-- **Stock**: reset the paper account in the Alpaca dashboard. For a clean history, also drop the `stockmarketbot` database before restarting the engine.
+- **Stock**: reset the paper account in the Alpaca dashboard. For a clean history, also drop the `stockmarketbot` database (as root, §6.6) before restarting the engine.
 
 ---
 
@@ -443,10 +528,10 @@ docker compose up -d crypto-engine
 
 ### 6.3 Boot-testing new images against a copy
 
-`compose.smoke.yml` (project `marketbots-smoke`) boots the new engine images beside the live stack: a throwaway local MongoDB, its own history store in memory (databases `crypto_staging` and `stock_staging`), loopback ports 18787 and 18788, a **copy** of the wallet volume, fake Alpaca keys, and no AI, Discord, email or news keys. Use it before deploying a change to engine startup, a Dockerfile or `compose.yml`. Its header has the commands:
+`compose.smoke.yml` (project `marketbots-smoke`) boots the new engine and dashboard images beside the live stack: a throwaway MongoDB in memory (the live version, a one-member replica set, no auth), its own history store in memory (databases `crypto_staging` and `stock_staging`), the engines on loopback ports 18787 and 18788 and the dashboards on http://127.0.0.1:13101 and http://127.0.0.1:13102 (the public view: no sign-in there), a **copy** of the wallet volume, fake Alpaca keys, and no AI, Discord, email or news keys. Use it before deploying a change to engine startup, a Dockerfile or `compose.yml`, and as the preview of a dashboard change (what Vercel's preview deployments were). Its header has the commands:
 
 ```powershell
-docker compose build                                   # builds the images; running containers are not touched
+docker compose build                                   # builds the images; running containers are not touched (dashboards: §8.4)
 docker compose -f compose.smoke.yml up -d
 docker compose -f compose.smoke.yml logs -f crypto-engine
 docker compose -f compose.smoke.yml down
@@ -507,7 +592,52 @@ docker run --rm -v ${PWD}\data\kraken-ohlcvt:/in:ro -v ${PWD}\data\kraken-ohlcvt
 
 The `chmod` matters: `unzip` restores the archive's modes (0600, owned by root), which the engine's non-root user can't read (`kraken_files` fails with `EACCES`).
 
-### 6.6 Alpaca's history (stock backfill)
+The archives can be deleted once extracted; the CSVs can be deleted once `kraken_files` is done (Admin → System), but the next quarter's import needs only its own folder anyway.
+
+### 6.6 The database volume and its backups
+
+Both bots' MongoDB data, the books (accounts, positions, orders, fills, decisions), the settings, the audit log, the events and the news, lives in the volume `marketbots_mongo-data`, inside Docker's disk on C:. `compose.yml` declares it `external`, like the wallet: compose never creates it, and a missing volume stops `docker compose up mongo` with `external volume "marketbots_mongo-data" not found`. Don't "fix" that with an empty volume: find out what happened, and restore a backup (below).
+
+- **Never remove it.** No `docker volume rm`, no `down -v` ([AGENTS.md](../AGENTS.md) rule 6).
+- **Never start the crypto engine on a database without its books.** To it, a missing `accounts` document means a fresh database, and it resets the paper wallet to match (§6). Before it starts on a restored or new database, check that the document is there (below).
+- It is a named volume (ext4 inside Docker's disk), never a bind mount from the Windows disk: MongoDB needs real fsync and file locking.
+- **MongoDB 8.0 refuses to start on Linux kernels 6.19 through 7.0.13** (a TCMalloc incompatibility), and Docker Desktop brings its own kernel. Before updating Docker Desktop, check the kernel it would bring; after an update, `docker info --format "{{.KernelVersion}}"` (6.18.54 on 2026-11-07).
+
+**The server** (`mongo`): MongoDB 8.0.34, the official image pinned by digest, as a single-member replica set `rs0` (Better Auth's sign-in writes use transactions, which need one), with auth on and network compression off (CVE-2025-14847). `docker/mongo/start.sh` writes a fresh keyFile to tmpfs at every start (a replica set with auth needs one; with a single member nothing else reads it), then runs the image's entrypoint. It runs as the image's `mongodb` user with a read-only root and no capabilities, on the internal `db` network only: no host port, no internet. Every client connects to `mongo:27017` with `replicaSet=rs0`.
+
+**The users** (`docker/mongo/init.js`, idempotent): it initiates the replica set, creates `root`, a role per dashboard and a user per engine, dashboard and the backup (§3.8), and sets every password to `.env`'s. On a new volume it uses the localhost exception (no user yet, and a connection from inside the container); after that it signs in as root. It prints each role and user it set, never a password:
+
+```powershell
+docker compose exec mongo mongosh --quiet /etc/mongo/init.js
+```
+
+**Backups:** `mongo-backup` dumps the whole server with `mongodump --oplog`, one consistent snapshot of both databases with their users and roles, into `backupsmongomongo-<UTC timestamp>.archive.gz` in the repo folder (git-ignored, on the Windows disk, so it survives a Docker or WSL reset): once when it starts (retried every 5 minutes until it works), then daily at 11:00 UTC. The newest 14 are kept. Check it with `docker logs marketbots-mongo-backup`; an extra backup now, e.g. before risky work: `docker compose restart mongo-backup`. At worst, a lost volume costs the paper history since the last backup.
+
+**Look inside** (Git Bash or PowerShell 7; Windows PowerShell 5.1 drops the inner quotes). The root password comes from the container's own environment, so it never shows on screen:
+
+```bash
+docker compose exec mongo sh -c 'mongosh --quiet -u root -p "$MONGO_ROOT_PASSWORD" --authenticationDatabase admin'            # a shell as root
+docker compose exec mongo sh -c 'mongosh --quiet -u root -p "$MONGO_ROOT_PASSWORD" --authenticationDatabase admin cryptomarketbot --eval "db.accounts.countDocuments()"'   # 1 or more, never 0
+```
+
+**Restore** only as a last resort. Everything written since the backup is lost, and crypto's books go back to that moment while the wallet keeps every later trade: unless nothing traded since, expect *Books vs wallet: mismatch* (§10). From the repo folder, in Git Bash:
+
+```bash
+docker compose stop crypto-engine stock-engine crypto-web stock-web
+# Only if the volume is gone: an empty one, with the replica set and users (§4).
+docker volume create marketbots_mongo-data && docker compose up -d mongo
+docker compose exec mongo mongosh --quiet /etc/mongo/init.js
+# The backup over what is there (--drop): both databases, users and roles, as of the snapshot.
+docker compose exec -T mongo sh -c 'mongorestore --quiet -u root -p "$MONGO_ROOT_PASSWORD" --authenticationDatabase admin --gzip --archive --oplogReplay --drop' < backups/mongo/mongo-<stamp>.archive.gz
+docker compose exec mongo mongosh --quiet /etc/mongo/init.js   # the passwords back to .env's, if one changed since
+# Check crypto's accounts document (above), then:
+docker compose up -d --no-build crypto-engine stock-engine crypto-web stock-web
+docker compose restart mongo-backup
+```
+
+One bot's database only: add `--nsInclude "stockmarketbot.*"` and leave out `--oplogReplay`, with only that bot's engine and dashboard stopped.
+
+### 6.7 Alpaca's history (stock backfill)
 
 The stock engine fills its history store from Alpaca's SIP bars (all exchanges; the free plan serves them once they're 15 minutes old) with its own key, inside the engine: never run a second process with the live key (§1). Two jobs share one pacer, at most one request every 2 s (30 a minute, a fifth of the engine's REST budget):
 
@@ -516,7 +646,6 @@ The stock engine fills its history store from Alpaca's SIP bars (all exchanges; 
 
 Both resume after a restart. Progress is on Admin → System under *History store*. Nothing to download by hand.
 
-The archives can be deleted once extracted; the CSVs can be deleted once `kraken_files` is done (Admin → System), but the next quarter's import needs only its own folder anyway.
 
 ---
 
@@ -572,7 +701,7 @@ For crypto: `docker compose stop crypto-engine`, then `docker start cryptomarket
 - Both use the same wallet volume. They no longer use the same database: the old containers still point at the old Atlas clusters, which stopped at the database move (below). Don't roll back to them since then.
 - `docker start` brings the old container back with its original image and settings. The old engines were created without `SCRAPER_URL`, so they don't need the removed old scrapers.
 - Use `docker start`, not `docker compose up` in the old folder: that would rebuild and recreate the old container from the old repo.
-- Dashboards roll back with Vercel's instant rollback.
+- Dashboards: §8.3.
 
 ### Cleanup after 14 days (with owner approval)
 
@@ -604,59 +733,83 @@ On 2026-10-30 the three databases (`cryptomarketbot`, `stockmarketbot`, `servers
 
 **Cleanup after 14 days** (with owner approval, from 2026-11-13): delete the commented line from `.env`, delete the Atlas clusters, and delete `backups\mongo-atlas-2026-10-30\`.
 
+### The move to the server's own MongoDB (2026-11-07)
+
+On 2026-11-07 (the night of 11-07 to 11-08 UTC) both bots' databases moved from the Azure DocumentDB free tier, whose capped CPU kept refusing queries (§1), to the stack's own `mongo` (§6.6), and the dashboards moved from Vercel into the stack (§8), all at once ([plans/LOCAL-MONGO.md](plans/LOCAL-MONGO.md)). The owner pointed the domains at the server first; Caddy's admin API moved to 127.0.0.2 and the dashboard sites went in as soon as the names resolved here.
+
+- `mongo` was started on the new `marketbots_mongo-data` volume and set up by `init.js`. With no agent episode running, both engines were stopped at 07:59 UTC on 11-08 and the wallet backed up (`kraken-paper-20261108T075858Z.tgz`).
+- `mongodump` from Azure, one database and one collection at a time, into `backups\mongo-azure-2026-11-07\` (crypto 53 MB in 415 s, stock 68 MB in 332 s on the capped cluster; stock's first try timed out connecting). That folder is also the copy of Azure as it was left.
+- `mongorestore` as root with `--noIndexRestore --noOptionsRestore`: DocumentDB marks every collection `statsEnabled`, an option MongoDB refuses. Then the restored databases were dumped again and compared with Azure's document by document: all 155,259 documents in 61 collections matched, crypto's `accounts` document included.
+- The engines were recreated on `mongo` at 08:13 UTC (same images, new `MONGODB_URI` and the `db` network), about 14½ minutes after they stopped: both ready in about 10 s, no `paper workspace reset`, no warnings. The dashboards started beside them. They had been down since the DNS change.
+- The engines rebuilt their `INDEXES` at start; the 26 indexes Azure still had on collections that code no longer writes (the old cycles, research, reports, seed runs, shadow book, backtests and core reviews) were recreated from the dump's metadata, so all 185 of Azure's indexes exist here.
+- Afterwards the engine sites stopped passing on the signed API and `/host/*` (§2): only the old Vercel dashboards used them.
+
+**Rollback**, only soon after the move (anything written since is only here, and crypto's books would no longer match the wallet): stop the engines and dashboards, restore the latest `backups\mongo\` archive's two databases into Azure one collection at a time, point the engines' `MONGODB_URI` in `compose.yml` back at `.env`'s, and give the domains back to the Vercel projects. Azure being capped, this is for a broken move, not a slow one.
+
+**Cleanup**, with the owner's OK, once the move is verified: delete the two dashboard projects on Vercel (§8.5), the Azure cluster with its `marketbots-metrics` service principal, the `AZURE_*` lines in `.env`, and its Azure `MONGODB_URI` (local dev then uses `mongo-dev`, §3.5). Keep `backups\mongo-azure-2026-11-07\` until the local backups have a few weeks.
+
 ---
 
-## 8. Vercel
+## 8. The web apps
 
-Three Vercel projects build from `colinfran/marketbots`, on the Hobby plan of the `colinfran` team:
+The two dashboards run in the stack, as `crypto-web` and `stock-web` (variables: §3.4), behind Caddy (§2). The landing page stays on Vercel (§8.5). Until 2026-11-07 the dashboards were the Vercel projects `cryptomarketbot` and `stockmarketbot`.
 
-| Project | Root Directory | Domain |
-|---|---|---|
-| `cryptomarketbot` | `apps/crypto-web` | cryptomarketbot.app |
-| `stockmarketbot` | `apps/stock-web` | stockmarketbot.app |
-| `marketbots` | `apps/landing` | marketbots.vercel.app |
+### 8.1 The image
 
-The two dashboards are the same projects as before the merge, with the same domains, env vars and auth.
+`docker/web/Dockerfile`, one file for both, chosen by the build arguments `APP` (`crypto-web`, `stock-web`) and `CORE` (`crypto-core`, `stock-core`) that compose passes:
 
-### 8.1 Project settings
+- **Build:** `pnpm fetch` from the lockfile (cached), then the app and the packages it uses (`packages/config`, `core`, the bot's core, `ui`, `web-kit`), an offline install filtered to `@mb/<app>...`, and `next build` with `output: "standalone"` (`next.config.ts`). Nothing reads the database or a secret at build time: every page awaits `connection()`. `NEXT_PUBLIC_DISPLAY_TIMEZONE` is a build argument (§3.4).
+- **Runtime:** the engines' pinned `node:22-bookworm-slim`, tini, user `node`: the standalone server (`apps/<app>/server.js`, with the workspace packages bundled into it), `.next/static` and `public`. Healthcheck: `/robots.txt`, which needs neither the database nor the engine. compose adds a read-only root, no capabilities, tmpfs for `/tmp` and Next's cache (the candles route's Kraken calls), 512 MB, and the networks `web` (the internet: useSend, Discord, Kraken's candles; not the scraper or search) and `db`.
+- **Only what it copies counts.** A commit that changes none of those files leaves every layer cached and the image identical, so compose keeps that dashboard's container running: a stock-only change never restarts `crypto-web`, and commits to the engines or the docs restart neither. The lockfile and the root manifests are in both images, so a dependency change rebuilds both. A new shared package a dashboard imports must also go into the Dockerfile's `COPY` lines (and `transpilePackages`, [AGENTS.md](../AGENTS.md)). The dashboards' tests stay out of the build context (`.dockerignore`).
 
-In each project:
+### 8.2 Deploys
 
-1. *Settings → Build and Deployment*:
-   - **Root Directory**: as in the table above.
-   - **Include files outside the root directory in the Build Step**: on. The apps import `packages/*`.
-   - **Skip deployments when there are no changes to the root directory or its dependencies**: on (§8.2).
-   - **Node.js Version**: 24.x.
-   - Framework Next.js; install and build commands default (pnpm is detected from the root lockfile).
-2. *Settings → Git*: repo `colinfran/marketbots`, production branch `main`. No custom Ignored Build Step.
+Every new commit on `main` in the server's working tree deploys the dashboards:
 
-After a deploy, check that you can sign in, the stream connects, and a *Pause* / *Resume* round trip works. The old repos no longer deploy anything and can be archived (read-only).
+1. The repo's `post-commit` hook (`.githooks/`; `post-merge` too, so a `git pull` that moves `main` counts) starts the on-demand task `\marketbots\Web deploy` and returns at once: a commit never waits for a build. Not on other branches, and not for each commit a rebase replays.
+2. The task runs `docker/web/autodeploy.mjs` on the server's Node, without a window, one run at a time (a run asked for meanwhile waits its turn). It reads `main`, fetches that commit from this repo into a clean clone beside it (`..\marketbots-deploy`; never the working tree, which may hold work in progress), and runs `docker compose up -d --build --no-deps <app>` there for `crypto-web`, then `stock-web`, with the live `.env`.
+3. An app whose image changed is swapped in a few seconds (Caddy answers 502 meanwhile); one whose image didn't change keeps running (§8.1). A failed build leaves the running container as it was.
+4. Its log: `logs\autodeploy\<UTC date>.log` in the repo (`deploying`, then `deployed`, `unchanged` or `deploy failed` per app), and the last deployed commit in `logs\autodeploy\state.json`. A failure also goes to the bot's Discord channel (as *<Bot> deploy*). The next commit on `main`, or running the task again, retries.
 
-### 8.2 Skipping unaffected builds
+Nothing polls: the hooks are the only trigger. A push to GitHub deploys only the landing page (§8.5), and a commit made elsewhere deploys here once it is pulled. The engines never deploy this way: by name, between agent episodes (§5.1).
 
-So that a push touching only one bot doesn't rebuild the other bot's dashboard. Vercel reads the pnpm workspace: a project builds when a commit changes its Root Directory or a workspace package it depends on (its `package.json`, followed through the packages' own dependencies). Otherwise the commit shows *Skipped - Not affected*.
+**Install** once, from an administrator PowerShell, as the account that signs in on the server: `.\docker\web\install-autodeploy.ps1`. It registers the task (S4U, so no window; Docker Desktop itself runs only after sign-in) and sets `git config core.hooksPath .githooks` in this clone. Check: `git config core.hooksPath` says `.githooks`, and `Get-ScheduledTask -TaskPath '\marketbots\' -TaskName 'Web deploy' | Get-ScheduledTaskInfo` shows the last run and its result (0).
 
-- A new shared package is covered once it's in the app's `dependencies`; there's no list to update.
-- Commits that touch only the engines, `docs/` or `contracts/` build nothing.
+**Pause:** `Disable-ScheduledTask -TaskPath '\marketbots\' -TaskName 'Web deploy'` (the hooks then only say they couldn't start it); `Enable-ScheduledTask` resumes.
+
+**By hand:**
+
+```powershell
+Start-ScheduledTask -TaskPath '\marketbots\' -TaskName 'Web deploy'     # deploys main, unless it is deployed already
+node docker\web\autodeploy.mjs                                          # the same, in this window, with its log
+node docker\web\autodeploy.mjs --force                                  # rebuild main's though it is deployed (after changing NEXT_PUBLIC_DISPLAY_TIMEZONE, or after a preview build, §8.4)
+docker compose up -d --no-build crypto-web                               # recreate on the current image, after changing one of its variables in .env (§3.4)
+```
+
+Don't `docker compose up -d --build crypto-web` from the working tree: that deploys uncommitted work.
 
 ### 8.3 Bad deploys
 
-Vercel's instant rollback (*Deployments* → a previous deployment → *Instant Rollback*). Only the last few deployments are kept (§8.4); to go further back, redeploy an older commit.
+- **Revert the commit** (`git revert <sha>`): the revert is a new commit on `main`, so it deploys, and the cache usually makes it quick.
+- **An instant way back**, for a risky change: tag the running image before the commit, `docker tag marketbots-crypto-web:latest marketbots-crypto-web:prev`. To go back: `docker tag marketbots-crypto-web:prev marketbots-crypto-web:latest`, then `docker compose up -d --no-build crypto-web`. The next deploy builds `main`'s again.
+- **The logs:** `docker compose logs --since 1h crypto-web`. Unhandled server errors also go to the bot's Discord channel (*Server error on …*).
 
-### 8.4 Deployment storage
+### 8.4 Previews
 
-Every deployment Vercel keeps holds its own copy of the dashboard's server code (*Functions Storage*). The Hobby plan caps that at 10 GB for the whole team, all projects together, and going over can block deploys. With the default 30-day retention, a busy month of pushes fills it: on 2026-10-30 the team had ~400 kept deployments, ~300 of them these three projects'.
+What Vercel's preview deployments were: `compose.smoke.yml` boots the dashboard images against the smoke engines, on http://127.0.0.1:13101 and http://127.0.0.1:13102 (§6.3); or `pnpm dev:<bot>-web` runs one against `mongo-dev` (§3.5).
 
-- **Retention** (*Team Settings → Security & Privacy → Deployment Retention Policy*, applied to all existing projects): the shortest periods. Vercel still keeps each project's last 3 production deployments, so rollback works.
-- **Clean-up by hand**, if usage is high again: delete all but the live deployment and the two before it. Each project's *Deployments* page does it, or the CLI (`npx vercel login` first):
+Building the images for the smoke file (`docker compose build crypto-web`) puts the working tree's build under the `latest` tag the live containers were started from. The running containers keep their own image, but a `docker compose up -d --no-build` would start the preview. Afterwards, put `main`'s back: `node docker\web\autodeploy.mjs --force`.
 
-  ```powershell
-  npx vercel list cryptomarketbot                  # newest first
-  npx vercel rm <deployment id> ... --safe --yes   # --safe skips anything on a domain
-  ```
+### 8.5 The landing page (Vercel)
 
-  Deleted deployments can be restored for a while from the project's *Settings → Security → Recently Deleted*.
-- Usage is counted in GB-months, so the figure on *Usage* can stay high until the billing period resets, even after a clean-up.
+One Vercel project still builds from `colinfran/marketbots`, on the Hobby plan of the `colinfran` team: `marketbots`, Root Directory `apps/landing`, at marketbots.vercel.app. It has no database and no secrets.
+
+- **Deploys** on every push to `main` that changes `apps/landing` or a workspace package it depends on (Vercel reads the pnpm workspace; any other commit shows *Skipped - Not affected*).
+- **Settings** (*Settings → Build and Deployment*): Root Directory `apps/landing`; *Include files outside the root directory in the Build Step* on; *Skip deployments when there are no changes to the root directory or its dependencies* on; Node.js 24.x; Next.js defaults. *Settings → Git*: `colinfran/marketbots`, production branch `main`.
+- **Bad deploys:** Vercel's instant rollback (*Deployments* → a previous deployment → *Instant Rollback*).
+- **Deployment storage:** each kept deployment holds a copy of its server code (*Functions Storage*), capped at 10 GB for the team on the Hobby plan. With the shortest retention (*Team Settings → Security & Privacy → Deployment Retention Policy*), Vercel keeps each project's last 3 production deployments. To clean up by hand: `npx vercel list marketbots`, then `npx vercel rm <deployment id> ... --safe --yes` (`--safe` skips anything on a domain).
+
+The dashboards' old projects, `cryptomarketbot` and `stockmarketbot`, gave their domains to the server on 2026-11-07. The owner deletes them once the move is verified, and Vercel's copies of the dashboards' secrets with them. Keep the Vercel account, the domains (Vercel hosts their DNS, §2) and Vercel's GitHub app (the landing project builds through it).
 
 ---
 
@@ -761,28 +914,35 @@ A run takes about a minute, and costs nothing (`ai_calls`: `cost_source: "local"
 
 | Symptom | Likely cause / fix |
 | --- | --- |
-| `Invalid engine environment` for every variable, `MONGODB_URI` first | No `.env` at the repo root, or compose was run from another folder: compose reads `.env` from the project folder (§3.3). |
+| `Invalid engine environment` for most variables | No `.env` at the repo root, or compose was run from another folder: compose reads `.env` from the project folder (§3.3). |
 | `external volume "cryptomarketbot_kraken-paper" not found` | The wallet volume is missing. Don't create an empty one on this server: check `docker volume ls`, then restore a backup (§6.2). |
 | `port is already allocated` on `docker compose up` | Another container holds 8787/8788, usually an old engine (`docker ps`). Stop it. Don't move the port: Caddy targets it. |
 | `Invalid engine environment` in logs | A required variable is missing or too short (secrets need 32+ characters). Fix it in `.env` (the bot's names have its prefix there), then `docker compose up -d <bot>-engine`. |
-| `MongoDB connection failed; retrying` | The cluster's firewall (Azure portal → the cluster → *Networking*) doesn't allow the server's IP, or the URI/password is wrong (a `$` in it: §3.3). |
+| `MongoDB connection failed; retrying` | `mongo` is down or still starting (`docker compose ps mongo`, `docker compose logs mongo`): the engine connects by itself once it answers. `Authentication failed`: the user's password in `.env`'s MONGO section changed without `init.js` being run again (§3.8), or the engine wasn't recreated after it. `getaddrinfo ENOTFOUND mongo`: the engine isn't on the `db` network (`docker compose up -d --no-build <bot>-engine`). |
+| `mongo` exits at start: `keyFile` or `permissions` errors | `docker/mongo/start.sh` couldn't write the keyFile to `/run/mongo` (the tmpfs and its `uid=999` in `compose.yml`). |
+| `mongo` exits at start on a new Docker Desktop | Its Linux kernel is one MongoDB 8.0 refuses (6.19 through 7.0.13, §6.6): `docker info --format "{{.KernelVersion}}"`. Go back to the previous Docker Desktop. |
+| `external volume "marketbots_mongo-data" not found` | The database volume is missing. Don't create an empty one on this server: check `docker volume ls`, then restore a backup (§6.6). |
 | `another engine holds the lease; waiting for it to expire` | Another engine is on the same database: an old container (`docker ps`), or a local dev engine without a `_dev` database (§3.5). |
 | `Kraken CLI paper wallet unavailable` | Run the §6.1 commands to see the CLI's own error. No orders are placed until it works (retried every minute). |
 | Admin → System: *Books vs wallet: mismatch* | Something traded the workspace outside the engine, or a fill was lost. New entries are blocked. The owner view lists the differences; *Reset paper wallet* clears it. |
 | Alert *Paper wallet was recreated* | The engine found an empty wallet while the books have history: the volume was lost or a new one was created. Stop `crypto-engine`, check the mount (§6), restore a backup or reset the wallet. |
-| Log `paper workspace reset to match a fresh database` | The crypto engine started against a new database (wrong `MONGODB_DB_NAME`?) and reset the wallet. Fix the name; the previous wallet state is gone unless you have a backup. |
+| Log `paper workspace reset to match a fresh database` | The crypto engine started against a new or empty database (wrong `MONGODB_DB_NAME`? a restore that didn't bring `accounts`, §6.6?) and reset the wallet. Fix the name; the previous wallet state is gone unless you have a backup. |
 | Stock: Admin → Alpaca REST *down*, 401s in logs | Wrong or old paper keys (a reset can issue new ones). |
 | Stock: `406 connection limit exceeded` on market data | Something else uses the account's one data connection: another script, a notebook, a local engine with the live keys. The engine retries every minute. |
 | Stock: `405 symbol limit exceeded` | Lower *Live price subscriptions* in Admin → Settings (the free plan allows 30). |
 | Stock: spreads rejected by the broker | Options level below 3: raise it in Alpaca or turn spreads off in Settings. |
 | Headless news sources down in Admin | The scraper isn't running or is unhealthy: `docker compose ps scraper`, `docker compose logs scraper`, the health check in §5.3. |
-| Header says "No stream" | `ENGINE_STREAM_URL` isn't set on Vercel (redeploy after adding it). |
-| Stream stuck on "reconnecting" | Caddy isn't running or lacks the site, `STREAM_ALLOWED_ORIGINS` doesn't include the exact dashboard origin (handshake refused), or `STREAM_TOKEN_SECRET` differs between Vercel and the engine (connection closed with 4003). |
-| "Owner sign-in is not configured" | `BETTER_AUTH_SECRET` (32+ characters), `MONGODB_URI` or `OWNER_EMAIL` is missing on Vercel. |
-| No sign-in email arrives | `USESEND_API_KEY`, `USESEND_BASE_URL` or `USESEND_FROM_EMAIL` is missing or wrong, or the sender domain isn't verified in useSend (Vercel function logs show the error). Only `OWNER_EMAIL` is ever emailed. |
-| Vercel skips a build that changed a dashboard | The change was outside the app and its workspace dependencies, e.g. a package the app imports without listing it in `package.json` (§8.2). List it, or redeploy by hand. |
-| A deploy is blocked for storage, or *Functions Storage* is near 10 GB | Too many kept deployments (§8.4). |
-| Vercel build can't resolve `@mb/...` | *Include files outside the root directory* is off (§8.1). |
+| Header says "No stream" | The dashboard has no `ENGINE_STREAM_URL`: the bot's `<BOT>_ENGINE_STREAM_URL` in `.env`, then `docker compose up -d --no-build <bot>-web`. |
+| Stream stuck on "reconnecting" | Caddy isn't running or lacks the engine's site, `STREAM_ALLOWED_ORIGINS` doesn't include the exact dashboard origin (handshake refused), or the dashboard was started with another `STREAM_TOKEN_SECRET` than the engine (connection closed with 4003: recreate both after changing it in `.env`). |
+| "Owner sign-in is not configured" | `BETTER_AUTH_SECRET` (32+ characters) or `OWNER_EMAIL` is missing from the dashboard (`.env`'s `<BOT>_BETTER_AUTH_SECRET`, `OWNER_EMAIL`; then `docker compose up -d --no-build <bot>-web`). |
+| Sign-in fails with `Unauthorized` in `docker compose logs <bot>-web` | The dashboard's database user lacks a privilege its code now uses: a new write needs its line in `docker/mongo/init.js` (§3.8), then `init.js` run again. |
+| No sign-in email arrives | `USESEND_API_KEY`, `USESEND_BASE_URL` or `USESEND_FROM_EMAIL` is missing or wrong, or the sender domain isn't verified in useSend (`docker compose logs <bot>-web` shows the error). Only `OWNER_EMAIL` is ever emailed. |
+| A dashboard answers 502 | Its container is down, restarting or being swapped by a deploy: `docker compose ps`, `docker compose logs --since 1h <bot>-web`. A few seconds during a deploy are normal. |
+| *Server error on …* alerts in Discord | An unhandled error in the dashboard's server, now from its container: `docker compose logs --since 1h <bot>-web` has the stack. *The database is unreachable* on the page: `mongo` is down (`docker compose ps mongo`). |
+| A commit didn't deploy the dashboards | `logs\autodeploy\<UTC date>.log` has no `deploying` line: the hooks aren't on (`git config core.hooksPath` must say `.githooks`), the commit wasn't on `main`, or the task is disabled or missing (`Get-ScheduledTask -TaskPath '\marketbots\'`; install: §8.2). `deploy failed`: the build's output is in the log and in Discord; the running version stays up. |
+| The deploy log says `unchanged` for an app a commit changed | The change is outside what its image copies (§8.1): a package the dashboard imports but the Dockerfile doesn't `COPY`. Add it there. |
+| The landing page's Vercel deploy is blocked for storage, or *Functions Storage* is near 10 GB | Too many kept deployments (§8.5). |
+| The landing page's Vercel build can't resolve `@mb/...` | *Include files outside the root directory* is off (§8.5). |
 | `llm` won't start: `could not select device driver "nvidia"` | Docker can't see the GPUs: update the NVIDIA driver and Docker Desktop, and check the WSL2 backend is on. |
 | `llm` exits at start with `cudaMalloc failed: out of memory` | Something else holds GPU memory (a game, a second model server, a big transcode). Free it, then `docker compose up -d llm`. |
 | `llm` exits at start: the model file can't be opened | The file isn't in the `marketbots_models` volume (a new server, a Docker or WSL reset, a new model). Fetch it with `docker compose --profile setup run --rm llm-model`, then `docker compose up -d llm`. |
@@ -814,16 +974,16 @@ Every reading (2 s by default) the agent reads Windows, `nvidia-smi` and LibreHa
 - The chart samples, in `data\host.sqlite`: every reading, kept a little over an hour, and minute averages with the energy measured in each minute, kept 30 days. Expired rows are deleted once a minute. The recorded energy totals (today, 24 hours, 7 and 30 days) are summed from the outlet's minute samples.
 - The owner's commands (fan setting, agent settings, outlet discovery, from either dashboard), in the same file with their outcomes, kept 30 days. The request is audited in the sending bot's audit log.
 
-Its API serves them: 127.0.0.1:`HOST_API_PORT` (8789), published by Caddy at `/host` on both engine domains (§3). Only the dashboards' servers call it, with `HOST_API_SECRET`, and only while Admin → Server is open: `GET /status`, `GET /history?range=`, `POST /commands`, `GET /commands/<id>`. Nothing about the machine goes to the bots' database, and the engines don't know the agent exists.
+Its API serves them: 127.0.0.1:`HOST_API_PORT` (8789). Only the dashboards' servers call it, at `http://host.docker.internal:8789` (Docker Desktop forwards that to the host's loopback, §3.4), with `HOST_API_SECRET`, and only while Admin → Server is open. Caddy also publishes it at `/host` on both engine domains (§2), which only the old Vercel dashboards used: `GET /status`, `GET /history?range=`, `POST /commands`, `GET /commands/<id>`. Nothing about the machine goes to the bots' database, and the engines don't know the agent exists.
 
 ### 11.1 Its variables
 
-The agent reads the repo's `.env` (§3), started with `node --env-file`: the SHARED section's `HOST_API_SECRET` and the HOST section, under their own names. It ignores the bots' variables in the file. Nothing in the HOST section goes to Vercel.
+The agent reads the repo's `.env` (§3), started with `node --env-file`: the SHARED section's `HOST_API_SECRET` and the HOST section, under their own names. It ignores the bots' variables in the file. Nothing in the HOST section goes to a container.
 
 | Variable | What |
 | --- | --- |
-| `HOST_API_SECRET` | SHARED, 32+ characters: the dashboards send it with every call (each Vercel project has the same value, §3.4). Empty: the API is off; the agent still reads and runs the fans |
-| `HOST_API_PORT` | Optional: the API's port on 127.0.0.1 (default 8789; Caddy forwards `/host/*` to it) |
+| `HOST_API_SECRET` | SHARED, 32+ characters: the dashboards send it with every call (compose gives both the same value, §3.4). Empty: the API is off; the agent still reads and runs the fans |
+| `HOST_API_PORT` | Optional: the API's port on 127.0.0.1 (default 8789; the dashboards' `HOST_API_URL` in `compose.yml` points at it) |
 | `FAN_CONTROL` | `on`: the agent sets the motherboard fans. `off` (default): it only reads them (§11.4) |
 | `VESYNC_USERNAME`, `VESYNC_PASSWORD` | A VeSync account that sees the outlet: a separate one the home or outlet is shared with (accept the share in the VeSync app, signed in as it). Without them, no power or energy readings (the recorded history still shows) |
 | `VESYNC_TIMEZONE`, `VESYNC_COUNTRY_CODE`, `VESYNC_REFRESH_MS` | Optional: the account's time zone (default the server's) and country (`US`), and how often the outlet is read (60000 ms) |
@@ -834,7 +994,7 @@ The agent's own settings (the reading interval, the electricity price and curren
 ### 11.2 First install
 
 ```powershell
-notepad .env                                             # MONGODB_URI (SHARED), the HOST section: the VeSync login (.env exists from §2)
+notepad .env                                             # HOST_API_SECRET (SHARED), the HOST section: the VeSync login (.env exists from §2)
 pnpm install
 pnpm --filter @mb/host-agent build
 .\apps\host-agent\scripts\install-sensors.ps1            # administrator PowerShell
@@ -856,7 +1016,7 @@ Get-Content apps\host-agent\data\logs\agent.log -Tail 50 -Wait          # JSON l
 Get-ScheduledTask -TaskPath '\marketbots\' | Get-ScheduledTaskInfo      # last run and result of both tasks
 ```
 
-Any time is fine: the engines don't depend on it. The page itself deploys with the dashboards (push to `main`).
+Any time is fine: the engines don't depend on it. The page itself deploys with the dashboards (a commit to `main`, §8.2).
 
 The task's command line names the env file. Tasks registered before the move to one `.env` (2026-10-30) start the agent with `.env.host`: run `install-tasks.ps1` again once (administrator PowerShell, as the account that signs in), then restart the agent as above.
 
@@ -906,7 +1066,7 @@ The import matches the old monitor's own energy totals to the watt-hour. Running
 
 | Symptom | Likely cause / fix |
 | --- | --- |
-| *The host agent has never reported* | The `Host agent` task isn't running (`Get-ScheduledTask -TaskPath '\marketbots\' \| Get-ScheduledTaskInfo`, then the log, §11.3; a bad `.env` stops it at start: the task's last result is 1), or the dashboard can't reach its API: the log says *API off* (`HOST_API_SECRET` empty) or *API not started*; Vercel's `HOST_API_URL` / `HOST_API_SECRET` don't match (§3.4); Caddy lacks the `/host` route (§3). From the server, `curl.exe -s -o NUL -w "%{http_code}" https://engine.cryptomarketbot.app/host/status` answers 401 when the route and the agent are up (no secret sent). |
+| *The host agent has never reported* | The `Host agent` task isn't running (`Get-ScheduledTask -TaskPath '\marketbots\' \| Get-ScheduledTaskInfo`, then the log, §11.3; a bad `.env` stops it at start: the task's last result is 1), or the dashboard can't reach its API: the log says *API off* (`HOST_API_SECRET` empty) or *API not started*; the dashboard was started with another `HOST_API_SECRET` (recreate it after a change, §3.4). From the dashboard's container, `docker compose exec crypto-web node -e "fetch('http://host.docker.internal:8789/status').then(r=>console.log(r.status))"` prints 401 when the agent is up (no secret sent). |
 | *Offline* with a time | The agent stopped, or stopped being reachable, after that reading. The history stays. |
 | *Motherboard sensors: LibreHardwareMonitor is not responding* | The `Host sensors` task isn't running, or the PawnIO prompt wasn't approved: run `start-sensors.ps1` by hand. |
 | No CPU temperature, every fan at 100% | *Cooling protection*: LibreHardwareMonitor has no `CPU Package` temperature (sensors still loading, or the driver isn't approved). |

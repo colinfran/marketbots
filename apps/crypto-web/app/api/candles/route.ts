@@ -2,9 +2,10 @@ import { SYMBOL_PATTERN } from "@mb/crypto-core/venues"
 import { NextResponse } from "next/server"
 
 /**
- * Price candles for the charts, straight from Kraken's public OHLC endpoint (no key). Vercel's
- * IPs are separate from the trading server's, so chart traffic never eats into the engine's
- * Kraken rate limit. Responses are cached briefly at the edge.
+ * Price candles for the charts, straight from Kraken's public OHLC endpoint (no key). They leave
+ * from the trading server's address, which the engine's Kraken REST client uses too, so Next's
+ * fetch cache keeps them to one call per pair and interval every 30 s (≤15-minute candles) or
+ * 2 minutes, and browsers cache the answer briefly.
  */
 
 const INTERVALS = new Set([5, 15, 60, 240, 1440])

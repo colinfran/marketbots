@@ -1,0 +1,14 @@
+#!/bin/sh
+# A new commit on main deploys the dashboards (docker/web/autodeploy.mjs, docs/SERVER.md §8). This only
+# starts the on-demand task "\marketbots\Web deploy" and returns: the build runs outside this shell
+# and never holds up the commit. Active once docker/web/install-autodeploy.ps1 has set core.hooksPath.
+[ "$(git rev-parse --abbrev-ref HEAD 2>/dev/null)" = "main" ] || exit 0
+# Not for each commit a rebase or cherry-pick replays: the deploy reads main when it runs anyway.
+[ -d "$(git rev-parse --git-path rebase-merge)" ] || [ -d "$(git rev-parse --git-path rebase-apply)" ] && exit 0
+command -v schtasks.exe >/dev/null 2>&1 || exit 0
+if MSYS_NO_PATHCONV=1 schtasks.exe /run /tn '\marketbots\Web deploy' >/dev/null 2>&1; then
+  echo "autodeploy: started the Web deploy task (log: logs/autodeploy/)"
+else
+  echo "autodeploy: couldn't start the Web deploy task; deploy by hand (docs/SERVER.md §8)" >&2
+fi
+exit 0

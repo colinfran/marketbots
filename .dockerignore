@@ -1,10 +1,12 @@
 # The engine images need the workspace manifests, packages/* and their own apps/<bot>-engine.
+# The dashboard images (docker/web/Dockerfile) need their own apps/<bot>-web and the packages it uses.
 # The scraper image needs apps/scraper only.
 **/node_modules
 **/.next
 **/dist
 **/coverage
 **/*.tsbuildinfo
+**/next-env.d.ts
 .git
 .vercel
 # Real keys never enter a build context: compose passes them at runtime (environment, from .env).
@@ -15,8 +17,10 @@ docs
 contracts
 data
 backups
+logs
 *.md
-apps/crypto-web/**
-!apps/crypto-web/package.json
-apps/stock-web/**
-!apps/stock-web/package.json
+# The dashboards' tests don't go into their images, so a test-only change keeps the image as it is.
+apps/crypto-web/tests
+apps/stock-web/tests
+apps/landing
+apps/host-agent
