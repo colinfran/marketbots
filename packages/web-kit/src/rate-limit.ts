@@ -220,15 +220,14 @@ const message = (error: unknown) => (error instanceof Error ? error.message : St
 
 /**
  * Keeps the limiter's bans and the store in step. The first requests after a start wait for the
- * stored list (3 s at most); then it is read again every minute in the background, which picks up
- * the Admin page's unbans and saves the counts of refused requests. A new ban is saved at once.
+ * stored list (3 s at most); then a timer reads it again every minute, traffic or not, which picks
+ * up the Admin page's unbans and saves the counts of refused requests. A new ban is saved at once.
  */
 export class BanSync {
   private first: Promise<void> | null = null
   private firstStarted = 0
   private firstDone = false
   private running = false
-  private lastRun = -Infinity
   /** Bans being saved: kept even if a reload that started before the save doesn't list them. */
   private readonly saving = new Set<string>()
 
@@ -238,20 +237,22 @@ export class BanSync {
     private readonly now: () => number = Date.now,
   ) {}
 
-  /** Call before each request: waits for the first load, then starts a reload when one is due. */
+  /** Call before each request: the first call loads the bans and starts the timer; the first requests wait for the load. */
   async ready(): Promise<void> {
     if (!this.first) {
       this.firstStarted = this.now()
       this.first = this.run().finally(() => {
         this.firstDone = true
       })
+      const timer = setInterval(() => {
+        if (!this.running) void this.run()
+      }, SYNC_MS)
+      // Never keeps the process alive on its own.
+      ;(timer as { unref?: () => void }).unref?.()
     }
-    if (!this.firstDone) {
-      const wait = this.firstStarted + FIRST_LOAD_WAIT_MS - this.now()
-      if (wait > 0) await Promise.race([this.first, new Promise((resolve) => setTimeout(resolve, wait))])
-      return
-    }
-    if (!this.running && this.now() - this.lastRun >= SYNC_MS) void this.run()
+    if (this.firstDone) return
+    const wait = this.firstStarted + FIRST_LOAD_WAIT_MS - this.now()
+    if (wait > 0) await Promise.race([this.first, new Promise((resolve) => setTimeout(resolve, wait))])
   }
 
   banned(ban: BanRecord) {
@@ -270,7 +271,6 @@ export class BanSync {
   async run() {
     this.running = true
     const started = this.now()
-    this.lastRun = started
     try {
       const counts = this.limiter.drainBlocked()
       if (counts.size) await this.store.recordBlocked(counts).catch((error: unknown) => console.error("[rate-limit] refused-request counts not saved:", message(error)))

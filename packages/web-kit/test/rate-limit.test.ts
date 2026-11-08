@@ -157,12 +157,13 @@ describe("BanSync", () => {
     expect(rl.take("203.0.113.7")).toMatchObject({ banned: true })
   })
 
-  it("reloads every minute: drops lifted bans, keeps its own unsaved ones, saves refused counts", async () => {
-    const c = clock()
+  it("reloads every minute without traffic: drops lifted bans, keeps its own unsaved ones, saves refused counts", async () => {
+    vi.useFakeTimers()
     const { bans, blocked, store } = memoryStore(["lifted", "kept"])
-    const rl = new RateLimiter(LIMITS, c.now)
-    const sync = new BanSync(rl, store, c.now)
+    const rl = new RateLimiter()
+    const sync = new BanSync(rl, store)
     await sync.ready()
+    const refusedAt = Date.now()
     rl.take("kept")
     rl.take("kept")
     bans.delete("lifted") // Unban on the Admin page.
@@ -171,13 +172,15 @@ describe("BanSync", () => {
     vi.mocked(store.add).mockImplementationOnce(() => new Promise<void>((resolve) => (finish = resolve)))
     expect(earnBan(rl, "fresh")).toMatchObject({ newBan: true })
     sync.banned({ key: "fresh", at: new Date(), reason: rl.reason, path: "/", userAgent: null })
-    c.advance(MINUTE)
-    await sync.ready() // Due: starts the reload in the background.
-    await vi.waitFor(() => expect(store.load).toHaveBeenCalledTimes(2))
-    await sync.run()
+    // No request comes: the timer reloads.
+    await vi.advanceTimersByTimeAsync(MINUTE)
+    expect(store.load).toHaveBeenCalledTimes(2)
     expect(["lifted", "kept", "fresh"].map((k) => rl.isBanned(k))).toEqual([false, true, true])
-    expect(blocked[0]).toEqual(new Map([["kept", { count: 2, last: c.now() - MINUTE }]]))
+    expect(blocked).toEqual([new Map([["kept", { count: 2, last: refusedAt }]])])
     finish()
+    await vi.advanceTimersByTimeAsync(MINUTE)
+    expect(store.load).toHaveBeenCalledTimes(3)
+    expect(blocked).toHaveLength(1) // Nothing refused since: nothing to save.
   })
 
   it("keeps its bans when the store can't be read", async () => {
