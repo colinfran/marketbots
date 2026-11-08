@@ -7,6 +7,10 @@ const nextConfig: NextConfig = {
   // The shared packages ship TypeScript sources.
   transpilePackages: ["@mb/core", "@mb/stock-core", "@mb/ui", "@mb/web-kit"],
   poweredByHeader: false,
+  // The rate limit (proxy.ts) tells link prefetches by Next's router headers, which Next otherwise
+  // removes before the proxy runs. The proxy only lets requests through or refuses them, so the URL
+  // normalization this also skips (for proxy rewrites, redirects and locales) changes nothing here.
+  skipProxyUrlNormalize: true,
   turbopack: {
     rules: {
       "*.css": {

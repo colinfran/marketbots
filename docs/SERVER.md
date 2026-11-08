@@ -9,7 +9,7 @@ What runs where:
 | Where | What | Config |
 | --- | --- | --- |
 | Windows server, Docker stack `marketbots` | `crypto-engine` on 127.0.0.1:8787 (with the Kraken CLI paper wallet), `stock-engine` on 127.0.0.1:8788, the dashboards `crypto-web` on 127.0.0.1:3101 and `stock-web` on 127.0.0.1:3102, `mongo` (both bots' MongoDB, no host port) and `mongo-backup`, `scraper` (no host port), `llm` (llama.cpp with the local model on both GPUs, no host port), `search` (SearXNG for local research, no host port), `history` (Postgres with TimescaleDB and pgvector, no host port), `history-backup` and `wallet-backup`. For local dev only: `mongo-dev` (profile `dev`, 127.0.0.1:27018) | `compose.yml`, `.env` at the repo root |
-| Caddy on the Windows host | `cryptomarketbot.app` → 127.0.0.1:3101, `stockmarketbot.app` → 127.0.0.1:3102 (their `www.` names redirect); `engine.cryptomarketbot.app` → 127.0.0.1:8787, `engine.stockmarketbot.app` → 127.0.0.1:8788 (only the WebSocket stream and the health checks) | `C:\Caddy\Caddyfile` |
+| Caddy on the Windows host | `cryptomarketbot.app` → 127.0.0.1:3101, `stockmarketbot.app` → 127.0.0.1:3102 (their `www.` names redirect); `engine.cryptomarketbot.app` → 127.0.0.1:8787, `engine.stockmarketbot.app` → 127.0.0.1:8788 (only the WebSocket stream and the health checks); their access log and ban list (§8.6) | `C:\Caddy\Caddyfile`, `C:\Caddy\marketbots-banned.caddy` |
 | The Windows host, outside Docker | The host agent and its LibreHardwareMonitor (Admin → Server, the motherboard fans; §11); the `Web deploy` task, which the repo's git hooks start on every commit to `main` (§8) | `.env` at the repo root (its HOST section) |
 | Vercel | one project: the landing page, `apps/landing` at marketbots.vercel.app (§8.5) | its project settings |
 | Alpaca | the stock bot's paper account | `.env` (`STOCK_ALPACA_*`, engine only) |
@@ -88,10 +88,32 @@ Its admin API listens on 127.0.0.2, not on the default 127.0.0.1 (global options
 
 Docker Desktop forwards `host.docker.internal` to the host's 127.0.0.1, so every container on this machine reaches whatever listens there. On 2026-11-05 a throwaway container read Caddy's configuration through the default admin address with a forged `Host` header: it could have rewritten it, for example to serve `C:\` on a public site. The containers don't reach 127.0.0.2 (probed on 2026-11-07), and the host still can, so a reload needs no restart. The other loopback services the containers reach all require a secret: the engines' signed API, the host agent, LibreHardwareMonitor, the cron stack's Postgres.
 
+Every marketbots site imports one snippet: the access log and the ban list (§8.6).
+
+```caddy
+(marketbots) {
+	log {
+		output file C:/Caddy/logs/marketbots.log {
+			roll_size 20MiB
+			roll_keep 20
+			roll_keep_for 720h
+		}
+		format filter {
+			request>uri query {
+				replace token REDACTED
+			}
+		}
+	}
+	import C:/Caddy/marketbots-banned.caddy
+	abort @banned
+}
+```
+
 The dashboards' sites:
 
 ```caddy
 (webapp) {
+	import marketbots
 	# The dashboards use no WebSockets (the stream goes to engine.<domain>) and no image optimizer:
 	# both are where 2026's self-hosted-only Next.js advisories were.
 	@upgrade header Upgrade *
@@ -120,17 +142,14 @@ www.stockmarketbot.app {
 
 Caddy sets `X-Forwarded-For` to the visitor's address (one sent by the visitor is replaced) and `X-Forwarded-Host`: the login rate limit keys on a hash of the first, the dashboards' same-origin check reads the second. Next compresses its own responses, so the sites have no `encode`, which could hold back streamed pages.
 
-The engine sites pass on only what browsers use: the live stream and the health checks.
+The engine sites pass on only what browsers use: the live stream and the health checks. They use no `handle` blocks: Caddy orders `handle` before `abort`, which would let a banned visitor through.
 
 ```caddy
 (engine) {
-	@public path /v1/stream /healthz /readyz
-	handle @public {
-		reverse_proxy {args[0]}
-	}
-	handle {
-		respond 404
-	}
+	import marketbots
+	@private not path /v1/stream /healthz /readyz
+	respond @private 404
+	reverse_proxy {args[0]}
 }
 
 engine.cryptomarketbot.app {
@@ -144,7 +163,9 @@ engine.stockmarketbot.app {
 
 The engines also serve `/v1/status` and `/v1/commands`: the dashboards' heartbeat reads and commands, answered only when signed with the bot's `STREAM_TOKEN_SECRET` (docs/CRYPTO.md, docs/STOCK.md). The dashboards call those over `host.docker.internal` (`ENGINE_URL`, §3.4), and the host agent's API the same way (§11), so neither faces the internet. Until 2026-11-07 the engine sites passed everything on, with `/host/*` going to the agent, for the dashboards on Vercel.
 
-After editing the Caddyfile, validate it, then reload:
+Until 2026-11-08 the sites had no access log and no ban list, and the engine sites used `handle` blocks. The Caddyfile before that change is `C:\Caddy\Caddyfile.bak-2026-11-08`.
+
+After editing the Caddyfile (or the ban list), validate it, then reload:
 
 ```powershell
 C:\Caddy\caddy.exe validate --config C:\Caddy\Caddyfile
@@ -811,6 +832,36 @@ One Vercel project still builds from `colinfran/marketbots`, on the Hobby plan o
 
 The dashboards' old projects, `cryptomarketbot` and `stockmarketbot`, gave their domains to the server on 2026-11-07. The owner deletes them once the move is verified, and Vercel's copies of the dashboards' secrets with them. Keep the Vercel account, the domains (Vercel hosts their DNS, §2) and Vercel's GitHub app (the landing project builds through it).
 
+### 8.6 Abuse: the access log, the ban list and the rate limit
+
+The dashboards are public (paper money, read-only for everyone but the owner), so anything can hit them. Scanners began probing both for Next.js exploits within hours of the move here: the `Server Reference ID did not match` errors in the dashboards' logs are React2Shell probes, which a patched Next refuses. What is reachable from the internet: the dashboards' pages and public API routes (`/api/candles`, `/api/status`, `/api/days`, `/api/trades`, `/api/stream-token`, sign-in), and the engines' stream and health checks (§2). The owner-only routes need the owner's session, and the engines' signed API, the host agent and every database have no public address at all.
+
+Three layers, all from 2026-11-08:
+
+**The access log.** Caddy logs every request to the four marketbots sites (not the `www.` redirects) to `C:\Caddy\logs\marketbots.log`: JSON, one line per request, with the visitor's address (`request.client_ip`), the host, URI, status and user agent. It rolls at 20 MiB and keeps 30 days (at most 20 old files). Caddy redacts cookies and `Authorization` headers by itself; the `(marketbots)` snippet also redacts the `token` of sign-in links. The busiest addresses of the last hour:
+
+```powershell
+$since = [DateTimeOffset]::UtcNow.AddHours(-1).ToUnixTimeSeconds()
+Get-Content C:\Caddy\logs\marketbots.log | ConvertFrom-Json | Where-Object ts -gt $since | Group-Object { $_.request.client_ip } | Sort-Object Count -Descending | Select-Object -First 10 Count, Name
+Select-String -Path C:\Caddy\logs\marketbots.log -SimpleMatch '"client_ip":"203.0.113.7"' | Select-Object -Last 20   # what one address did
+```
+
+Requests from this machine to the public names come back through the router, from the home connection's public address, so the owner's own browsing at home and any test run here show up under that address.
+
+**The ban list.** `C:\Caddy\marketbots-banned.caddy` lists the addresses Caddy drops on all four sites before anything else runs: the connection closes without an answer. Add one `client_ip` line per address or CIDR range with a comment (when, why), then reload Caddy (§2); taking a line out and reloading lifts the ban. The placeholder 192.0.2.1, a documentation address, keeps the list valid while nobody is banned. `abort` runs before `respond` and `reverse_proxy` in Caddy's directive order, but after `handle`: that's why the engine sites have no `handle` blocks. Tested on 2026-11-08 by banning 127.0.0.1 for a few seconds: `curl.exe --resolve cryptomarketbot.app:443:127.0.0.1 https://cryptomarketbot.app/` got an empty reply. (`client_ip` is the connection's address. If a CDN ever sits in front, Caddy's `trusted_proxies` makes it the visitor's.)
+
+**The rate limit.** Each dashboard's `proxy.ts` runs `@mb/web-kit/rate-limit` on every request but build assets and static files (`/_next/static`, the icons, `robots.txt`, which is also the healthcheck):
+
+- Each visitor, keyed by the address Caddy puts in `X-Forwarded-For` (an IPv6 address by its /64), has a bucket of 180 points that refills at 3 a second. A request costs 1. An empty bucket answers `429 Too Many Requests` with `Retry-After`.
+- A link prefetch costs 0.2. Next's router prefetches every link in view, so one page view makes up to ~120 prefetches, and Next answers each with only the route's shell (~230 bytes against 200-400 KB for the page). Measured in a real browser on 2026-11-08: the heaviest page view costs ~25 points, and clicking a link every 2 s ~70 a minute, so two or three readers behind one address stay well under the limit while a scraper is held to 3 pages a second. Only `RSC: 1` with `Next-Router-Prefetch: 1` counts as a prefetch: either header alone gets the whole page. Next hides those headers from the proxy unless `next.config.ts` sets `skipProxyUrlNormalize` (both dashboards do; it changes nothing else here, since the proxy never rewrites or redirects).
+- A visitor refused 100 points' worth within 10 minutes is banned: 1 hour, doubling with each ban within a day of the last, up to 24 hours. Each ban is logged: `docker compose logs crypto-web | Select-String rate-limit` shows `[rate-limit] <address> banned for 60 min (ban 1 within a day)`. An address banned again and again belongs in Caddy's list.
+- The owner's session lifts the limit, and any ban, for its address for an hour. It is looked up only once the address is over the limit, at most once a minute per address, so forged cookies can't turn into database load.
+- The state is the container's memory (one container per dashboard): a deploy or `docker compose restart <bot>-web` clears every count and ban.
+
+Sign-in has its own, stricter limits per address, kept in MongoDB (Better Auth; §3.4).
+
+What none of this does: limit the engines' stream, which caps itself (10 connections per address, `STREAM_MAX_CLIENTS` in all, 100 by default, shared by everyone, owner included), or stop a flood big enough to fill the home connection. That would take every site on this server offline, and only a proxy in front of it (Cloudflare, for example) could absorb it; it would also hide the home address, which the domains' DNS records publish (§2).
+
 ---
 
 ## 9. The local model server (`llm`)
@@ -933,6 +984,8 @@ A run takes about a minute, and costs nothing (`ai_calls`: `cost_source: "local"
 | Stock: spreads rejected by the broker | Options level below 3: raise it in Alpaca or turn spreads off in Settings. |
 | Headless news sources down in Admin | The scraper isn't running or is unhealthy: `docker compose ps scraper`, `docker compose logs scraper`, the health check in §5.3. |
 | Header says "No stream" | The dashboard has no `ENGINE_STREAM_URL`: the bot's `<BOT>_ENGINE_STREAM_URL` in `.env`, then `docker compose up -d --no-build <bot>-web`. |
+| A dashboard answers `Too many requests` | The rate limit (§8.6): that address used up its bucket, or was banned (`docker compose logs <bot>-web \| Select-String rate-limit`). Signing in as the owner lifts it for the owner's address; `docker compose restart <bot>-web` clears every count and ban. |
+| A site drops the connection (empty reply) | The address is in Caddy's ban list, `C:\Caddy\marketbots-banned.caddy` (§8.6). |
 | Stream stuck on "reconnecting" | Caddy isn't running or lacks the engine's site, `STREAM_ALLOWED_ORIGINS` doesn't include the exact dashboard origin (handshake refused), or the dashboard was started with another `STREAM_TOKEN_SECRET` than the engine (connection closed with 4003: recreate both after changing it in `.env`). |
 | "Owner sign-in is not configured" | `BETTER_AUTH_SECRET` (32+ characters) or `OWNER_EMAIL` is missing from the dashboard (`.env`'s `<BOT>_BETTER_AUTH_SECRET`, `OWNER_EMAIL`; then `docker compose up -d --no-build <bot>-web`). |
 | Sign-in fails with `Unauthorized` in `docker compose logs <bot>-web` | The dashboard's database user lacks a privilege its code now uses: a new write needs its line in `docker/mongo/init.js` (§3.8), then `init.js` run again. |

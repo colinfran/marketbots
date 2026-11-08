@@ -11,7 +11,7 @@ export { sameOrigin, type Viewer } from "@mb/web-kit/auth"
  * emailed code) for OWNER_EMAIL only, with this dashboard's own secret, database and domain. The
  * IP salt "smb-ip." must never change: the login rate-limit records are keyed by it.
  */
-export const { auth, authConfigured, getViewer } = createAuth({
+export const { auth, authConfigured, getViewer, isOwnerRequest } = createAuth({
   appName: "StockMarketBot",
   ipSalt: "smb-ip.",
   env,

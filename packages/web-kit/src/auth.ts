@@ -150,13 +150,16 @@ export const createAuth = ({
   /** Built on first use, so `next build` doesn't need the database or secrets. */
   const auth = () => (instance ??= build())
 
-  const getViewer = cache(async (): Promise<Viewer> => {
-    if (!authConfigured()) return { owner: false }
-    const session = await auth().api.getSession({ headers: await headers() })
-    return { owner: isOwnerEmail(session?.user.email, env.ownerEmail()) }
-  })
+  /** Whether a request's headers carry the owner's session: getViewer outside a request scope (the rate limit's proxy). */
+  const isOwnerRequest = async (requestHeaders: Headers): Promise<boolean> => {
+    if (!authConfigured()) return false
+    const session = await auth().api.getSession({ headers: requestHeaders })
+    return isOwnerEmail(session?.user.email, env.ownerEmail())
+  }
 
-  return { auth, authConfigured, getViewer }
+  const getViewer = cache(async (): Promise<Viewer> => (authConfigured() ? { owner: await isOwnerRequest(await headers()) } : { owner: false }))
+
+  return { auth, authConfigured, getViewer, isOwnerRequest }
 }
 
 /** app/api/auth/[...all]: magic-link and code sign-in, link verification, sign-out (503 until sign-in is configured). */
