@@ -18,6 +18,15 @@ describe("rounding helpers", () => {
     expect(floorToStep(19722.990169, 0.00001)).toBe(19722.99016)
   })
 
+  it("never rounds a very large amount up a lot", () => {
+    // 3.1e13 steps: a slack of 1e-13 relative was 3 lots, and a stop-loss asked the wallet for
+    // 311011883.14568 PEPE of the 311011883.14565 it held (2026-11-09).
+    expect(floorToStep(311011883.14565, 0.00001)).toBe(311011883.14565)
+    expect(floorToStep(311011883.14562, 0.00001)).toBe(311011883.14562)
+    expect(floorToStep(311011883.145652, 0.00001)).toBe(311011883.14565)
+    expect(floorToStep(9876543210.12345, 0.00001)).toBe(9876543210.12345)
+  })
+
   it("rounds to price ticks", () => {
     expect(roundToStep(45285.24, 0.1)).toBe(45285.2)
     expect(roundToStep(0.5549, 0.001)).toBe(0.555)

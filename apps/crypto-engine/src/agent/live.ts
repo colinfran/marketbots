@@ -6,7 +6,7 @@ import { normalizeCryptoAgentDecisions, type CryptoAgentAnswer, type NormalizedC
 import type { DecisionDoc, PositionDoc } from "@mb/crypto-core/db"
 import { roundTo } from "@mb/crypto-core/math"
 import { cleanLine } from "@mb/engine-kit/util/text"
-import { loadFeatures, processDecision } from "../orchestrator/decide"
+import { loadFeatures, plausibleTarget, processDecision } from "../orchestrator/decide"
 import { correlationMatrix } from "../risk/correlation"
 import type { AccountState } from "../risk/engine"
 import { boundedStop, candidateFeatures, type CryptoCandidate } from "../strategies/types"
@@ -125,7 +125,8 @@ const outcomeOf = (dec: NormalizedCryptoAgentDecision, doc: DecisionDoc): AgentA
   if (e.status === "rejected") return action(dec, "rejected", doc.risk?.reasons.slice(0, 3).join("; ") || e.notes[0] || "rejected")
   if (e.status === "failed" || e.status === "skipped") return action(dec, "rejected", e.notes[0] ?? e.status)
   const raised = e.notes.find((n) => n.startsWith("stop raised"))
-  return action(dec, raised ? "updated" : "held", raised ?? "unchanged")
+  const ignored = e.notes.find((n) => n.startsWith("target "))
+  return action(dec, raised ? "updated" : "held", [raised, ignored].filter(Boolean).join("; ") || "unchanged")
 }
 
 /** The agent's decisions into the paper account: exits first, holds, then entries by conviction. */
@@ -185,7 +186,8 @@ export const actOnCryptoAnswer = async (d: Pick<CryptoAgentDeps, "ctx">, answer:
       }
       // The cycle's levels when the agent gives none: 2 ATR(1h) inside the allowed range, then 2.5R.
       const stop = agentStop(q.mid, dec.stop_loss, boundedStop(q.mid, 2 * (f?.atr_1h ?? q.mid * 0.015), settings), settings.kraken)
-      const target = dec.take_profit !== null && dec.take_profit > q.mid ? dec.take_profit : q.mid + 2.5 * (q.mid - stop)
+      // Its target, unless that is below the price or a unit slip (`plausibleTarget`).
+      const target = plausibleTarget(dec.take_profit, q.mid) ? dec.take_profit : q.mid + 2.5 * (q.mid - stop)
       const strategy = dec.strategy ?? "discretionary"
       candidate = { instrument: dec.symbol, symbol: dec.symbol, strategy, score: dec.conviction, signal: `agent: ${cleanLine(dec.thesis, 120)}`, features: f ? candidateFeatures(f) : {}, stop_hint: stop, target_hint: target }
       decision = { ...dec, stop_loss: stop, take_profit: target }

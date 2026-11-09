@@ -36,13 +36,17 @@ export const median = (values: number[]) => {
  * Floors `value` to a multiple of `step` (e.g. a lot size), without float drift: a value within
  * 1e-13 of a multiple (relative, or 1e-9 steps when that's larger) counts as that multiple. Float
  * error grows with the number of steps (150,000 coins at 5 lot decimals is 1.5e10 steps), so a
- * fixed tolerance would floor an amount sitting on a lot boundary down a whole step.
+ * fixed tolerance would floor an amount sitting on a lot boundary down a whole step. The slack
+ * never exceeds half a step: past 1e13 steps the relative 1e-13 is whole steps, and it rounded
+ * 311M PEPE (3.1e13 steps at 5 lot decimals) up 3 lots, more than the wallet held. So past 5e12
+ * steps an amount rounds to its nearest lot, never more than half a lot up.
  */
 export const floorToStep = (value: number, step: number): number => {
   if (step <= 0) return value
   const decimals = Math.max(0, Math.ceil(-Math.log10(step)))
   const steps = value / step
-  return Number((Math.floor(steps + Math.max(1e-9, Math.abs(steps) * 1e-13)) * step).toFixed(decimals))
+  const slack = Math.min(0.5, Math.max(1e-9, Math.abs(steps) * 1e-13))
+  return Number((Math.floor(steps + slack) * step).toFixed(decimals))
 }
 
 /** Rounds `value` to the nearest multiple of `step` (e.g. a price tick). */

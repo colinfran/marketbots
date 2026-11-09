@@ -128,6 +128,27 @@ describe("ledger + paper wallet", () => {
     expect(outcomes[0]).toMatchObject({ closed: true, fill: { qty: 19722.99017 } })
     expect(wallet.coins.get("PUMP")).toBe(0)
   })
+
+  it("buys and sells exactly the size asked at hundreds of millions of coins", async () => {
+    // PEPE/USD on 2026-11-09: rounding added 3 lots to every order of 311M PEPE, so the buy got
+    // 0.00003 more than asked and the stop's sale asked for 0.00003 more than the wallet held.
+    const PEPE: PairInfo = { ...BTC, symbol: "PEPE/USD", restPair: "PEPEUSD", altname: "PEPEUSD", base: "PEPE", quote: "ZUSD", priceDecimals: 9, lotDecimals: 5, tickSize: 1e-9, lotStep: 1e-5, orderMin: 0, costMin: 0 }
+    const wallet = new FakeWallet(10_000, 0.004, 0, 0.000005063, 0.000005062)
+    const bus = await makeBus(db.col)
+    const ledger = new Ledger(db.col, bus)
+    await ledger.ensureAccount(10_000)
+    const hub = fakeHub({ "PEPE/USD": quote({ symbol: "PEPE/USD", bid: 0.000005062, ask: 0.000005063, mid: 0.0000050625 }) }, [PEPE]) as unknown as MarketHub
+    const executor = new Executor(db.col, ledger, new PaperWalletExecution(wallet.cli(), hub), bus, silentLogger)
+    const order = (side: "buy" | "sell", qty: number) =>
+      executor.execute({ instrument: "PEPE/USD", side, qty, limitPrice: null, referencePrice: 0.0000050625, purpose: side === "buy" ? "entry" : "exit", decisionId: null, positionId: null, meta: {} })
+    await order("buy", 311011883.14562)
+    expect(wallet.coins.get("PEPE")).toBe(311011883.14562)
+    const [position] = await ledger.openPositions()
+    const { outcomes } = await order("sell", position.qty)
+    expect(outcomes[0]).toMatchObject({ closed: true, fill: { qty: 311011883.14562 } })
+    expect(wallet.coins.get("PEPE")).toBe(0)
+    expect(wallet.calls.filter((c) => c[1] === "buy" || c[1] === "sell").map((c) => c[3])).toEqual(["311011883.14562", "311011883.14562"])
+  })
 })
 
 describe("reconcileWallet", () => {

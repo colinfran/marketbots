@@ -143,6 +143,21 @@ describe("crypto agent decisions", () => {
     ])
   })
 
+  it("takes a target over 3× the price for a unit slip: an entry gets its default target, a hold keeps the position's", async () => {
+    // PEPE on 2026-11-09: reviews gave its 0.0000056 target as 560, 5600 and 0.00056, and the last one stuck.
+    const { d, ctx } = await setup()
+    const [entry] = await actOnCryptoAnswer(d, answer([decision({ take_profit: 6_500_000 })]), ep("e1"))
+    expect(entry).toMatchObject({ outcome: "filled" })
+    // 2.5R from the 65,000 mid over the 63,000 stop.
+    expect((await ctx.ledger.openPositions())[0].take_profit_price).toBe(70_000)
+    const [slip] = await actOnCryptoAnswer(d, answer([decision({ action: "hold", stop_loss: null, take_profit: 7_200_000 })]), ep("e2"))
+    expect(slip).toMatchObject({ action: "hold", outcome: "held", detail: "target 7200000 ignored: over 3× the ask 65010" })
+    expect((await ctx.ledger.openPositions())[0].take_profit_price).toBe(70_000)
+    const [moved] = await actOnCryptoAnswer(d, answer([decision({ action: "hold", stop_loss: null, take_profit: 72_000 })]), ep("e3"))
+    expect(moved).toMatchObject({ outcome: "held", detail: "unchanged" })
+    expect((await ctx.ledger.openPositions())[0].take_profit_price).toBe(72_000)
+  })
+
   it("sells what it holds once the minimum hold has passed, and posts the exit to Discord", async () => {
     const { d, ctx } = await setup()
     await actOnCryptoAnswer(d, answer([decision()]), ep("e1"))

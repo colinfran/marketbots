@@ -24,6 +24,17 @@ import { exitPosition } from "./trading"
 
 const HOUR = 3_600_000
 
+/**
+ * The furthest above the price a take-profit may sit, as a multiple of it. A target past it is a
+ * unit slip, not a plan (on 2026-11-09 the model's reviews gave PEPE's 0.0000056 as 560, 5600 and
+ * 0.00056), so it is ignored: an entry falls back to its setup's target, a hold keeps the position's.
+ */
+export const MAX_TARGET_MULTIPLE = 3
+
+/** Whether `target` is a take-profit a long at `price` can mean: above it, and at most `MAX_TARGET_MULTIPLE` times it. */
+export const plausibleTarget = (target: number | null | undefined, price: number): target is number =>
+  typeof target === "number" && target > price && target <= price * MAX_TARGET_MULTIPLE
+
 export const loadFeatures = async (ctx: EngineContext, symbols: string[]) => {
   const features: Features[] = []
   const failures: string[] = []
@@ -154,7 +165,7 @@ export const processDecision = async (ctx: EngineContext, i: DecisionInput): Pro
     ctx.setCycleState("risk_check", d.symbol)
     const pair = ctx.hub.pairs.get(d.symbol)!
     const stop = d.stop_loss && d.stop_loss < quote.mid ? d.stop_loss : i.candidate.stop_hint
-    const target = d.take_profit && d.take_profit > quote.mid ? d.take_profit : i.candidate.target_hint
+    const target = plausibleTarget(d.take_profit, quote.mid) ? d.take_profit : i.candidate.target_hint
     const riskState = await ctx.ledger.riskState()
     const limit = roundPrice(pair, quote.ask * (1 + settings.kraken.max_slippage_bps / 10_000))
     // Risk per trade, a little more or less by the agent's conviction (the core's is fixed); the risk engine's caps can only cut it.
@@ -294,9 +305,10 @@ export const processDecision = async (ctx: EngineContext, i: DecisionInput): Pro
     // Stops only ever move up on a long: a lower stop would add risk the original plan didn't take.
     const p = i.position
     const newStop = d.stop_loss && (!p.stop_price || d.stop_loss > p.stop_price) && quote && d.stop_loss < quote.bid ? d.stop_loss : p.stop_price
-    const newTarget = d.take_profit && quote && d.take_profit > quote.ask ? d.take_profit : p.take_profit_price
+    const newTarget = quote && plausibleTarget(d.take_profit, quote.ask) ? d.take_profit : p.take_profit_price
     await ctx.ledger.updatePosition(p._id, { stop_price: newStop, take_profit_price: newTarget, last_reviewed_at: now, last_review_price: quote?.mid ?? p.mark_price })
     if (newStop !== p.stop_price) doc.execution.notes.push(`stop raised ${p.stop_price} → ${newStop}`)
+    if (quote && d.take_profit && d.take_profit > quote.ask * MAX_TARGET_MULTIPLE) doc.execution.notes.push(`target ${d.take_profit} ignored: over ${MAX_TARGET_MULTIPLE}× the ask ${quote.ask}`)
   }
   if (i.position && d.action !== "hold") await ctx.ledger.updatePosition(i.position._id, { last_reviewed_at: now, last_review_price: quote?.mid ?? i.position.mark_price })
 
