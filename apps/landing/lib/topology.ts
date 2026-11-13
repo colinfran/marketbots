@@ -5,9 +5,10 @@
  * paper account. Pure geometry and timing, no React or DOM: components/topology.tsx draws it.
  *
  * Both layouts mirror the bots around what they share: stock on the left, crypto on the right, the
- * stack's shared services down the middle, Browser, Vercel and the database above, the outside world
- * below. Laid out that way no two engine edges cross; the one crossing left (search to the
- * internet, over the crypto engine's scraper edge) is drawn as a hop.
+ * Browser above the stack, and inside it the dashboards and their database at the top and the
+ * shared services down the middle, the outside world below. Laid out that way no two engine edges
+ * cross; the one crossing left (search to the internet, over the crypto engine's scraper edge) is
+ * drawn as a hop.
  *
  * One departure from the chart: news sources, which it lists with the two paper accounts, get a
  * node of their own under the search engines and article pages. They are where the bots read, not
@@ -28,7 +29,7 @@ export type EdgeId = "browser-dashboards" | "dashboards-db" | `browser-${Bot}` |
 /** The chart's edges, caller to callee, with its labels. */
 export const EDGES: Record<EdgeId, { from: NodeId; to: NodeId; label?: string }> = {
   "browser-dashboards": { from: "browser", to: "dashboards", label: "HTTPS" },
-  "dashboards-db": { from: "dashboards", to: "db", label: "Read data and write commands" },
+  "dashboards-db": { from: "dashboards", to: "db", label: "Read data, write sign-ins" },
   "browser-stock": { from: "browser", to: "stock", label: "Engine WebSocket stream" },
   "browser-crypto": { from: "browser", to: "crypto", label: "Engine WebSocket stream" },
   "stock-db": { from: "stock", to: "db", label: "Own trading state" },
@@ -150,11 +151,12 @@ export type Layout = {
   /** Font sizes, in layout units: node titles, node details, edge labels. */
   type: { title: number; detail: number; label: number }
   /**
-   * The Docker stack, and the baseline its name is centered on: on its top edge, which the name
-   * breaks like a fieldset's legend (`border`), or just inside it.
+   * The Docker stack, and where its name sits: on its top edge, which the name breaks like a
+   * fieldset's legend (`border`, one line, centered on `x`), or just inside it (from `x`, on two
+   * lines when `wrap`).
    */
   server: Box
-  legend: Pt & { border: boolean }
+  legend: Pt & { border: boolean; anchor: "start" | "middle"; wrap: boolean }
   nodes: Record<NodeId, Box>
   routes: Record<EdgeId, Route>
   labels: Label[]
@@ -190,96 +192,100 @@ function mirrored(
   return { ...rest, nodes: { ...nodes, crypto }, routes, labels: [...labels, ...cryptoLabels] }
 }
 
-/** Desktop: the engines flank the shared column, each fanning out to it along its own spine. */
+/**
+ * Desktop: the engines flank the shared column, each fanning out to it along its own spine. The
+ * stack's name sits on its top edge between the browser's stream and its HTTPS edge, which cross it.
+ */
 const WIDE = mirrored({
   id: "wide",
   w: 960,
-  h: 562,
+  h: 570,
   type: { title: 11.5, detail: 9.5, label: 9 },
-  server: { x: 24, y: 178, w: 912, h: 230 },
-  legend: { x: 480, y: 181.5, border: true },
+  server: { x: 24, y: 58, w: 912, h: 358 },
+  legend: { x: 311, y: 61.5, border: true, anchor: "middle", wrap: false },
   nodes: {
     browser: { x: 420, y: 8, w: 120, h: 30 },
-    dashboards: { x: 335, y: 56, w: 290, h: 42 },
-    db: { x: 335, y: 116, w: 290, h: 42 },
-    stock: { x: 52, y: 259, w: 180, h: 48 },
-    llm: { x: 326, y: 198, w: 308, h: 56 },
-    history: { x: 326, y: 262, w: 308, h: 42 },
-    search: { x: 326, y: 312, w: 308, h: 42 },
-    scraper: { x: 326, y: 362, w: 308, h: 30 },
-    internet: { x: 300, y: 426, w: 360, h: 30 },
-    news: { x: 300, y: 470, w: 360, h: 30 },
-    services: { x: 300, y: 514, w: 360, h: 38 },
+    dashboards: { x: 335, y: 82, w: 290, h: 42 },
+    db: { x: 335, y: 142, w: 290, h: 42 },
+    stock: { x: 52, y: 267, w: 180, h: 48 },
+    llm: { x: 326, y: 206, w: 308, h: 56 },
+    history: { x: 326, y: 270, w: 308, h: 42 },
+    search: { x: 326, y: 320, w: 308, h: 42 },
+    scraper: { x: 326, y: 370, w: 308, h: 30 },
+    internet: { x: 300, y: 434, w: 360, h: 30 },
+    news: { x: 300, y: 478, w: 360, h: 30 },
+    services: { x: 300, y: 522, w: 360, h: 38 },
   },
   stock: {
-    browser: { pts: [{ x: 420, y: 23 }, { x: 142, y: 23 }, { x: 142, y: 259 }] },
-    db: { pts: [{ x: 196, y: 259 }, { x: 196, y: 137 }, { x: 335, y: 137 }] },
-    llm: { pts: [{ x: 232, y: 283 }, { x: 296, y: 283 }, { x: 296, y: 226 }, { x: 326, y: 226 }] },
-    history: { pts: [{ x: 232, y: 283 }, { x: 326, y: 283 }] },
-    search: { pts: [{ x: 232, y: 283 }, { x: 296, y: 283 }, { x: 296, y: 333 }, { x: 326, y: 333 }] },
-    scraper: { pts: [{ x: 232, y: 283 }, { x: 296, y: 283 }, { x: 296, y: 377 }, { x: 326, y: 377 }] },
-    services: { pts: [{ x: 142, y: 307 }, { x: 142, y: 533 }, { x: 300, y: 533 }] },
-    news: { pts: [{ x: 156, y: 307 }, { x: 156, y: 485 }, { x: 300, y: 485 }] },
+    browser: { pts: [{ x: 420, y: 23 }, { x: 142, y: 23 }, { x: 142, y: 267 }] },
+    db: { pts: [{ x: 196, y: 267 }, { x: 196, y: 163 }, { x: 335, y: 163 }] },
+    llm: { pts: [{ x: 232, y: 291 }, { x: 296, y: 291 }, { x: 296, y: 234 }, { x: 326, y: 234 }] },
+    history: { pts: [{ x: 232, y: 291 }, { x: 326, y: 291 }] },
+    search: { pts: [{ x: 232, y: 291 }, { x: 296, y: 291 }, { x: 296, y: 341 }, { x: 326, y: 341 }] },
+    scraper: { pts: [{ x: 232, y: 291 }, { x: 296, y: 291 }, { x: 296, y: 385 }, { x: 326, y: 385 }] },
+    services: { pts: [{ x: 142, y: 315 }, { x: 142, y: 541 }, { x: 300, y: 541 }] },
+    news: { pts: [{ x: 156, y: 315 }, { x: 156, y: 493 }, { x: 300, y: 493 }] },
   },
   middle: {
-    "browser-dashboards": { pts: [{ x: 480, y: 38 }, { x: 480, y: 56 }] },
-    "dashboards-db": { pts: [{ x: 480, y: 98 }, { x: 480, y: 116 }] },
-    "search-internet": { pts: [{ x: 634, y: 343 }, { x: 650, y: 343 }, { x: 650, y: 426 }], hops: [{ x: 650, y: 377, side: 1 }] },
-    "scraper-internet": { pts: [{ x: 480, y: 392 }, { x: 480, y: 426 }] },
+    "browser-dashboards": { pts: [{ x: 480, y: 38 }, { x: 480, y: 82 }] },
+    "dashboards-db": { pts: [{ x: 480, y: 124 }, { x: 480, y: 142 }] },
+    "search-internet": { pts: [{ x: 634, y: 351 }, { x: 650, y: 351 }, { x: 650, y: 434 }], hops: [{ x: 650, y: 385, side: 1 }] },
+    "scraper-internet": { pts: [{ x: 480, y: 400 }, { x: 480, y: 434 }] },
   },
   labels: [
-    { edge: "browser-dashboards", x: 488, y: 50.5, anchor: "start", lines: ["HTTPS"] },
-    { edge: "dashboards-db", x: 488, y: 110.5, anchor: "start", lines: ["Read data and write commands"] },
+    { edge: "browser-dashboards", x: 488, y: 76.5, anchor: "start", lines: ["HTTPS"] },
+    { edge: "dashboards-db", x: 488, y: 136.5, anchor: "start", lines: ["Read data, write sign-ins"] },
     { edge: "browser-stock", x: 281, y: 16.5, anchor: "middle", lines: ["Engine WebSocket stream"] },
-    { edge: "stock-db", x: 265, y: 130.5, anchor: "middle", lines: ["Own trading state"] },
+    { edge: "stock-db", x: 265, y: 156.5, anchor: "middle", lines: ["Own trading state"] },
   ],
 })
 
 /**
- * Phones: the engines side by side at the top of the stack, each running a spine down its own
- * side of the shared column; the browser's stream comes in from the outside edges.
+ * Phones: the engines side by side below the dashboards, each running a spine down its own side of
+ * the shared column; the browser's stream comes in from the outside edges. The HTTPS edge crosses
+ * the stack's top edge in the middle, so its name sits inside, top left, on two lines.
  */
 const TALL = mirrored({
   id: "tall",
   w: 380,
-  h: 700,
+  h: 704,
   type: { title: 12, detail: 9.5, label: 8.5 },
-  server: { x: 12, y: 200, w: 356, h: 330 },
-  legend: { x: 190, y: 219, border: false },
+  server: { x: 12, y: 50, w: 356, h: 484 },
+  legend: { x: 24, y: 66, border: false, anchor: "start", wrap: true },
   nodes: {
     browser: { x: 134, y: 8, w: 112, h: 30 },
-    dashboards: { x: 100, y: 58, w: 180, h: 52 },
-    db: { x: 92, y: 134, w: 196, h: 42 },
-    stock: { x: 24, y: 232, w: 152, h: 50 },
-    llm: { x: 66, y: 304, w: 248, h: 70 },
-    history: { x: 66, y: 382, w: 248, h: 42 },
-    search: { x: 66, y: 432, w: 248, h: 42 },
-    scraper: { x: 66, y: 482, w: 248, h: 32 },
-    internet: { x: 50, y: 548, w: 280, h: 34 },
-    news: { x: 50, y: 596, w: 280, h: 30 },
-    services: { x: 50, y: 640, w: 280, h: 50 },
+    dashboards: { x: 100, y: 90, w: 180, h: 52 },
+    db: { x: 92, y: 162, w: 196, h: 42 },
+    stock: { x: 24, y: 236, w: 152, h: 50 },
+    llm: { x: 66, y: 308, w: 248, h: 70 },
+    history: { x: 66, y: 386, w: 248, h: 42 },
+    search: { x: 66, y: 436, w: 248, h: 42 },
+    scraper: { x: 66, y: 486, w: 248, h: 32 },
+    internet: { x: 50, y: 552, w: 280, h: 34 },
+    news: { x: 50, y: 600, w: 280, h: 30 },
+    services: { x: 50, y: 644, w: 280, h: 50 },
   },
   stock: {
-    browser: { pts: [{ x: 134, y: 23 }, { x: 6, y: 23 }, { x: 6, y: 257 }, { x: 24, y: 257 }] },
-    db: { pts: [{ x: 44, y: 232 }, { x: 44, y: 155 }, { x: 92, y: 155 }] },
-    llm: { pts: [{ x: 48, y: 282 }, { x: 48, y: 339 }, { x: 66, y: 339 }] },
-    history: { pts: [{ x: 48, y: 282 }, { x: 48, y: 403 }, { x: 66, y: 403 }] },
-    search: { pts: [{ x: 48, y: 282 }, { x: 48, y: 453 }, { x: 66, y: 453 }] },
-    scraper: { pts: [{ x: 48, y: 282 }, { x: 48, y: 498 }, { x: 66, y: 498 }] },
-    services: { pts: [{ x: 34, y: 282 }, { x: 34, y: 665 }, { x: 50, y: 665 }] },
-    news: { pts: [{ x: 41, y: 282 }, { x: 41, y: 611 }, { x: 50, y: 611 }] },
+    browser: { pts: [{ x: 134, y: 23 }, { x: 6, y: 23 }, { x: 6, y: 261 }, { x: 24, y: 261 }] },
+    db: { pts: [{ x: 44, y: 236 }, { x: 44, y: 183 }, { x: 92, y: 183 }] },
+    llm: { pts: [{ x: 48, y: 286 }, { x: 48, y: 343 }, { x: 66, y: 343 }] },
+    history: { pts: [{ x: 48, y: 286 }, { x: 48, y: 407 }, { x: 66, y: 407 }] },
+    search: { pts: [{ x: 48, y: 286 }, { x: 48, y: 457 }, { x: 66, y: 457 }] },
+    scraper: { pts: [{ x: 48, y: 286 }, { x: 48, y: 502 }, { x: 66, y: 502 }] },
+    services: { pts: [{ x: 34, y: 286 }, { x: 34, y: 669 }, { x: 50, y: 669 }] },
+    news: { pts: [{ x: 41, y: 286 }, { x: 41, y: 615 }, { x: 50, y: 615 }] },
   },
   middle: {
-    "browser-dashboards": { pts: [{ x: 190, y: 38 }, { x: 190, y: 58 }] },
-    "dashboards-db": { pts: [{ x: 190, y: 110 }, { x: 190, y: 134 }] },
-    "search-internet": { pts: [{ x: 314, y: 463 }, { x: 324, y: 463 }, { x: 324, y: 548 }], hops: [{ x: 324, y: 498 }] },
-    "scraper-internet": { pts: [{ x: 190, y: 514 }, { x: 190, y: 548 }] },
+    "browser-dashboards": { pts: [{ x: 190, y: 38 }, { x: 190, y: 90 }] },
+    "dashboards-db": { pts: [{ x: 190, y: 142 }, { x: 190, y: 162 }] },
+    "search-internet": { pts: [{ x: 314, y: 467 }, { x: 324, y: 467 }, { x: 324, y: 552 }], hops: [{ x: 324, y: 502 }] },
+    "scraper-internet": { pts: [{ x: 190, y: 518 }, { x: 190, y: 552 }] },
   },
   labels: [
-    { edge: "browser-dashboards", x: 197, y: 51, anchor: "start", lines: ["HTTPS"] },
-    { edge: "dashboards-db", x: 197, y: 120, anchor: "start", lines: ["Read data and", "write commands"] },
+    { edge: "browser-dashboards", x: 197, y: 84, anchor: "start", lines: ["HTTPS"] },
+    { edge: "dashboards-db", x: 197, y: 155, anchor: "start", lines: ["Read data, write sign-ins"] },
     { edge: "browser-stock", x: 70, y: 16.5, anchor: "middle", lines: ["Engine WebSocket stream"] },
-    { edge: "stock-db", x: 50, y: 190, anchor: "start", lines: ["Own trading state"] },
+    { edge: "stock-db", x: 50, y: 222, anchor: "start", lines: ["Own trading state"] },
   ],
 })
 

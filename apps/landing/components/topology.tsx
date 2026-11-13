@@ -69,10 +69,10 @@ const NODES: Record<Exclude<NodeId, Bot | "services">, { Icon: LucideIcon; rows:
   browser: { Icon: AppWindowIcon, rows: [title("Browser")] },
   dashboards: {
     Icon: LayoutDashboardIcon,
-    rows: [title("Vercel dashboards"), detail(hot("stockmarketbot.app", "dashboards:stock"), " · ", hot("cryptomarketbot.app", "dashboards:crypto"))],
-    tall: [title("Vercel dashboards"), detail(hot("stockmarketbot.app", "dashboards:stock")), detail(hot("cryptomarketbot.app", "dashboards:crypto"))],
+    rows: [title("Dashboards"), detail(hot("stockmarketbot.app", "dashboards:stock"), " · ", hot("cryptomarketbot.app", "dashboards:crypto"))],
+    tall: [title("Dashboards"), detail(hot("stockmarketbot.app", "dashboards:stock")), detail(hot("cryptomarketbot.app", "dashboards:crypto"))],
   },
-  db: { Icon: DatabaseIcon, rows: [title("Azure DocumentDB"), detail("separate database per bot")] },
+  db: { Icon: DatabaseIcon, rows: [title("MongoDB"), detail("separate database per bot")] },
   llm: {
     Icon: SparklesIcon,
     rows: [title("Local LLM"), detail("Qwen 3.6 on two GPUs"), detail(hot("the agents", "llm:agents"), ", ", hot("summaries", "llm:summaries"), ", research")],
@@ -105,8 +105,8 @@ const STEPS = [
 /** Names for the screen-reader version of the chart. */
 const NAMES: Record<NodeId, string> = {
   browser: "Browser",
-  dashboards: "Vercel dashboards",
-  db: "Azure DocumentDB (MongoDB), a separate database per bot",
+  dashboards: "Dashboards, one per bot",
+  db: "MongoDB, a separate database per bot",
   services: "the Alpaca paper account and the Kraken paper wallet",
   news: "news sources",
   internet: "search engines and article pages",
@@ -236,11 +236,19 @@ function Diagram({ layout, hover, onHover, className }: { layout: Layout; hover:
           </filter>
         </defs>
 
-        {/* The Docker stack; a legend on its border masks the border behind it (46 mono characters wide). */}
+        {/* The Docker stack; a legend on its border masks the border behind it (46 mono characters wide, centered). */}
         <rect x={server.x} y={server.y} width={server.w} height={server.h} rx={14} strokeDasharray="4 4" className="fill-foreground/[0.025] stroke-foreground/20" />
         {legend.border && <rect x={legend.x - 23 * 0.6 * (type.label + 0.5) - 8} y={server.y - 8} width={46 * 0.6 * (type.label + 0.5) + 16} height={16} className="fill-background" />}
-        <text x={legend.x} y={legend.y} textAnchor="middle" fontSize={type.label + 0.5} className="fill-muted-foreground font-mono">
-          <tspan className="fill-foreground">marketbots</tspan> Docker stack, on the owner&apos;s server
+        <text x={legend.x} y={legend.y} textAnchor={legend.anchor} fontSize={type.label + 0.5} className="fill-muted-foreground font-mono">
+          <tspan className="fill-foreground">marketbots</tspan>
+          {" Docker stack,"}
+          {legend.wrap ? (
+            <tspan x={legend.x} dy={(type.label + 0.5) * 1.25}>
+              on the owner&apos;s server
+            </tspan>
+          ) : (
+            " on the owner's server"
+          )}
         </text>
 
         {/* Edges, with an arrowhead where the caller reaches the callee */}
@@ -367,7 +375,17 @@ const onReducedMotion = (onChange: () => void) => {
   return () => query.removeEventListener("change", onChange)
 }
 
-export function Topology() {
+/**
+ * Which layout shows from what width: the wide one needs ~840 px to read at full size on the
+ * homepage; framed in a blog post's column (`embedded`), it goes wide from 560 px, a little smaller.
+ */
+const BREAKPOINTS = {
+  page: { wide: "hidden @min-[840px]:block", tall: "mx-auto max-w-[440px] @min-[840px]:hidden" },
+  embedded: { wide: "hidden @min-[560px]:block", tall: "mx-auto max-w-[440px] @min-[560px]:hidden" },
+}
+
+export function Topology({ embedded = false }: { embedded?: boolean }) {
+  const breakpoints = BREAKPOINTS[embedded ? "embedded" : "page"]
   const root = useRef<HTMLElement>(null)
   const titleId = useId()
   const reduced = useSyncExternalStore(onReducedMotion, () => matchMedia(REDUCED).matches, () => false)
@@ -416,14 +434,14 @@ export function Topology() {
           aria-hidden
           className="pointer-events-none absolute inset-0 [background-image:radial-gradient(color-mix(in_oklab,var(--foreground)_14%,transparent)_1px,transparent_1px)] [background-size:16px_16px] [mask-image:radial-gradient(ellipse_at_center,black_35%,transparent_80%)]"
         />
-        <Diagram layout={LAYOUTS.wide} hover={hover} onHover={setHover} className="hidden @min-[840px]:block" />
-        <Diagram layout={LAYOUTS.tall} hover={hover} onHover={setHover} className="mx-auto max-w-[440px] @min-[840px]:hidden" />
+        <Diagram layout={LAYOUTS.wide} hover={hover} onHover={setHover} className={breakpoints.wide} />
+        <Diagram layout={LAYOUTS.tall} hover={hover} onHover={setHover} className={breakpoints.tall} />
       </div>
       <Steps />
       <div className="sr-only">
         <p>
-          The marketbots Docker stack, on the owner&apos;s server, runs the stock engine, the crypto engine, the local LLM, web search, the shared scraper and the
-          history store. Its connections:
+          The marketbots Docker stack, on the owner&apos;s server, runs both dashboards, their MongoDB, the stock engine, the crypto engine, the local LLM, web
+          search, the shared scraper and the history store. Its connections:
         </p>
         <ul>
           {(Object.keys(EDGES) as EdgeId[]).map((e) => (
