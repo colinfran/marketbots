@@ -17,7 +17,7 @@
     "@mb/core": "workspace:*",
     "better-auth": "^1.7.13",
     "mongodb": "^7.7.0",
-    "next": "16.4.3",
+    "next": "16.4.6",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "server-only": "0.0.1"
