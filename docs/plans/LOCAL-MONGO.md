@@ -20,7 +20,7 @@ Other differences from the plan:
 - The web image takes a second build argument, `CORE` (the bot's core package), and copies only the app and the packages it uses, so a commit that doesn't touch a dashboard leaves its image and container as they are.
 - `mongo` runs as the image's `mongodb` user with a read-only root and no capabilities. The dashboard roles are `crypto_dashboard` and `stock_dashboard` (admin database): `dbStats` on every database, for the storage card.
 - `.env`'s `MONGODB_URI` stays the Azure one (local dev) until the cluster is deleted; `.env.example` already has mongo-dev's.
-- Still to come, separately and owner-approved (§7.12): the landing page's topology text, and Admin → System's storage card (its Azure wording and the 32 GB limit).
+- Done since, separately and owner-approved (§7.12): Admin → System's storage card (its Azure wording and the 32 GB limit, 2026-11-08) and the landing page's topology (2026-11-12: the dashboards and MongoDB drawn inside the Docker stack, no "Vercel dashboards" or "Azure DocumentDB").
 
 ## 1. Why
 
