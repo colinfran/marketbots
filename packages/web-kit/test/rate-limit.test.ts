@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server"
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { type BanRecord, type BanStore, BanSync, type BlockedCounts, clientKey, LIMITS, type Limits, RateLimiter, rateLimitProxy } from "../src/rate-limit"
+import { type BanRecord, type BanStore, BanSync, type BlockedCounts, clientKey, LIMITS, type Limits, RateLimiter, rateLimitProxy, scannerProbe } from "../src/rate-limit"
 
 const MINUTE = 60_000
 
@@ -137,6 +137,18 @@ describe("RateLimiter", () => {
     expect(rl.take("banned")).toMatchObject({ banned: true })
   })
 
+  it("bans at once on a probe, but never the owner's exempt address", () => {
+    const { rl, advance } = limiter()
+    expect(rl.ban("a")).toBe(true)
+    expect(rl.ban("a")).toBe(false)
+    expect(rl.take("a")).toEqual({ allowed: false, banned: true, newBan: false })
+    rl.markOwner("owner")
+    expect(rl.ban("owner")).toBe(false)
+    expect(rl.isBanned("owner")).toBe(false)
+    advance(LIMITS.ownerMs)
+    expect(rl.ban("owner")).toBe(true)
+  })
+
   it("replaces its bans with the stored list, keeping the ones it is told to", () => {
     const { rl, advance } = limiter()
     earnBan(rl, "old")
@@ -208,6 +220,100 @@ describe("BanSync", () => {
     expect(done).toBe(false)
     await vi.advanceTimersByTimeAsync(200)
     expect(done).toBe(true)
+  })
+})
+
+describe("scannerProbe", () => {
+  const none = new Headers()
+
+  it("spots the paths scanners asked for in the access log", () => {
+    const probes = [
+      "/.env",
+      "/.env.local",
+      "/.env.production",
+      "/.env~",
+      "/backend/.env",
+      "/var/www/html/.env",
+      "/.git/config",
+      "/.git/HEAD",
+      "/.config/gcloud/application_default_credentials.json",
+      "/.aws/credentials",
+      "/.DS_Store",
+      "/%2eenv",
+      "/wp-admin/install.php",
+      "/wp-config.php",
+      "/info.php",
+      "/phpinfo.php",
+      "/xmlrpc.php",
+      "/vendor/phpunit/phpunit/src/Util/PHP/eval-stdin.php",
+      "/wp-login",
+      "/wordpress/",
+      "/phpmyadmin/index",
+      "/cgi-bin/luci",
+      "/default.aspx",
+      "/credentials.json",
+      "/gcp-credentials.json",
+      "/google-credentials.json",
+      "/service-account.json",
+      "/firebase-adminsdk.json",
+      "/secrets.yaml",
+      "/key.json",
+      "/keyfile.json",
+      "/google-key.json",
+      "/firebase-key.json",
+      "/private_key.pem",
+      "/terraform.tfstate",
+      "/terraform.tfstate.backup",
+      "/terraform.tfvars.json",
+      "/cloudformation.yaml",
+      "/serverless.yml",
+      "/samconfig.toml",
+      "/amplify.yml",
+      "/cdk.json",
+      "/docker-compose.prod.yml",
+      "/id_rsa",
+      "/id_ed25519.pub",
+    ]
+    expect(probes.filter((p) => !scannerProbe(p, none))).toEqual([])
+    expect(scannerProbe("/.env", none)).toBe("scanner probe: a path only scanners request")
+  })
+
+  it("never takes a browser's request for one", () => {
+    const pages = [
+      "/",
+      "/markets",
+      "/markets/BTC-USD",
+      "/markets/BRK.B",
+      "/agent",
+      "/agent/b8860848-6408-4974-a617-32a52288a8b4",
+      "/decisions/88ae177c-ead7-48e4-95de-86212e5c1f00",
+      "/journal/2026-11-12",
+      "/holdings",
+      "/news",
+      "/admin/server",
+      "/login",
+      "/api/stream-token",
+      "/api/auth/get-session",
+      "/api/candles",
+      "/api/host/commands/abc",
+      "/robots.txt",
+      "/sitemap.xml",
+      "/manifest.webmanifest",
+      "/sw.js",
+      "/_next/static/chunks/3_ond1-x2a2sw.js.map",
+      "/static/chunks/049914d_fk5xp.js",
+      "/.well-known/appspecific/com.chrome.devtools.json",
+      "/.well-known/security.txt",
+      "/apple-touch-icon.png",
+      "/monkey.json",
+      "/%E0%A4%A",
+    ]
+    expect(pages.filter((p) => scannerProbe(p, none))).toEqual([])
+  })
+
+  it("takes any Next-Action header for a server-action probe", () => {
+    expect(scannerProbe("/", new Headers({ "next-action": "x" }))).toBe("scanner probe: a server action (Next-Action header; the dashboards have none)")
+    expect(scannerProbe("/markets", new Headers({ "Next-Action": "" }))).not.toBeNull()
   })
 })
 
@@ -298,6 +404,45 @@ describe("rateLimitProxy", () => {
     for (let i = 0; i < LIMITS.burst; i++) await proxy(request(cookie))
     expect((await proxy(request(cookie))).status).toBe(429)
     expect(error).toHaveBeenCalledExactlyOnceWith("[rate-limit] owner check failed:", "db down")
+  })
+
+  it("bans a scanner's probe on its first request: 404, logged, saved, then 403 for everything", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    const { added, store } = memoryStore()
+    const proxy = rateLimitProxy({ isOwner: async () => false, store })
+    expect((await proxy(request())).status).toBe(200)
+    const res = await proxy(request({}, "/backend/.env?x=1"))
+    expect(res.status).toBe(404)
+    expect(res.headers.get("cache-control")).toBe("no-store")
+    expect((await proxy(request())).status).toBe(403)
+    expect((await proxy(request({}, "/.git/config"))).status).toBe(403)
+    expect(warn).toHaveBeenCalledExactlyOnceWith("[rate-limit] 198.51.100.4 banned for good: scanner probe: a path only scanners request (/backend/.env)")
+    await vi.waitFor(() => expect(added).toHaveLength(1))
+    expect(added[0]).toMatchObject({ key: "198.51.100.4", path: "/backend/.env", userAgent: "scraper/1.0", reason: "scanner probe: a path only scanners request" })
+    // Another address is untouched.
+    expect((await proxy(request({ "x-forwarded-for": "198.51.100.5" }))).status).toBe(200)
+  })
+
+  it("bans a server-action probe", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {})
+    const { added, store } = memoryStore()
+    const proxy = rateLimitProxy({ isOwner: async () => false, store })
+    const probe = new NextRequest("https://cryptomarketbot.app/", { method: "POST", body: "{}", headers: { "x-forwarded-for": "198.51.100.4", "next-action": "x" } })
+    expect((await proxy(probe)).status).toBe(404)
+    expect((await proxy(request())).status).toBe(403)
+    await vi.waitFor(() => expect(added).toHaveLength(1))
+    expect(added[0].reason).toContain("Next-Action")
+  })
+
+  it("answers the owner's exempt address 404 for a probe, without a ban", async () => {
+    const { added, store } = memoryStore()
+    const proxy = rateLimitProxy({ isOwner: async () => true, store })
+    const cookie = { cookie: "__Secure-better-auth.session_token=abc.def" }
+    // Over the limit once, so the owner's session is looked up and exempts the address.
+    for (let i = 0; i <= LIMITS.burst; i++) expect((await proxy(request(cookie))).status).toBe(200)
+    expect((await proxy(request(cookie, "/.env"))).status).toBe(404)
+    expect((await proxy(request(cookie))).status).toBe(200)
+    expect(added).toEqual([])
   })
 
   it("counts a prefetch at a fifth", async () => {

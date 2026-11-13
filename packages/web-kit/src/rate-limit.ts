@@ -21,6 +21,9 @@ import { type NextRequest, NextResponse } from "next/server"
  * address is over the limit, at most once a minute per address, so forged cookies can't turn into
  * database load.
  *
+ * A scanner's probe (`scannerProbe`: a path no browser asks a dashboard for, or a server action)
+ * earns the same ban on its first request, answered 404.
+ *
  * The buckets are this process's memory: each dashboard is one container, and a deploy clears them.
  * Caddy's ban list (C:\Caddy\marketbots-banned.caddy, §8.6) blocks an address on every site at once.
  */
@@ -132,6 +135,14 @@ export class RateLimiter {
     e.strikes = 0
     this.banned.set(key, now)
     return { allowed: false, banned: true, newBan: true }
+  }
+
+  /** Bans an address at once (a scanner's probe). False when it is banned already or exempt as the owner's. */
+  ban(key: string): boolean {
+    const now = this.now()
+    if (this.banned.has(key) || this.entry(key, now).ownerUntil > now) return false
+    this.banned.set(key, now)
+    return true
   }
 
   /** Whether to look up the owner's session for this address now: at most once per `ownerCheckMs`. */
@@ -316,6 +327,38 @@ export const clientKey = (forwardedFor: string | null): string => {
  */
 const isPrefetch = (h: Headers) => h.get("rsc") === "1" && h.get("next-router-prefetch") === "1"
 
+/**
+ * Paths only scanners ask a dashboard for, from what they asked for in Caddy's access log: a dot
+ * file or folder anywhere but /.well-known (/.env, /backend/.env, /.git/config), server scripts,
+ * WordPress and phpMyAdmin, cloud credential files and deployment files. Not here, because a
+ * browser can ask for them: source maps (DevTools), /sw.js, /.well-known/… and every other 404.
+ */
+export const SCANNER_PATHS: readonly RegExp[] = [
+  /\/\.(?!well-known(?:\/|$))[^/]/,
+  /\.(?:php\d?|phtml|aspx?|jsp|cgi)(?:\/|$)/i,
+  /\/(?:wp-(?:admin|content|includes|login|json)|wordpress|phpmyadmin|cgi-bin)(?:\/|$)/i,
+  /\/[^/]*(?:credential|secret|service[-_]?account|adminsdk|keyfile)[^/]*\.(?:json|ya?ml|toml|txt|ini|xml)$/i,
+  /\/(?:[\w-]*[-_])?keys?\.(?:json|pem)$/i,
+  /\/(?:terraform\.tfstate[^/]*|[^/]*\.tfvars(?:\.json)?|cloudformation\.(?:json|ya?ml)|serverless\.ya?ml|samconfig\.toml|amplify\.ya?ml|cdk\.json|docker-compose[^/]*\.ya?ml|id_(?:rsa|dsa|ecdsa|ed25519)(?:\.pub)?)$/i,
+]
+
+/**
+ * Why a request can only be a scanner's, as the ban's reason, or null. The dashboards have no
+ * server actions, so a Next-Action header probes Next's server-action decoder (Caddy refuses those
+ * before they get here; this is the backstop). The path is matched decoded, as scanners also send
+ * /%2eenv.
+ */
+export const scannerProbe = (pathname: string, headers: Headers): string | null => {
+  if (headers.has("next-action")) return "scanner probe: a server action (Next-Action header; the dashboards have none)"
+  let path = pathname
+  try {
+    path = decodeURIComponent(pathname)
+  } catch {
+    // Malformed escapes: match the path as sent.
+  }
+  return SCANNER_PATHS.some((re) => re.test(path)) ? "scanner probe: a path only scanners request" : null
+}
+
 const text = (status: number, body: string, headers: Record<string, string> = {}) =>
   new NextResponse(body, { status, headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store", ...headers } })
 
@@ -323,16 +366,34 @@ const tooMany = (retryAfter: number) => text(429, "Too many requests. Wait a min
 
 const forbidden = () => text(403, "This address is blocked from this site for sending too many requests.\n")
 
+const notFound = () => text(404, "Not found.\n")
+
 /**
- * The dashboard's proxy (proxy.ts): lets a request through, or answers 429 (over the limit) or 403
- * (banned). `isOwner` is the auth module's session check for a request's headers; `store` keeps the
- * bans across deploys.
+ * The dashboard's proxy (proxy.ts): lets a request through, or answers 429 (over the limit), 403
+ * (banned) or 404 (a scanner's probe, which bans). `isOwner` is the auth module's session check for
+ * a request's headers; `store` keeps the bans across deploys.
  */
 export const rateLimitProxy = ({ isOwner, store, limiter = new RateLimiter() }: { isOwner: (headers: Headers) => Promise<boolean>; store?: BanStore; limiter?: RateLimiter }) => {
   const sync = store ? new BanSync(limiter, store) : null
+  const record = (request: NextRequest, key: string, reason: string): BanRecord => ({
+    key,
+    at: new Date(),
+    reason,
+    path: request.nextUrl.pathname.slice(0, 300),
+    userAgent: request.headers.get("user-agent")?.slice(0, 300) ?? null,
+  })
   return async (request: NextRequest): Promise<NextResponse> => {
     await sync?.ready()
     const key = clientKey(request.headers.get("x-forwarded-for"))
+    // A banned address's probe is refused (and counted) like its other requests, below.
+    const probe = limiter.isBanned(key) ? null : scannerProbe(request.nextUrl.pathname, request.headers)
+    if (probe) {
+      if (limiter.ban(key)) {
+        console.warn(`[rate-limit] ${key} banned for good: ${probe} (${request.nextUrl.pathname.slice(0, 120)})`)
+        sync?.banned(record(request, key, probe))
+      }
+      return notFound()
+    }
     const verdict = limiter.take(key, isPrefetch(request.headers))
     if (verdict.allowed) return NextResponse.next()
     const owner = () =>
@@ -347,7 +408,7 @@ export const rateLimitProxy = ({ isOwner, store, limiter = new RateLimiter() }: 
     if (!verdict.banned) return tooMany(verdict.retryAfter)
     if (verdict.newBan) {
       console.warn(`[rate-limit] ${key} banned for good: ${limiter.reason}`)
-      sync?.banned({ key, at: new Date(), reason: limiter.reason, path: request.nextUrl.pathname.slice(0, 300), userAgent: request.headers.get("user-agent")?.slice(0, 300) ?? null })
+      sync?.banned(record(request, key, limiter.reason))
     }
     return forbidden()
   }

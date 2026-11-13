@@ -6,7 +6,8 @@ import { ago, num } from "./lib/format"
 import { UnbanButton } from "./unban-button"
 
 /**
- * Admin page: the addresses the dashboard's rate limit banned for good (docs/SERVER.md §8.6), with
+ * Admin page: the addresses the dashboard's rate limit banned for good, for flooding or for a
+ * scanner's probe (docs/SERVER.md §8.6), with
  * what earned each ban, how many requests it has been refused since, and an Unban button.
  */
 export function BannedAddresses({ bans, dateTime }: { bans: WebBanDoc[]; dateTime: (value: Date) => string }) {
@@ -15,7 +16,8 @@ export function BannedAddresses({ bans, dateTime }: { bans: WebBanDoc[]; dateTim
       <CardHeader>
         <CardTitle className="text-base">Banned addresses</CardTitle>
         <CardDescription>
-          Addresses that kept requesting after the rate limit refused them are banned for good: every request from them gets 403. Unban lets one back in within a minute.
+          Addresses that kept requesting after the rate limit refused them, and scanners on their first probe (a path like /.env or /wp-admin; hover the date for the reason),
+          are banned for good: every request from them gets 403. Unban lets one back in within a minute.
           Signing in from a banned address lifts its ban too. This site only: Caddy&apos;s ban list (C:\Caddy\marketbots-banned.caddy) blocks an address on both.
         </CardDescription>
       </CardHeader>
