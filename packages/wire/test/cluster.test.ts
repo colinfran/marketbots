@@ -17,4 +17,14 @@ describe("cluster", () => {
     expect(c.confirm(root!, "SEC approves spot Solana ETF today", "yahoo.com")).toBe(false)
     expect(c.confirm(root!, "SEC approves spot Solana ETF, says agency", "coindesk.com")).toBe(false)
   })
+
+  it("forgets roots older than a day", () => {
+    const c = new ClusterIndex()
+    const t = NOW.getTime()
+    c.add("old", "Fed holds rates steady", [], t - 25 * 3_600_000, "reuters.com")
+    c.add("recent", "Nvidia beats estimates", ["NVDA"], t - 2 * 3_600_000, "cnbc.com")
+    c.prune(t)
+    expect(c.size).toBe(1)
+    expect(c.match("Nvidia beats estimates again", ["NVDA"], t)?.id).toBe("recent")
+  })
 })

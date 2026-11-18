@@ -237,6 +237,8 @@ export class Wire<C extends string, W extends WireSettingsBase> {
     const result = { stored: [] as WireItemDoc<C>[], dropped: 0, duplicates: 0, confirmed: 0 }
     const s = this.d.settings()
     if (s.mode === "off") return result
+    // Roots older than a day can never match again (match looks 6 hours back from now).
+    this.cluster.prune(this.now().getTime())
     const spec = this.specs.get(source)
     const sets = this.d.symbols()
     const known = [...new Set([...sets.universe, ...sets.held, ...sets.focus])]

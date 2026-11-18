@@ -84,6 +84,7 @@ export class ClusterIndex {
     return independent
   }
 
+  /** Drops roots older than a day (entries are in time order); the wire calls it on every ingest. */
   prune(now: number) {
     const cutoff = now - MEMORY_MS
     if (this.entries.length && this.entries[0].at < cutoff) this.entries = this.entries.filter((e) => e.at >= cutoff)

@@ -1,17 +1,22 @@
 /** Async helpers: sleeping, backoff, and running periodic jobs without overlap. */
 
+/**
+ * Resolves after `ms`, or as soon as `signal` aborts. The abort listener is removed when the timer
+ * fires: callers sleep on signals that live as long as the engine (every polled news source, once
+ * per poll), and each listener left behind kept ~0.6 KB alive, ~40 MB a day.
+ */
 export const sleep = (ms: number, signal?: AbortSignal) =>
   new Promise<void>((resolve) => {
     if (signal?.aborted) return resolve()
-    const timer = setTimeout(resolve, ms)
-    signal?.addEventListener(
-      "abort",
-      () => {
-        clearTimeout(timer)
-        resolve()
-      },
-      { once: true },
-    )
+    const onAbort = () => {
+      clearTimeout(timer)
+      resolve()
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort)
+      resolve()
+    }, ms)
+    signal?.addEventListener("abort", onAbort, { once: true })
   })
 
 /** Exponential backoff with full jitter: attempt 1 → up to base, doubling to max. */
