@@ -2,6 +2,7 @@ import type { DatabaseStorageView, EngineStatusBase } from "@mb/core/db"
 import type { WireSourceHealth } from "@mb/core/wire"
 import { cn } from "cn"
 import Link from "next/link"
+import { AiCallsToday } from "./ai-calls-today"
 import { Empty, KV, Meter, SectionTitle } from "./bits"
 import { Badge } from "./components/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "./components/card"
@@ -55,8 +56,8 @@ export function EngineHealthCard({
   )
 }
 
-/** The model server as the engine sees it, and the agent's model. */
-export function AiHealthCard({ ai, model }: { ai: Status["ai"]; model: string | null }) {
+/** The model server as the engine sees it, and the agent's model. Calls today count the viewer's day, from `callTimes` (@mb/web-kit/queries `getAiCallTimes`). */
+export function AiHealthCard({ ai, model, callTimes }: { ai: Status["ai"]; model: string | null; callTimes: number[] }) {
   return (
     <Card>
       <CardHeader>
@@ -67,7 +68,9 @@ export function AiHealthCard({ ai, model }: { ai: Status["ai"]; model: string | 
       <CardContent>
         <KV label="Enabled">{ai.enabled ? "yes" : "no (LLM_URL missing)"}</KV>
         <KV label="Agent's model">{model ? model.replace(/^local\//, "") : "—"}</KV>
-        <KV label="Calls today">{ai.calls_today}</KV>
+        <KV label="Calls today">
+          <AiCallsToday times={callTimes} />
+        </KV>
         <KV label="Last call">{ago(ai.last_call_at)}</KV>
         {ai.last_error && <p className="text-loss mt-2 line-clamp-3 text-xs">{ai.last_error}</p>}
       </CardContent>

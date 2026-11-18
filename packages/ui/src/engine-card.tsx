@@ -1,3 +1,4 @@
+import { AiCallsToday } from "./ai-calls-today"
 import { Badge } from "./components/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/card"
 import { titleCase } from "./lib/format"
@@ -6,21 +7,22 @@ import { titleCase } from "./lib/format"
 export type EngineCardEngine = {
   online: boolean
   heartbeatAgeS: number | null
-  status: { status: string; kill_switch: boolean; ai: { calls_today: number } } | null
+  status: { status: string; kill_switch: boolean } | null
 }
 
 /**
- * The engine at a glance: run state, AI calls today, the bot's own health rows (venue or broker,
- * market) and an optional note.
+ * The engine at a glance: run state, AI calls today (the viewer's day, from `aiCallTimes`: the
+ * @mb/web-kit/queries `getAiCallTimes`), the bot's own health rows (venue or broker, market) and an
+ * optional note.
  */
-export function EngineCard({ engine, rows, note }: { engine: EngineCardEngine; rows: [string, React.ReactNode][]; note?: React.ReactNode }) {
+export function EngineCard({ engine, aiCallTimes, rows, note }: { engine: EngineCardEngine; aiCallTimes: number[]; rows: [string, React.ReactNode][]; note?: React.ReactNode }) {
   const s = engine.status
   const all: [string, React.ReactNode][] = s
     ? [
         [
           "AI calls today",
           <span key="calls" className="font-mono tabular-nums">
-            {s.ai.calls_today}
+            <AiCallsToday times={aiCallTimes} />
           </span>,
         ],
         ...rows,

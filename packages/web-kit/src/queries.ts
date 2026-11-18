@@ -8,7 +8,7 @@ import type { Viewer } from "./auth"
 
 /**
  * The read queries both dashboards run the same way: engine state, the admin lists, events,
- * AI costs and the news engine. Each awaits `connection()`, so pages render at request time with
+ * AI calls and the news engine. Each awaits `connection()`, so pages render at request time with
  * live data (never prerendered at build). Only plain, serializable values leave this module.
  * Each app binds them to its collections (lib/data.ts, lib/queries.ts) and keeps its own
  * trading queries next to them. The engine's heartbeat comes from the engine itself
@@ -135,6 +135,18 @@ export const createQueries = <Cols extends Record<QueryCollectionName, unknown>,
     return (await typed()).notifications.find({}).sort({ at: -1 }).limit(limit).toArray()
   }
 
+  /**
+   * When each AI call of the last 26 hours ran (ms), for "AI calls today" in the viewer's own day
+   * (@mb/ui/ai-calls-today counts them in the browser). A local day is at most 25 hours long, so
+   * the window holds all of it in any time zone. The engine's `ai.calls_today` counts the bot's day.
+   */
+  const getAiCallTimes = async (): Promise<number[]> => {
+    await connection()
+    const since = new Date(Date.now() - 26 * 3_600_000)
+    const docs = await (await typed()).aiCalls.find({ at: { $gte: since } }, { projection: { _id: 0, at: 1 } }).toArray()
+    return docs.map((d) => d.at.getTime())
+  }
+
   const toEvents = (docs: Document[], viewer: Viewer) =>
     docs
       .map(({ _id, expires_at, ...e }) => {
@@ -220,6 +232,7 @@ export const createQueries = <Cols extends Record<QueryCollectionName, unknown>,
     getAudit,
     getCommands,
     getNotifications,
+    getAiCallTimes,
     getRecentEvents,
     getWireItems,
     getWireItemsById,

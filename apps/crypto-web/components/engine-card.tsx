@@ -2,7 +2,7 @@ import { EngineCard as EngineCardShell } from "@mb/ui/engine-card"
 import type { EngineSummary } from "@/lib/data"
 
 /** The engine at a glance (@mb/ui/engine-card) with crypto's rows: data and wallet health. */
-export function EngineCard({ engine }: { engine: EngineSummary }) {
+export function EngineCard({ engine, aiCallTimes }: { engine: EngineSummary; aiCallTimes: number[] }) {
   const s = engine.status
   const rows: [string, React.ReactNode][] = s
     ? [
@@ -11,5 +11,5 @@ export function EngineCard({ engine }: { engine: EngineSummary }) {
         ["Books reconciled", s.reconciliation ? (s.reconciliation.ok ? "yes" : "mismatch") : "—"],
       ]
     : []
-  return <EngineCardShell engine={engine} rows={rows} />
+  return <EngineCardShell engine={engine} aiCallTimes={aiCallTimes} rows={rows} />
 }

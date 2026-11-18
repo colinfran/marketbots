@@ -34,6 +34,7 @@ export const {
   getAudit,
   getCommands,
   getNotifications,
+  getAiCallTimes,
   getRecentEvents,
   getWireItems,
   getWireFacets,

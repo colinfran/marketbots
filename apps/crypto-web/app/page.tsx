@@ -9,7 +9,7 @@ import { Delta, Empty, Stat } from "@/components/bits"
 import { EngineCard } from "@/components/engine-card"
 import { agentStatusView } from "@/lib/agent"
 import { getViewer } from "@/lib/auth"
-import { getAccount, getEngine, getSettings } from "@/lib/data"
+import { getAccount, getAiCallTimes, getEngine, getSettings } from "@/lib/data"
 import { time, usd } from "@/lib/format"
 import { pageMetadata, site } from "@/lib/site"
 
@@ -20,7 +20,7 @@ export const metadata: Metadata = {
 
 /** Live: the account at a glance, and everything the agent and the local model are doing as they do it. */
 export default async function LivePage() {
-  const [viewer, data, engine, settings] = await Promise.all([getViewer(), getAccount(), getEngine(), getSettings()])
+  const [viewer, data, engine, settings, aiCallTimes] = await Promise.all([getViewer(), getAccount(), getEngine(), getSettings(), getAiCallTimes()])
   const status = agentStatusView(engine.status)
   const textShown = viewer.owner || !!settings?.settings.agent?.public_thinking
 
@@ -82,7 +82,7 @@ export default async function LivePage() {
           </CardContent>
         </Card>
         <div className="space-y-4 lg:col-span-2">
-          <EngineCard engine={engine} />
+          <EngineCard engine={engine} aiCallTimes={aiCallTimes} />
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Activity</CardTitle>

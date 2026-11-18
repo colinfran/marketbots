@@ -4,7 +4,7 @@ import type { EngineSummary } from "@/lib/queries"
 const stream = (state: string) => (state === "connected" ? "live" : state)
 
 /** The engine at a glance (@mb/ui/engine-card) with stock's rows: broker and data health and the market. */
-export function EngineCard({ engine }: { engine: EngineSummary }) {
+export function EngineCard({ engine, aiCallTimes }: { engine: EngineSummary; aiCallTimes: number[] }) {
   const s = engine.status
   const rows: [string, React.ReactNode][] = s
     ? [
@@ -14,5 +14,5 @@ export function EngineCard({ engine }: { engine: EngineSummary }) {
         ["Market", s.market?.is_open ? "open" : "closed"],
       ]
     : []
-  return <EngineCardShell engine={engine} rows={rows} />
+  return <EngineCardShell engine={engine} aiCallTimes={aiCallTimes} rows={rows} />
 }

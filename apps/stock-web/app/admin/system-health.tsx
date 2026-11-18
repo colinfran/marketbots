@@ -9,7 +9,17 @@ import type { EngineSummary, getDatabaseStorage } from "@/lib/queries"
 import { cn } from "@/lib/utils"
 
 /** Health of the engine on the trading server and everything it depends on (@mb/ui/system-health), with Alpaca's cards. */
-export function SystemHealth({ engine, problems, storage }: { engine: EngineSummary; problems: EngineEvent[]; storage: Awaited<ReturnType<typeof getDatabaseStorage>> }) {
+export function SystemHealth({
+  engine,
+  problems,
+  storage,
+  aiCallTimes,
+}: {
+  engine: EngineSummary
+  problems: EngineEvent[]
+  storage: Awaited<ReturnType<typeof getDatabaseStorage>>
+  aiCallTimes: number[]
+}) {
   const s = engine.status
   return (
     <div className="space-y-8">
@@ -48,7 +58,7 @@ export function SystemHealth({ engine, problems, storage }: { engine: EngineSumm
                 ))}
               </CardContent>
             </Card>
-            <AiHealthCard ai={s.ai} model={s.agent?.model ?? null} />
+            <AiHealthCard ai={s.ai} model={s.agent?.model ?? null} callTimes={aiCallTimes} />
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Market</CardTitle>

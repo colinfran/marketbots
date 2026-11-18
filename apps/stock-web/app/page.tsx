@@ -11,7 +11,7 @@ import { MarketStatus } from "@/components/market-status"
 import { agentStatusView } from "@/lib/agent"
 import { getViewer } from "@/lib/auth"
 import { usd } from "@/lib/format"
-import { getEngine, getLiveAccount, getSettings } from "@/lib/queries"
+import { getAiCallTimes, getEngine, getLiveAccount, getSettings } from "@/lib/queries"
 import { pageMetadata, site } from "@/lib/site"
 
 export const metadata: Metadata = {
@@ -21,7 +21,7 @@ export const metadata: Metadata = {
 
 /** Live: the account at a glance, and everything the agent and the local model are doing as they do it. */
 export default async function LivePage() {
-  const [viewer, live, engine, settings] = await Promise.all([getViewer(), getLiveAccount(), getEngine(), getSettings()])
+  const [viewer, live, engine, settings, aiCallTimes] = await Promise.all([getViewer(), getLiveAccount(), getEngine(), getSettings(), getAiCallTimes()])
   const status = agentStatusView(engine.status)
   const textShown = viewer.owner || settings.agent.public_thinking
   const market = engine.status?.market
@@ -83,7 +83,7 @@ export default async function LivePage() {
           </CardContent>
         </Card>
         <div className="space-y-4 lg:col-span-2">
-          <EngineCard engine={engine} />
+          <EngineCard engine={engine} aiCallTimes={aiCallTimes} />
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Activity</CardTitle>
