@@ -14,7 +14,7 @@ import { CommandButton } from "@/components/command"
 import { getViewer } from "@/lib/auth"
 import { listBans } from "@/lib/bans"
 import { ago, titleCase, usd } from "@/lib/format"
-import { getAiCallTimes, getAudit, getCommands, getDatabaseStorage, getEngine, getEngineState, getLiveAccount, getNotifications, getRecentEvents, getSettings, getSettingsDoc } from "@/lib/queries"
+import { getAiCallTimes, getAudit, getCommands, getDatabaseStorage, getEngine, getEngineState, getLiveAccount, getNotifications, getRecentEvents, getSettings, getSettingsDoc, getTriggerTimes } from "@/lib/queries"
 import { SETTINGS_SECTIONS } from "./settings-sections"
 import { SystemHealth } from "./system-health"
 
@@ -23,7 +23,7 @@ export const metadata: Metadata = { title: "Admin", robots: { index: false, foll
 export default async function AdminPage() {
   const viewer = await getViewer()
   if (!viewer.owner) redirect("/login")
-  const [doc, settings, state, engine, audit, problems, notifications, commands, live, storage, bans, aiCallTimes] = await Promise.all([
+  const [doc, settings, state, engine, audit, problems, notifications, commands, live, storage, bans, aiCallTimes, triggerTimes] = await Promise.all([
     getSettingsDoc(),
     getSettings(),
     getEngineState(),
@@ -36,6 +36,7 @@ export default async function AdminPage() {
     getDatabaseStorage(),
     listBans(),
     getAiCallTimes(),
+    getTriggerTimes(),
   ])
   const ks = state?.kill_switch
   const running = state?.status === "running" && !ks?.engaged
@@ -132,7 +133,7 @@ export default async function AdminPage() {
           <TabsTrigger value="logs">Logs</TabsTrigger>
         </TabsList>
         <TabsContent value="system" className="mt-4 space-y-8">
-          <SystemHealth engine={engine} problems={problems} storage={storage} aiCallTimes={aiCallTimes} />
+          <SystemHealth engine={engine} problems={problems} storage={storage} aiCallTimes={aiCallTimes} triggerTimes={triggerTimes} />
           <BannedAddresses bans={bans} dateTime={formatDateTime} />
         </TabsContent>
         {/* Kept mounted so unsaved edits survive switching tabs. */}

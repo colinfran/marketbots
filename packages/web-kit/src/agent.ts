@@ -8,6 +8,7 @@ export type { AgentStatusView, EpisodeRowView, EpisodeView, NoteView, StepView, 
 export const agentStatusView = (status: { agent?: AgentStatus } | null): AgentStatusView | null => (status?.agent ? toAgentStatusView(status.agent) : null)
 import type { Collection } from "mongodb"
 import { connection } from "next/server"
+import { localDayWindowStart } from "./queries"
 
 /**
  * The agent's pages (docs/plans/LOCAL-AI.md §11), the same in both dashboards: its episodes, its
@@ -68,6 +69,14 @@ export const createAgentQueries = <Cols extends AgentCollections>({ collections 
     }
   }
 
+  /** When each episode of the last 26 hours started (ms), for "Episodes today" in the viewer's day (./queries `localDayWindowStart`). The heartbeat's `episodes_today` counts the bot's day. */
+  const getEpisodeTimes = async (): Promise<number[]> => {
+    await connection()
+    const { agentEpisodes } = await collections()
+    const docs = await agentEpisodes.find({ started_at: { $gte: localDayWindowStart() } }, { projection: { _id: 0, started_at: 1 } }).toArray()
+    return docs.map((d) => d.started_at.getTime())
+  }
+
   /** The episodes that started in [from, to), oldest first (a journal day). */
   const getEpisodesBetween = async (from: Date, to: Date) => {
     await connection()
@@ -86,5 +95,5 @@ export const createAgentQueries = <Cols extends AgentCollections>({ collections 
     }
   }
 
-  return { getEpisodes, getEpisodesBetween, getEpisode, getAgentMemory }
+  return { getEpisodes, getEpisodeTimes, getEpisodesBetween, getEpisode, getAgentMemory }
 }

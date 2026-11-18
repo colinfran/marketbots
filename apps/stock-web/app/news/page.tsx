@@ -4,12 +4,13 @@ import { Button } from "@mb/ui/components/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@mb/ui/components/card"
 import { Input } from "@mb/ui/components/input"
 import { TableCell } from "@mb/ui/components/table"
+import { LocalDayCount } from "@mb/ui/local-day-count"
 import { WireSourcesSection } from "@mb/ui/system-health"
 import { LiveWireList, SourceHealthStrip, TriggerList } from "@mb/ui/wire"
 import { PageHeader, SectionTitle } from "@/components/bits"
 import { getViewer } from "@/lib/auth"
 import { titleCase, wireSource } from "@/lib/format"
-import { getEngine, getSettings, getWireFacets, getWireItems, getWireTriggers } from "@/lib/queries"
+import { getEngine, getSettings, getTriggerTimes, getWireFacets, getWireItems, getWireTriggers } from "@/lib/queries"
 import { pageMetadata } from "@/lib/site"
 
 export const metadata: Metadata = pageMetadata({
@@ -29,7 +30,15 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
   const symbol = one("symbol")?.trim().toUpperCase()
   const filter = { symbol: symbol && TICKER.test(symbol) ? symbol : undefined, category: one("category"), source: one("source"), minSeverity: one("min") ? Number(one("min")) || undefined : undefined }
   const filtered = Object.values(filter).some((v) => v !== undefined)
-  const [viewer, items, triggers, facets, engine, settings] = await Promise.all([getViewer(), getWireItems({ ...filter, limit: 150 }), getWireTriggers(40), getWireFacets(), getEngine(), getSettings()])
+  const [viewer, items, triggers, facets, engine, settings, triggerTimes] = await Promise.all([
+    getViewer(),
+    getWireItems({ ...filter, limit: 150 }),
+    getWireTriggers(40),
+    getWireFacets(),
+    getEngine(),
+    getSettings(),
+    getTriggerTimes(),
+  ])
   const wire = engine.status?.wire ?? null
   const t = settings.wire.thresholds
   const levels = new Map([
@@ -49,6 +58,7 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
       {wire && viewer.owner ? (
         <WireSourcesSection
           wire={wire}
+          triggerTimes={triggerTimes}
           note={(w) => (
             <TableCell className="max-w-xs text-xs" title={[w.detail, w.last_error].filter(Boolean).join(" · ")}>
               {w.detail && <p className="text-muted-foreground truncate">{w.detail}</p>}
@@ -61,7 +71,13 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
           <CardHeader>
             <CardTitle className="text-base">News engine</CardTitle>
             <CardDescription>
-              {wire ? `Mode ${wire.mode} · ${wire.items_last_hour} items in the last hour · ${wire.triggers_today} triggers today` : "The engine hasn't reported news-engine health yet."}
+              {wire ? (
+                <>
+                  Mode {wire.mode} · {wire.items_last_hour} items in the last hour · <LocalDayCount times={triggerTimes} /> triggers today
+                </>
+              ) : (
+                "The engine hasn't reported news-engine health yet."
+              )}
             </CardDescription>
           </CardHeader>
           {wire && (

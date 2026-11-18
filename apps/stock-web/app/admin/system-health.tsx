@@ -14,11 +14,13 @@ export function SystemHealth({
   problems,
   storage,
   aiCallTimes,
+  triggerTimes,
 }: {
   engine: EngineSummary
   problems: EngineEvent[]
   storage: Awaited<ReturnType<typeof getDatabaseStorage>>
   aiCallTimes: number[]
+  triggerTimes: number[]
 }) {
   const s = engine.status
   return (
@@ -104,7 +106,7 @@ export function SystemHealth({
             )}
           </section>
 
-          {s.wire && <WireSourcesSummary wire={s.wire} />}
+          {s.wire && <WireSourcesSummary wire={s.wire} triggerTimes={triggerTimes} />}
         </>
       )}
 

@@ -10,6 +10,7 @@ import { Badge } from "./components/badge"
 import { Button } from "./components/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./components/table"
+import { LocalDayCount } from "./local-day-count"
 import { CommandButton, CommandResult, useCommand } from "./command"
 import { Step, type StepStatus } from "./steps"
 import { useKit } from "./kit"
@@ -66,8 +67,11 @@ function Outcome({ action, outcome, symbol }: { action: string; outcome: string;
   )
 }
 
-/** The agent's state from the heartbeat: on or off, what it is doing, its queue, its speed, its breakers; the owner can resume paused entries. */
-export function AgentStatusCard({ status, online, owner = false }: { status: AgentStatusView | null; online: boolean; owner?: boolean }) {
+/**
+ * The agent's state from the heartbeat: on or off, what it is doing, its queue, its speed, its breakers; the owner can resume paused entries.
+ * Episodes today count the viewer's day, from `episodeTimes` (@mb/web-kit/agent `getEpisodeTimes`), not the heartbeat's bot day.
+ */
+export function AgentStatusCard({ status, online, episodeTimes, owner = false }: { status: AgentStatusView | null; online: boolean; episodeTimes: number[]; owner?: boolean }) {
   const now = useNow()
   if (!status) return <Empty>The engine hasn&apos;t reported the agent yet: it starts with the engine.</Empty>
   const state = !online ? "engine offline" : status.state === "running" && status.episode ? `working on ${SPECIAL[status.episode.subject] ?? status.episode.subject}, step ${status.episode.step}` : status.state
@@ -95,7 +99,7 @@ export function AgentStatusCard({ status, online, owner = false }: { status: Age
           <div>
             <dt className="text-muted-foreground text-xs">Episodes today</dt>
             <dd className="tabular-nums">
-              {status.episodes_today}
+              <LocalDayCount times={episodeTimes} />
               <span className="text-muted-foreground"> · last {ago(status.last_episode_at, now)}</span>
             </dd>
           </div>

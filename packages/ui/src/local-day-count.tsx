@@ -10,11 +10,13 @@ const subscribe = (onTick: () => void) => {
 }
 
 /**
- * AI calls since midnight in the viewer's time zone, counted in the browser from the call times the
- * page read (each bot's engine counts its own day: crypto UTC, stock New York's). The server render
- * shows a dash until the page hydrates; the page's refreshes bring new calls.
+ * A "today" count in the viewer's own day (AI calls, agent episodes, news triggers): how many of
+ * `times` (ms, the last 26 hours the page read) fall after midnight in the browser's time zone. The
+ * engines count the bot's day (crypto UTC, stock New York's), which a viewer elsewhere would see turn
+ * over at an odd hour. The server render shows a dash until the page hydrates; the page's refreshes
+ * bring new times.
  */
-export function AiCallsToday({ times }: { times: number[] }) {
+export function LocalDayCount({ times }: { times: number[] }) {
   const count = useSyncExternalStore(
     subscribe,
     () => countLocalDay(times, Date.now()),

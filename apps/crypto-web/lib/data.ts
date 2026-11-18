@@ -29,6 +29,7 @@ export const {
   getCommands,
   getNotifications,
   getAiCallTimes,
+  getTriggerTimes,
   getRecentEvents,
   getWireItems,
   getWireItemsById,

@@ -2,12 +2,12 @@ import type { DatabaseStorageView, EngineStatusBase } from "@mb/core/db"
 import type { WireSourceHealth } from "@mb/core/wire"
 import { cn } from "cn"
 import Link from "next/link"
-import { AiCallsToday } from "./ai-calls-today"
 import { Empty, KV, Meter, SectionTitle } from "./bits"
 import { Badge } from "./components/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "./components/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./components/table"
 import { ago, bytes, duration, num, titleCase } from "./lib/format"
+import { LocalDayCount } from "./local-day-count"
 
 /**
  * The building blocks of the Admin page's system health: the engine, AI, server, database and stream
@@ -69,7 +69,7 @@ export function AiHealthCard({ ai, model, callTimes }: { ai: Status["ai"]; model
         <KV label="Enabled">{ai.enabled ? "yes" : "no (LLM_URL missing)"}</KV>
         <KV label="Agent's model">{model ? model.replace(/^local\//, "") : "—"}</KV>
         <KV label="Calls today">
-          <AiCallsToday times={callTimes} />
+          <LocalDayCount times={callTimes} />
         </KV>
         <KV label="Last call">{ago(ai.last_call_at)}</KV>
         {ai.last_error && <p className="text-loss mt-2 line-clamp-3 text-xs">{ai.last_error}</p>}
@@ -187,12 +187,15 @@ export function StreamHealthCard({ status, children }: { status: Pick<Status, "w
   )
 }
 
-/** Every news source with its health. `note` renders the last column (the bot's notes and errors). */
-export function WireSourcesSection({ wire, note }: { wire: NonNullable<Status["wire"]>; note: (source: WireSourceHealth) => React.ReactNode }) {
+/**
+ * Every news source with its health. `note` renders the last column (the bot's notes and errors).
+ * Triggers today count the viewer's day, from `triggerTimes` (@mb/web-kit/queries `getTriggerTimes`).
+ */
+export function WireSourcesSection({ wire, triggerTimes, note }: { wire: NonNullable<Status["wire"]>; triggerTimes: number[]; note: (source: WireSourceHealth) => React.ReactNode }) {
   return (
     <section>
       <SectionTitle>
-        News engine sources · mode {wire.mode} · {wire.items_last_hour} items in the last hour · {wire.triggers_today} triggers today
+        News engine sources · mode {wire.mode} · {wire.items_last_hour} items in the last hour · <LocalDayCount times={triggerTimes} /> triggers today
       </SectionTitle>
       <Table>
         <TableHeader>
@@ -224,15 +227,15 @@ export function WireSourcesSection({ wire, note }: { wire: NonNullable<Status["w
   )
 }
 
-/** Admin's one line on the news engine; every source with its errors is on the News page. */
-export function WireSourcesSummary({ wire }: { wire: NonNullable<Status["wire"]> }) {
+/** Admin's one line on the news engine; every source with its errors is on the News page. Triggers today as in `WireSourcesSection`. */
+export function WireSourcesSummary({ wire, triggerTimes }: { wire: NonNullable<Status["wire"]>; triggerTimes: number[] }) {
   const running = wire.sources.filter((s) => s.state !== "disabled")
   const ok = running.filter((s) => s.state === "ok").length
   return (
     <section>
       <SectionTitle>News engine</SectionTitle>
       <p className="text-muted-foreground text-sm">
-        Mode {wire.mode} · {ok} of {running.length} sources ok · {wire.items_last_hour} items in the last hour · {wire.triggers_today} triggers today. Every source with its
+        Mode {wire.mode} · {ok} of {running.length} sources ok · {wire.items_last_hour} items in the last hour · <LocalDayCount times={triggerTimes} /> triggers today. Every source with its
         errors is on{" "}
         <Link href="/news" className="text-foreground underline underline-offset-2">
           News

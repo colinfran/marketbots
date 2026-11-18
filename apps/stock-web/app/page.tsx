@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@mb/u
 import { Delta, Empty, Stat } from "@/components/bits"
 import { EngineCard } from "@/components/engine-card"
 import { MarketStatus } from "@/components/market-status"
-import { agentStatusView } from "@/lib/agent"
+import { agentStatusView, getEpisodeTimes } from "@/lib/agent"
 import { getViewer } from "@/lib/auth"
 import { usd } from "@/lib/format"
 import { getAiCallTimes, getEngine, getLiveAccount, getSettings } from "@/lib/queries"
@@ -21,7 +21,7 @@ export const metadata: Metadata = {
 
 /** Live: the account at a glance, and everything the agent and the local model are doing as they do it. */
 export default async function LivePage() {
-  const [viewer, live, engine, settings, aiCallTimes] = await Promise.all([getViewer(), getLiveAccount(), getEngine(), getSettings(), getAiCallTimes()])
+  const [viewer, live, engine, settings, aiCallTimes, episodeTimes] = await Promise.all([getViewer(), getLiveAccount(), getEngine(), getSettings(), getAiCallTimes(), getEpisodeTimes()])
   const status = agentStatusView(engine.status)
   const textShown = viewer.owner || settings.agent.public_thinking
   const market = engine.status?.market
@@ -67,7 +67,7 @@ export default async function LivePage() {
         )}
       </div>
 
-      <AgentStatusCard status={status} online={engine.online} owner={viewer.owner} />
+      <AgentStatusCard status={status} online={engine.online} episodeTimes={episodeTimes} owner={viewer.owner} />
 
       <div className="grid gap-4 lg:grid-cols-5">
         <Card className="lg:col-span-3">

@@ -3,7 +3,7 @@ import { AgentLive, AgentMemory, AgentStatusCard, AskAgentForm, EpisodeTable } f
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@mb/ui/components/card"
 import { StreamBadge } from "@mb/ui/live"
 import { PageHeader, SectionTitle } from "@/components/bits"
-import { agentStatusView, getAgentMemory, getEpisode, getEpisodes } from "@/lib/agent"
+import { agentStatusView, getAgentMemory, getEpisode, getEpisodes, getEpisodeTimes } from "@/lib/agent"
 import { getViewer } from "@/lib/auth"
 import { getEngine, getSettings } from "@/lib/queries"
 import { pageMetadata } from "@/lib/site"
@@ -16,7 +16,7 @@ export const metadata: Metadata = pageMetadata({
 
 /** The agent (docs/plans/LOCAL-AI.md §11): what it is doing now, its memory, its episodes. */
 export default async function AgentPage() {
-  const [viewer, engine, settings, episodes, memory] = await Promise.all([getViewer(), getEngine(), getSettings(), getEpisodes(50), getAgentMemory()])
+  const [viewer, engine, settings, episodes, memory, episodeTimes] = await Promise.all([getViewer(), getEngine(), getSettings(), getEpisodes(50), getAgentMemory(), getEpisodeTimes()])
   const thinking = viewer.owner || !!settings.agent?.public_thinking
   const latest = episodes[0] ? await getEpisode(episodes[0].id, { thinking }) : null
   const status = agentStatusView(engine.status)
@@ -27,7 +27,7 @@ export default async function AgentPage() {
         description="A local AI model that decides for the bot. Code watches prices, news, the setup screen, the session and its own watches all the time and wakes it when something matters; it looks things up one step at a time and decides. It trades stocks and options in the paper account through the bot's risk checks."
         action={<StreamBadge />}
       />
-      <AgentStatusCard status={status} online={engine.online} owner={viewer.owner} />
+      <AgentStatusCard status={status} online={engine.online} episodeTimes={episodeTimes} owner={viewer.owner} />
       <div className="grid gap-4 lg:grid-cols-5">
         <Card className="lg:col-span-3">
           <CardHeader>

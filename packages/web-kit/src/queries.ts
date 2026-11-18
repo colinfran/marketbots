@@ -82,6 +82,14 @@ export const toRowView = (i: WireItemDoc<string>): WireRowView => ({
   article: toArticleView(i.article),
 })
 
+/**
+ * The start of the window for "today" counts in the viewer's own day: the dashboards render on the
+ * server, which can't know the viewer's time zone, so the page reads the times of the last 26 hours
+ * and the browser counts those since its midnight (@mb/ui/local-day-count). A local day is at most
+ * 25 hours long, so the window holds all of it in any zone.
+ */
+export const localDayWindowStart = (now = Date.now()) => new Date(now - 26 * 3_600_000)
+
 /** The collections the shared queries read. Each bot passes its own map; the bot-specific document types are read off it. */
 type QueryCollectionName = "engineState" | "events" | "commands" | "audit" | "notifications" | "aiCalls" | "wireItems" | "wireTriggers"
 
@@ -135,15 +143,17 @@ export const createQueries = <Cols extends Record<QueryCollectionName, unknown>,
     return (await typed()).notifications.find({}).sort({ at: -1 }).limit(limit).toArray()
   }
 
-  /**
-   * When each AI call of the last 26 hours ran (ms), for "AI calls today" in the viewer's own day
-   * (@mb/ui/ai-calls-today counts them in the browser). A local day is at most 25 hours long, so
-   * the window holds all of it in any time zone. The engine's `ai.calls_today` counts the bot's day.
-   */
+  /** When each AI call of the last 26 hours ran (ms), for "AI calls today" in the viewer's day (see `localDayWindowStart`). The engine's `ai.calls_today` counts the bot's day. */
   const getAiCallTimes = async (): Promise<number[]> => {
     await connection()
-    const since = new Date(Date.now() - 26 * 3_600_000)
-    const docs = await (await typed()).aiCalls.find({ at: { $gte: since } }, { projection: { _id: 0, at: 1 } }).toArray()
+    const docs = await (await typed()).aiCalls.find({ at: { $gte: localDayWindowStart() } }, { projection: { _id: 0, at: 1 } }).toArray()
+    return docs.map((d) => d.at.getTime())
+  }
+
+  /** When each news trigger of the last 26 hours that fired or queued (what the engine's `wire.triggers_today` counts, on the bot's day) happened, ms. */
+  const getTriggerTimes = async (): Promise<number[]> => {
+    await connection()
+    const docs = await (await typed()).wireTriggers.find({ status: { $in: ["fired", "queued"] }, at: { $gte: localDayWindowStart() } }, { projection: { _id: 0, at: 1 } }).toArray()
     return docs.map((d) => d.at.getTime())
   }
 
@@ -233,6 +243,7 @@ export const createQueries = <Cols extends Record<QueryCollectionName, unknown>,
     getCommands,
     getNotifications,
     getAiCallTimes,
+    getTriggerTimes,
     getRecentEvents,
     getWireItems,
     getWireItemsById,

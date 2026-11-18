@@ -1,7 +1,7 @@
-import { AiCallsToday } from "./ai-calls-today"
 import { Badge } from "./components/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/card"
 import { titleCase } from "./lib/format"
+import { LocalDayCount } from "./local-day-count"
 
 /** What the card needs from a bot's engine summary (both bots' `engine_status` have these fields). */
 export type EngineCardEngine = {
@@ -22,7 +22,7 @@ export function EngineCard({ engine, aiCallTimes, rows, note }: { engine: Engine
         [
           "AI calls today",
           <span key="calls" className="font-mono tabular-nums">
-            <AiCallsToday times={aiCallTimes} />
+            <LocalDayCount times={aiCallTimes} />
           </span>,
         ],
         ...rows,
