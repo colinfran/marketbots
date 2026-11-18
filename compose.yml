@@ -141,8 +141,10 @@ services:
       # The log history (see crypto-engine).
       - ./logs/stock-engine:/logs
     stop_grace_period: 30s
-    # Up from 768 MB: headroom at the open with ~1,500 tracked symbols.
-    mem_limit: 1g
+    # 768 MB, then 1 GB (headroom at the open with ~1,500 tracked symbols), then 2 GB (Node's heap
+    # limit is half of this: 1,048 MB) after three heap-out-of-memory crashes on 2026-11-12, -13 and
+    # -16, 39 to 60 hours after each start.
+    mem_limit: 2g
     logging: *logging
 
   # The crypto dashboard (https://cryptomarketbot.app): its Next.js standalone server

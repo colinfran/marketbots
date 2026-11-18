@@ -471,7 +471,7 @@ The Docker VM has 15.5 GiB and the other stacks use ~3.5 GiB of it. Every servic
 | Service | Limit | Expected |
 | --- | --- | --- |
 | `crypto-engine` | 1 GB | ~0.35 GB |
-| `stock-engine` | 1 GB (was 768 MB: headroom at the open with ~1,500 tracked symbols) | 0.3–0.5 GB |
+| `stock-engine` | 2 GB (was 768 MB, then 1 GB for headroom at the open with ~1,500 tracked symbols; raised on 2026-11-17 after three heap-out-of-memory crashes, 39 to 60 hours after each start). Node's heap limit is half the cap: 1,048 MB | 0.3–0.5 GB |
 | `scraper` | 1 GB | 0.15 GB idle, up to 0.5 GB while rendering |
 | `llm` | 6 GB RAM, 6 CPUs | ~2.5 GB at start, up to ~4.5 GB with its prompt cache (capped at 2 GB); ~6.8 GB of GPU memory on each card, always (§9) |
 | `llm-model` | 256 MB | not running: only when you fetch a model file (§9), and removed when done |
