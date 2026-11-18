@@ -14,7 +14,7 @@ import { LocalDayCount } from "./local-day-count"
 import { CommandButton, CommandResult, useCommand } from "./command"
 import { Step, type StepStatus } from "./steps"
 import { useKit } from "./kit"
-import { ago, num, usd } from "./lib/format"
+import { ago, latestTime, num, usd } from "./lib/format"
 import { useNow } from "./live"
 import { ModelCallCard } from "./model-feed"
 import { useStream } from "./stream"
@@ -69,9 +69,20 @@ function Outcome({ action, outcome, symbol }: { action: string; outcome: string;
 
 /**
  * The agent's state from the heartbeat: on or off, what it is doing, its queue, its speed, its breakers; the owner can resume paused entries.
- * Episodes today count the viewer's day, from `episodeTimes` (@mb/web-kit/agent `getEpisodeTimes`), not the heartbeat's bot day.
+ * `episodes` (@mb/web-kit/agent `getEpisodeTimes`, from the stored episodes): today's count in the viewer's day, not the heartbeat's
+ * bot day; and the last one, the later of the stored and the heartbeat's, which is null from an engine restart to the next episode.
  */
-export function AgentStatusCard({ status, online, episodeTimes, owner = false }: { status: AgentStatusView | null; online: boolean; episodeTimes: number[]; owner?: boolean }) {
+export function AgentStatusCard({
+  status,
+  online,
+  episodes,
+  owner = false,
+}: {
+  status: AgentStatusView | null
+  online: boolean
+  episodes: { started: number[]; lastAt: string | null }
+  owner?: boolean
+}) {
   const now = useNow()
   if (!status) return <Empty>The engine hasn&apos;t reported the agent yet: it starts with the engine.</Empty>
   const state = !online ? "engine offline" : status.state === "running" && status.episode ? `working on ${SPECIAL[status.episode.subject] ?? status.episode.subject}, step ${status.episode.step}` : status.state
@@ -99,8 +110,8 @@ export function AgentStatusCard({ status, online, episodeTimes, owner = false }:
           <div>
             <dt className="text-muted-foreground text-xs">Episodes today</dt>
             <dd className="tabular-nums">
-              <LocalDayCount times={episodeTimes} />
-              <span className="text-muted-foreground"> · last {ago(status.last_episode_at, now)}</span>
+              <LocalDayCount times={episodes.started} />
+              <span className="text-muted-foreground"> · last {ago(latestTime(status.last_episode_at, episodes.lastAt), now)}</span>
             </dd>
           </div>
           <div>

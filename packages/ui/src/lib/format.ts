@@ -49,6 +49,12 @@ export const zonedFormat = (timeZone: string) => ({
   time: (value: When) => (value ? new Date(value).toLocaleTimeString("en-US", { timeZone, hour: "numeric", minute: "2-digit", second: "2-digit" }) : "—"),
 })
 
+/** The later of two ISO times, either of which may be missing (null when both are). */
+export const latestTime = (a: string | null | undefined, b: string | null | undefined) => {
+  if (!a || !b) return a || b || null
+  return Date.parse(a) >= Date.parse(b) ? a : b
+}
+
 export const ago = (value: When, now = Date.now()) => {
   if (!value) return "never"
   const s = Math.max(0, Math.round((now - new Date(value).getTime()) / 1000))

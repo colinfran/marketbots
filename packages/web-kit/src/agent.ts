@@ -25,6 +25,9 @@ export type AgentCollections = {
 
 const iso = (d: Date | null | undefined) => (d ? d.toISOString() : null)
 
+/** The agent card's clock (`getEpisodeTimes`; the same shape as @mb/ui/agent's `AgentStatusCard` `episodes`). */
+export type EpisodeTimes = { started: number[]; lastAt: string | null }
+
 const toRow = (e: AgentEpisodeDoc): EpisodeRowView => ({
   id: e._id,
   started_at: e.started_at.toISOString(),
@@ -69,12 +72,21 @@ export const createAgentQueries = <Cols extends AgentCollections>({ collections 
     }
   }
 
-  /** When each episode of the last 26 hours started (ms), for "Episodes today" in the viewer's day (./queries `localDayWindowStart`). The heartbeat's `episodes_today` counts the bot's day. */
-  const getEpisodeTimes = async (): Promise<number[]> => {
+  /**
+   * The agent card's clock, from the stored episodes. `started`: when each episode of the last 26
+   * hours started (ms), for "Episodes today" in the viewer's day (./queries `localDayWindowStart`;
+   * the heartbeat's `episodes_today` counts the bot's day). `lastAt`: when the latest one finished
+   * (ISO): the heartbeat's `last_episode_at` is kept in memory, so it is null from an engine restart
+   * until the next episode ends. Episodes run one at a time, so the latest started is the latest finished.
+   */
+  const getEpisodeTimes = async (): Promise<EpisodeTimes> => {
     await connection()
     const { agentEpisodes } = await collections()
-    const docs = await agentEpisodes.find({ started_at: { $gte: localDayWindowStart() } }, { projection: { _id: 0, started_at: 1 } }).toArray()
-    return docs.map((d) => d.started_at.getTime())
+    const [docs, latest] = await Promise.all([
+      agentEpisodes.find({ started_at: { $gte: localDayWindowStart() } }, { projection: { _id: 0, started_at: 1 } }).toArray(),
+      agentEpisodes.findOne({}, { sort: { started_at: -1 }, projection: { _id: 0, started_at: 1, finished_at: 1 } }),
+    ])
+    return { started: docs.map((d) => d.started_at.getTime()), lastAt: iso(latest?.finished_at ?? latest?.started_at) }
   }
 
   /** The episodes that started in [from, to), oldest first (a journal day). */

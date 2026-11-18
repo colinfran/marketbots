@@ -27,7 +27,7 @@ export default async function AgentPage() {
         description="A local AI model that decides for the bot. Code watches prices, news, the setup screen, the session and its own watches all the time and wakes it when something matters; it looks things up one step at a time and decides. It trades stocks and options in the paper account through the bot's risk checks."
         action={<StreamBadge />}
       />
-      <AgentStatusCard status={status} online={engine.online} episodeTimes={episodeTimes} owner={viewer.owner} />
+      <AgentStatusCard status={status} online={engine.online} episodes={episodeTimes} owner={viewer.owner} />
       <div className="grid gap-4 lg:grid-cols-5">
         <Card className="lg:col-span-3">
           <CardHeader>

@@ -67,7 +67,7 @@ export default async function LivePage() {
         )}
       </div>
 
-      <AgentStatusCard status={status} online={engine.online} episodeTimes={episodeTimes} owner={viewer.owner} />
+      <AgentStatusCard status={status} online={engine.online} episodes={episodeTimes} owner={viewer.owner} />
 
       <div className="grid gap-4 lg:grid-cols-5">
         <Card className="lg:col-span-3">
