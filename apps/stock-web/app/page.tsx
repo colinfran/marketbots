@@ -1,4 +1,3 @@
-import { formatTime } from "@mb/stock-core/time"
 import type { Metadata } from "next"
 import Link from "next/link"
 import { AgentStatusCard } from "@mb/ui/agent"
@@ -10,7 +9,7 @@ import { EngineCard } from "@/components/engine-card"
 import { MarketStatus } from "@/components/market-status"
 import { agentStatusView, getEpisodeTimes } from "@/lib/agent"
 import { getViewer } from "@/lib/auth"
-import { usd } from "@/lib/format"
+import { clock, usd } from "@/lib/format"
 import { getAiCallTimes, getEngine, getLiveAccount, getSettings } from "@/lib/queries"
 import { pageMetadata, site } from "@/lib/site"
 
@@ -44,7 +43,7 @@ export default async function LivePage() {
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
           {market && live && <MarketStatus open={market.open} close={market.close} nextOpen={market.next_open ?? new Date(live.clock.next_open)} renderedAt={new Date()} />}
-          {live && <span className="text-muted-foreground">Account as of {formatTime(live.asOf)}</span>}
+          {live && <span className="text-muted-foreground">Account as of {clock(live.asOf)}</span>}
           {!engine.online && <span className="text-loss">The engine is offline.</span>}
         </div>
         {!live ? (

@@ -1,11 +1,10 @@
-import { formatDateTime } from "@mb/stock-core/time"
 import type { Metadata } from "next"
 import { NewsFunnelCard } from "@mb/ui/analytics"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@mb/ui/components/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mb/ui/components/table"
 import { Delta, Empty, PageHeader, SectionTitle, Stat, SymbolLink } from "@/components/bits"
 import { CumulativePnlChart, DailyPnlChart, EquityChart } from "@/components/charts"
-import { num, pct, titleCase, usd } from "@/lib/format"
+import { dayClock, num, pct, titleCase, usd } from "@/lib/format"
 import { cumulativePnl, getEquitySeries, getLiveAccount, getSettings, getWireAnalytics, listDailyStats, listTrades, summarizeBySymbol } from "@/lib/queries"
 import { compound } from "@/lib/returns"
 import { pageMetadata } from "@/lib/site"
@@ -151,7 +150,7 @@ export default async function AnalyticsPage() {
                     <TableCell className="text-right tabular-nums">
                       {s.wins} / {s.losses}
                     </TableCell>
-                    <TableCell className="text-muted-foreground text-right">{formatDateTime(s.last_at)}</TableCell>
+                    <TableCell className="text-muted-foreground text-right">{dayClock(s.last_at)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

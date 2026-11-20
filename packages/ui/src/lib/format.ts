@@ -2,7 +2,7 @@
  * Display formatting both dashboards share, for server and client components. What differs per
  * bot stays in the app's lib/format: prices and quantities (crypto's magnitude-aware decimals vs
  * stock's cents and shares) and symbol URLs. Times use the time zone each app passes to
- * `zonedFormat` (crypto NEXT_PUBLIC_DISPLAY_TIMEZONE, stock New York).
+ * `zonedFormat` (both dashboards: NEXT_PUBLIC_DISPLAY_TIMEZONE, Pacific; stock also shows market hours in New York time).
  */
 
 const usdFormatter = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" })

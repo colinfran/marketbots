@@ -1,10 +1,9 @@
 import type { EngineEvent } from "@mb/stock-core/events"
-import { formatDateTime } from "@mb/stock-core/time"
 import { Card, CardContent, CardHeader, CardTitle } from "@mb/ui/components/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mb/ui/components/table"
 import { AiHealthCard, DatabaseStorageCard, EngineHealthCard, HealthDot, HistoryHealthCard, ProblemsSection, ServerHealthCard, StreamHealthCard, WireSourcesSummary } from "@mb/ui/system-health"
 import { Empty, KV, SectionTitle } from "@/components/bits"
-import { ago, pct, price, titleCase } from "@/lib/format"
+import { ago, dayClock, pct, price, sessionDayTime, sessionHours, titleCase } from "@/lib/format"
 import type { EngineSummary, getDatabaseStorage } from "@/lib/queries"
 import { cn } from "@/lib/utils"
 
@@ -32,7 +31,7 @@ export function SystemHealth({
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <EngineHealthCard
               engine={{ ...engine, status: s }}
-              dateTime={formatDateTime}
+              dateTime={dayClock}
               activity={
                 <>
                   {titleCase(s.cycle_state)}
@@ -68,8 +67,8 @@ export function SystemHealth({
               <CardContent>
                 <KV label="Trading day">{s.market?.day ?? "—"}</KV>
                 <KV label="Session">{s.market ? (s.market.is_open ? "open" : s.market.is_trading_day ? "closed" : "no session today") : "—"}</KV>
-                <KV label="Hours">{s.market?.open && s.market.close ? `${formatDateTime(s.market.open)} – ${formatDateTime(s.market.close)}${s.market.early_close ? " (early close)" : ""}` : "—"}</KV>
-                <KV label="Next open">{s.market?.next_open ? formatDateTime(s.market.next_open) : "—"}</KV>
+                <KV label="Hours">{s.market?.open && s.market.close ? `${sessionHours(s.market.open, s.market.close)}${s.market.early_close ? " (early close)" : ""}` : "—"}</KV>
+                <KV label="Next open">{s.market?.next_open ? sessionDayTime(s.market.next_open) : "—"}</KV>
               </CardContent>
             </Card>
             <ServerHealthCard system={s.system} />
@@ -110,7 +109,7 @@ export function SystemHealth({
         </>
       )}
 
-      <ProblemsSection problems={problems} dateTime={formatDateTime} timeClassName="w-36" />
+      <ProblemsSection problems={problems} dateTime={dayClock} timeClassName="w-36" />
     </div>
   )
 }

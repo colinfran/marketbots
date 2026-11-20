@@ -1,4 +1,3 @@
-import { formatDateTime } from "@mb/stock-core/time"
 import type { Metadata } from "next"
 import { redirect } from "next/navigation"
 import { WakeAgentForm } from "@mb/ui/agent"
@@ -13,7 +12,7 @@ import { Empty, PageHeader, SectionTitle, StatusBadge } from "@/components/bits"
 import { CommandButton } from "@/components/command"
 import { getViewer } from "@/lib/auth"
 import { listBans } from "@/lib/bans"
-import { ago, titleCase, usd } from "@/lib/format"
+import { ago, dayClock, titleCase, usd } from "@/lib/format"
 import { getAiCallTimes, getAudit, getCommands, getDatabaseStorage, getEngine, getEngineState, getLiveAccount, getNotifications, getRecentEvents, getSettings, getSettingsDoc, getTriggerTimes } from "@/lib/queries"
 import { SETTINGS_SECTIONS } from "./settings-sections"
 import { SystemHealth } from "./system-health"
@@ -58,7 +57,7 @@ export default async function AdminPage() {
             </CardTitle>
             <CardDescription>
               {ks?.engaged
-                ? `Halted ${formatDateTime(ks.at!)} by ${ks.by}: ${ks.reason}`
+                ? `Halted ${dayClock(ks.at!)} by ${ks.by}: ${ks.reason}`
                 : state?.status === "paused"
                   ? `Paused${state.pause_reason ? `: ${state.pause_reason}` : ""}. No new entries; stops, targets and options exits stay active.`
                   : "Running: the agent decides and enters; stops, targets and options exits are active."}
@@ -134,7 +133,7 @@ export default async function AdminPage() {
         </TabsList>
         <TabsContent value="system" className="mt-4 space-y-8">
           <SystemHealth engine={engine} problems={problems} storage={storage} aiCallTimes={aiCallTimes} triggerTimes={triggerTimes} />
-          <BannedAddresses bans={bans} dateTime={formatDateTime} />
+          <BannedAddresses bans={bans} dateTime={dayClock} />
         </TabsContent>
         {/* Kept mounted so unsaved edits survive switching tabs. */}
         <TabsContent value="settings" forceMount className="mt-4 data-[state=inactive]:hidden">
@@ -198,7 +197,7 @@ export default async function AdminPage() {
                 <TableBody>
                   {audit.map((a) => (
                     <TableRow key={a._id}>
-                      <TableCell className="text-muted-foreground text-xs whitespace-nowrap">{formatDateTime(a.at)}</TableCell>
+                      <TableCell className="text-muted-foreground text-xs whitespace-nowrap">{dayClock(a.at)}</TableCell>
                       <TableCell className="text-sm">{a.actor}</TableCell>
                       <TableCell className="font-mono text-xs">{a.action}</TableCell>
                       <TableCell className="text-muted-foreground max-w-xl truncate font-mono text-xs" title={JSON.stringify(a.details)}>

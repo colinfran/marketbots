@@ -13,16 +13,17 @@ import {
 import { zonedFormat } from "@mb/ui/lib/format"
 import { useMemo, useState } from "react"
 import type { CumulativePoint, PriceRange, PriceRow } from "@/lib/queries"
-import { pct, price, qty, usd } from "@/lib/format"
+import { pct, price, qty, TIME_ZONE, usd } from "@/lib/format"
 
 /**
  * StockMarketBot's charts: the shared ones (@mb/ui/charts) with stock's data and formats. Times,
- * on the axis and in tooltips, are New York times, like the market. Charts are single-series
+ * on the axis and in tooltips, are in the owner's time zone (lib/format TIME_ZONE); a daily bar or
+ * day is the New York trading day, so those stay on New York dates. Charts are single-series
  * (equity, cumulative P&L) or polarity (daily P&L), so none needs a legend: the card title names
  * the series. P&L bars also encode sign by direction from the zero line.
  */
 
-const { dateTime } = zonedFormat(MARKET_TZ)
+const { dateTime } = zonedFormat(TIME_ZONE)
 
 /** Equity and price axes span at least 0.4% of the value, so moves of a few cents don't look like swings. */
 const MIN_SPAN = 0.004
@@ -46,7 +47,7 @@ export function EquityChart({ series, baseline }: { series: { key: string; label
       fitBaseline={near}
       minSpan={MIN_SPAN}
       height={256}
-      timeZone={MARKET_TZ}
+      timeZone={TIME_ZONE}
       dateTime={dateTime}
       empty="Not enough history yet."
       tabs={{ value: range, options: series.map((s) => ({ key: s.key, label: s.label })), onChange: setRange }}
@@ -118,7 +119,7 @@ export function PriceChart({ symbol, ranges, levels }: { symbol: string; ranges:
       minSpan={MIN_SPAN}
       price={price}
       height={288}
-      timeZone={MARKET_TZ}
+      timeZone={intraday ? TIME_ZONE : MARKET_TZ}
       intraday={intraday}
       tooltip={({ t, close, row }) => ({
         title: intraday ? dateTime(t) : weekdayDate(t),
@@ -135,5 +136,5 @@ export function PriceChart({ symbol, ranges, levels }: { symbol: string; ranges:
 }
 
 export function CumulativePnlChart({ points }: { points: CumulativePoint[] }) {
-  return <SharedCumulativePnlChart points={points} height={224} timeZone={MARKET_TZ} dateTime={dateTime} empty="No closed trades yet." />
+  return <SharedCumulativePnlChart points={points} height={224} timeZone={TIME_ZONE} dateTime={dateTime} empty="No closed trades yet." />
 }

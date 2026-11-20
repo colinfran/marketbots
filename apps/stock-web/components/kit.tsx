@@ -1,13 +1,12 @@
 "use client"
 
 import type { EngineEvent, EventDataMap } from "@mb/stock-core/events"
-import { formatDateTime } from "@mb/stock-core/time"
 import { AGENT_ICONS, agentDetail, agentLinks, isAgentEvent } from "@mb/ui/agent-events"
 import type { BotKit } from "@mb/ui/kit"
 import { ActivityIcon, AlertTriangleIcon, ArrowDownRightIcon, ArrowUpRightIcon, BotIcon, BrainIcon, type LucideIcon, NewspaperIcon, ShieldCheckIcon, ShieldXIcon, WalletIcon, ZapIcon } from "lucide-react"
 import Link from "next/link"
 import { STATUS_STYLES } from "@/components/bits"
-import { pct, price, time, tone, wireSource } from "@/lib/format"
+import { dayClock, pct, price, time, tone, wireSource } from "@/lib/format"
 
 /**
  * StockMarketBot's kit for the shared dashboard components (@mb/ui/kit): brand, formatting,
@@ -96,7 +95,7 @@ export const kit: BotKit<EngineEvent> = {
       return { symbol: d.symbol, bid: d.bid, ask: d.ask, last: d.price, change_pct: d.change_pct }
     },
   },
-  format: { price, time, dateTime: formatDateTime },
+  format: { price, time, dateTime: dayClock },
   symbolHref: (symbol) => `/markets/${encodeURIComponent(symbol)}`,
   sourceLabel: wireSource,
   statusStyles: STATUS_STYLES,

@@ -1,11 +1,11 @@
 import type { DecisionDoc, OptionPositionDoc } from "@mb/stock-core/db"
 import { daysToExpiry, describeContract, isOptionSymbol, STRATEGY_LABEL } from "@mb/stock-core/options"
-import { formatDateTime, formatTime, marketDay } from "@mb/stock-core/time"
+import { marketDay } from "@mb/stock-core/time"
 import { ZapIcon } from "lucide-react"
 import Link from "next/link"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mb/ui/components/table"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@mb/ui/components/tooltip"
-import { decisionHref, price, qty, titleCase, usd } from "@/lib/format"
+import { clock, dayClock, decisionHref, price, qty, titleCase, usd } from "@/lib/format"
 import type { DecisionRow, LiveAccount, TradeRow } from "@/lib/queries"
 import { ActionBadge, Delta, Empty, StatusBadge, SymbolLink } from "./bits"
 import { CommandButton } from "./command"
@@ -136,7 +136,7 @@ export function OptionsTable({ positions, closed = false, owner = false }: { pos
                   <span className="text-muted-foreground">—</span>
                 )}
               </TableCell>
-              <TableCell className="text-muted-foreground text-right tabular-nums">{closed ? (o.closed_at ? formatDateTime(o.closed_at) : "—") : daysToExpiry(o.expiration, today)}</TableCell>
+              <TableCell className="text-muted-foreground text-right tabular-nums">{closed ? (o.closed_at ? dayClock(o.closed_at) : "—") : daysToExpiry(o.expiration, today)}</TableCell>
               <TableCell className="text-muted-foreground text-xs whitespace-normal">
                 {closed ? (
                   <>
@@ -235,12 +235,12 @@ export function DecisionsTable({ decisions, showDay = false }: { decisions: Deci
                 <TableCell className="text-muted-foreground whitespace-nowrap">
                   {decisionHref(d) ? (
                     <Link href={decisionHref(d)!} className="hover:underline">
-                      {showDay ? formatDateTime(d.created_at) : formatTime(d.created_at)}
+                      {showDay ? dayClock(d.created_at) : clock(d.created_at)}
                     </Link>
                   ) : showDay ? (
-                    formatDateTime(d.created_at)
+                    dayClock(d.created_at)
                   ) : (
-                    formatTime(d.created_at)
+                    clock(d.created_at)
                   )}
                 </TableCell>
                 <TableCell>
@@ -320,7 +320,7 @@ export function TradesTable({ trades, showDay = true }: { trades: TradeRow[]; sh
             const option = isOptionSymbol(t.symbol)
             return (
               <TableRow key={t.id} className="align-top">
-                <TableCell className="text-muted-foreground whitespace-nowrap">{showDay ? formatDateTime(t.at) : formatTime(t.at)}</TableCell>
+                <TableCell className="text-muted-foreground whitespace-nowrap">{showDay ? dayClock(t.at) : clock(t.at)}</TableCell>
                 <TableCell>
                   {option ? (
                     <span className="flex flex-col">

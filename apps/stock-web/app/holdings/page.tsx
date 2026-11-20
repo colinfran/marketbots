@@ -1,4 +1,3 @@
-import { formatDateTime } from "@mb/stock-core/time"
 import { STRATEGY_LABEL } from "@mb/stock-core/options"
 import { SETUP_INFO, type Setup } from "@mb/stock-core/setups"
 import type { Metadata } from "next"
@@ -7,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@mb/u
 import { Delta, Empty, PageHeader, PaperBadge, SectionTitle, Stat, SymbolLink } from "@/components/bits"
 import { OptionsTable, PositionsTable } from "@/components/tables"
 import { getViewer } from "@/lib/auth"
-import { pct, price, titleCase, usd } from "@/lib/format"
+import { dayClock, pct, price, titleCase, usd } from "@/lib/format"
 import { getLiveAccount } from "@/lib/queries"
 import { pageMetadata } from "@/lib/site"
 
@@ -96,7 +95,7 @@ export default async function HoldingsPage() {
                     key={p.symbol}
                     title={<SymbolLink symbol={p.symbol} />}
                     badges={p.plan ? [...(p.plan.setup ? [setupName(p.plan.setup)] : []), ...(p.plan.horizon ? [titleCase(p.plan.horizon)] : [])] : []}
-                    meta={`${p.plan ? `Opened ${formatDateTime(p.plan.opened_at)} · ` : ""}stop ${price(p.plan?.stop_loss)} · target ${price(p.plan?.take_profit)}`}
+                    meta={`${p.plan ? `Opened ${dayClock(p.plan.opened_at)} · ` : ""}stop ${price(p.plan?.stop_loss)} · target ${price(p.plan?.take_profit)}`}
                     weight={share(p.marketValue)}
                     thesis={p.plan?.thesis ?? ""}
                     invalidation={p.plan?.invalidation ?? null}
@@ -108,7 +107,7 @@ export default async function HoldingsPage() {
                     key={o._id}
                     title={<SymbolLink symbol={o.underlying} />}
                     badges={[STRATEGY_LABEL[o.strategy], `Expires ${o.expiration}`]}
-                    meta={`Opened ${formatDateTime(o.opened_at)} · exits at −${o.stop_loss_pct}% / +${o.take_profit_pct}% of value`}
+                    meta={`Opened ${dayClock(o.opened_at)} · exits at −${o.stop_loss_pct}% / +${o.take_profit_pct}% of value`}
                     weight={share(o.mark ? o.mark.value * 100 * o.qty : (o.cost_usd ?? 0))}
                     thesis={o.thesis}
                     invalidation={o.invalidation}

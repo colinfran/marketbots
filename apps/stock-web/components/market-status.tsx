@@ -2,7 +2,7 @@
 
 import { CircleIcon } from "lucide-react"
 import { useSyncExternalStore } from "react"
-import { formatDateTime, formatTime } from "@mb/stock-core/time"
+import { sessionDayTime, sessionTime } from "@/lib/format"
 
 const TICK_MS = 15_000
 
@@ -28,7 +28,7 @@ export function MarketStatus({ open, close, nextOpen, renderedAt }: { open: Date
         <CircleIcon className={isOpen ? "fill-gain text-gain size-2.5" : "fill-muted-foreground text-muted-foreground size-2.5"} />
         Market {isOpen ? "open" : "closed"}
       </span>
-      <span className="text-muted-foreground">{isOpen ? `Closes ${formatTime(close!)}` : `Opens ${formatDateTime(opensAt)}`}</span>
+      <span className="text-muted-foreground">{isOpen ? `Closes ${sessionTime(close!)}` : `Opens ${sessionDayTime(opensAt)}`}</span>
     </>
   )
 }
