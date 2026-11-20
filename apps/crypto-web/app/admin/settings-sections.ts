@@ -20,6 +20,8 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     fields: [
       { path: "long_term.btc_pct", label: "BTC held long term (% of equity)", kind: "number" },
       { path: "long_term.eth_pct", label: "ETH held long term (% of equity)", kind: "number" },
+      { path: "long_term.sol_pct", label: "SOL held long term (% of equity)", kind: "number" },
+      { path: "long_term.stagger_hours", label: "Hours between its buys", kind: "number" },
     ],
   },
   {

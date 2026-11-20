@@ -100,12 +100,16 @@ export const coreSettingsSchema = z.object({
   news_veto_hours: z.number().min(0).max(168),
 })
 
-/** The long-term book (strategies.long_term turns it on and caps its exposure): BTC and ETH held through swings. */
+/** The long-term book (strategies.long_term turns it on and caps its exposure): BTC, ETH and SOL held for months to years. */
 export const longTermSettingsSchema = z.object({
-  /** BTC's share of equity, %. 0: not held. */
+  /** BTC's share of equity when bought, %. 0: not bought. */
   btc_pct: pct(0, 50),
-  /** ETH's share of equity, %. 0: not held. */
+  /** ETH's share of equity when bought, %. 0: not bought. */
   eth_pct: pct(0, 50),
+  /** SOL's share of equity when bought, %. 0: not bought. */
+  sol_pct: pct(0, 50),
+  /** Hours between the book's buys, so no single moment sets every entry price (0: all in the same hour). */
+  stagger_hours: z.number().int().min(0).max(24),
 })
 
 export const strategySettingsSchema = z.object({
@@ -226,7 +230,7 @@ export const DEFAULT_SETTINGS: Settings = {
     event_driven: { enabled: true, max_exposure_pct: 40 },
     discretionary: { enabled: true, max_exposure_pct: 30 },
     core: { enabled: true, max_exposure_pct: 90 },
-    long_term: { enabled: true, max_exposure_pct: 50 },
+    long_term: { enabled: true, max_exposure_pct: 65 },
   },
   core: {
     max_positions: 5,
@@ -236,8 +240,10 @@ export const DEFAULT_SETTINGS: Settings = {
     news_veto_hours: 24,
   },
   long_term: {
-    btc_pct: 25,
+    btc_pct: 30,
     eth_pct: 15,
+    sol_pct: 15,
+    stagger_hours: 4,
   },
   universe: {
     kraken_symbols: ["BTC/USD", "ETH/USD", "SOL/USD", "XRP/USD", "DOGE/USD", "ADA/USD", "LINK/USD", "AVAX/USD", "LTC/USD", "DOT/USD"],

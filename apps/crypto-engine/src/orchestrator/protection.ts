@@ -36,7 +36,8 @@ export const trailedStop = (p: Pick<PositionDoc, "avg_price" | "stop_price" | "t
 
 export const checkProtection = async (ctx: EngineContext, inFlight: Set<string>) => {
   for (const p of await ctx.ledger.openPositions()) {
-    if (inFlight.has(p._id)) continue
+    // A long-term holding has no stop, target or trail: nothing here ever sells one, even a stray level.
+    if (inFlight.has(p._id) || p.strategy_id === "long_term") continue
     const q = ctx.hub.quote(p.symbol)
     if (!q || q.ageS > MAX_QUOTE_AGE_S) continue
     const kind = p.stop_price !== null && q.bid <= p.stop_price ? "stop_loss" : p.take_profit_price !== null && q.bid >= p.take_profit_price ? "take_profit" : null

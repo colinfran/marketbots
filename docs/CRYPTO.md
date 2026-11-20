@@ -166,12 +166,19 @@ Rules, not the agent, hold the bot's core positions (`apps/crypto-engine/src/str
 
 ## The long-term book
 
-BTC and ETH held for the long term, through short-term swings (`src/orchestrator/long-term.ts`; built 2026-11-06 at the owner's request, after the trend core sat in cash in a falling market and the account held nothing for the long run). Once an hour, 3 minutes after the hourly candle closes, it looks at each holding's last completed week (to Monday 00:00 UTC) against its 200-day average (`weeklyCloseVs200`, completed daily candles):
+BTC, ETH and SOL held for months to years, through drawdowns of 30% or more (`src/orchestrator/long-term.ts`). Once an hour, 3 minutes after the hourly candle closes, it buys the first of them it doesn't hold, in that order, at its share of equity: `long_term.btc_pct` (30%), `long_term.eth_pct` (15%) and `long_term.sol_pct` (15%), with **no stop and no target**. It buys once `long_term.stagger_hours` (4) clock hours have passed since its last buy (the newest long-term position's `opened_at`), so the entries are spread out and no single moment sets every price; 0 buys them all in the same hour.
 
-- held by the book and the week closed below the average: sold (the risk engine's exit, no minimum hold);
-- not held and the week closed above it: bought to its share of equity, `long_term.btc_pct` (25%) and `long_term.eth_pct` (15%), with **no stop and no target**.
+**It never sells.** No trend rule, no stop, no target, no trailing stop:
 
-So a sale waits for a weekly close below the 200-day average and a buy-back for one above it. Its entries go through `evaluateCryptoEntry` with `rules` and `longTerm`: every account gate, the per-asset, total, correlated, strategy (`strategies.long_term.max_exposure_pct`, 50) and cash caps, but no stop check, no per-position cap (so BTC can be 25%), and its holdings don't count toward `max_concurrent_positions`. It runs before the trend core in the same minute, so it takes its share first. It opens nothing while the drawdown breaker pauses entries, waits while an agent episode runs, and leaves a pair alone that another book holds. `strategies.long_term.enabled` turns it off. Its trades are `decisions` documents (`trigger_kind: "long_term"`, model `rules`, prompt version `long-term-v1`); buys and sales post to Discord. The agent sees its positions as LONG-TERM BOOK and may close one only when news about it woke it.
+- an agent hold that proposes a stop or target leaves the holding with none (`processDecision`: "long-term holding: no stop or target is set on it");
+- an agent close or reduce is blocked, news or not (`actOnCryptoAnswer`), and `processDecision` refuses one from any decision;
+- the protection loop skips long-term positions, so even a stray level can't sell one (`checkProtection`), and the news engine's emergency action leaves them alone.
+
+Only the owner sells one: Close on the position (`position.close`), the kill switch with liquidation, `portfolio.drawdown_action: halt_and_liquidate`, or a paper reset. To keep one sold, set its share to 0 first, or the book buys it back at the next hour.
+
+Its entries go through `evaluateCryptoEntry` with `rules` and `longTerm`: every account gate, the per-asset (`max_asset_exposure_pct`, 30, which caps BTC's share), total, correlated, strategy (`strategies.long_term.max_exposure_pct`, 65: the 60% of shares plus room for prices to move during the build) and cash caps, but no stop check, no per-position cap, and its holdings don't count toward `max_concurrent_positions`. A buy is all of the share at once (adding to a position is disabled). It runs before the trend core in the same minute, so it takes its share first. It buys nothing while the drawdown breaker pauses entries, waits while an agent episode runs, and leaves a pair alone that another book holds. `strategies.long_term.enabled` turns it off. Its buys are `decisions` documents (`trigger_kind: "long_term"`, model `rules`, prompt version `long-term-v2`) and post to Discord. The agent sees its positions as LONG-TERM BOOK, told to answer hold.
+
+History: built 2026-11-06 for BTC (25%) and ETH (15%), held only while the last weekly close was above the 200-day average (`long-term-v1`). The agent's holds set stops and targets on them, which the protection loop then hit: from 11-06 to 11-16 BTC was bought and stopped out 11 times, $207 in fees for −$452, until a weekly close below the average sold it on 11-16. On 2026-11-20, at the owner's request, the stops were fixed and the book became BTC 30%, ETH 15%, SOL 15%, never sold by the bot.
 
 ## Strategies
 

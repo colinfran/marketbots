@@ -92,10 +92,11 @@ export const STRATEGIES: Record<StrategyId, StrategyInfo> = {
   long_term: {
     id: "long_term",
     name: "Long-term book",
-    summary: "Rules, not the AI: holds BTC (25% of equity) and ETH (15%) for the long term, through short-term swings, and sells one only after a week closing below its 200-day average (buying it back after a week closing above).",
+    summary:
+      "Rules, not the AI: holds BTC (30% of equity), ETH (15%) and SOL (15%) for months to years, through drawdowns. Each is bought once, a few hours apart, with no stop and no target, and the bot never sells it: only the owner does.",
     rationale:
-      "Most of crypto's return has come from a few long bull markets. Holding the two largest coins through them, and stepping aside only when the long-term trend breaks, captures that without trading the noise.",
-    evaluation: "Compared with simply holding BTC and ETH: does stepping aside below the 200-day average cut drawdowns more than it costs in missed upside?",
-    ai_role: "None in its rules; the agent may close one of its positions only when news about it woke the agent.",
+      "Most of crypto's return has come from a few long bull markets, and the days that make it are impossible to pick in advance. Holding the largest coins through the swings, rather than stopping out and buying back, captures that and pays fees once.",
+    evaluation: "Compared with the trading books over the same months: return and drawdown after fees.",
+    ai_role: "None: the agent sees its holdings but can't sell, reduce, stop or target them.",
   },
 }

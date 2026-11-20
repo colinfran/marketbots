@@ -383,11 +383,23 @@
             "type": "number",
             "minimum": 0,
             "maximum": 50
+          },
+          "sol_pct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 50
+          },
+          "stagger_hours": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 24
           }
         },
         "required": [
           "btc_pct",
-          "eth_pct"
+          "eth_pct",
+          "sol_pct",
+          "stagger_hours"
         ]
       },
       "universe": {
@@ -1228,11 +1240,23 @@
             "type": "number",
             "minimum": 0,
             "maximum": 50
+          },
+          "sol_pct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 50
+          },
+          "stagger_hours": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 24
           }
         },
         "required": [
           "btc_pct",
-          "eth_pct"
+          "eth_pct",
+          "sol_pct",
+          "stagger_hours"
         ],
         "additionalProperties": false
       },

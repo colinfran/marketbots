@@ -194,7 +194,7 @@ export const processDecision = async (ctx: EngineContext, i: DecisionInput): Pro
       take_profit_price: i.rules ? null : roundPrice(pair, target),
       notes: [
         i.longTerm
-          ? `${i.longTerm.targetPct}% of equity, held long term: no stop or target; sold after a week closing below its 200-day average`
+          ? `${i.longTerm.targetPct}% of equity, held long term: no stop or target; only the owner sells it`
           : i.rules
             ? `risks ${riskPct}% of equity at the stop (the trend core); no target: the stop trails`
             : `risks ${riskPct}% of equity at the stop (conviction ${d.conviction})`,
@@ -269,8 +269,8 @@ export const processDecision = async (ctx: EngineContext, i: DecisionInput): Pro
             Quantity: filled,
             Price: `$${formatPrice(pair, avg)}`,
             Cost: `$${cost.toFixed(2)}${riskState?.equityUsd ? ` (${((cost / riskState.equityUsd) * 100).toFixed(1)}% of equity)` : ""}`,
-            Stop: i.longTerm ? "none: sold after a week closing below its 200-day average" : `${formatPrice(pair, stop)}`,
-            Target: i.rules ? "none: the stop trails" : `$${formatPrice(pair, target)}`,
+            Stop: i.longTerm ? "none: held long term, only the owner sells it" : `${formatPrice(pair, stop)}`,
+            Target: i.longTerm ? "none" : i.rules ? "none: the stop trails" : `$${formatPrice(pair, target)}`,
             Strategy: i.longTerm ? "long-term book (rules)" : i.rules ? "trend core (rules)" : i.candidate.strategy.replace("_", " "),
             Conviction: i.rules ? "rules" : `${d.conviction}/100`,
           },
@@ -281,6 +281,9 @@ export const processDecision = async (ctx: EngineContext, i: DecisionInput): Pro
     }
   } else if (d.action === "buy") {
     doc.execution = { ...doc.execution, status: "skipped", notes: ["no live order book at execution time"] }
+  } else if ((d.action === "reduce" || d.action === "close") && i.position?.strategy_id === "long_term") {
+    // Only the owner sells a long-term holding (position.close); no decision does.
+    doc.execution = { ...doc.execution, status: "rejected", notes: ["a long-term holding is sold only by the owner"] }
   } else if ((d.action === "reduce" || d.action === "close") && i.position) {
     const check = evaluateExit({ reason: i.rules ? "rules" : "ai", openedAt: i.position.opened_at.getTime(), venueOnline: ctx.hub.tradingOnline, minHoldMinutes: settings.kraken.min_hold_minutes })
     doc.risk = { approved: check.approved, resized: false, checks: check.checks, reasons: check.reasons }
@@ -301,6 +304,10 @@ export const processDecision = async (ctx: EngineContext, i: DecisionInput): Pro
     } else {
       doc.execution.status = "rejected"
     }
+  } else if (d.action === "hold" && i.position?.strategy_id === "long_term") {
+    // A long-term holding keeps no stop and no target, whatever a review proposes: a stop would sell it in a swing.
+    await ctx.ledger.updatePosition(i.position._id, { last_reviewed_at: now, last_review_price: quote?.mid ?? i.position.mark_price })
+    if (d.stop_loss || d.take_profit) doc.execution.notes.push("long-term holding: no stop or target is set on it")
   } else if (d.action === "hold" && i.position) {
     // Stops only ever move up on a long: a lower stop would add risk the original plan didn't take.
     const p = i.position

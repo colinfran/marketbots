@@ -63,7 +63,7 @@
     },
     "long_term": {
       "enabled": true,
-      "max_exposure_pct": 50
+      "max_exposure_pct": 65
     }
   },
   "core": {
@@ -74,8 +74,10 @@
     "news_veto_hours": 24
   },
   "long_term": {
-    "btc_pct": 25,
-    "eth_pct": 15
+    "btc_pct": 30,
+    "eth_pct": 15,
+    "sol_pct": 15,
+    "stagger_hours": 4
   },
   "universe": {
     "kraken_symbols": [

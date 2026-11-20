@@ -158,6 +158,36 @@ describe("crypto agent decisions", () => {
     expect((await ctx.ledger.openPositions())[0].take_profit_price).toBe(72_000)
   })
 
+  it("never sells, stops or targets a long-term holding, even on news about it, and the protection loop leaves it alone", async () => {
+    // 2026-11-07 to -15: the agent's holds set stops on the long-term book's BTC and ETH, which sold them 11 times in 9 days.
+    const quotes = { "BTC/USD": quote() }
+    const { d, ctx } = await setup(DEFAULT_SETTINGS, quotes)
+    // A real fill (the wallet holds the BTC, so a sale would go through), made the book's.
+    await actOnCryptoAnswer(d, answer([decision()]), ep("e0"))
+    const [bought] = await ctx.ledger.openPositions()
+    await ctx.col.positions.updateOne(
+      { _id: bought._id },
+      { $set: { strategy_id: "long_term", stop_price: null, take_profit_price: null, trail_usd: null, opened_at: new Date(Date.now() - 2 * 86_400_000) } },
+    )
+    ctx.ledger.forgetOpenPositions()
+    const [hold] = await actOnCryptoAnswer(d, answer([decision({ action: "hold", stop_loss: 64_000, take_profit: 70_000 })]), ep("e1"))
+    expect(hold).toMatchObject({ outcome: "held", detail: "long-term holding: no stop or target is set on it" })
+    const news = [{ id: "news:1", kind: "news", subject: "BTC/USD", refs: { item_ids: ["w1"] } }] as unknown as Observation[]
+    const [close] = await actOnCryptoAnswer(d, answer([decision({ action: "close" })]), ep("e2", new Set(), news))
+    expect(close).toMatchObject({ outcome: "blocked", detail: expect.stringContaining("only the owner sells it") })
+    const [p] = await ctx.ledger.openPositions()
+    expect([p._id, p.stop_price, p.take_profit_price, p.trail_usd]).toEqual([bought._id, null, null, null])
+    // Even a stray stop and target never sell it: a 30% drop, then a rally through the target.
+    await ctx.col.positions.updateOne({ _id: bought._id }, { $set: { stop_price: 60_000, take_profit_price: 66_000 } })
+    ctx.ledger.forgetOpenPositions()
+    quotes["BTC/USD"] = quote({ bid: 45_490, ask: 45_510, mid: 45_500 })
+    await checkProtection(ctx, new Set())
+    quotes["BTC/USD"] = quote({ bid: 90_990, ask: 91_010, mid: 91_000 })
+    await checkProtection(ctx, new Set())
+    expect((await ctx.ledger.openPositions()).map((x) => x._id)).toEqual([bought._id])
+    expect(await ctx.col.orders.countDocuments({ side: "sell" })).toBe(0)
+  })
+
   it("sells what it holds once the minimum hold has passed, and posts the exit to Discord", async () => {
     const { d, ctx } = await setup()
     await actOnCryptoAnswer(d, answer([decision()]), ep("e1"))

@@ -263,6 +263,8 @@ export class Engine {
     const { ledger, settings, hub } = this.d
     const position = (await ledger.openPositions()).find((p) => p.symbol === symbol)
     if (!position) return "no open position"
+    // The long-term book rides out bad news too: only the owner sells it.
+    if (position.strategy_id === "long_term") return "long-term holding: left alone"
     const action = settings.current.wire.emergency_action
     if (action === "exit") {
       const report = await exitPosition(this.ctx, position, { purpose: "exit", market: true })
