@@ -14,6 +14,8 @@ export const AGENT_DIR = fileURLToPath(new URL("..", import.meta.url))
 const schema = z.object({
   /** The API's port on 127.0.0.1; Caddy publishes it at /host on each engine domain. */
   HOST_API_PORT: z.coerce.number().int().min(1).max(65_535).default(8789),
+  /** The API's address. Linux: the docker0 address (172.17.0.1), which the dashboards reach as host.docker.internal. */
+  HOST_API_HOST: z.string().min(1).default("127.0.0.1"),
   /** Sent by the dashboards' servers with every request (SHARED). Empty: the API is off and Admin → Server can't reach the agent. */
   HOST_API_SECRET: z
     .string()

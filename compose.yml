@@ -149,7 +149,7 @@ services:
 
   # The crypto dashboard (https://cryptomarketbot.app): its Next.js standalone server
   # (docker/web/Dockerfile), behind Caddy on the host. Its server calls the engine's signed API and
-  # the host agent through host.docker.internal (the host's 127.0.0.1), and MongoDB over `db` as
+  # the host agent through host.docker.internal (the docker0 address), and MongoDB over `db` as
   # crypto_web, which reads crypto's database and writes only sign-ins and audit entries
   # (docker/mongo/init.js). On `web`, not `default`: it can't reach the scraper or search. Deployed
   # by docker/web/autodeploy.mjs on every commit to main (docs/SERVER.md §8).
@@ -171,7 +171,7 @@ services:
       SITE_URL: ${CRYPTO_SITE_URL:-https://cryptomarketbot.app}
       # The browser's stream (through Caddy), and the server's own way to the engine.
       ENGINE_STREAM_URL: ${CRYPTO_ENGINE_STREAM_URL:-}
-      ENGINE_URL: http://host.docker.internal:8787
+      ENGINE_URL: http://crypto-engine:8787
       STREAM_TOKEN_SECRET: ${CRYPTO_STREAM_TOKEN_SECRET:-}
       BETTER_AUTH_SECRET: ${CRYPTO_BETTER_AUTH_SECRET:-}
       OWNER_EMAIL: ${OWNER_EMAIL:-}
@@ -181,6 +181,10 @@ services:
       DISCORD_WEBHOOK_URL: ${CRYPTO_DISCORD_WEBHOOK_URL:-}
       HOST_API_URL: http://host.docker.internal:8789
       HOST_API_SECRET: ${HOST_API_SECRET:-}
+    # The host agent listens on the docker0 address (HOST_API_HOST); Linux has no built-in
+    # host.docker.internal, and a container can't reach the host's 127.0.0.1.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       # Loopback only: Caddy on the host forwards https://cryptomarketbot.app here.
       - "127.0.0.1:3101:3000"
@@ -210,7 +214,7 @@ services:
       MONGODB_DB_NAME: ${STOCK_MONGODB_DB_NAME:-}
       SITE_URL: ${STOCK_SITE_URL:-https://stockmarketbot.app}
       ENGINE_STREAM_URL: ${STOCK_ENGINE_STREAM_URL:-}
-      ENGINE_URL: http://host.docker.internal:8788
+      ENGINE_URL: http://stock-engine:8788
       STREAM_TOKEN_SECRET: ${STOCK_STREAM_TOKEN_SECRET:-}
       BETTER_AUTH_SECRET: ${STOCK_BETTER_AUTH_SECRET:-}
       OWNER_EMAIL: ${OWNER_EMAIL:-}
@@ -220,6 +224,8 @@ services:
       DISCORD_WEBHOOK_URL: ${STOCK_DISCORD_WEBHOOK_URL:-}
       HOST_API_URL: http://host.docker.internal:8789
       HOST_API_SECRET: ${HOST_API_SECRET:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       # Loopback only: Caddy on the host forwards https://stockmarketbot.app here.
       - "127.0.0.1:3102:3000"
@@ -239,7 +245,7 @@ services:
   # both bots: never removed (AGENTS.md rule 6). Recreating it pauses both bots' database for a few
   # seconds (they retry): do it at a quiet time. Network compression stays off (CVE-2025-14847).
   mongo:
-    image: mongo:8.0.34@sha256:b9924c330a8bbc5800fe9c69f04a84e221eca7b28fd049a0354147d9908fa142
+    image: mongo:8.0.38@sha256:bdc216e9d5a6ec2cfdac789b5832fdab64cd32055f59885cae918a92de63c361
     container_name: marketbots-mongo
     restart: unless-stopped
     user: "999:999"
@@ -286,7 +292,7 @@ services:
   # disk, which survives a Docker or WSL reset: one consistent snapshot (--oplog) of the whole
   # server. Once at start, then daily at 11:00 UTC; the newest 14 kept. Restore: docs/SERVER.md §6.6.
   mongo-backup:
-    image: mongo:8.0.34@sha256:b9924c330a8bbc5800fe9c69f04a84e221eca7b28fd049a0354147d9908fa142
+    image: mongo:8.0.38@sha256:bdc216e9d5a6ec2cfdac789b5832fdab64cd32055f59885cae918a92de63c361
     container_name: marketbots-mongo-backup
     restart: unless-stopped
     user: "999:999"
@@ -332,7 +338,7 @@ services:
   # replica set on a new volume.
   mongo-dev:
     profiles: ["dev"]
-    image: mongo:8.0.34@sha256:b9924c330a8bbc5800fe9c69f04a84e221eca7b28fd049a0354147d9908fa142
+    image: mongo:8.0.38@sha256:bdc216e9d5a6ec2cfdac789b5832fdab64cd32055f59885cae918a92de63c361
     container_name: marketbots-mongo-dev
     restart: unless-stopped
     command: [mongod, --replSet, rs0, --bind_ip_all, --quiet, --wiredTigerCacheSizeGB, "0.25", --networkMessageCompressors, disabled]

@@ -97,12 +97,12 @@ export const createApi = ({ secret, store, commands, log, now = Date.now }: ApiD
     })
   })
 
-/** Starts the API on 127.0.0.1:`port`. */
-export const startApi = (deps: ApiDeps, port: number) =>
+/** Starts the API on `host`:`port` (127.0.0.1 by default; the docker0 address on Linux). */
+export const startApi = (deps: ApiDeps, port: number, host = "127.0.0.1") =>
   new Promise<Server>((resolve, reject) => {
     const server = createApi(deps)
     server.once("error", reject)
-    server.listen(port, "127.0.0.1", () => {
+    server.listen(port, host, () => {
       server.off("error", reject)
       resolve(server)
     })

@@ -38,7 +38,7 @@ services:
   # The live stack's MongoDB version, as a one-member replica set like it (Better Auth's sign-in
   # writes need one), without auth. The healthcheck initiates the replica set.
   mongo:
-    image: mongo:8.0.34@sha256:b9924c330a8bbc5800fe9c69f04a84e221eca7b28fd049a0354147d9908fa142
+    image: mongo:8.0.38@sha256:bdc216e9d5a6ec2cfdac789b5832fdab64cd32055f59885cae918a92de63c361
     command: [mongod, --replSet, rs0, --bind_ip_all, --quiet, --networkMessageCompressors, disabled]
     tmpfs:
       - /data/db

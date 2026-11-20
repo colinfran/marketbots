@@ -1,14 +1,26 @@
 #!/bin/sh
 # A new commit on main deploys the dashboards (docker/web/autodeploy.mjs, docs/SERVER.md §8). This only
-# starts the on-demand task "\marketbots\Web deploy" and returns: the build runs outside this shell
-# and never holds up the commit. Active once docker/web/install-autodeploy.ps1 has set core.hooksPath.
+# starts the deploy in the background and returns (Windows: the on-demand task "\marketbots\Web deploy";
+# Linux: a transient systemd user unit), so the build never holds up the commit. Active once core.hooksPath
+# is .githooks (docker/web/install-autodeploy.ps1 on Windows; `git config core.hooksPath .githooks` on Linux).
 [ "$(git rev-parse --abbrev-ref HEAD 2>/dev/null)" = "main" ] || exit 0
 # Not for each commit a rebase or cherry-pick replays: the deploy reads main when it runs anyway.
 [ -d "$(git rev-parse --git-path rebase-merge)" ] || [ -d "$(git rev-parse --git-path rebase-apply)" ] && exit 0
-command -v schtasks.exe >/dev/null 2>&1 || exit 0
-if MSYS_NO_PATHCONV=1 schtasks.exe /run /tn '\marketbots\Web deploy' >/dev/null 2>&1; then
-  echo "autodeploy: started the Web deploy task (log: logs/autodeploy/)"
-else
-  echo "autodeploy: couldn't start the Web deploy task; deploy by hand (docs/SERVER.md §8)" >&2
+top="$(git rev-parse --show-toplevel)"
+if command -v schtasks.exe >/dev/null 2>&1; then
+  if MSYS_NO_PATHCONV=1 schtasks.exe /run /tn '\marketbots\Web deploy' >/dev/null 2>&1; then
+    echo "autodeploy: started the Web deploy task (log: logs/autodeploy/)"
+  else
+    echo "autodeploy: couldn't start the Web deploy task; deploy by hand (docs/SERVER.md §8)" >&2
+  fi
+elif command -v systemd-run >/dev/null 2>&1; then
+  # Linux: one transient user unit per commit (autodeploy.mjs's lock file queues them, as the task's
+  # queue did). Needs linger for colin and colin in the docker group.
+  if systemd-run --user --no-block --collect --quiet --unit="marketbots-web-deploy-$(date +%s%N)" \
+       --working-directory="$top" /usr/bin/node "$top/docker/web/autodeploy.mjs" >/dev/null 2>&1; then
+    echo "autodeploy: started (log: logs/autodeploy/; journalctl --user -u 'marketbots-web-deploy-*')"
+  else
+    echo "autodeploy: couldn't start; deploy by hand: node docker/web/autodeploy.mjs" >&2
+  fi
 fi
 exit 0

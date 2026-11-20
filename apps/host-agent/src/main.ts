@@ -137,8 +137,8 @@ async function main() {
   )
   // Without its API the agent still reads and runs the fans; only Admin → Server can't reach it.
   if (env.HOST_API_SECRET) {
-    api = await startApi({ secret: env.HOST_API_SECRET, store, commands, log }, env.HOST_API_PORT).catch((e) => {
-      log.error("API not started", { port: env.HOST_API_PORT, error: errorMessage(e) })
+    api = await startApi({ secret: env.HOST_API_SECRET, store, commands, log }, env.HOST_API_PORT, env.HOST_API_HOST).catch((e) => {
+      log.error("API not started", { host: env.HOST_API_HOST, port: env.HOST_API_PORT, error: errorMessage(e) })
       return null
     })
   } else log.warn("API off: HOST_API_SECRET is empty, so Admin → Server can't reach the agent")
