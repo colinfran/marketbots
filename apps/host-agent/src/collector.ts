@@ -5,8 +5,15 @@ import { cpuSensors, diskRates, type Board } from "./lhm"
 import { errorMessage } from "./log"
 import { readNvidia } from "./nvidia"
 
-/** One reading of the machine: what Windows reports, every NVIDIA card, and the motherboard's sensors. */
+/** One reading of the machine: what the OS reports, every NVIDIA card, and the motherboard's sensors. */
 export type Reading = Pick<HostStatus, "system" | "cpu" | "gpus" | "memory" | "storage"> & { errors: string[] }
+
+/**
+ * Real volumes only. On Linux, df also lists snaps (squashfs), tmpfs, overlay (Docker), AppImage
+ * mounts and /boot: none of them is storage the Server page should show.
+ */
+const VIRTUAL_FS = /^(squashfs|tmpfs|devtmpfs|ramfs|overlay|nsfs|efivarfs|proc|sysfs|cgroup2?|fuse\..*)$/i
+export const realVolume = (v: { type?: string; mount?: string }) => !VIRTUAL_FS.test(v.type ?? "") && !/^\/(snap|boot)(\/|$)/.test(v.mount ?? "")
 
 const finite = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null)
 
@@ -85,7 +92,7 @@ export class Collector {
       gpus: gpus ?? [],
       memory: { total_bytes: total, used_bytes: total - free, available_bytes: free, utilization: total ? ((total - free) / total) * 100 : null },
       storage: {
-        volumes: (volumes ?? []).map((v) => ({
+        volumes: (volumes ?? []).filter(realVolume).map((v) => ({
           mount: v.mount,
           filesystem: v.type || null,
           total_bytes: finite(v.size),

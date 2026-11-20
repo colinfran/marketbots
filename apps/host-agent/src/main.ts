@@ -2,11 +2,11 @@ import type { Server } from "node:http"
 import { join } from "node:path"
 import type { HostStatusDoc } from "@mb/core/host"
 import { startApi } from "./api"
+import { boardFile, createBoard } from "./board"
 import { Collector } from "./collector"
 import { HostCommands } from "./commands"
 import { loadEnv } from "./env"
 import { FanController, startWatchdog } from "./fans"
-import { Lhm } from "./lhm"
 import { errorMessage, log, logToFile } from "./log"
 import { MinuteSamples, rawSample, type SampleInput } from "./samples"
 import { SettingsFile } from "./settings"
@@ -45,12 +45,13 @@ async function main() {
   let readTimer: NodeJS.Timeout | null = null
   let api: Server | null = null
 
-  const board = new Lhm(env.LHM_CONNECTION_FILE)
+  const file = boardFile(env)
+  const board = createBoard(file)
   const control = env.FAN_CONTROL === "on"
   // The bundle's sibling: fan control runs from the built agent (dist/), not from tsx. Without its
   // watchdog the agent can't set the fans, so it exits with an error and its task restarts it.
   const watchdog = control
-    ? startWatchdog(new URL("./fan-watchdog.js", import.meta.url), env.LHM_CONNECTION_FILE, logDir, log, {
+    ? startWatchdog(new URL("./fan-watchdog.js", import.meta.url), file, logDir, log, {
         error: (m) => fans.fault(m),
         exit: () => void shutdown("watchdog stopped", 1),
       })

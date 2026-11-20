@@ -1,0 +1,21 @@
+[Unit]
+Description=marketbots host agent (Admin -> Server; docs/SERVER.md §11)
+After=docker.service network-online.target marketbots-gpu-power.service
+Wants=network-online.target docker.service
+
+[Service]
+User=colin
+WorkingDirectory=/home/colin/GitHub/marketbots/apps/host-agent
+# The API binds 172.17.0.1 (HOST_API_HOST): wait for docker0, or the agent runs without its API.
+ExecStartPre=/bin/sh -c 'for i in $(seq 120); do ip -4 addr show docker0 2>/dev/null | grep -q "inet 172.17.0.1/" && exit 0; sleep 1; done; exit 1'
+ExecStart=/usr/bin/node --enable-source-maps --env-file=/home/colin/GitHub/marketbots/.env /home/colin/GitHub/marketbots/apps/host-agent/dist/main.js
+Restart=always
+RestartSec=60
+# Signal the agent only, never its fan watchdog: that child must outlive the agent to hand the fans back
+# to the BIOS if the agent dies (fans.ts startWatchdog); on a normal stop the agent releases them itself,
+# and the watchdog exits once the agent disconnects. (KillMode=mixed would SIGKILL it with a crashed agent.)
+KillMode=process
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target

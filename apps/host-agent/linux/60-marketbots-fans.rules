@@ -1,0 +1,4 @@
+# The marketbots host agent sets the motherboard fan headers through the nct6775 driver (src/hwmon.ts),
+# as the user it runs as (colin), but the driver's pwmN and pwmN_enable files are root-only. This
+# gives that user's group write access to them whenever the chip appears (boot, module load).
+ACTION=="add", SUBSYSTEM=="hwmon", ATTR{name}=="nct6*", RUN+="/bin/sh -c 'chgrp colin /sys%p/pwm[1-7] /sys%p/pwm[1-7]_enable && chmod g+w /sys%p/pwm[1-7] /sys%p/pwm[1-7]_enable'"

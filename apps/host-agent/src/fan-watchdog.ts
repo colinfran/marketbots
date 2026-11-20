@@ -1,12 +1,13 @@
-import { FAN_CONTROL_ID, Lhm } from "./lhm"
+import { createBoard } from "./board"
+import { FAN_CONTROL_ID } from "./lhm"
 import { log, logToFile } from "./log"
 
 /**
  * The fan watchdog (fans.ts startWatchdog): a detached process the agent heartbeats before every
  * fan write, naming the motherboard headers it owns. If the heartbeats stop for 8 seconds, or the
  * agent exits (the IPC channel closes), it hands those headers back to the BIOS, retrying every
- * second until each one took, then exits. Best effort: it can't help if Windows or
- * LibreHardwareMonitor itself is down, which is why the BIOS's own thermal protection stays on.
+ * second until each one took, then exits. Best effort: it can't help if the OS or the sensor
+ * backend (LibreHardwareMonitor on Windows, hwmon on Linux) is down, which is why the BIOS's own thermal protection stays on.
  *
  * It has no stdio: it writes to the agent's log file (argv[3]) and, while the agent is there,
  * reports failures to it. A header that keeps failing is reported once, not every second.
@@ -14,7 +15,7 @@ import { log, logToFile } from "./log"
 
 const [connectionFile = "", logDir] = process.argv.slice(2)
 if (logDir) logToFile(logDir)
-const board = new Lhm(connectionFile)
+const board = createBoard(connectionFile)
 const send = (message: object) => {
   if (process.connected) process.send?.(message, () => undefined)
 }
