@@ -670,6 +670,15 @@ describe("executeDecisions: adjust_exits", () => {
     expect(await recordFor("AAPL")).toMatchObject({ stop_loss: 101.92, reason: "exits replaced; stop 103.95 too close/above price; default 2% stop" })
   })
 
+  it("refuses to adjust a long-term holding's exits: the book's rules set them", async () => {
+    await holdWithExits("AAPL", 10, 104, { stop: 95, target: 110 })
+    await (await collections()).plans.updateOne({ _id: "AAPL" }, { $set: { book: "long_term", trail_pct: 20 } })
+    await execute([decision({ symbol: "AAPL", action: "adjust_exits", stop_loss: 103, take_profit: null })])
+    expect(await recordFor("AAPL")).toMatchObject({ status: "rejected", reason: "a long-term holding's exits are its rules'" })
+    expect(broker.openOrders("AAPL").map((o) => o.limit_price ?? o.stop_price)).toEqual(["110", "95"])
+    expect(await plan("AAPL")).toMatchObject({ stop_loss: 95, take_profit: 110 })
+  })
+
   it("never lowers the stop: a lower request keeps the current one", async () => {
     await holdWithExits("AAPL", 10, 104, { stop: 95, target: 110 })
     await execute([decision({ symbol: "AAPL", action: "adjust_exits", stop_loss: 90, take_profit: 112 })])

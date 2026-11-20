@@ -169,6 +169,20 @@ describe("stock agent", () => {
       expect(sold).toMatchObject({ outcome: "filled", detail: "sold 10 of 10 shares" })
     })
 
+    it("never adjusts a long-term holding's exits: the book's rules set them", async () => {
+      // 2026-11: adjust_exits gave VLO and RVMD the trading book's default 2R target, and MPC a stop 1% below the price.
+      const { d, ctx, known, broker, refresh } = await setup()
+      broker.setPrice("AAPL", 200)
+      await actOnStockAnswer(d, answer([decision()]), ep("e1"), known)
+      await refresh()
+      await ctx.col.plans.updateOne({ _id: "AAPL" }, { $set: { book: "long_term", trail_pct: 20 } })
+      const before = await ctx.col.plans.findOne({ _id: "AAPL" })
+      expect(await bookText(d)).toContain("adjust_exits on it is refused")
+      const [blocked] = await actOnStockAnswer(d, answer([decision({ action: "adjust_exits", stop_loss: 198, take_profit: null })]), ep("e2"), known)
+      expect(blocked).toMatchObject({ outcome: "blocked", detail: expect.stringMatching(/^a long-term holding's exits are its rules'/) })
+      expect(await ctx.col.plans.findOne({ _id: "AAPL" })).toMatchObject({ stop_loss: before!.stop_loss, take_profit: before!.take_profit })
+    })
+
     it("buys an option only from a menu it loaded in the same episode", async () => {
       const { d, ctx, known, broker } = await setup()
       prices.NVDA = 142

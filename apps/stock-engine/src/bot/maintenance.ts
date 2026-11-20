@@ -69,9 +69,14 @@ export const ensureProtection = async (ctx: TradingContext): Promise<string[]> =
     const plan = planBySymbol.get(position.symbol)
     // The long-term book's base holdings have no stop: a weekly close below the 200-day average sells them.
     if (plan?.book === "long_term" && plan.stop_loss === null) continue
-    // A plan with a stop and no target (the trend core's) gets a plain stop: it rides its trend.
-    const stopOnly = !!plan && plan.stop_loss !== null && plan.take_profit === null
-    const exits = resolveExits(price, plan?.stop_loss ?? null, plan?.take_profit ?? null, r, heldExitBounds(r))
+    // A plan with a stop and no target (the trend core's) gets a plain stop: it rides its trend. So does a long-term
+    // leader, at its trailing stop as it stands: the trading book's bounds would cap a 20% trail at 15%.
+    const longTerm = plan?.book === "long_term"
+    const stopOnly = !!plan && plan.stop_loss !== null && (plan.take_profit === null || longTerm)
+    const exits =
+      longTerm && plan.stop_loss !== null && plan.stop_loss < price
+        ? { stop: plan.stop_loss, target: null }
+        : resolveExits(price, plan?.stop_loss ?? null, longTerm ? null : (plan?.take_profit ?? null), r, heldExitBounds(r))
     if (plan?.stop_loss != null && exits.stop < plan.stop_loss - 0.005) {
       bus.emit("protection.triggered", { symbol: position.symbol, kind: "unprotected_stop", price, structure_id: null }, { summary: `${position.symbol} is through its ${plan.stop_loss} stop with no exit orders; selling`, level: "warn", instrument: position.symbol })
       const sold = await flatten(ctx, [position], ` (price ${price} reached its ${plan.stop_loss} stop with no exit orders)`)
@@ -171,6 +176,31 @@ export const trailStops = async (ctx: TradingContext, positions: AlpacaPosition[
   return notes
 }
 
+/**
+ * The long-term book never has a target (docs/STOCK.md): a long-term plan with one (the agent's adjust_exits gave
+ * VLO and RVMD the trading book's default 2R target in 2026-11) gets its resting exits replaced with a plain stop
+ * at the plan's stop, and the target cleared. If placing the stop fails, ensureProtection re-protects the shares at
+ * that stop in this same pass.
+ */
+export const conformLongTerm = async (ctx: TradingContext, positions: AlpacaPosition[]): Promise<string[]> => {
+  const plans = await ctx.col.plans.find({ book: "long_term", take_profit: { $ne: null } }).toArray()
+  const notes: string[] = []
+  for (const plan of plans) {
+    const position = positions.find((p) => p.symbol === plan._id && isStock(p) && p.side === "long")
+    const qty = position ? Math.floor(Number(position.qty)) : 0
+    if (!position || qty < 1) continue
+    try {
+      await cancelSymbolOrders(ctx.alpaca, plan._id)
+      await ctx.col.plans.updateOne({ _id: plan._id }, { $set: { take_profit: null, updated_at: new Date() } })
+      if (plan.stop_loss !== null && plan.stop_loss < Number(position.current_price)) await protect(ctx, plan._id, qty, plan.stop_loss, null, plan.decision_id)
+      notes.push(`long-term ${plan._id}: target ${plan.take_profit} removed, stop ${plan.stop_loss ?? "none"}`)
+    } catch (error) {
+      notes.push(`could not clear ${plan._id}'s target: ${errorMessage(error)}`)
+    }
+  }
+  return notes
+}
+
 /** The regular upkeep. In the last minutes of the session the overnight rules are how the day ends. */
 export const maintain = async (ctx: TradingContext, session: Session, { now = new Date() }: { now?: Date } = {}): Promise<string[]> => {
   const { alpaca, col, settings, alerts } = ctx
@@ -202,6 +232,7 @@ export const maintain = async (ctx: TradingContext, session: Session, { now = ne
     if (flattened.length) await alerts.send("info", "Overnight rules: sold the day's intraday positions", flattened.join("\n"), { path: `/journal/${session.day}` })
   }
 
+  notes.push(...(await conformLongTerm(ctx, positions)))
   notes.push(...(await trailStops(ctx, positions)))
   notes.push(...(await ensureProtection(ctx)))
   notes.push(...(await reconcileOptions(ctx, positions, now)))

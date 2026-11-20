@@ -129,7 +129,7 @@ export const liveBookText = async (d: Pick<StockAgentDeps, "ctx" | "snapshot" | 
   const stocks = book.stocks.map((p) => {
     const plan = book.plans.get(p.symbol)
     const m = d.price(p.symbol) ?? Number(p.current_price)
-    return `- ${p.symbol}: ${p.qty} shares at ${Number(p.avg_entry_price).toFixed(2)}, now ${m} (${(Number(p.unrealized_plpc ?? 0) * 100).toFixed(2)}%), stop ${plan?.stop_loss ?? "none"}, target ${plan?.take_profit ?? "none"}${plan?.book === "core" ? ", TREND CORE (rules-managed: its stop trails and a close below the 50-day average sells it; sell it yourself only on news that breaks the trend)" : plan?.book === "long_term" ? ", LONG-TERM BOOK (rules-managed: held for months until a week closes below its 200-day average; sell it yourself only on news that breaks the long-term case)" : ""}, ${plan?.horizon ?? "?"} horizon${plan ? `, opened ${formatTime(plan.opened_at)}` : ""}. Thesis: ${plan?.thesis ?? "none recorded"} Invalidation: ${plan?.invalidation ?? "none recorded"}`
+    return `- ${p.symbol}: ${p.qty} shares at ${Number(p.avg_entry_price).toFixed(2)}, now ${m} (${(Number(p.unrealized_plpc ?? 0) * 100).toFixed(2)}%), stop ${plan?.stop_loss ?? "none"}, target ${plan?.take_profit ?? "none"}${plan?.book === "core" ? ", TREND CORE (rules-managed: its stop trails and a close below the 50-day average sells it; sell it yourself only on news that breaks the trend)" : plan?.book === "long_term" ? ", LONG-TERM BOOK (rules-managed: held for months until a week closes below its 200-day average; its exits are the rules' and adjust_exits on it is refused; sell it yourself only on news that breaks the long-term case)" : ""}, ${plan?.horizon ?? "?"} horizon${plan ? `, opened ${formatTime(plan.opened_at)}` : ""}. Thesis: ${plan?.thesis ?? "none recorded"} Invalidation: ${plan?.invalidation ?? "none recorded"}`
   })
   const options = book.options.map(
     (o) =>
@@ -193,6 +193,12 @@ export const actOnStockAnswer = async (
       let decision = dec.action === "sell" ? { ...dec, sell_pct: null } : dec
       // The trend core's positions end by its rules (the trailing stop, a broken trend); the agent overrides them only on news.
       const ruled = book.plans.get(dec.symbol)?.book
+      // A long-term holding's exits are the book's: none for the base, a leader's trailing stop. The trading book's
+      // exit rules (a 15% stop cap, a default 2R target) put a target on VLO and RVMD and a 1% stop on MPC in 2026-11.
+      if (dec.action === "adjust_exits" && ruled === "long_term") {
+        out.push(action(dec, "blocked", `a long-term holding's exits are its rules' (none for the base ETFs, a stop trailing ${settings.long_term.leader_trail_pct}% below a leader's price); adjust_exits on it is refused`))
+        continue
+      }
       if (dec.action === "sell" && (ruled === "core" || ruled === "long_term") && !newsWoke(episode.wake.observations, dec.symbol)) {
         const why = ruled === "core" ? "a trend-core position closes by its rules (its trailing stop, a broken trend)" : "a long-term holding is sold by its rules (a week closing below its 200-day average, a leader's trailing stop)"
         out.push(action(dec, "blocked", `${why}; you may sell it only when news about it woke you`))

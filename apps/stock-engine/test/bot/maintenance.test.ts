@@ -3,7 +3,7 @@ import type { EngineEvent } from "@mb/stock-core/events"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { Alpaca } from "../../src/alpaca/client"
 import type { EngineContext } from "../../src/bot/context"
-import { enforceOvernightRules as overnight, ensureProtection as protect, maintain as upkeep, recordDailyStats as dailyStats, trailedStop, trailStops } from "../../src/bot/maintenance"
+import { conformLongTerm, enforceOvernightRules as overnight, ensureProtection as protect, maintain as upkeep, recordDailyStats as dailyStats, trailedStop, trailStops } from "../../src/bot/maintenance"
 import type { Session } from "../../src/bot/session"
 import type { EventBus } from "../../src/bus/event-bus"
 import { fakeBroker, type FakeBroker } from "../helpers/broker"
@@ -117,6 +117,14 @@ describe("ensureProtection", () => {
     expect(await plan("NVDA")).toMatchObject({ stop_loss: 190, take_profit: null })
   })
 
+  it("protects a long-term leader at its trailing stop as it stands, with no target, past the trading book's 15% cap", async () => {
+    broker.setPosition("RVMD", 2, 175)
+    await addPlan("RVMD", { book: "long_term", stop_loss: 136.06, take_profit: null, trail_pct: 20, horizon: "multi_day" })
+    expect(await ensureProtection()).toEqual(["protected RVMD: stop 136.06, no target"])
+    expect(broker.submitted).toEqual([expect.objectContaining({ symbol: "RVMD", qty: "2", type: "stop", stop_price: "136.06" })])
+    expect(await plan("RVMD")).toMatchObject({ stop_loss: 136.06, take_profit: null })
+  })
+
   it("reports and alerts when protection fails", async () => {
     broker.setPosition("AAPL", 10, 100)
     broker.setPosition("MSFT", 2, 400)
@@ -227,6 +235,21 @@ describe("trailing stops", () => {
     expect(notes).toEqual(["trailed AAPL: stop 95 → 101"])
     expect(broker.submitted).toEqual([expect.objectContaining({ symbol: "AAPL", qty: "10", order_class: "oco", take_profit: { limit_price: "120.00" }, stop_loss: { stop_price: "101.00" } })])
     expect(await plan("AAPL")).toMatchObject({ stop_loss: 101, take_profit: 120, trail_usd: 5 })
+  })
+
+  it("clears a long-term plan's target, replacing its exits with a plain stop at the plan's stop", async () => {
+    // VLO on 2026-11-16: adjust_exits left an OCO with the trading book's default 2R target on a long-term leader.
+    broker.setPosition("VLO", 1, 338.49, { avg: 352.24 })
+    addExits("VLO", 1)
+    await addPlan("VLO", { book: "long_term", stop_loss: 304.31, take_profit: 463.53, trail_pct: 20, horizon: "multi_day", decision_id: "dec-vlo" })
+    broker.setPosition("PSX", 2, 230, { avg: 248.78 })
+    await addPlan("PSX", { book: "long_term", stop_loss: 212.58, take_profit: null, trail_pct: 20, horizon: "multi_day" })
+    expect(await settle(conformLongTerm(ctx, await alpaca.getPositions()))).toEqual(["long-term VLO: target 463.53 removed, stop 304.31"])
+    expect(broker.submitted).toEqual([expect.objectContaining({ symbol: "VLO", qty: "1", type: "stop", stop_price: "304.31" })])
+    expect(broker.openOrders("VLO").map((o) => [o.type, o.stop_price])).toEqual([["stop", "304.31"]])
+    expect(await plan("VLO")).toMatchObject({ stop_loss: 304.31, take_profit: null, trail_pct: 20 })
+    // Once clear, nothing more to do.
+    expect(await settle(conformLongTerm(ctx, await alpaca.getPositions()))).toEqual([])
   })
 
   it("trails a stop-only plan with a plain stop", async () => {

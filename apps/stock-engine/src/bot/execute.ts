@@ -455,11 +455,12 @@ export const executeDecisions = async (
   async function adjust(d: Decision, decisionId: string): Promise<Outcome> {
     const position = held.get(d.symbol)
     if (!position) return reject("not currently held", [{ name: "held", ok: false, detail: "not currently held" }])
+    const plan = plans.get(d.symbol)
+    if (plan?.book === "long_term") return reject("a long-term holding's exits are its rules'", [{ name: "long_term_exits", ok: false, detail: "a long-term holding's exits are its rules'" }])
     const qty = Math.floor(Number(position.qty))
     if (qty < 1) return reject("fractional position: exit orders need whole shares")
     const price = priceOf(d.symbol)
     if (!price) return reject("no current price")
-    const plan = plans.get(d.symbol)
     const current = plan?.stop_loss ?? null
     const exits = resolveExits(price, ratchetStop(d.stop_loss, plan), d.take_profit ?? plan?.take_profit ?? null, r, heldExitBounds(r))
     // The kept stop can be unusable (price at or just above it); a repaired one would land lower,
